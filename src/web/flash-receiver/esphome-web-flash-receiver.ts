@@ -4,6 +4,8 @@ import { customElement, query, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { ESP_SERIAL_LOGS } from "../../platforms/esp/serial-logs.js";
+import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -11,6 +13,7 @@ import { isPortPickerCancel, webSerialAvailability } from "../../util/web-serial
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
 import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
+import { Preparation } from "../install/preparation.js";
 import { openPortForLogs } from "../logs/open-port-for-logs.js";
 import { acquireBootLogs } from "./boot-logs.js";
 import { flashReceiverStyles } from "./esphome-web-flash-receiver.styles.js";
@@ -26,7 +29,11 @@ import {
   type ReceiverNote,
   type ReceiverRun,
 } from "./receiver-engine.js";
-import { ReceiverPreparation } from "./receiver-preparation.js";
+import {
+  prepareForReceiver,
+  type ReceiverInput,
+  type ReceiverPrepared,
+} from "./receiver-preparation.js";
 
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../../components/ansi-log.js";
@@ -67,11 +74,18 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   // with the flasher's guide until the engine moves on.
   @state() private _waiting: ReceiverNote | null = null;
   // The image is checked and its engine loaded before the click; see the class.
-  private _preparation = new ReceiverPreparation(
+  private _preparation = new Preparation<
+    ReceiverInput | Promise<ReceiverInput>,
+    ReceiverPrepared,
+    string
+  >(
     this,
-    () => this._localize,
+    (input) => prepareForReceiver(input, this._localize),
     (error) => this._onPrepared(error)
   );
+  // The logs policy of the flasher that was last prepared. It outlives the
+  // preparation, for the logs of a flash that is already done.
+  private _logsPolicy: SerialLogsPolicy = ESP_SERIAL_LOGS;
 
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
 
@@ -180,6 +194,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     if (this._fileInput && this._preparation.state.kind === "idle") {
       this._fileInput.value = "";
     }
+    const prepared = this._preparation.state;
+    if (prepared.kind === "ready") this._logsPolicy = prepared.value.logs;
     if (error !== null) this._setState("error", error);
     else if (this._firmware) this._setState("connecting", this._readyMessage());
     else this._resetForRetry();
@@ -273,7 +289,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     if (this._working) return;
     const preparation = this._preparation.state;
     if (preparation.kind === "ready") {
-      await this._runInstall(preparation.run);
+      await this._runInstall(preparation.value.run);
       return;
     }
     if (preparation.kind !== "retryable") return;
@@ -366,7 +382,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     const port = this._logPort;
     if (!port) return;
     const gen = this._bootLogsGen;
-    if (!(await openPortForLogs(port, this._localize, this._preparation.logs))) return;
+    if (!(await openPortForLogs(port, this._localize, this._logsPolicy))) return;
     // A flash started (or the receiver unmounted) during the reopen: the
     // dialog must not cover the new install, and the handle just opened
     // would otherwise be orphaned open for the tab's lifetime.
@@ -515,7 +531,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         .port=${this._logPort}
         ?open=${this._logsOpen}
         .deviceLabel=${this._deviceName ?? this._localize("web.flash.title")}
-        .policy=${this._preparation.logs}
+        .policy=${this._logsPolicy}
         @port-replaced=${(e: CustomEvent<SerialPort>) => {
           this._logPort = e.detail;
         }}

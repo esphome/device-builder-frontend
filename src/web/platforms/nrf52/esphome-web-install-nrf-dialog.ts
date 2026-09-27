@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
-import { css, html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, LitElement, nothing } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import "../../../components/base-dialog.js";
@@ -8,6 +8,7 @@ import { localizeContext } from "../../../context/index.js";
 import {
   type DfuPackage,
   loadDfuEngine,
+  loadDfuPackage,
   withManualBootloaderHint,
 } from "../../../platforms/nrf52/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
@@ -18,11 +19,11 @@ import {
 } from "../../../util/serial-bootloader-touch.js";
 import { requestSerialPort } from "../../../util/web-serial.js";
 
-import { filePickerStyles, renderFilePicker } from "../../install/file-picker.js";
 import {
-  FilePreparation,
-  type PreparationFailure,
-} from "../../install/file-preparation.js";
+  type FilePickerError,
+  filePickerStyles,
+  renderFilePicker,
+} from "../../install/file-picker.js";
 import {
   installActionsStyles,
   installTerminalState,
@@ -30,6 +31,8 @@ import {
   renderProgressCard,
   renderRetryButton,
 } from "../../install/install-progress.js";
+
+import { Preparation, type Prepared } from "../../install/preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -49,45 +52,56 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _state: InstallState = "idle";
+  @state() private _file: File | null = null;
   // Rounded so per-packet callbacks re-render only on a visible change.
   @state() private _progress = 0;
   @state() private _errorMessage = "";
-  // Blocks a second click while a step's port picker is open.
+  // Blocks a second click while the flash step's port picker is open.
   @state() private _pending = false;
+  // Why the picked file cannot be installed, shown under the picker.
+  @state() private _fileError: FilePickerError | null = null;
+
+  @query("input[type=file]") private _fileInput?: HTMLInputElement;
   @state() private _reconnecting = false;
   @state() private _logLines: string[] = [];
 
   // The package is read and parsed when it is picked, so the click that
   // starts the install goes straight to the port picker.
-  private _package = new FilePreparation<DfuPackage>(
+  private _package = new Preparation<File, DfuPackage, FilePickerError>(
     this,
     (file) => this._parse(file),
-    (failure) => this._fail(failure.title)
+    (failure) => this._onPrepared(failure)
   );
 
-  private async _parse(file: File): Promise<{ value: DfuPackage } | PreparationFailure> {
-    let engine: Awaited<ReturnType<typeof loadDfuEngine>>;
+  private async _parse(file: File): Promise<Prepared<DfuPackage, FilePickerError>> {
+    let bytes: ArrayBuffer;
     try {
-      engine = await loadDfuEngine();
+      bytes = await file.arrayBuffer();
     } catch (err) {
-      // A stale chunk after a deploy, or the network: not the file's fault.
+      // A revoked file handle rejects here.
       return {
-        title: this._localize("firmware.engine_load_failed"),
-        detail: getErrorMessage(err),
-        retryable: true,
+        failure: {
+          title: this._localize("firmware.nrf_bad_package"),
+          detail: getErrorMessage(err),
+        },
+        retryable: false,
       };
     }
-    try {
-      return { value: engine.parseDfuPackage(new Uint8Array(await file.arrayBuffer())) };
-    } catch (err) {
-      // A revoked file handle rejects here too.
-      return {
-        title: this._localize("web.nrf.install_error_bad_package", {
-          error: getErrorMessage(err),
-        }),
-        detail: "",
-      };
-    }
+    const parsed = await loadDfuPackage(new Uint8Array(bytes));
+    if ("pkg" in parsed) return { value: parsed.pkg };
+    return {
+      failure: { title: this._localize(parsed.key), detail: parsed.detail },
+      retryable: parsed.key === "firmware.engine_load_failed",
+    };
+  }
+
+  private _onPrepared(failure: FilePickerError | null): void {
+    this._fileError = failure;
+    if (this._package.state.kind !== "idle") return;
+    // A refused file is unpicked: the input fires no change for the same
+    // file again, so it could not be picked a second time.
+    this._file = null;
+    if (this._fileInput) this._fileInput.value = "";
   }
 
   private _log = (line: string) => {
@@ -100,14 +114,16 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     }
   }
 
-  // Also while a step's file read, engine load or picker is pending: a close
-  // then would reset the dialog under a step that keeps running.
+  // Also while a step's picker is open: a close then would reset the dialog
+  // under a step that keeps running.
   private get _busy(): boolean {
     return this._pending || this._state === "resetting" || this._state === "flashing";
   }
 
   private _reset(): void {
     this._state = "idle";
+    this._file = null;
+    this._fileError = null;
     this._package.clear();
     this._progress = 0;
     this._errorMessage = "";
@@ -122,28 +138,27 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   }
 
   private _onFileChange = (e: Event): void => {
-    this._package.start((e.target as HTMLInputElement).files?.[0] ?? null);
+    this._file = (e.target as HTMLInputElement).files?.[0] ?? null;
+    this._fileError = null;
+    if (this._file) this._package.start(this._file);
+    else this._package.clear();
   };
 
-  // Back to the setup step, with the file checked again or another to pick.
-  private _retry = (): void => {
-    this._state = "idle";
-    this._package.recover();
+  // The engine did not load for the picked file: load it again.
+  private _retryFile = (): void => {
+    this._fileError = null;
+    this._package.retry();
   };
 
   private async _startInstall(): Promise<void> {
-    if (this._package.state.kind !== "ready" || this._pending) return;
-    this._pending = true;
+    if (this._package.state.kind !== "ready" || this._state !== "idle") return;
     this._logLines = [];
     this._state = "resetting";
     try {
       // Nothing is awaited before the touch's port picker: it needs the
       // click's activation.
-      if (!(await touchIntoBootloader({ onLog: this._log }))) {
-        this._state = "idle";
-        return;
-      }
-      this._state = "waiting";
+      const touched = await touchIntoBootloader({ onLog: this._log });
+      this._state = touched ? "waiting" : "idle";
     } catch (err) {
       // A failed pick has nothing to do with the board; only the touch earns
       // the manual-bootloader hint.
@@ -155,8 +170,6 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
               : getErrorMessage(err),
         })
       );
-    } finally {
-      this._pending = false;
     }
   }
 
@@ -205,22 +218,18 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   }
 
   private _renderSetup() {
-    return html`
-      ${renderFilePicker({
-        label: this._localize("web.nrf.install_file_label"),
-        accept: ".zip",
-        file: this._package.file,
-        placeholder: this._localize("web.nrf.install_file_placeholder"),
-        onChange: this._onFileChange,
-      })}
-      ${
+    return renderFilePicker({
+      label: this._localize("web.nrf.install_file_label"),
+      accept: ".zip",
+      file: this._file,
+      placeholder: this._localize("web.nrf.install_file_placeholder"),
+      onChange: this._onFileChange,
+      preparing:
         this._package.state.kind === "pending"
-          ? html`<p class="preparing" role="status">
-              ${this._localize("web.install.preparing")}
-            </p>`
-          : nothing
-      }
-    `;
+          ? this._localize("web.install.preparing")
+          : undefined,
+      error: this._fileError,
+    });
   }
 
   private _statusMessage(): string {
@@ -262,10 +271,13 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
   private _renderAction() {
     switch (this._state) {
       case "idle":
+        if (this._package.state.kind === "retryable") {
+          return renderRetryButton(this._localize, this._retryFile);
+        }
         return html`
           <wa-button
             variant="brand"
-            ?disabled=${this._package.state.kind !== "ready" || this._pending}
+            ?disabled=${this._package.state.kind !== "ready"}
             @click=${this._startInstall}
           >
             ${this._localize("dashboard.install")}
@@ -282,7 +294,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
           </wa-button>
         `;
       case "error":
-        return renderRetryButton(this._localize, this._retry);
+        return renderRetryButton(this._localize, () => (this._state = "idle"));
       case "success":
         return renderCloseButton(this._localize, this._onAfterHide);
       default:
@@ -304,18 +316,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     `;
   }
 
-  static styles = [
-    espHomeStyles,
-    filePickerStyles,
-    installActionsStyles,
-    css`
-      .preparing {
-        margin: var(--wa-space-s) 0 0;
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
-      }
-    `,
-  ];
+  static styles = [espHomeStyles, filePickerStyles, installActionsStyles];
 }
 
 declare global {

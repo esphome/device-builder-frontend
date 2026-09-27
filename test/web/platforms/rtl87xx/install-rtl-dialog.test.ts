@@ -34,7 +34,7 @@ vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => 
   return { ...real, loadAmbz2Image: seams.loadAmbz2Image };
 });
 
-import { pickFile } from "../../_pick-file.js";
+import { pickerText, pickFile, slowFile } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { Ambz2ImageError } from "../../../../src/platforms/rtl87xx/libretiny-uf2.js";
 import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
@@ -44,17 +44,24 @@ import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87x
 const IMAGE = { runs: [], totalBytes: 0 };
 const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
 
-const uf2 = () => new File([new Uint8Array(8)], "firmware.uf2");
+const uf2 = (name = "firmware.uf2") => new File([new Uint8Array(8)], name);
 
-// A dialog with a UF2 picked, read and checked.
-async function mountDialog(): Promise<any> {
-  const el = (await mount(new ESPHomeWebInstallRtlDialog(), {
+async function mountBare(): Promise<any> {
+  return (await mount(new ESPHomeWebInstallRtlDialog(), {
     _localize: identityLocalize,
     open: true,
   } as Partial<ESPHomeWebInstallRtlDialog>)) as any;
+}
+
+// A dialog with a UF2 picked, read and checked.
+async function mountDialog(): Promise<any> {
+  const el = await mountBare();
   await pickFile(el, "_image", uf2());
   return el;
 }
+
+const INSTALL = "firmware.browser_flash_action";
+const installDisabled = (el: any) => button(el, INSTALL).hasAttribute("disabled");
 
 const card = (el: any) => el.shadowRoot!.querySelector("esphome-process-terminal") as any;
 const log = (el: any) =>
@@ -125,25 +132,22 @@ describe("esphome-web-install-rtl-dialog", () => {
     expect(card(el).state).toBe("success");
   });
 
-  it("refuses an AmebaZ image with the wrong-family copy and a bad file with the bad-file copy", async () => {
+  it("names an AmebaZ image and a bad file under the picker, when they are picked", async () => {
     mocks.parseAmbz2Image.mockImplementation(() => {
       throw new Ambz2ImageError(
         "firmware.rtl_wrong_family",
         new Error("family 0x22e0d6fc")
       );
     });
-    // Named when the file is picked, before any port is asked for.
     const el = await mountDialog();
-    expect(card(el).state).toBe("error");
-    expect(card(el).statusMessage).toBe("firmware.rtl_wrong_family");
-    expect(card(el).statusDetail).toBe("family 0x22e0d6fc");
-    expect(mocks.requestSerialPort).not.toHaveBeenCalled();
-
-    // Back on the setup step the refused file is gone, and installs nothing.
-    button(el, "command.retry").click();
-    await el.updateComplete;
+    // Still on the setup step, with the file refused and nothing to install.
     expect(card(el)).toBeNull();
-    expect(el._image.file).toBeNull();
+    expect(pickerText(el)).toEqual({
+      name: "web.rtl.install_file_placeholder",
+      status: "",
+      error: "firmware.rtl_wrong_family: family 0x22e0d6fc",
+    });
+    expect(installDisabled(el)).toBe(true);
     await el._flash();
     expect(mocks.requestSerialPort).not.toHaveBeenCalled();
 
@@ -151,36 +155,46 @@ describe("esphome-web-install-rtl-dialog", () => {
       throw new Ambz2ImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
     });
     await pickFile(el, "_image", uf2());
-    expect(card(el).statusMessage).toBe("firmware.rtl_bad_uf2");
-    expect(card(el).statusDetail).toBe("not a UF2");
+    expect(pickerText(el).error).toBe("firmware.rtl_bad_uf2: not a UF2");
+
+    // A good file clears the line and offers the install.
+    mocks.parseAmbz2Image.mockReturnValue(IMAGE);
+    await pickFile(el, "_image", uf2("good.uf2"));
+    expect(pickerText(el)).toEqual({ name: "good.uf2", status: "", error: "" });
+    expect(installDisabled(el)).toBe(false);
+  });
+
+  it("unpicks a refused file, so the same file can be picked again", async () => {
+    mocks.parseAmbz2Image.mockImplementation(() => {
+      throw new Ambz2ImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
+    });
+    const el = await mountBare();
+    const input = el.shadowRoot!.querySelector("input[type=file]") as HTMLInputElement;
+    const cleared = vi.fn();
+    Object.defineProperty(input, "value", {
+      configurable: true,
+      set: cleared,
+      get: () => "",
+    });
+    await pickFile(el, "_image", uf2());
+    expect(cleared).toHaveBeenCalledWith("");
   });
 
   it("offers the install only once the picked file is read and checked", async () => {
-    let read!: (bytes: ArrayBuffer) => void;
-    const slow = {
-      name: "firmware.uf2",
-      arrayBuffer: () => new Promise<ArrayBuffer>((resolve) => (read = resolve)),
-    } as unknown as File;
-    const el = (await mount(new ESPHomeWebInstallRtlDialog(), {
-      _localize: identityLocalize,
-      open: true,
-    } as Partial<ESPHomeWebInstallRtlDialog>)) as any;
-    const installDisabled = () =>
-      button(el, "firmware.browser_flash_action").hasAttribute("disabled");
-    expect(installDisabled()).toBe(true);
+    const slow = slowFile("firmware.uf2");
+    const el = await mountBare();
+    expect(installDisabled(el)).toBe(true);
 
-    el._onFileChange({ target: { files: [slow] } });
+    el._onFileChange({ target: { files: [slow.file] } });
     await el.updateComplete;
-    expect(text(el)).toContain("web.install.preparing");
-    expect(installDisabled()).toBe(true);
+    expect(pickerText(el).status).toBe("web.install.preparing");
+    expect(installDisabled(el)).toBe(true);
     await el._flash();
     expect(mocks.requestSerialPort).not.toHaveBeenCalled();
 
-    read(new ArrayBuffer(8));
-    await vi.waitFor(() => expect(el._image.state.kind).toBe("ready"));
-    await el.updateComplete;
-    expect(text(el)).not.toContain("web.install.preparing");
-    expect(installDisabled()).toBe(false);
+    slow.read(new ArrayBuffer(8));
+    await vi.waitFor(() => expect(installDisabled(el)).toBe(false));
+    expect(pickerText(el).status).toBe("");
   });
 
   it("asks for the port in the click itself, with nothing awaited before it", async () => {
@@ -191,38 +205,22 @@ describe("esphome-web-install-rtl-dialog", () => {
     await install;
   });
 
-  it("never installs a file that another pick overtook", async () => {
-    let first!: (bytes: ArrayBuffer) => void;
-    const slow = {
-      name: "old.uf2",
-      arrayBuffer: () => new Promise<ArrayBuffer>((resolve) => (first = resolve)),
-    } as unknown as File;
-    const el = (await mount(new ESPHomeWebInstallRtlDialog(), {
-      _localize: identityLocalize,
-      open: true,
-    } as Partial<ESPHomeWebInstallRtlDialog>)) as any;
-    el._onFileChange({ target: { files: [slow] } });
-    const newer = { runs: [], totalBytes: 1 };
-    mocks.parseAmbz2Image.mockReturnValue(newer);
-    await pickFile(el, "_image", new File([new Uint8Array(8)], "new.uf2"));
-    // The first read ends now, with another image; it must not replace the newer one.
-    mocks.parseAmbz2Image.mockReturnValue(IMAGE);
-    first(new ArrayBuffer(8));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(el._image.state).toMatchObject({ kind: "ready", value: newer });
-    expect(el._image.file.name).toBe("new.uf2");
-  });
-
-  it("checks the same file again after the parser did not load", async () => {
+  it("offers Retry for the same file after the parser did not load", async () => {
     seams.loadAmbz2Image.mockResolvedValueOnce({
       key: "firmware.engine_load_failed",
       detail: "Failed to fetch",
     });
     const el = await mountDialog();
-    expect(card(el).statusMessage).toBe("firmware.engine_load_failed");
+    expect(pickerText(el)).toEqual({
+      name: "firmware.uf2",
+      status: "",
+      error: "firmware.engine_load_failed: Failed to fetch",
+    });
     button(el, "command.retry").click();
-    await vi.waitFor(() => expect(el._image.state.kind).toBe("ready"));
-    expect(el._image.file.name).toBe("firmware.uf2");
+    await vi.waitFor(() => expect(button(el, INSTALL)).toBeDefined());
+    await el.updateComplete;
+    expect(pickerText(el)).toEqual({ name: "firmware.uf2", status: "", error: "" });
+    expect(installDisabled(el)).toBe(false);
   });
 
   it("goes back to the setup step when the picker is dismissed, and reports a failed flash", async () => {

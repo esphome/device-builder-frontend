@@ -17,7 +17,7 @@ import {
   FlashImageSlot,
   RESET_ACTION_KEY,
 } from "../platform-support.js";
-import { type DfuPackage, loadDfuEngine } from "./index.js";
+import { type DfuPackage, loadDfuEngine, loadDfuPackage } from "./index.js";
 import { withManualBootloaderHint } from "./manual-bootloader-hint.js";
 
 declare module "../platform-support.js" {
@@ -50,21 +50,13 @@ export async function startNrfDfuInstall(
   const bytes = artifact.bytes;
   const stale = () => host._device !== device;
 
-  let parseDfuPackage: Awaited<ReturnType<typeof loadDfuEngine>>["parseDfuPackage"];
-  try {
-    ({ parseDfuPackage } = await loadDfuEngine());
-  } catch (err) {
-    if (!stale())
-      host._fail(host._localize("firmware.engine_load_failed"), getErrorMessage(err));
-    return;
-  }
+  const parsed = await loadDfuPackage(bytes);
   if (stale()) return;
-  try {
-    nrfPackage.set(host, parseDfuPackage(bytes));
-  } catch (err) {
-    host._fail(host._localize("firmware.nrf_bad_package"), getErrorMessage(err));
+  if ("key" in parsed) {
+    host._fail(host._localize(parsed.key), parsed.detail);
     return;
   }
+  nrfPackage.set(host, parsed.pkg);
 
   showResetStep(host);
 }
