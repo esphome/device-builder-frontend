@@ -234,6 +234,11 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
     }
     const id = ++this._hydrateId;
     const { configuration, yaml } = this;
+    // A newer parse replaced this one, or the YAML was edited since and this
+    // is a reload: the tree on screen waits for the reload of that edit, or
+    // is the one of the YAML the editor wrote when the edit was taken back.
+    const outdated = () =>
+      id !== this._hydrateId || (yaml !== this.yaml && !this._hydrating);
     try {
       // Pass ``this.yaml`` so the parser sees the user's current
       // draft buffer — without it the post-add hydrate would read
@@ -243,7 +248,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       const parsed = await this._parses.fetch(`${configuration}\0${yaml}`, () =>
         this._api.parseDeviceAutomations(configuration, yaml)
       );
-      if (id !== this._hydrateId) return;
+      if (outdated()) return;
       // A successful parse clears any prior parse error, so the banner
       // doesn't stick after the user fixes invalid YAML in the pane.
       this._error = "";
@@ -270,7 +275,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         this._dropStaleTree();
       }
     } catch (err) {
-      if (id !== this._hydrateId) return;
+      if (outdated()) return;
       this._dropStaleTree();
       this._error = formatApiError(err, this._localize, "device.automation_parse_error");
       // The hold stays: the tree is still from before the edit.

@@ -259,6 +259,35 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     expect(editor.inert).toBe(false);
   });
 
+  it.each([
+    [
+      "the tree",
+      (d: ReturnType<typeof deferred<ParsedAutomation[]>>) => d.resolve([parsedEdited()]),
+    ],
+    [
+      "the failure",
+      (d: ReturnType<typeof deferred<ParsedAutomation[]>>) => d.reject(new Error("boom")),
+    ],
+  ])("ignores %s of a reload whose edit was taken back meanwhile", async (_n, land) => {
+    const d = deferred<ParsedAutomation[]>();
+    const { editor, inner } = await mount({
+      parseDeviceAutomations: vi.fn().mockReturnValue(d.promise),
+    });
+    const tree = inner.value;
+    inner._engine._lastSelfWrittenYaml = YAML;
+    await editByHand(editor);
+    editor.reload();
+
+    editor.yaml = YAML;
+    await editor.updateComplete;
+    land(d);
+    await settled(editor);
+
+    expect(inner.value).toBe(tree);
+    expect(inner._error).toBe("");
+    expect(editor.inert).toBe(false);
+  });
+
   it("is released by a reload that has nothing to read", async () => {
     const { editor, inner } = await mount();
     await editByHand(editor);
