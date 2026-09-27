@@ -458,9 +458,10 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     host._open = false;
   };
   // A reopen for the same device is a new install run on an open dialog.
-  const reopen = (host: { _open: boolean; _installRun: number }) => {
+  const reopen = (host: { _open: boolean; _installRun: number; _step: string }) => {
     host._installRun++;
     host._open = true;
+    host._step = "connecting";
   };
 
   type Made = ReturnType<typeof ready>;
@@ -617,6 +618,41 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     expect(esptool.flashFirmware).not.toHaveBeenCalled();
     expect(host._fail).not.toHaveBeenCalled();
     expect(host._failureKind).toBeNull();
+  });
+
+  it("finishes a flash the same device was reopened during without painting on the new run", async () => {
+    const { host } = ready();
+    esptool.flashFirmware.mockImplementationOnce(async (_l, _d, _a, onProgress) => {
+      onProgress({ percent: 40 });
+      dismiss(host);
+      reopen(host);
+      onProgress({ percent: 100 });
+    });
+
+    await run(host);
+
+    // The board still gets its reset, so the new firmware boots.
+    expect(esptool.resetAndDisconnect).toHaveBeenCalledTimes(1);
+    expect(host._flashPercent).toBe(40);
+    expect(host._step).toBe("connecting");
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when a flash fails after the same device was reopened", async () => {
+    const { host } = ready();
+    esptool.flashFirmware.mockImplementationOnce(async (_l, _d, _a, onProgress) => {
+      onProgress({ percent: 40 });
+      dismiss(host);
+      reopen(host);
+      throw new SerialDeviceLostError();
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(esptool.resetAndDisconnect).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._step).toBe("connecting");
   });
 
   it("stands down when the same device was reopened during the connect", async () => {

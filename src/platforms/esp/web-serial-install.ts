@@ -211,12 +211,17 @@ export async function startWebSerialInstall(
   if (await standDown()) return;
 
   // 5. Flash on the still-open session.
+  // The flash and the reset run to their end whatever the dialog does: a
+  // write cut short leaves the board without firmware. A dismissal only keeps
+  // them from painting on the dialog.
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
+  let percent = 0;
   try {
     await esptool.flashFirmware(detected.loader, firmwareBytes, flashAddress, (p) => {
-      host._flashPercent = p.percent;
+      percent = p.percent;
+      if (stillCurrent()) host._flashPercent = percent;
     });
   } catch (err) {
     console.error("[Web Serial] Flash error:", err);
@@ -225,20 +230,22 @@ export async function startWebSerialInstall(
     // last blocks may not be written.
     const gone =
       err instanceof SerialDeviceLostError || err instanceof SerialWriteStalledError;
-    if (gone || host._flashPercent < 100) {
+    if (gone || percent < 100) {
       // The failure first: the release can take its whole deadline when the
       // write that hung still holds the port.
-      host._fail(
-        namedConnectFailure(err, host._localize) ??
-          formatApiError(err, host._localize, "firmware.flash_failed")
-      );
+      if (stillCurrent()) {
+        host._fail(
+          namedConnectFailure(err, host._localize) ??
+            formatApiError(err, host._localize, "firmware.flash_failed")
+        );
+      }
       await releaseSerial(esptool, detected);
       return;
     }
   }
 
   // 6. Reset
-  host._statusMessage = host._localize("firmware.status_resetting");
+  if (stillCurrent()) host._statusMessage = host._localize("firmware.status_resetting");
   try {
     await esptool.resetAndDisconnect(detected.loader, detected.transport, detected.port);
   } catch {
@@ -247,6 +254,7 @@ export async function startWebSerialInstall(
     await releaseSerial(esptool, detected);
   }
 
+  if (!stillCurrent()) return;
   host._statusMessage = host._localize("firmware.status_done");
   finishWithLogsPort(host, detected.port);
 }
