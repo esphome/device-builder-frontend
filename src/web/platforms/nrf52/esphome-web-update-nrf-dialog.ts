@@ -230,7 +230,7 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
     if (engine.isSerialDeviceLost(err)) return this._localize("serial.device_lost");
     // Only a device that never answered: one that stopped part way has the
     // transport.
-    if (err instanceof engine.SmpNoReplyError && this._progress === 0) {
+    if (err instanceof engine.SmpSilentDeviceError) {
       return this._localize("web.nrf.update_no_reply");
     }
     return this._localize("web.nrf.install_error_flash", {

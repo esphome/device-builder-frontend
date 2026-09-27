@@ -13,6 +13,7 @@ import {
   parseSmpFrame,
   SmpNoReplyError,
   smpQueryDeviceParams,
+  SmpSilentDeviceError,
   type SmpTransport,
   smpUploadImage,
 } from "../../../src/platforms/nrf52/smp-protocol.js";
@@ -308,6 +309,23 @@ describe("smpUploadImage", () => {
     const { done } = await upload(device, image);
 
     await expect(done).rejects.toThrow(message);
+  });
+
+  it("names a device that never answered apart from one that stopped", async () => {
+    const image = await parseMcubootImage(makeMcubootImage());
+    const silent = new FakeSmpDevice();
+    silent.exchange = () => Promise.reject(new SmpNoReplyError("timeout"));
+    const stopped = new FakeSmpDevice();
+    stopped.onUpload = () => {
+      throw new SmpNoReplyError("timeout");
+    };
+
+    const never = (await upload(silent, image)).done;
+    const partWay = (await upload(stopped, image)).done;
+
+    await expect(never).rejects.toBeInstanceOf(SmpSilentDeviceError);
+    await expect(partWay).rejects.toBeInstanceOf(SmpNoReplyError);
+    await expect(partWay).rejects.not.toBeInstanceOf(SmpSilentDeviceError);
   });
 
   it("fails when the uploaded image is not in the update slot", async () => {

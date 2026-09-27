@@ -44,6 +44,7 @@ import { SMP_BLE_SERVICE_UUID } from "../../../../src/platforms/nrf52/smp-ble-se
 import {
   SmpBleServiceNotFoundError,
   SmpNoReplyError,
+  SmpSilentDeviceError,
 } from "../../../../src/platforms/nrf52/smp-engine.js";
 import { SerialDeviceLostError } from "../../../../src/util/serial-open-error.js";
 import { ESPHomeWebUpdateNrfDialog } from "../../../../src/web/platforms/nrf52/esphome-web-update-nrf-dialog.js";
@@ -154,7 +155,9 @@ describe.each(TRANSPORTS)(
 
     it("names a device that never answers as one without that transport", async () => {
       const el = await mountDialog();
-      flash.mockRejectedValue(new SmpNoReplyError("SMP: no response from the device"));
+      flash.mockRejectedValue(
+        new SmpSilentDeviceError("SMP: no response from the device")
+      );
 
       await el[run]();
 
@@ -176,10 +179,7 @@ describe.each(TRANSPORTS)(
     it("reports a device that stops answering part way with the engine's reason", async () => {
       const el = await mountDialog();
       const err = new SmpNoReplyError("SMP: no response from the device");
-      flash.mockImplementation(async (_target, _image, hooks) => {
-        hooks.onProgress(40);
-        throw err;
-      });
+      flash.mockRejectedValue(err);
 
       await el[run]();
 
