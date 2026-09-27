@@ -151,6 +151,14 @@ describe("esphome-web-flash-receiver engines", () => {
     engines.esp.prepare.mockRejectedValueOnce(new Error("chunk fetch failed"));
     const { el } = await handOff({}, false);
     expect((el as any)._state).toBe("error");
+    // The click that prepares again does not open the picker: the fetch may
+    // have used up its user activation.
+    await (el as any)._onPrimary();
+    expect(engines.esp.prepare).toHaveBeenCalledTimes(2);
+    expect(requestPort).not.toHaveBeenCalled();
+    expect((el as any)._state).toBe("connecting");
+    expect((el as any)._statusMessage).toBe("web.flash.firmware_ready");
+    expect((el as any)._busy).toBe(false);
     await (el as any)._onPrimary();
     expect(engines.esp.prepare).toHaveBeenCalledTimes(2);
     expect(requestPort).toHaveBeenCalledOnce();

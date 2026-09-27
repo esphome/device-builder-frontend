@@ -575,7 +575,7 @@
     "install_failed": "Installation failed.",
     "compile_failed": "Compilation failed.",
     "download_failed": "Failed to download firmware.",
-    "no_flashable_binary": "No flashable binary available for this device. web.esphome.io supports ESP32 and ESP8266 only.",
+    "no_flashable_binary": "This build did not produce a firmware image that web.esphome.io can install on this device.",
     "no_binaries": "No binaries were produced for this device. Make sure the build completed successfully.",
     "no_binaries_remote": "The build on {receiver} reported success, but no firmware binaries came back to this dashboard.",
     "no_binaries_remote_detail": "The build server may have failed to package or transfer the firmware. Check the build server logs, then try again.",

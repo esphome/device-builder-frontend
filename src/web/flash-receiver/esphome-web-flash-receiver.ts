@@ -270,7 +270,18 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     }
     // Held from here, so a second click cannot start a second preparation.
     this._busy = true;
-    if (!(await this._prepared)) this._startPrepare();
+    if (!(await this._prepared)) {
+      // The earlier preparation failed. Preparing again can outlast this
+      // click's user activation, which the port picker needs, so show the
+      // firmware as ready and take the next click for the install.
+      this._startPrepare();
+      const ready = await this._prepared;
+      this._busy = false;
+      if (ready) {
+        this._setState("connecting", this._localize("web.flash.firmware_ready"));
+      }
+      return;
+    }
     await this._runInstall(this._prepared);
   }
 
