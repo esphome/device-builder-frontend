@@ -46,12 +46,16 @@ export type ReceiverRun = (
 export interface ReceiverEngine {
   /** The serial logs policy for the rebooted board's logs afterwards. */
   readonly logs: SerialLogsPolicy;
-  /** The run for ``parts``, or the reason they are not this flasher's image. Never throws. */
+  /**
+   * The run for ``parts``, or why there is none: they are not this flasher's
+   * image, or (``retryable``) a chunk the check needs did not load. Never
+   * throws.
+   */
   prepare(
     parts: FlashPart[],
     erase: boolean,
     localize: LocalizeFunc
-  ): Promise<{ run: ReceiverRun } | { error: string }>;
+  ): Promise<{ run: ReceiverRun } | { error: string; retryable?: boolean }>;
 }
 
 /**

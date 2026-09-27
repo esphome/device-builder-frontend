@@ -4,18 +4,14 @@ import { customElement, query, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
-import { ESP_SERIAL_LOGS } from "../../platforms/esp/serial-logs.js";
-import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { getErrorMessage } from "../../util/error-message.js";
 import { isPortPickerCancel, webSerialAvailability } from "../../util/web-serial.js";
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
 import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
 import { openPortForLogs } from "../logs/open-port-for-logs.js";
-import type { FlashPart } from "../platforms/esp/firmware-build.js";
 import { acquireBootLogs } from "./boot-logs.js";
 import { flashReceiverStyles } from "./esphome-web-flash-receiver.styles.js";
 import { FlashHandshake, parseFlasherParams } from "./flash-handshake.js";
@@ -24,14 +20,13 @@ import {
   type FirmwareMessage,
   type FlashState,
   HANDOFF_FLASHERS,
-  type HandoffFlasher,
 } from "./protocol.js";
 import {
   RECEIVER_ENGINES,
-  type ReceiverEngine,
   type ReceiverNote,
   type ReceiverRun,
 } from "./receiver-engine.js";
+import { ReceiverPreparation } from "./receiver-preparation.js";
 
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../../components/ansi-log.js";
@@ -71,16 +66,14 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   // What the board needs from the user mid-flash (a strap, a reset), shown
   // with the flasher's guide until the engine moves on.
   @state() private _waiting: ReceiverNote | null = null;
-  // The logs policy of the flasher that last ran, for the boot logs after.
-  private _logsPolicy: SerialLogsPolicy = ESP_SERIAL_LOGS;
-  // The handed-over image's run, settled before the click (see _prepare).
-  private _prepared: Promise<ReceiverRun | null> = Promise.resolve(null);
-  // Prepares the handed-over image again, kept until it has succeeded once:
-  // a chunk that failed to load must not leave the tab unable to retry.
-  private _reprepare?: () => Promise<ReceiverRun | null>;
+  // The image is checked and its engine loaded before the click; see the class.
+  private _preparation = new ReceiverPreparation(
+    this,
+    () => this._localize,
+    (error) => this._onPrepared(error)
+  );
 
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
-  @state() private _hasFile = false;
 
   private _handshake?: FlashHandshake;
   private _hasOpener = false;
@@ -102,8 +95,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     super.connectedCallback();
     // The page exists to flash: warm the esptool chunk while the hand-off arrives.
     preloadEsptool();
-    // And its receiver engine, so the manual file path's click reaches the
-    // port picker without a chunk fetch; a miss is reported by _prepare.
+    // And its receiver engine, a chunk of its own, so an ESP hand-off is
+    // ready as soon as it arrives; a miss is named by the preparation.
     void RECEIVER_ENGINES.esp().catch(() => {});
     const params = parseFlasherParams(window.location.hash);
     this._hasOpener = window.opener != null;
@@ -162,10 +155,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       data: new Uint8Array(p.data),
       address: p.address,
     }));
-    this._reprepare = () =>
-      this._prepare(parts, msg.erase !== false, msg.flasher ?? DEFAULT_HANDOFF_FLASHER);
-    this._startPrepare();
-    // The prepared run owns the bytes from here; the card only needs the names.
+    // The preparation owns the bytes from here; the card only needs the names.
     this._firmware = { ...msg, parts: [] };
     // Name the tab + card after the device so several concurrent flash tabs are
     // distinguishable (legacy did the same with the transmitted device name).
@@ -175,12 +165,31 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         name: msg.deviceName,
       });
     }
-    this._setState(
-      "connecting",
-      msg.name
-        ? this._localize("web.flash.firmware_ready_named", { name: msg.name })
-        : this._localize("web.flash.firmware_ready")
-    );
+    this._setState("connecting", this._localize("web.install.preparing"));
+    this._preparation.start({
+      parts,
+      erase: msg.erase !== false,
+      flasher: msg.flasher ?? DEFAULT_HANDOFF_FLASHER,
+    });
+  }
+
+  // A preparation ended: name why it failed, or show the firmware as ready.
+  private _onPrepared(error: string | null): void {
+    // A file that was dropped is unpicked too: the input fires no change for
+    // the same file again, so it could not be picked a second time.
+    if (this._fileInput && this._preparation.state.kind === "idle") {
+      this._fileInput.value = "";
+    }
+    if (error !== null) this._setState("error", error);
+    else if (this._firmware) this._setState("connecting", this._readyMessage());
+    else this._resetForRetry();
+  }
+
+  private _readyMessage(): string {
+    const name = this._firmware?.name;
+    return name
+      ? this._localize("web.flash.firmware_ready_named", { name })
+      : this._localize("web.flash.firmware_ready");
   }
 
   // Update local state AND relay it to the opener so the dashboard mirrors it.
@@ -228,15 +237,32 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._logLines = [];
   }
 
+  // Manual mode: the picked file is read and prepared here, not on the click.
   private _onFileChange(): void {
-    this._hasFile = (this._fileInput?.files?.length ?? 0) > 0;
-    // In no-opener (manual) mode the primary button is disabled once a flash is
-    // done. Picking another file starts a fresh attempt, so clear the done state
-    // — otherwise a second manual flash would need a full page reload.
-    if (this._flashDone) {
-      this._flashDone = false;
-      this._resetForRetry();
-    }
+    const file = this._fileInput?.files?.[0];
+    // The primary button is disabled once a flash is done. Picking another
+    // file starts a fresh attempt, so clear the done state — otherwise a
+    // second manual flash would need a full page reload.
+    this._flashDone = false;
+    this._resetForRetry();
+    this._preparation.clear();
+    if (!file) return;
+    this._setState("connecting", this._localize("web.install.preparing"));
+    // The read is part of the preparation, which a newer pick supersedes.
+    this._preparation.start(
+      file.arrayBuffer().then(
+        (bytes) => ({
+          parts: [{ data: new Uint8Array(bytes), address: 0 }],
+          erase: true,
+          flasher: DEFAULT_HANDOFF_FLASHER,
+        }),
+        (err: unknown) => {
+          // The file changed or went away after it was picked.
+          console.error("[flash receiver] Could not read the picked file:", err);
+          throw new Error(this._localize("web.flash.choose_file"));
+        }
+      )
+    );
   }
 
   private async _onPrimary(): Promise<void> {
@@ -244,102 +270,22 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       window.close();
       return;
     }
-    if (this._busy) return;
-    if (!this._firmware) {
-      const file = this._fileInput?.files?.[0];
-      if (!file) {
-        this._setState("error", this._localize("web.flash.choose_file"));
-        return;
-      }
-      // Held from here: the read and the check must not let a second click in.
-      this._busy = true;
-      let data: Uint8Array;
-      try {
-        data = new Uint8Array(await file.arrayBuffer());
-      } catch (err) {
-        // The file changed or went away after it was picked.
-        console.error("[flash receiver] Could not read the picked file:", err);
-        this._busy = false;
-        this._setState("error", this._localize("web.flash.choose_file"));
-        return;
-      }
-      await this._runInstall(
-        this._prepare([{ data, address: 0 }], true, DEFAULT_HANDOFF_FLASHER)
-      );
+    if (this._working) return;
+    const preparation = this._preparation.state;
+    if (preparation.kind === "ready") {
+      await this._runInstall(preparation.run);
       return;
     }
-    // Held from here, so a second click cannot start a second preparation.
+    if (preparation.kind !== "retryable") return;
+    // A chunk did not load earlier; load it again. The install is offered
+    // once that is done, on a click of its own.
+    this._setState("connecting", this._localize("web.install.preparing"));
+    this._preparation.retry();
+  }
+
+  // Nothing is awaited before the port picker: it needs the click's activation.
+  private async _runInstall(run: ReceiverRun): Promise<void> {
     this._busy = true;
-    if (!(await this._prepared)) {
-      // The earlier preparation failed. Preparing again can outlast this
-      // click's user activation, which the port picker needs, so show the
-      // firmware as ready and take the next click for the install.
-      this._startPrepare();
-      const ready = await this._prepared;
-      this._busy = false;
-      if (ready) {
-        this._setState("connecting", this._localize("web.flash.firmware_ready"));
-      }
-      return;
-    }
-    await this._runInstall(this._prepared);
-  }
-
-  private _startPrepare(): void {
-    const prepare = this._reprepare;
-    if (!prepare) return;
-    this._prepared = prepare().then((run) => {
-      // The run holds what it needs; let the handed-over bytes go.
-      if (run) this._reprepare = undefined;
-      return run;
-    });
-  }
-
-  /**
-   * Load the flasher's engine and check the image, ahead of the click: the
-   * click then goes straight to the port picker, inside its user activation,
-   * and a bad image is named before the user is asked for a port. Resolves
-   * null once the failure is on the card.
-   */
-  private async _prepare(
-    parts: FlashPart[],
-    erase: boolean,
-    flasher: HandoffFlasher
-  ): Promise<ReceiverRun | null> {
-    let engine: ReceiverEngine;
-    try {
-      engine = await RECEIVER_ENGINES[flasher]();
-    } catch (err) {
-      console.error("[flash receiver] Could not load the engine chunk:", err);
-      this._setState("error", this._localize("firmware.engine_load_failed"));
-      return null;
-    }
-    try {
-      const plan = await engine.prepare(parts, erase, this._localize);
-      if ("error" in plan) {
-        this._setState("error", plan.error);
-        return null;
-      }
-      this._logsPolicy = engine.logs;
-      return plan.run;
-    } catch (err) {
-      // An engine broke its never-throws contract: name the image, not the network.
-      console.error("[flash receiver] The engine could not check the image:", err);
-      this._setState(
-        "error",
-        `${this._localize("web.flash.invalid_image")} (${getErrorMessage(err)})`
-      );
-      return null;
-    }
-  }
-
-  private async _runInstall(prepared: Promise<ReceiverRun | null>): Promise<void> {
-    this._busy = true;
-    const run = await prepared;
-    if (!run) {
-      this._busy = false;
-      return;
-    }
     this._flashDone = false;
     this._progress = null;
     this._waiting = null;
@@ -420,7 +366,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     const port = this._logPort;
     if (!port) return;
     const gen = this._bootLogsGen;
-    if (!(await openPortForLogs(port, this._localize, this._logsPolicy))) return;
+    if (!(await openPortForLogs(port, this._localize, this._preparation.logs))) return;
     // A flash started (or the receiver unmounted) during the reopen: the
     // dialog must not cover the new install, and the handle just opened
     // would otherwise be orphaned open for the tab's lifetime.
@@ -439,9 +385,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   private _resetForRetry(): void {
     this._waiting = null;
     this._state = this._firmware ? "connecting" : "idle";
-    this._statusMessage = this._firmware
-      ? this._localize("web.flash.firmware_ready")
-      : "";
+    this._statusMessage = this._firmware ? this._readyMessage() : "";
     this._progress = null;
   }
 
@@ -451,13 +395,21 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         ? this._localize("web.flash.close_tab")
         : this._localize("command.done");
     }
+    // A click then loads the chunk that did not load, and installs nothing.
+    if (this._preparation.state.kind === "retryable") {
+      return this._localize("command.retry");
+    }
     return this._localize("web.flash.connect_install");
+  }
+
+  // Flashing, or getting the firmware ready to.
+  private get _working(): boolean {
+    return this._busy || this._preparation.state.kind === "pending";
   }
 
   private get _primaryDisabled(): boolean {
     if (this._flashDone) return !this._hasOpener;
-    if (this._busy) return true;
-    return !this._firmware && !this._hasFile;
+    return this._working || this._preparation.state.kind === "idle";
   }
 
   private get _hint(): string {
@@ -482,7 +434,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           ${
             this._state !== "idle"
               ? html`<div class="status status--${this._state}">
-                  ${this._busy ? html`<wa-spinner></wa-spinner>` : nothing}
+                  ${this._working ? html`<wa-spinner></wa-spinner>` : nothing}
                   <span>${this._statusMessage}</span>
                 </div>`
               : nothing
@@ -527,7 +479,12 @@ export class ESPHomeWebFlashReceiver extends LitElement {
               ? nothing
               : html`<label class="manual">
                   <span>${this._localize("web.flash.manual")}</span>
-                  <input type="file" accept=".bin" @change=${this._onFileChange} />
+                  <input
+                    type="file"
+                    accept=".bin"
+                    ?disabled=${this._busy}
+                    @change=${this._onFileChange}
+                  />
                 </label>`
           }
           <div class="card-actions-row" slot="actions">
@@ -558,7 +515,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         .port=${this._logPort}
         ?open=${this._logsOpen}
         .deviceLabel=${this._deviceName ?? this._localize("web.flash.title")}
-        .policy=${this._logsPolicy}
+        .policy=${this._preparation.logs}
         @port-replaced=${(e: CustomEvent<SerialPort>) => {
           this._logPort = e.detail;
         }}

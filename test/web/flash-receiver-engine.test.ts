@@ -36,19 +36,26 @@ const engines = vi.hoisted(() => {
         async (
           _parts: unknown,
           _erase: boolean
-        ): Promise<{ run: typeof run } | { error: string }> => ({ run })
+        ): Promise<{ run: typeof run } | { error: string; retryable?: boolean }> => ({
+          run,
+        })
       ),
     };
   };
-  return { esp: make("esp"), rtl: make("rtl-ambz2") };
+  const esp = make("esp");
+  const rtl = make("rtl-ambz2");
+  // The lazy chunk loads; a test makes one reject to stand for a failed fetch.
+  const load = { esp: vi.fn(async () => esp), rtl: vi.fn(async () => rtl) };
+  return { esp, rtl, load };
 });
 vi.mock("../../src/web/flash-receiver/receiver-engine.js", () => ({
   RECEIVER_ENGINES: {
-    esp: async () => engines.esp,
-    "rtl-ambz2": async () => engines.rtl,
+    esp: () => engines.load.esp(),
+    "rtl-ambz2": () => engines.load.rtl(),
   },
 }));
 
+import { isPortPickerCancel } from "../../src/util/web-serial.js";
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
 import { MSG_FIRMWARE, MSG_READY } from "../../src/web/flash-receiver/protocol.js";
 
@@ -64,10 +71,10 @@ afterEach(() => {
 
 const requestPort = vi.fn(async () => port);
 
-async function handOff(frame: Record<string, unknown>, click = true) {
-  const opener = { postMessage: vi.fn() };
+// A receiver page: opened by a dashboard when ``opener`` is given, else by hand.
+async function mountReceiver(opener: { postMessage: ReturnType<typeof vi.fn> } | null) {
   Object.defineProperty(window, "opener", { value: opener, configurable: true });
-  window.location.hash = "#nonce=n1";
+  window.location.hash = opener ? "#nonce=n1" : "";
   Object.defineProperty(navigator, "serial", {
     configurable: true,
     value: { requestPort, getPorts: async () => [] },
@@ -76,6 +83,14 @@ async function handOff(frame: Record<string, unknown>, click = true) {
   (el as any)._localize = (k: string) => k;
   document.body.appendChild(el);
   await el.updateComplete;
+  return el;
+}
+
+// Hands ``frame`` over and, unless told not to, waits for it to be prepared
+// and clicks the install.
+async function handOff(frame: Record<string, unknown>, click = true, settle = true) {
+  const opener = { postMessage: vi.fn() };
+  const el = await mountReceiver(opener);
   window.dispatchEvent(
     new MessageEvent("message", {
       data: {
@@ -88,11 +103,34 @@ async function handOff(frame: Record<string, unknown>, click = true) {
       source: opener as unknown as Window,
     })
   );
-  await (el as any)._prepared;
-  await el.updateComplete;
+  if (!settle) return { el, opener };
+  await settled(el);
   if (click) await (el as any)._onPrimary();
   return { el, opener };
 }
+
+const preparation = (el: ESPHomeWebFlashReceiver): string =>
+  (el as any)._preparation.state.kind;
+
+// Waits out a preparation that is under way.
+async function settled(el: ESPHomeWebFlashReceiver) {
+  await vi.waitFor(() => expect(preparation(el)).not.toBe("pending"));
+  await el.updateComplete;
+}
+
+// A receiver opened by hand, with ``file`` as the picked one.
+async function pickFile(file: { arrayBuffer: () => Promise<ArrayBuffer> }) {
+  const el = await mountReceiver(null);
+  Object.defineProperty(el, "_fileInput", {
+    value: { files: [file], value: "C:\\fakepath\\firmware.bin" },
+  });
+  await (el as any)._onFileChange();
+  await settled(el);
+  return el;
+}
+
+const primaryButton = (el: ESPHomeWebFlashReceiver) =>
+  el.shadowRoot!.querySelector(".action-btn--primary") as HTMLButtonElement;
 
 const states = (opener: { postMessage: ReturnType<typeof vi.fn> }) =>
   opener.postMessage.mock.calls
@@ -127,17 +165,58 @@ describe("esphome-web-flash-receiver engines", () => {
     expect("note" in seen[seen.length - 1]).toBe(false);
   });
 
-  it("names a bad image when the firmware arrives, before any port is asked for", async () => {
-    // The click prepares once more; a bad image is still a bad image.
-    const bad = { error: "firmware.rtl_bad_uf2 (family)" };
-    engines.rtl.prepare.mockResolvedValueOnce(bad).mockResolvedValueOnce(bad);
+  it("names a bad image when the firmware arrives, and offers no install for it", async () => {
+    engines.rtl.prepare.mockResolvedValueOnce({ error: "firmware.rtl_bad_uf2 (family)" });
     const { el } = await handOff({ flasher: "rtl-ambz2" }, false);
     expect((el as any)._state).toBe("error");
     expect((el as any)._statusMessage).toContain("firmware.rtl_bad_uf2");
+    // The same bytes would fail the same check: nothing to try again.
+    expect(preparation(el)).toBe("idle");
+    expect(primaryButton(el).disabled).toBe(true);
     await (el as any)._onPrimary();
+    expect(engines.rtl.prepare).toHaveBeenCalledOnce();
     expect(requestPort).not.toHaveBeenCalled();
-    expect(engines.rtl.run).not.toHaveBeenCalled();
     expect((el as any)._busy).toBe(false);
+    // The click changed nothing: the card still names the bad image.
+    expect((el as any)._state).toBe("error");
+    expect((el as any)._statusMessage).toContain("firmware.rtl_bad_uf2");
+  });
+
+  it("checks the image again after a chunk its check needs did not load", async () => {
+    engines.rtl.prepare.mockResolvedValueOnce({
+      error: "firmware.engine_load_failed (Failed to fetch)",
+      retryable: true,
+    });
+    const { el } = await handOff({ flasher: "rtl-ambz2" }, false);
+    expect((el as any)._state).toBe("error");
+    expect(preparation(el)).toBe("retryable");
+    expect(primaryButton(el).disabled).toBe(false);
+    await (el as any)._onPrimary();
+    await settled(el);
+    expect(engines.rtl.prepare).toHaveBeenCalledTimes(2);
+    expect(preparation(el)).toBe("ready");
+  });
+
+  it("leaves a newer pick's status alone when an overtaken file fails to read", async () => {
+    let failFirst!: (err: Error) => void;
+    const el = await mountReceiver(null);
+    const files = [
+      {
+        arrayBuffer: () =>
+          new Promise<ArrayBuffer>((_resolve, reject) => {
+            failFirst = reject;
+          }),
+      },
+    ];
+    Object.defineProperty(el, "_fileInput", { value: { files } });
+    const firstPick = (el as any)._onFileChange();
+    files[0] = { arrayBuffer: async () => new ArrayBuffer(8) };
+    await (el as any)._onFileChange();
+    await settled(el);
+    failFirst(new Error("NotReadableError"));
+    await firstPick;
+    expect(preparation(el)).toBe("ready");
+    expect((el as any)._state).toBe("idle");
   });
 
   it("names the image, not the network, when an engine throws while checking it", async () => {
@@ -147,25 +226,67 @@ describe("esphome-web-flash-receiver engines", () => {
     expect((el as any)._statusMessage).toBe("web.flash.invalid_image (boom)");
   });
 
-  it("prepares again on the click after a preparation that failed", async () => {
-    engines.esp.prepare.mockRejectedValueOnce(new Error("chunk fetch failed"));
-    const { el } = await handOff({}, false);
+  it("loads the engine again on the click after a load that failed", async () => {
+    // The page's warm-up and the preparation both miss the chunk.
+    const offline = new TypeError("Failed to fetch");
+    engines.load.esp.mockRejectedValueOnce(offline).mockRejectedValueOnce(offline);
+    const { el } = await handOff({ name: "fw.bin" }, false);
     expect((el as any)._state).toBe("error");
-    // The click that prepares again does not open the picker: the fetch may
-    // have used up its user activation.
+    expect((el as any)._statusMessage).toBe("firmware.engine_load_failed");
+    expect(preparation(el)).toBe("retryable");
+    expect(primaryButton(el).disabled).toBe(false);
+    // The button says what the click does: it loads again, it does not install.
+    expect(primaryButton(el).textContent?.trim()).toBe("command.retry");
+    // The click that loads again does not open the picker: the fetch may
+    // use up its user activation.
     await (el as any)._onPrimary();
-    expect(engines.esp.prepare).toHaveBeenCalledTimes(2);
     expect(requestPort).not.toHaveBeenCalled();
+    await settled(el);
+    expect(engines.load.esp).toHaveBeenCalledTimes(3);
     expect((el as any)._state).toBe("connecting");
-    expect((el as any)._statusMessage).toBe("web.flash.firmware_ready");
-    expect((el as any)._busy).toBe(false);
+    expect((el as any)._statusMessage).toBe("web.flash.firmware_ready_named");
+    expect(primaryButton(el).textContent?.trim()).toBe("web.flash.connect_install");
     await (el as any)._onPrimary();
-    expect(engines.esp.prepare).toHaveBeenCalledTimes(2);
     expect(requestPort).toHaveBeenCalledOnce();
     expect(engines.esp.run).toHaveBeenCalledOnce();
     expect((el as any)._state).toBe("done");
-    // Prepared once for good: a later click reuses the run.
-    expect((el as any)._reprepare).toBeUndefined();
+  });
+
+  it("offers the install only once the preparation has settled", async () => {
+    let ready!: (plan: { run: typeof engines.esp.run }) => void;
+    engines.esp.prepare.mockReturnValueOnce(
+      new Promise((resolve) => {
+        ready = resolve;
+      })
+    );
+    const { el } = await handOff({}, false, false);
+    await vi.waitFor(() => expect(engines.esp.prepare).toHaveBeenCalled());
+    await el.updateComplete;
+    // Still fetching and checking: no install, and a click starts nothing.
+    expect((el as any)._statusMessage).toBe("web.install.preparing");
+    expect(primaryButton(el).disabled).toBe(true);
+    await (el as any)._onPrimary();
+    expect(requestPort).not.toHaveBeenCalled();
+
+    ready({ run: engines.esp.run });
+    await settled(el);
+    expect(primaryButton(el).disabled).toBe(false);
+    expect((el as any)._statusMessage).toBe("web.flash.firmware_ready");
+  });
+
+  it("keeps the firmware's name on the ready line after a dismissed picker", async () => {
+    requestPort.mockRejectedValueOnce(new DOMException("dismissed", "NotFoundError"));
+    vi.mocked(isPortPickerCancel).mockReturnValueOnce(true);
+    const { el } = await handOff({ name: "fw.bin" });
+    expect((el as any)._statusMessage).toBe("web.flash.firmware_ready_named");
+  });
+
+  it("asks for the port in the click itself, with nothing awaited before it", async () => {
+    const { el } = await handOff({}, false);
+    // Not awaited: the picker has to be asked for before the click's turn ends.
+    const install = (el as any)._onPrimary();
+    expect(requestPort).toHaveBeenCalledOnce();
+    await install;
   });
 
   it("reports a frame naming a flasher it does not have as malformed", async () => {
@@ -182,22 +303,99 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(engines.esp.run).toHaveBeenCalledOnce();
   });
 
-  it("frees the button when the picked file cannot be read", async () => {
-    Object.defineProperty(window, "opener", { value: null, configurable: true });
-    window.location.hash = "";
-    const el = new ESPHomeWebFlashReceiver();
-    (el as any)._localize = (k: string) => k;
-    document.body.appendChild(el);
+  it("prepares a picked file when it is picked, so the click opens the picker", async () => {
+    const el = await pickFile({ arrayBuffer: async () => new ArrayBuffer(4) });
+    expect(engines.esp.prepare).toHaveBeenCalledOnce();
+    expect(engines.esp.prepare.mock.calls[0][1]).toBe(true); // a manual flash erases
+    expect((el as any)._state).toBe("idle");
+    expect(primaryButton(el).disabled).toBe(false);
+    const install = (el as any)._onPrimary();
+    expect(requestPort).toHaveBeenCalledOnce();
+    await install;
+    expect(engines.esp.run).toHaveBeenCalledOnce();
+  });
+
+  it("never offers the install of a file that another pick overtook", async () => {
+    let first!: (plan: { run: typeof engines.esp.run }) => void;
+    engines.esp.prepare
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          first = resolve;
+        })
+      )
+      .mockResolvedValueOnce({ error: "web.flash.invalid_image" });
+    const el = await mountReceiver(null);
+    const files = [{ arrayBuffer: async () => new ArrayBuffer(4) }];
+    Object.defineProperty(el, "_fileInput", { value: { files } });
+    await (el as any)._onFileChange();
+    // A second pick, of a file that is not firmware, while the first is checked.
+    files[0] = { arrayBuffer: async () => new ArrayBuffer(8) };
+    await (el as any)._onFileChange();
+    await settled(el);
+    // The first file's check ends now; it must not come back as ready.
+    first({ run: engines.esp.run });
+    await Promise.resolve();
     await el.updateComplete;
-    Object.defineProperty(el, "_fileInput", {
-      value: {
-        files: [{ arrayBuffer: () => Promise.reject(new Error("NotReadableError")) }],
-      },
+    expect(preparation(el)).toBe("idle");
+    expect((el as any)._statusMessage).toBe("web.flash.invalid_image");
+    expect(primaryButton(el).disabled).toBe(true);
+  });
+
+  it("says it is preparing while a picked file is still being read", async () => {
+    let read!: (bytes: ArrayBuffer) => void;
+    const el = await mountReceiver(null);
+    const file = {
+      arrayBuffer: () =>
+        new Promise<ArrayBuffer>((resolve) => {
+          read = resolve;
+        }),
+    };
+    Object.defineProperty(el, "_fileInput", { value: { files: [file] } });
+    const picked = (el as any)._onFileChange();
+    await el.updateComplete;
+    expect((el as any)._statusMessage).toBe("web.install.preparing");
+    // The read is part of the work: the line comes with its spinner.
+    expect(preparation(el)).toBe("pending");
+    expect(el.shadowRoot!.querySelector(".status wa-spinner")).not.toBeNull();
+    expect(primaryButton(el).disabled).toBe(true);
+    expect(engines.esp.prepare).not.toHaveBeenCalled();
+    read(new ArrayBuffer(4));
+    await picked;
+    await settled(el);
+    expect(primaryButton(el).disabled).toBe(false);
+  });
+
+  it("names a picked file that is not firmware when it is picked", async () => {
+    engines.esp.prepare.mockResolvedValueOnce({ error: "web.flash.invalid_image" });
+    const el = await pickFile({ arrayBuffer: async () => new ArrayBuffer(4) });
+    expect((el as any)._state).toBe("error");
+    expect((el as any)._statusMessage).toBe("web.flash.invalid_image");
+    expect(requestPort).not.toHaveBeenCalled();
+    expect((el as any)._fileInput.value).toBe("");
+  });
+
+  it("says so when the picked file cannot be read, and offers no install", async () => {
+    const el = await pickFile({
+      arrayBuffer: () => Promise.reject(new Error("NotReadableError")),
     });
-    await (el as any)._onPrimary();
     expect((el as any)._busy).toBe(false);
     expect((el as any)._state).toBe("error");
-    expect(engines.esp.run).not.toHaveBeenCalled();
+    expect((el as any)._statusMessage).toBe("web.flash.choose_file");
+    expect(engines.esp.prepare).not.toHaveBeenCalled();
+    expect(primaryButton(el).disabled).toBe(true);
+    // Unpicked, so picking the same file again fires a change.
+    expect((el as any)._fileInput.value).toBe("");
+  });
+
+  it("keeps a file picked while it is ready or can be checked again", async () => {
+    const ready = await pickFile({ arrayBuffer: async () => new ArrayBuffer(4) });
+    expect((ready as any)._fileInput.value).not.toBe("");
+    document.body.innerHTML = "";
+    const offline = new TypeError("Failed to fetch");
+    engines.load.esp.mockRejectedValueOnce(offline).mockRejectedValueOnce(offline);
+    const retryable = await pickFile({ arrayBuffer: async () => new ArrayBuffer(4) });
+    expect(preparation(retryable)).toBe("retryable");
+    expect((retryable as any)._fileInput.value).not.toBe("");
   });
 
   it("sends the manual reset as the done note and parks the port for Logs", async () => {
