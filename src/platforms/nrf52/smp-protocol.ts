@@ -1,23 +1,19 @@
 /**
- * SMP (Simple Management Protocol) engine used by both the BLE and serial
- * MCUboot OTA transports. Handles frame building/parsing, MCUboot image
- * validation, and the upload sequence (chunks → test → reset).
+ * The SMP (Simple Management Protocol) side of an MCUboot update, shared by
+ * the Bluetooth and serial transports: frames, image validation, and the
+ * upload sequence (chunks, mark for test, reset).
  */
 import { cborDecode, cborEncode } from "./smp-cbor.js";
 
-// SMP opcodes
 export const MGMT_OP_READ = 0;
 export const MGMT_OP_WRITE = 2;
 
-// SMP management groups
 export const MGMT_GROUP_OS = 0;
 export const MGMT_GROUP_IMAGE = 1;
 
-// OS group command IDs
 export const OS_MGMT_RESET = 5;
 export const OS_MGMT_MCUMGR_PARAMS = 6;
 
-// Image group command IDs
 export const IMG_MGMT_STATE = 0;
 export const IMG_MGMT_UPLOAD = 1;
 
@@ -28,17 +24,20 @@ const MCUBOOT_MAGIC = 0x96f3b83d;
 const SMP_HEADER_SIZE = 8;
 // CBOR overhead for the first upload chunk:
 //   map(4)=1, "data"=5, bstr-len(2)=3, "off"=4, uint32=5,
-//   "sha"=4, bstr(32)=34, "len"=4, uint32=5  → 65 bytes; +5 margin.
+//   "sha"=4, bstr(32)=34, "len"=4, uint32=5: 65 bytes, plus a margin of 5.
 const SMP_UPLOAD_FIRST_OVERHEAD = 70;
 
-// Fallback chunk sizes when OS_MGMT_MCUMGR_PARAMS is not available.
-export const SMP_CHUNK_SIZE_BLE = 128;
-export const SMP_CHUNK_SIZE_SERIAL = 128;
+/** The chunk size for a device that does not report its buffer. */
+export const SMP_CHUNK_SIZE_DEFAULT = 128;
+
+// Responses in a row that may leave the offset where it was before the
+// device counts as stuck.
+const MAX_STALLED_CHUNKS = 3;
 
 export interface SmpDeviceParams {
   /** Maximum SMP frame the device can receive, including the 8-byte header. */
   bufSize: number;
-  /** Number of SMP receive buffers — safe pipeline depth. */
+  /** Number of SMP receive buffers. */
   bufCount: number;
 }
 
@@ -65,19 +64,15 @@ export async function smpQueryDeviceParams(
       return { bufSize, bufCount };
     }
   } catch {
-    // Device doesn't support the command or timed out — use defaults.
+    // Older firmware has no such command; the caller falls back.
   }
   return null;
 }
 
 /**
- * Derive the optimal data-chunk size from device params.
- *
- * The chunk size is bounded by the device's SMP reassembly buffer (`buf_size`),
- * NOT by the per-BLE-write limit: a single SMP frame is fragmented across
- * multiple ATT writes on the transport side and reassembled by the device, so
- * frames much larger than one ATT packet are fine. Bigger chunks mean far fewer
- * request→response round-trips, which is where the BLE throughput win comes from.
+ * The largest data chunk the device's reassembly buffer takes. The buffer
+ * bounds it, not one Bluetooth write: a frame is split across writes and
+ * reassembled, and fewer round-trips is where the throughput comes from.
  */
 export function chunkSizeFromParams(params: SmpDeviceParams): number {
   // The first chunk carries the largest overhead (sha + len fields); use that as the limit.
@@ -85,13 +80,11 @@ export function chunkSizeFromParams(params: SmpDeviceParams): number {
 }
 
 /**
- * Transport abstraction: send an SMP frame and receive the matching response.
- * Both BLE and serial implementations satisfy this interface. Strictly
- * request→response — one exchange completes before the next begins.
+ * Sends an SMP frame and returns the response to it. One exchange completes
+ * before the next begins: mcumgr handles a single request at a time.
  */
 export interface SmpTransport {
   exchange(frame: Uint8Array, signal?: AbortSignal): Promise<Uint8Array>;
-  close(): void;
 }
 
 /** Build an SMP request frame (header + CBOR payload). */
@@ -152,10 +145,9 @@ export interface McubootImageInfo {
   /** SHA-256 hash of the full image (for the SMP upload sha field). */
   hash: Uint8Array;
   /**
-   * The MCUboot image hash from the image's SHA256 TLV — this is the value the
-   * device reports for each slot in the image list, so it's what we compare
-   * against to tell whether the device already has this image. Undefined when
-   * the TLV can't be located (e.g. an unexpected layout).
+   * The image's SHA256 TLV: the hash the device reports for each slot, so
+   * the one that says whether it already holds this image. Undefined when
+   * the TLV can't be located.
    */
   imageHash?: Uint8Array;
 }
@@ -193,13 +185,17 @@ function findImageHashTlv(
   return undefined;
 }
 
+/** A validated MCUboot image, ready to upload. */
+export interface McubootImage {
+  bytes: Uint8Array;
+  info: McubootImageInfo;
+}
+
 /**
- * Parse and validate a MCUboot-signed firmware binary. Throws on invalid magic,
- * wrong load address, or size mismatch; does not verify the TLV hash.
+ * Validate an MCUboot firmware binary. Throws on a bad magic or load
+ * address; does not verify the TLV hash.
  */
-export async function parseMcubootImageInfo(
-  bytes: Uint8Array
-): Promise<McubootImageInfo> {
+export async function parseMcubootImage(bytes: Uint8Array): Promise<McubootImage> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
   if (bytes.length < 32) throw new Error("Invalid MCUboot image (too short)");
@@ -233,7 +229,7 @@ export async function parseMcubootImageInfo(
 
   const imageHash = findImageHashTlv(bytes, view, hdrSize, imageSize, protectTlvSize);
 
-  return { version, imageSize, hash, imageHash };
+  return { bytes, info: { version, imageSize, hash, imageHash } };
 }
 
 export interface SmpUploadHooks {
@@ -243,13 +239,12 @@ export interface SmpUploadHooks {
 }
 
 /**
- * Upload a MCUboot firmware image via the given SMP transport, then mark it
- * for testing and reset the device. Throws on error or abort.
+ * Upload an MCUboot image over *transport*, mark it for test and reset the
+ * device. Throws on error or abort.
  */
 export async function smpUploadImage(
   transport: SmpTransport,
-  image: Uint8Array,
-  info: McubootImageInfo,
+  { bytes: image, info }: McubootImage,
   chunkSize: number,
   hooks: SmpUploadHooks
 ): Promise<void> {
@@ -321,30 +316,26 @@ export async function smpUploadImage(
 
   log(`Firmware version ${info.version}, ${kb(image.length)} KB`);
 
-  // Check the device's current image state BEFORE uploading, so we can skip the
-  // 200+ KB transfer when the device already has this exact image. The image
-  // list reports MCUboot's image hash (the SHA256 TLV), which is `info.imageHash`.
+  // The image list reports MCUboot's image hash (the SHA256 TLV), so a device
+  // that already holds this image skips the transfer.
   log("Checking device image status");
   let before = await readImageState();
 
-  // If the device is running an unconfirmed test image, the secondary slot still
-  // holds the confirmed fallback and MCUboot rejects a new upload (EBADSTATE).
-  // Confirm the running image first to free the update slot.
+  // While an unconfirmed test image runs, the update slot holds the confirmed
+  // fallback and MCUboot rejects an upload (EBADSTATE).
   if (before.activeHash && before.activeConfirmed === false) {
-    log("Running image is not confirmed — confirming it to free the update slot");
+    log("Running image is not confirmed; confirming it to free the update slot");
     await confirmActiveImage(before.activeHash);
     before = await readImageState();
   }
   if (info.imageHash) {
     if (before.activeHash && bytesEqual(before.activeHash, info.imageHash)) {
-      log("Device is already running this exact firmware — nothing to do.");
+      log("Device is already running this exact firmware; nothing to do.");
       onProgress(100);
       return;
     }
     if (before.slot1Hash && bytesEqual(before.slot1Hash, info.imageHash)) {
-      // The image is already in the update slot from a previous upload; skip the
-      // transfer and go straight to marking it for test.
-      log("This image is already in the update slot — skipping upload.");
+      log("This image is already in the update slot; skipping upload.");
       await testAndReset(before.slot1Hash);
       return;
     }
@@ -355,13 +346,9 @@ export async function smpUploadImage(
   const totalChunks = Math.ceil(image.length / chunkSize);
   log(`Transferring in ${totalChunks} packets of up to ${chunkSize} bytes`);
 
-  // Strictly sequential request→response. The mcumgr SMP-over-BLE transport
-  // handles one request at a time and reassembles incoming writes by length;
-  // a second request sent before the current one is ACK'd corrupts the
-  // device's reassembly buffer. Speed comes from a larger `chunkSize` (fewer
-  // round-trips), negotiated via OS_MGMT_MCUMGR_PARAMS — not from pipelining.
   const startedAt = Date.now();
   let offset = 0;
+  let stalled = 0;
   let lastLoggedPct = -1;
   while (offset < image.length) {
     if (signal?.aborted) throw signal.reason;
@@ -393,21 +380,21 @@ export async function smpUploadImage(
     if (typeof deviceOff !== "number")
       throw new Error("SMP: missing offset in upload response");
 
-    // The device dictates the next offset (it may re-request on a partial write).
+    // The device dictates the next offset: it re-requests a partial write.
+    stalled = deviceOff > offset ? 0 : stalled + 1;
+    if (stalled >= MAX_STALLED_CHUNKS) {
+      throw new Error(`SMP: the device stopped accepting data at offset ${offset}`);
+    }
     offset = deviceOff;
     const pct = Math.floor((offset / image.length) * 95);
     onProgress(pct);
 
-    // Log a status line every 10% so the terminal shows the transfer advancing
-    // with throughput, without flooding it with a line per packet.
     const decile = Math.floor((offset / image.length) * 10) * 10;
     if (decile > lastLoggedPct) {
       lastLoggedPct = decile;
       const elapsed = (Date.now() - startedAt) / 1000;
       const rate = elapsed > 0 ? offset / elapsed / 1024 : 0;
-      log(
-        `${decile}% — ${kb(offset)} / ${kb(image.length)} KB (${rate.toFixed(1)} KB/s)`
-      );
+      log(`${decile}%: ${kb(offset)} / ${kb(image.length)} KB (${rate.toFixed(1)} KB/s)`);
     }
   }
   const elapsed = (Date.now() - startedAt) / 1000;
@@ -415,17 +402,14 @@ export async function smpUploadImage(
     `Upload finished: ${kb(image.length)} KB in ${elapsed.toFixed(1)} s (${(image.length / elapsed / 1024).toFixed(1)} KB/s)`
   );
 
-  // Re-read the image list to get the hash the device assigned to the freshly
-  // uploaded image in the update slot.
   log("Fetching image list");
   const after = await readImageState();
   const slotHash = after.slot1Hash;
   if (!slotHash) throw new Error("SMP: secondary slot image not found after upload");
 
-  // Guard: if the just-uploaded image is byte-identical to the running one, the
-  // device is already on this firmware; marking it for test would fail.
+  // Marking the running image for test would fail.
   if (after.activeHash && bytesEqual(after.activeHash, slotHash)) {
-    log("Device is already running this exact firmware — nothing to do.");
+    log("Device is already running this exact firmware; nothing to do.");
     onProgress(100);
     return;
   }
@@ -448,8 +432,7 @@ export async function smpUploadImage(
     if (testRc !== 0) throw new Error(`SMP: image test failed (rc=${testRc})`);
 
     onProgress(98);
-    // Give the device a moment to finish persisting the image-state write before
-    // we ask it to reboot, so the pending/test flag is durably stored first.
+    // The test flag has to be stored before the device reboots.
     await new Promise<void>((resolve) => setTimeout(resolve, 1000));
     log("Resetting device to boot the new image");
     const resetFrame = buildSmpFrame(
@@ -459,13 +442,12 @@ export async function smpUploadImage(
       seq++,
       {}
     );
-    // The device may drop the connection before responding to reset; ignore errors here.
     try {
       await exchange(resetFrame);
     } catch {
-      // Expected: device resets before the ACK arrives.
+      // The device resets before its reply arrives.
     }
-    log("Done — the device is rebooting into the new firmware");
+    log("Done; the device is rebooting into the new firmware");
     onProgress(100);
   }
 }

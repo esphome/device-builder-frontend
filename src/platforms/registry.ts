@@ -41,13 +41,32 @@ export function serialLogsFor(
   return serialLogsOf(platformFor(targetPlatform));
 }
 
-/** The flasher of ``platform`` that writes a device's chip, if one does. */
+const writesChip = (install: AnyBrowserInstall, mcu: string | null): boolean =>
+  !install.chips || (mcu !== null && install.chips.includes(mcu));
+
+/**
+ * The flasher of ``platform`` that writes a device's chip whatever firmware
+ * it runs, if one does.
+ */
 export function installOf(
   platform: PlatformSupport | undefined,
   mcu: string | null
 ): AnyBrowserInstall | undefined {
   return platform?.installs?.find(
-    (install) => !install.chips || (mcu !== null && install.chips.includes(mcu))
+    (install) => !install.component && writesChip(install, mcu)
+  );
+}
+
+/** Every flasher a device can take: its chip's, and its firmware's own. */
+export function installsFor(
+  targetPlatform: string | null | undefined,
+  mcu: string | null,
+  loadedPlatforms: readonly string[]
+): readonly AnyBrowserInstall[] {
+  return (platformFor(targetPlatform)?.installs ?? []).filter(
+    (install) =>
+      writesChip(install, mcu) &&
+      (!install.component || loadedPlatforms.includes(install.component))
   );
 }
 
@@ -57,29 +76,6 @@ export function installFor(
   mcu: string | null
 ): AnyBrowserInstall | undefined {
   return installOf(platformFor(targetPlatform), mcu);
-}
-
-/**
- * Every flasher of ``platform`` that writes a device's chip (or is
- * chip-agnostic). Unlike ``installOf``, this keeps all matches — a platform can
- * offer several methods for the same chip (e.g. nRF52 DFU plus MCUboot OTA over
- * BLE and serial), and the dialog renders a row for each.
- */
-export function installsOf(
-  platform: PlatformSupport | undefined,
-  mcu: string | null
-): AnyBrowserInstall[] {
-  return (platform?.installs ?? []).filter(
-    (install) => !install.chips || (mcu !== null && install.chips.includes(mcu))
-  );
-}
-
-/** ``installsOf`` for a device's target platform. */
-export function installsFor(
-  targetPlatform: string | null | undefined,
-  mcu: string | null
-): AnyBrowserInstall[] {
-  return installsOf(platformFor(targetPlatform), mcu);
 }
 
 /** The install flow an install method string selects, if any. */

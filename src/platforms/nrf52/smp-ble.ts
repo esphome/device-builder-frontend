@@ -1,78 +1,29 @@
 /**
- * MCUboot OTA via BLE SMP — transport and install flow.
- * Uses the Zephyr/MCUboot SMP GATT service (the same service mcumgr-web uses).
+ * MCUboot updates over the mcumgr SMP GATT service: the Bluetooth transport
+ * for ``smp-protocol``.
  */
-import type { LocalizeFunc } from "../../common/localize.js";
-import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
-import {
-  downloadBuildArtifact,
-  installLog,
-} from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import { getErrorMessage } from "../../util/error-message.js";
-import { isPortPickerCancel } from "../../util/web-serial.js";
-import {
-  type BrowserInstall,
-  FLASH_ACTION_KEY,
-  FlashImageSlot,
-} from "../platform-support.js";
+import { SMP_BLE_CHARACTERISTIC_UUID, SMP_BLE_SERVICE_UUID } from "./smp-ble-service.js";
 import {
   chunkSizeFromParams,
-  type McubootImageInfo,
-  parseMcubootImageInfo,
-  SMP_CHUNK_SIZE_BLE,
+  type McubootImage,
+  SMP_CHUNK_SIZE_DEFAULT,
   smpQueryDeviceParams,
   type SmpTransport,
+  type SmpUploadHooks,
   smpUploadImage,
 } from "./smp-protocol.js";
 
-declare module "../platform-support.js" {
-  interface BrowserFlasherSteps {
-    "nrf-smp-ble": "nrf-smp-ble-ready";
+/** The picked device has no SMP service: not an mcumgr build, or the wrong device. */
+export class SmpBleServiceNotFoundError extends Error {
+  constructor() {
+    super("SMP Bluetooth service not found");
+    this.name = "SmpBleServiceNotFoundError";
   }
 }
 
-const SMP_SERVICE_UUID = "8d53dc1d-1db7-4cd3-868b-8a527460aa84";
-const SMP_CHARACTERISTIC_UUID = "da2e7828-fbce-4e01-ae9e-261174997c48";
-
-/** Parsed MCUboot image kept across Retry. */
-interface McubootImageSlotData {
-  image: Uint8Array;
-  info: McubootImageInfo;
-}
-
-export const nrfSmpBleImage = new FlashImageSlot<McubootImageSlotData>();
-
-/** The BLE SMP characteristic does not need Web Serial. */
-export const NRF_SMP_BLE_REQUIRES_WEB_SERIAL = false;
-
-/**
- * Open the BLE device chooser for an SMP-capable device.
- * Names are used to pre-filter; with none the picker shows all devices.
- */
-export async function requestSmpBleDevice(
-  names: string[]
-): Promise<BluetoothDevice | null> {
-  const known = [...new Set(names.filter(Boolean))];
-  const options: RequestDeviceOptions = known.length
-    ? {
-        filters: known.map((name) => ({ name })),
-        optionalServices: [SMP_SERVICE_UUID],
-      }
-    : { acceptAllDevices: true, optionalServices: [SMP_SERVICE_UUID] };
-  try {
-    return await navigator.bluetooth.requestDevice(options);
-  } catch (err) {
-    if (!isPortPickerCancel(err)) throw err;
-    return null;
-  }
-}
-
-/** SMP transport backed by a BLE GATT characteristic. */
-// Milliseconds to wait for a response notification before giving up.
 const BLE_EXCHANGE_TIMEOUT_MS = 10_000;
-// Per-ATT-packet write size. Web Bluetooth does not expose the negotiated MTU,
-// so use a value safe for the standard 247-byte MTU (247 − 3 ATT overhead).
-// The mcumgr firmware reassembles a full SMP frame across these fragments.
+// Web Bluetooth does not expose the negotiated MTU, so stay within the
+// standard 247-byte one, less 3 bytes of ATT header.
 const BLE_WRITE_FRAGMENT = 244;
 
 class SmpBleTransport implements SmpTransport {
@@ -87,14 +38,13 @@ class SmpBleTransport implements SmpTransport {
     private readonly device: BluetoothDevice
   ) {
     this.onValueChanged = () => this.handleNotification();
-    this.onDisconnected = () => this.rejectAll(new Error("BLE device disconnected"));
+    this.onDisconnected = () => this.rejectAll(new Error("SMP: the device disconnected"));
     characteristic.addEventListener("characteristicvaluechanged", this.onValueChanged);
     device.addEventListener("gattserverdisconnected", this.onDisconnected);
   }
 
   private rejectAll(err: Error): void {
-    // Snapshot before clearing so the cleanup inside each reject callback
-    // doesn't mutate the map while we're iterating it.
+    // Snapshot first: each reject's cleanup mutates the map.
     const rejects = [...this.pendingReject.values()];
     this.pending.clear();
     this.pendingReject.clear();
@@ -104,15 +54,13 @@ class SmpBleTransport implements SmpTransport {
   private handleNotification(): void {
     const val = this.characteristic.value;
     if (!val) return;
-    // Use byteOffset/byteLength — val.buffer may be a larger shared ArrayBuffer
-    // and reading it directly would include bytes outside the notification window.
+    // val.buffer may be a larger shared ArrayBuffer; stay inside the window.
     const chunk = new Uint8Array(val.buffer, val.byteOffset, val.byteLength);
     const merged = new Uint8Array(this.rxBuf.length + chunk.length);
     merged.set(this.rxBuf);
     merged.set(chunk, this.rxBuf.length);
     this.rxBuf = merged;
 
-    // An SMP frame is complete when we have header + declared payload length.
     while (this.rxBuf.length >= 8) {
       const payloadLen = (this.rxBuf[2] << 8) | this.rxBuf[3];
       const frameLen = 8 + payloadLen;
@@ -122,22 +70,16 @@ class SmpBleTransport implements SmpTransport {
       this.rxBuf = this.rxBuf.slice(frameLen);
 
       const seq = frame[6];
-      // The stored callback includes cleanup (delete from both maps).
       this.pending.get(seq)?.(frame);
     }
   }
 
-  /** Await the BLE write, then return a Promise for the response notification. */
-  async send(
-    frame: Uint8Array,
-    signal?: AbortSignal
-  ): Promise<{ response: Promise<Uint8Array> }> {
+  async exchange(frame: Uint8Array, signal?: AbortSignal): Promise<Uint8Array> {
     const seq = frame[6];
 
     const response = new Promise<Uint8Array>((resolve, reject) => {
-      // Clean up synchronously inside resolve/reject so the maps are always
-      // up-to-date before any microtask runs — prevents close() from finding
-      // a stale entry and generating a spurious unhandled rejection.
+      // Cleaned up synchronously, so close() never finds a settled entry
+      // and raises an unhandled rejection for it.
       const cleanup = () => {
         clearTimeout(timer);
         this.pending.delete(seq);
@@ -158,7 +100,7 @@ class SmpBleTransport implements SmpTransport {
       timer = setTimeout(() => {
         if (this.pending.has(seq)) {
           cleanup();
-          reject(new Error("SMP: BLE response timeout"));
+          reject(new Error("SMP: no response from the device"));
         }
       }, BLE_EXCHANGE_TIMEOUT_MS);
 
@@ -174,10 +116,8 @@ class SmpBleTransport implements SmpTransport {
       );
     });
 
-    // An SMP frame can exceed the ATT MTU. The mcumgr BLE transport reassembles
-    // a single SMP frame across multiple BLE writes (keyed by the length field),
-    // so fragment the frame into MTU-sized ATT packets here. Web Bluetooth does
-    // not expose the negotiated MTU, so use a conservative fragment size.
+    // An SMP frame can exceed the ATT MTU; mcumgr reassembles one frame
+    // across writes by its length field.
     for (let start = 0; start < frame.length; start += BLE_WRITE_FRAGMENT) {
       const piece = frame.subarray(start, start + BLE_WRITE_FRAGMENT);
       const buf = piece.buffer.slice(
@@ -186,7 +126,7 @@ class SmpBleTransport implements SmpTransport {
       ) as ArrayBuffer;
       await this.writeFragment(buf, seq);
     }
-    return { response };
+    return response;
   }
 
   /** Write one MTU-sized fragment, retrying on transient GATT-busy errors. */
@@ -210,11 +150,6 @@ class SmpBleTransport implements SmpTransport {
     }
   }
 
-  async exchange(frame: Uint8Array, signal?: AbortSignal): Promise<Uint8Array> {
-    const { response } = await this.send(frame, signal);
-    return response;
-  }
-
   close(): void {
     this.characteristic.removeEventListener(
       "characteristicvaluechanged",
@@ -226,141 +161,40 @@ class SmpBleTransport implements SmpTransport {
   }
 }
 
-/** Connect to the device's SMP GATT service and return a transport. */
 async function connectSmpBle(device: BluetoothDevice): Promise<SmpBleTransport> {
-  const server = await device.gatt!.connect();
+  if (!device.gatt) throw new Error("SMP: the device has no GATT server");
+  const server = await device.gatt.connect();
   const service = await server
-    .getPrimaryService(SMP_SERVICE_UUID)
+    .getPrimaryService(SMP_BLE_SERVICE_UUID)
     .catch((err: unknown) => {
       if (err instanceof DOMException && err.name === "NotFoundError") {
-        throw new Error("firmware.nrf_smp_ble_service_not_found");
+        throw new SmpBleServiceNotFoundError();
       }
       throw err;
     });
-  const characteristic = await service.getCharacteristic(SMP_CHARACTERISTIC_UUID);
+  const characteristic = await service.getCharacteristic(SMP_BLE_CHARACTERISTIC_UUID);
   await characteristic.startNotifications();
   return new SmpBleTransport(characteristic, device);
 }
 
-// ── Install flow ──────────────────────────────────────────────────────────────
-
-async function startNrfSmpBleInstall(host: ESPHomeFirmwareInstallDialog): Promise<void> {
-  const device = host._device;
-  if (!device) return;
-
-  const artifact = await downloadBuildArtifact(
-    host,
-    device,
-    (binaries) => binaries.find((b) => b.file.endsWith("app_update.bin")),
-    "firmware.nrf_no_mcuboot_bin"
-  );
-  if (!artifact) return;
-
-  let info: McubootImageInfo;
+/** Connect to *device*, upload *image* and boot it; the link is closed either way. */
+export async function flashMcubootOverBle(
+  device: BluetoothDevice,
+  image: McubootImage,
+  hooks: SmpUploadHooks
+): Promise<void> {
+  hooks.onLog?.(`Connecting to ${device.name ?? "device"} over Bluetooth`);
+  const transport = await connectSmpBle(device);
   try {
-    info = await parseMcubootImageInfo(artifact.bytes);
-  } catch (err) {
-    if (host._device === device)
-      host._fail(host._localize("firmware.nrf_bad_mcuboot_image"), getErrorMessage(err));
-    return;
-  }
-
-  if (host._device !== device) return;
-  nrfSmpBleImage.set(host, { image: artifact.bytes, info });
-  host._step = "nrf-smp-ble-ready";
-  host._statusMessage = host._localize("firmware.nrf_smp_ble_ready_title");
-}
-
-async function nrfDoSmpBleFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
-  const slot = nrfSmpBleImage.get(host);
-  if (!slot || host._flashBusy) return;
-
-  const device = host._device;
-  const stillCurrent = () => host._device === device && nrfSmpBleImage.get(host) === slot;
-
-  if (!("bluetooth" in navigator)) {
-    if (stillCurrent()) host._fail(host._localize("dashboard.logs_ble_nus_unsupported"));
-    return;
-  }
-
-  const bleDevice = await requestSmpBleDevice([device?.name ?? ""].filter(Boolean));
-  if (!bleDevice || !stillCurrent()) return;
-
-  host._step = "flashing";
-  host._statusMessage = host._localize("firmware.nrf_smp_connecting");
-  host._flashPercent = 0;
-
-  const abort = new AbortController();
-  host._flashAbort = abort;
-  let transport: SmpBleTransport | undefined;
-
-  const log = installLog(host, stillCurrent);
-  try {
-    log(`Connecting to ${bleDevice.name ?? "device"} over Bluetooth`);
-    transport = await connectSmpBle(bleDevice);
-    if (!stillCurrent()) return;
-    log("Connected; negotiating transfer parameters");
-    host._statusMessage = host._localize("firmware.status_flashing");
-
-    // Speedup comes from a larger chunk size (fewer round-trips), NOT from
-    // pipelining: the mcumgr BLE transport handles one SMP request at a time
-    // and reassembles by length, so a second request sent before the first is
-    // ACK'd corrupts its reassembly buffer. Keep it strictly request→response.
-    const params = await smpQueryDeviceParams(transport, abort.signal);
-    const chunkSize = params ? chunkSizeFromParams(params) : SMP_CHUNK_SIZE_BLE;
-    log(
+    const params = await smpQueryDeviceParams(transport, hooks.signal);
+    const chunkSize = params ? chunkSizeFromParams(params) : SMP_CHUNK_SIZE_DEFAULT;
+    hooks.onLog?.(
       params
-        ? `Device buffer: ${params.bufSize} bytes × ${params.bufCount}; using ${chunkSize}-byte chunks`
-        : `Device did not report parameters; using default ${chunkSize}-byte chunks`
+        ? `Device buffer: ${params.bufSize} bytes x ${params.bufCount}; using ${chunkSize}-byte chunks`
+        : `Device did not report parameters; using ${chunkSize}-byte chunks`
     );
-
-    await smpUploadImage(transport, slot.image, slot.info, chunkSize, {
-      signal: abort.signal,
-      onProgress: (pct) => {
-        if (stillCurrent()) host._flashPercent = pct;
-      },
-      onLog: log,
-    });
-  } catch (err) {
-    if (stillCurrent()) {
-      host._fail(host._localize("firmware.nrf_smp_ble_failed"), getErrorMessage(err));
-    }
-    return;
+    await smpUploadImage(transport, image, chunkSize, hooks);
   } finally {
-    transport?.close();
-    if (host._flashAbort === abort) host._flashAbort = null;
+    transport.close();
   }
-
-  if (!stillCurrent()) return;
-  host._statusMessage = host._localize("firmware.status_done");
-  host._step = "done";
-}
-
-export const nrfSmpBleInstall: BrowserInstall<"nrf-smp-ble"> = {
-  id: "nrf-smp-ble",
-  methodKey: "nrf_smp_ble",
-  holdsPort: false,
-  requiresWebSerial: false,
-  image: nrfSmpBleImage,
-  start: startNrfSmpBleInstall,
-  showFirstStep(host) {
-    host._step = "nrf-smp-ble-ready";
-    host._statusMessage = host._localize("firmware.nrf_smp_ble_ready_title");
-  },
-  steps: {
-    "nrf-smp-ble-ready": {
-      detailKey: "firmware.nrf_smp_ble_ready_desc",
-      footer: () => ({
-        primary: { run: nrfDoSmpBleFlash, labelKey: FLASH_ACTION_KEY },
-      }),
-    },
-  },
-};
-
-/** The localize key when the SMP GATT service is not found on the picked device. */
-export function smpBleFailureKey(localize: LocalizeFunc, err: unknown): string {
-  if (err instanceof Error && err.message === "firmware.nrf_smp_ble_service_not_found") {
-    return localize("firmware.nrf_smp_ble_service_not_found");
-  }
-  return localize("firmware.nrf_smp_ble_failed");
 }

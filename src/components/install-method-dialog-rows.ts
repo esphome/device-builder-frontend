@@ -169,25 +169,25 @@ export function renderBleNusOption(
 }
 
 /**
- * A platform flasher's row (nRF52 DFU / MCUboot OTA, Pico, RTL8720C). With Web
- * Serial it flashes here; an install that works without it (BLE OTA, which sets
- * ``requiresWebSerial: false``) shows regardless. On an insecure origin a
- * flasher that can hand off sends its firmware to web.esphome.io instead, with
- * ``handoffDesc`` in place of the in-app copy. The caller picks which installs
- * to render and where (main list vs Advanced options).
+ * A platform flasher's row (nRF52 DFU, Pico, RTL8720C). With Web Serial it
+ * flashes here; on an insecure origin a flasher that can hand off sends its
+ * firmware to web.esphome.io instead, with ``handoffDesc`` in place of the
+ * in-app copy. A Bluetooth flasher needs Web Bluetooth instead.
  */
 export function renderPlatformFlashOption(
   ctx: MethodRowContext,
-  install: AnyBrowserInstall | undefined,
-  hasWebSerial: boolean,
+  install: AnyBrowserInstall,
+  browser: { webSerial: boolean; webBluetooth: boolean },
   handoffDesc?: TemplateResult | string
 ): TemplateResult | typeof nothing {
-  if (ctx.mode === "logs" || !install) return nothing;
-  const needsWebSerial = install.requiresWebSerial !== false;
-  const viaHandoff = handoffDesc !== undefined && install.handoff !== undefined;
-  if (needsWebSerial && !hasWebSerial && !viaHandoff) return nothing;
+  if (ctx.mode === "logs") return nothing;
+  const bluetooth = install.transport === "bluetooth";
+  const viaHandoff =
+    !bluetooth && handoffDesc !== undefined && install.handoff !== undefined;
+  const usable = bluetooth ? browser.webBluetooth : browser.webSerial;
+  if (!usable && !viaHandoff) return nothing;
   return renderMethodRow({
-    icon: "chip",
+    icon: bluetooth ? "bluetooth" : "chip",
     title: ctx.localize(`dashboard.install_method_${install.methodKey}`),
     desc: viaHandoff
       ? handoffDesc

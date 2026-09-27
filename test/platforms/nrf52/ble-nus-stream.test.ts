@@ -342,7 +342,7 @@ describe("requestBleNusDevice", () => {
     bluetooth.getAvailability.mockResolvedValue(true);
     const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
     await expect(requestBleNusDevice(["x"])).resolves.toBeNull();
-    expect(debug).toHaveBeenCalledWith("BLE NUS chooser closed", expect.anything());
+    expect(debug).toHaveBeenCalledWith("BLE chooser closed", expect.anything());
     debug.mockRestore();
   });
 });

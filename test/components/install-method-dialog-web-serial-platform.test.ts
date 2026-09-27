@@ -49,9 +49,11 @@ const flashableChip = (platform: string): string | null =>
 async function mount(
   platform: string,
   mode: "install" | "logs" = "install",
-  mcu: string | null = flashableChip(platform)
+  mcu: string | null = flashableChip(platform),
+  loadedPlatforms: string[] = []
 ): Promise<ESPHomeInstallMethodDialog> {
   const dialog = new ESPHomeInstallMethodDialog();
+  dialog.deviceLoadedPlatforms = loadedPlatforms;
   (dialog as any)._localize = defaultLocalize;
   (dialog as any)._api = {};
   dialog.deviceState = DeviceState.ONLINE;
@@ -75,6 +77,10 @@ const hasRowTitled = (d: ESPHomeInstallMethodDialog, key: string): boolean =>
   );
 const hasNrfDfuRow = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_nrf_dfu");
+const hasSmpBleRow = (d: ESPHomeInstallMethodDialog): boolean =>
+  hasRowTitled(d, "dashboard.install_method_nrf_smp_ble");
+const hasSmpSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
+  hasRowTitled(d, "dashboard.install_method_nrf_smp_serial");
 const hasRp2Row = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_rp2_uf2");
 const hasRtlRow = (d: ESPHomeInstallMethodDialog): boolean =>
@@ -118,6 +124,79 @@ describe("install-method-dialog platform gating", () => {
     expect(hasNrfDfuRow(d)).toBe(true);
     expect(hasRp2Row(d)).toBe(false);
     expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  describe("nRF52 MCUboot updates", () => {
+    const MCUMGR = ["ota.zephyr_mcumgr"];
+    const mountMcumgr = async (loaded = MCUMGR) => {
+      const d = await mount("nrf52", "install", null, loaded);
+      (d as unknown as { _advancedExpanded: boolean })._advancedExpanded = true;
+      await d.updateComplete;
+      return d;
+    };
+    const inAdvanced = (d: ESPHomeInstallMethodDialog, key: string): boolean =>
+      [...d.shadowRoot!.querySelectorAll(".advanced-panel-content .option .title")].some(
+        (el) => el.textContent?.trim() === defaultLocalize(key)
+      );
+
+    it("are not offered to a device whose firmware has no mcumgr", async () => {
+      setBluetooth(true);
+      const d = await mountMcumgr([]);
+      expect(hasNrfDfuRow(d)).toBe(true);
+      expect(hasSmpBleRow(d)).toBe(false);
+      expect(hasSmpSerialRow(d)).toBe(false);
+    });
+
+    it("offer Bluetooth in the list and serial under advanced options", async () => {
+      setBluetooth(true);
+      const d = await mountMcumgr();
+      expect(hasSmpBleRow(d)).toBe(true);
+      expect(inAdvanced(d, "dashboard.install_method_nrf_smp_ble")).toBe(false);
+      expect(inAdvanced(d, "dashboard.install_method_nrf_smp_serial")).toBe(true);
+      expect(inAdvanced(d, "dashboard.install_method_nrf_dfu")).toBe(false);
+    });
+
+    it("select their own install method", async () => {
+      setBluetooth(true);
+      const d = await mountMcumgr();
+      const selected: string[] = [];
+      d.addEventListener("select-method", (e) =>
+        selected.push((e as CustomEvent<{ method: string }>).detail.method)
+      );
+      for (const key of ["nrf_smp_ble", "nrf_smp_serial"]) {
+        const row = [...d.shadowRoot!.querySelectorAll<HTMLElement>(".option")].find(
+          (el) =>
+            el.querySelector(".title")?.textContent?.trim() ===
+            defaultLocalize(`dashboard.install_method_${key}`)
+        );
+        row!.click();
+      }
+      expect(selected).toEqual(["nrf-smp-ble", "nrf-smp-serial"]);
+    });
+
+    it("hide Bluetooth in a browser without Web Bluetooth", async () => {
+      setBluetooth(false);
+      const d = await mountMcumgr();
+      expect(hasSmpBleRow(d)).toBe(false);
+      expect(hasSmpSerialRow(d)).toBe(true);
+    });
+
+    it("keep Bluetooth and drop serial without Web Serial", async () => {
+      setBluetooth(true);
+      setWebSerialEnv({ serial: false, secure: true, href: "http://localhost:6052/" });
+      const d = await mountMcumgr();
+      expect(hasSmpBleRow(d)).toBe(true);
+      expect(hasSmpSerialRow(d)).toBe(false);
+    });
+
+    it("are install only", async () => {
+      setBluetooth(true);
+      const d = await mount("nrf52", "logs", null, MCUMGR);
+      (d as unknown as { _advancedExpanded: boolean })._advancedExpanded = true;
+      await d.updateComplete;
+      expect(hasSmpBleRow(d)).toBe(false);
+      expect(hasSmpSerialRow(d)).toBe(false);
+    });
   });
 
   // The Pico row needs only Web Serial (for the 1200-baud reset); WebUSB

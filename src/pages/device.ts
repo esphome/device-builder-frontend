@@ -1391,6 +1391,7 @@ export class ESPHomePageDevice extends LitElement {
           .deviceState=${this._installCtrl.deviceState}
           .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
           .deviceMcu=${this._installCtrl.deviceMcu}
+          .deviceLoadedPlatforms=${this._installCtrl.deviceLoadedPlatforms}
           .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
           .canFlashBootloader=${this._installCtrl.canFlashBootloader}
           .neverFlashed=${this._installCtrl.neverFlashed}

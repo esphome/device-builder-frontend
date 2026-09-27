@@ -20,6 +20,7 @@ import {
   installFor,
   installForMethod,
   installOf,
+  installsFor,
   platformFor,
   PLATFORMS,
   serialLogsFor,
@@ -99,6 +100,24 @@ describe("PLATFORMS", () => {
     expect(installOf(platform, "chip-b")).toBe(second);
     expect(installOf(platform, "chip-c")).toBeUndefined();
     expect(installOf(platform, null)).toBeUndefined();
+  });
+
+  it("offers a flasher its firmware has to support only once it is loaded", () => {
+    const dfu = installFor("nrf52", null);
+    expect(installsFor("nrf52", null, [])).toEqual([dfu]);
+    expect(installsFor("nrf52", null, ["ota.esphome"])).toEqual([dfu]);
+    const offered = installsFor("nrf52", null, ["ota.zephyr_mcumgr"]);
+    expect(offered.map((i) => i.id)).toEqual([
+      "nrf-dfu",
+      "nrf-smp-ble",
+      "nrf-smp-serial",
+    ]);
+    // The hand-off and the one-flasher callers never get one that needs firmware.
+    expect(installFor("nrf52", null)).toBe(dfu);
+  });
+
+  it("offers no flasher to a platform without a descriptor", () => {
+    expect(installsFor("esp32", null, ["ota.zephyr_mcumgr"])).toEqual([]);
   });
 
   it("has no install for a platform without a descriptor", () => {

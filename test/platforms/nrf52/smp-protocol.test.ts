@@ -1,294 +1,287 @@
-import { describe, expect, it } from "vitest";
-
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildSmpFrame,
   chunkSizeFromParams,
   IMG_MGMT_STATE,
   IMG_MGMT_UPLOAD,
+  type McubootImage,
   MGMT_GROUP_IMAGE,
   MGMT_GROUP_OS,
-  MGMT_OP_READ,
-  MGMT_OP_WRITE,
   OS_MGMT_MCUMGR_PARAMS,
   OS_MGMT_RESET,
-  parseMcubootImageInfo,
+  parseMcubootImage,
   parseSmpFrame,
   smpQueryDeviceParams,
   type SmpTransport,
   smpUploadImage,
 } from "../../../src/platforms/nrf52/smp-protocol.js";
+import { FakeSmpDevice, RUNNING } from "./_fake-smp-device.js";
+import { makeMcubootImage } from "./_mcuboot-image.js";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Build a minimal valid MCUboot image whose SHA256 TLV holds `hash`. */
-function makeMcubootImage(
-  hash: Uint8Array,
-  { imgSize = 64, version = [1, 2, 3] as [number, number, number] } = {}
-): Uint8Array {
-  const hdrSize = 32;
-  const tlvArea = 4 + 4 + 32; // info header + one TLV header + 32-byte hash
-  const total = hdrSize + imgSize + tlvArea;
-  const bytes = new Uint8Array(total);
-  const view = new DataView(bytes.buffer);
-
-  view.setUint32(0, 0x96f3b83d, true); // magic
-  view.setUint32(4, 0, true); // load addr
-  view.setUint16(8, hdrSize, true); // hdr size
-  view.setUint16(10, 0, true); // protected TLV size
-  view.setUint32(12, imgSize, true); // image size
-  bytes[20] = version[0];
-  bytes[21] = version[1];
-  view.setUint16(22, version[2], true);
-
-  const tlvOff = hdrSize + imgSize;
-  view.setUint16(tlvOff, 0x6907, true); // unprotected TLV info magic
-  view.setUint16(tlvOff + 2, tlvArea, true); // total TLV area size
-  bytes[tlvOff + 4] = 0x10; // IMAGE_TLV_SHA256
-  bytes[tlvOff + 5] = 0; // pad
-  view.setUint16(tlvOff + 6, 32, true); // length
-  bytes.set(hash, tlvOff + 8);
-
-  return bytes;
+async function upload(
+  device: SmpTransport,
+  image: McubootImage,
+  { chunkSize = 128, signal }: { chunkSize?: number; signal?: AbortSignal } = {}
+) {
+  const progress: number[] = [];
+  const log: string[] = [];
+  const done = smpUploadImage(device, image, chunkSize, {
+    onProgress: (p) => progress.push(p),
+    onLog: (line) => log.push(line),
+    signal,
+  });
+  done.catch(() => {});
+  await vi.runAllTimersAsync();
+  return { done, progress, log };
 }
 
-interface ImageEntry {
-  slot: number;
-  hash: Uint8Array;
-  active?: boolean;
-  confirmed?: boolean;
-}
-
-/** A scripted SMP transport that answers image-management commands. */
-class MockTransport implements SmpTransport {
-  uploadChunks = 0;
-  uploadedBytes = 0;
-  confirmed = false;
-  tested = false;
-  reset = false;
-  testHash?: Uint8Array;
-
-  constructor(private readonly getImages: () => ImageEntry[]) {}
-
-  async exchange(frame: Uint8Array): Promise<Uint8Array> {
-    const req = parseSmpFrame(frame);
-    const reply = (payload: Record<string, unknown>) =>
-      buildSmpFrame(3, req.group, req.id, req.seq, payload);
-
-    if (req.group === MGMT_GROUP_IMAGE && req.id === IMG_MGMT_STATE) {
-      if (req.op === MGMT_OP_READ) return reply({ images: this.getImages() });
-      if (req.payload.confirm === true) this.confirmed = true;
-      else {
-        this.tested = true;
-        this.testHash = req.payload.hash as Uint8Array;
-      }
-      return reply({ rc: 0 });
-    }
-    if (req.group === MGMT_GROUP_IMAGE && req.id === IMG_MGMT_UPLOAD) {
-      this.uploadChunks++;
-      const data = req.payload.data as Uint8Array;
-      const off = req.payload.off as number;
-      this.uploadedBytes = off + data.length;
-      return reply({ rc: 0, off: this.uploadedBytes });
-    }
-    if (req.group === MGMT_GROUP_OS && req.id === OS_MGMT_RESET) {
-      this.reset = true;
-      return reply({ rc: 0 });
-    }
-    return reply({ rc: 0 });
-  }
-
-  close(): void {}
-}
-
-const noHooks = { onProgress: () => {} };
-
-// ── Frame building / parsing ───────────────────────────────────────────────
-
-describe("buildSmpFrame / parseSmpFrame", () => {
-  it("round-trips the header fields and payload", () => {
-    const frame = buildSmpFrame(MGMT_OP_WRITE, MGMT_GROUP_IMAGE, IMG_MGMT_UPLOAD, 42, {
-      off: 128,
+describe("smp frames", () => {
+  it("round-trips a request", () => {
+    const frame = buildSmpFrame(2, MGMT_GROUP_IMAGE, IMG_MGMT_UPLOAD, 7, { off: 12 });
+    expect(parseSmpFrame(frame)).toEqual({
+      op: 2,
+      group: MGMT_GROUP_IMAGE,
+      id: IMG_MGMT_UPLOAD,
+      seq: 7,
+      payload: { off: 12 },
     });
-    const parsed = parseSmpFrame(frame);
-    expect(parsed.op).toBe(MGMT_OP_WRITE);
-    expect(parsed.group).toBe(MGMT_GROUP_IMAGE);
-    expect(parsed.id).toBe(IMG_MGMT_UPLOAD);
-    expect(parsed.seq).toBe(42);
-    expect(parsed.payload).toEqual({ off: 128 });
   });
 
-  it("encodes the payload length in the header", () => {
-    const frame = buildSmpFrame(MGMT_OP_READ, MGMT_GROUP_OS, OS_MGMT_MCUMGR_PARAMS, 0);
-    // No payload → length 0.
-    expect((frame[2] << 8) | frame[3]).toBe(0);
-    expect(frame.length).toBe(8);
+  it("puts the payload length in the header", () => {
+    const frame = buildSmpFrame(2, MGMT_GROUP_IMAGE, IMG_MGMT_UPLOAD, 0, { off: 12 });
+    expect((frame[2] << 8) | frame[3]).toBe(frame.length - 8);
   });
 
-  it("throws on a truncated frame", () => {
-    expect(() => parseSmpFrame(new Uint8Array(4))).toThrow();
+  it("wraps the sequence number to one byte", () => {
+    expect(parseSmpFrame(buildSmpFrame(0, 0, 0, 257)).seq).toBe(1);
+  });
+
+  it("rejects a frame shorter than its header", () => {
+    expect(() => parseSmpFrame(new Uint8Array(7))).toThrow("SMP: frame too short");
   });
 });
 
-// ── MCUboot image parsing ──────────────────────────────────────────────────
+describe("parseMcubootImage", () => {
+  it("reads the version, size and image hash", async () => {
+    const hash = new Uint8Array(32).fill(0x42);
+    const bytes = makeMcubootImage({
+      bodySize: 64,
+      version: [2, 5, 300],
+      imageHash: hash,
+    });
+    const image = await parseMcubootImage(bytes);
+    expect(image.bytes).toBe(bytes);
+    expect(image.info.version).toBe("2.5.300");
+    expect(image.info.imageSize).toBe(64);
+    expect(image.info.imageHash).toEqual(hash);
+    expect(image.info.hash).toHaveLength(32);
+  });
 
-describe("parseMcubootImageInfo", () => {
-  it("extracts version and the SHA256 TLV hash", async () => {
-    const hash = new Uint8Array(32).fill(0xab);
-    const info = await parseMcubootImageInfo(
-      makeMcubootImage(hash, { version: [1, 4, 7] })
+  it("finds the hash past a protected TLV area", async () => {
+    const hash = new Uint8Array(32).fill(0x42);
+    const image = await parseMcubootImage(
+      makeMcubootImage({ imageHash: hash, protectedTlvSize: 16 })
     );
-    expect(info.version).toBe("1.4.7");
-    expect(info.imageHash).toBeInstanceOf(Uint8Array);
-    expect(Array.from(info.imageHash!)).toEqual(Array.from(hash));
+    expect(image.info.imageHash).toEqual(hash);
   });
 
-  it("rejects a non-MCUboot binary", async () => {
-    await expect(parseMcubootImageInfo(new Uint8Array(64))).rejects.toThrow(/magic/);
+  it("leaves the image hash out when there is no TLV area", async () => {
+    const image = await parseMcubootImage(makeMcubootImage({ imageHash: null }));
+    expect(image.info.imageHash).toBeUndefined();
   });
 
-  it("rejects a too-short binary", async () => {
-    await expect(parseMcubootImageInfo(new Uint8Array(8))).rejects.toThrow();
+  it.each([
+    ["too short", new Uint8Array(16), "too short"],
+    ["a bad magic", makeMcubootImage({ magic: 0xdeadbeef }), "bad magic"],
+    [
+      "a load address",
+      makeMcubootImage({ loadAddress: 0x1000 }),
+      "non-zero load address",
+    ],
+  ])("rejects an image with %s", async (_name, bytes, message) => {
+    await expect(parseMcubootImage(bytes)).rejects.toThrow(message);
   });
 });
 
-// ── Device-parameter negotiation ───────────────────────────────────────────
-
-describe("smpQueryDeviceParams / chunkSizeFromParams", () => {
-  it("parses buf_size and buf_count from the device", async () => {
+describe("device parameters", () => {
+  it("reads the device's buffer size", async () => {
     const transport: SmpTransport = {
       exchange: async (frame) => {
         const req = parseSmpFrame(frame);
+        expect([req.group, req.id]).toEqual([MGMT_GROUP_OS, OS_MGMT_MCUMGR_PARAMS]);
         return buildSmpFrame(1, req.group, req.id, req.seq, {
           buf_size: 2475,
           buf_count: 4,
         });
       },
-      close: () => {},
     };
-    const params = await smpQueryDeviceParams(transport);
-    expect(params).toEqual({ bufSize: 2475, bufCount: 4 });
+    expect(await smpQueryDeviceParams(transport)).toEqual({ bufSize: 2475, bufCount: 4 });
   });
 
-  it("returns null when the device does not support the command", async () => {
-    const transport: SmpTransport = {
-      exchange: async () => {
-        throw new Error("not supported");
-      },
-      close: () => {},
-    };
-    expect(await smpQueryDeviceParams(transport)).toBeNull();
+  it.each([
+    ["rejects", () => Promise.reject(new Error("timeout"))],
+    ["answers without them", () => Promise.resolve(buildSmpFrame(1, 0, 6, 0, { rc: 8 }))],
+  ])("is null when the device %s", async (_name, exchange) => {
+    expect(await smpQueryDeviceParams({ exchange })).toBeNull();
   });
 
-  it("derives a chunk size bounded by buf_size, not a fixed cap", () => {
-    // A large buffer yields a correspondingly large chunk (fewer round-trips).
-    expect(chunkSizeFromParams({ bufSize: 2475, bufCount: 4 })).toBeGreaterThan(2000);
-    // A tiny buffer never drops below the 64-byte floor.
-    expect(chunkSizeFromParams({ bufSize: 40, bufCount: 1 })).toBe(64);
+  it("leaves room for the first chunk's header and fields", () => {
+    expect(chunkSizeFromParams({ bufSize: 2475, bufCount: 4 })).toBe(2475 - 8 - 70);
+    expect(chunkSizeFromParams({ bufSize: 100, bufCount: 1 })).toBe(64);
   });
 });
 
-// ── Upload orchestration ───────────────────────────────────────────────────
-
 describe("smpUploadImage", () => {
-  const hashActive = new Uint8Array(32).fill(0x11);
-  const hashOldSlot1 = new Uint8Array(32).fill(0x22);
-
-  it("skips the upload when the device is already running this image", async () => {
-    const hash = new Uint8Array(32).fill(0x33);
-    const image = makeMcubootImage(hash);
-    const info = await parseMcubootImageInfo(image);
-    const transport = new MockTransport(() => [
-      { slot: 0, hash, active: true, confirmed: true },
-      { slot: 1, hash: hashOldSlot1 },
-    ]);
-
-    await smpUploadImage(transport, image, info, 128, noHooks);
-
-    expect(transport.uploadChunks).toBe(0);
-    expect(transport.tested).toBe(false);
-    expect(transport.reset).toBe(false);
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it("skips the upload when the image is already in the update slot", async () => {
-    const hash = new Uint8Array(32).fill(0x44);
-    const image = makeMcubootImage(hash);
-    const info = await parseMcubootImageInfo(image);
-    const transport = new MockTransport(() => [
-      { slot: 0, hash: hashActive, active: true, confirmed: true },
-      { slot: 1, hash },
-    ]);
+  it("uploads in chunks, marks the image for test and resets", async () => {
+    const image = await parseMcubootImage(makeMcubootImage({ bodySize: 300 }));
+    const device = new FakeSmpDevice();
 
-    await smpUploadImage(transport, image, info, 128, noHooks);
+    const { done, progress } = await upload(device, image, { chunkSize: 128 });
+    await done;
 
-    expect(transport.uploadChunks).toBe(0);
-    expect(transport.tested).toBe(true);
-    expect(transport.reset).toBe(true);
-  });
-
-  it("confirms an unconfirmed running image before proceeding", async () => {
-    // Running image is this exact image but unconfirmed → confirm, then it's
-    // already-running so no upload is needed.
-    const hash = new Uint8Array(32).fill(0x55);
-    const image = makeMcubootImage(hash);
-    const info = await parseMcubootImageInfo(image);
-    const transport = new MockTransport(() => [
-      { slot: 0, hash, active: true, confirmed: false },
-      { slot: 1, hash: hashOldSlot1, confirmed: true },
-    ]);
-
-    await smpUploadImage(transport, image, info, 128, noHooks);
-
-    expect(transport.confirmed).toBe(true);
-    expect(transport.uploadChunks).toBe(0);
-  });
-
-  it("uploads, marks for test, and resets for a new image", async () => {
-    const hash = new Uint8Array(32).fill(0x66);
-    const image = makeMcubootImage(hash, { imgSize: 512 });
-    const info = await parseMcubootImageInfo(image);
-    const transport: MockTransport = new MockTransport(() => [
-      { slot: 0, hash: hashActive, active: true, confirmed: true },
-      // Slot 1 holds the uploaded image only once the transfer finishes.
-      { slot: 1, hash: transport.uploadedBytes >= image.length ? hash : hashOldSlot1 },
-    ]);
-
-    const percents: number[] = [];
-    await smpUploadImage(transport, image, info, 128, {
-      onProgress: (p) => percents.push(p),
+    expect(device.received).toEqual(image.bytes);
+    const chunks = device.requests.filter((r) => r.id === IMG_MGMT_UPLOAD);
+    expect(chunks).toHaveLength(Math.ceil(image.bytes.length / 128));
+    expect(chunks[0].payload).toMatchObject({
+      off: 0,
+      len: image.bytes.length,
+      sha: image.info.hash,
     });
-
-    expect(transport.uploadChunks).toBeGreaterThan(0);
-    expect(transport.uploadedBytes).toBe(image.length);
-    expect(transport.tested).toBe(true);
-    expect(Array.from(transport.testHash!)).toEqual(Array.from(hash));
-    expect(transport.reset).toBe(true);
-    expect(percents[percents.length - 1]).toBe(100);
+    expect(chunks[1].payload).not.toHaveProperty("sha");
+    const tail = device.requests.slice(-2);
+    expect(tail[0]).toMatchObject({
+      id: IMG_MGMT_STATE,
+      payload: { hash: device.uploadedHash, confirm: false },
+    });
+    expect(tail[1]).toMatchObject({ group: MGMT_GROUP_OS, id: OS_MGMT_RESET });
+    expect(progress[progress.length - 1]).toBe(100);
+    expect(progress).toEqual([...progress].sort((a, b) => a - b));
   });
 
-  it("throws when the device reports an error mid-upload", async () => {
+  it("finishes when the reset drops the link before its reply", async () => {
+    const image = await parseMcubootImage(makeMcubootImage());
+    const device = new FakeSmpDevice();
+    device.resetDropsLink = true;
+
+    const { done, progress } = await upload(device, image);
+
+    await expect(done).resolves.toBeUndefined();
+    expect(progress[progress.length - 1]).toBe(100);
+  });
+
+  it("sends nothing to a device already running the image", async () => {
+    const image = await parseMcubootImage(makeMcubootImage({ imageHash: RUNNING }));
+    const device = new FakeSmpDevice();
+
+    const { done, progress } = await upload(device, image);
+    await done;
+
+    expect(device.ids()).toEqual([`${MGMT_GROUP_IMAGE}/${IMG_MGMT_STATE}`]);
+    expect(progress).toEqual([100]);
+  });
+
+  it("skips the transfer when the update slot already holds the image", async () => {
     const hash = new Uint8Array(32).fill(0x77);
-    const image = makeMcubootImage(hash, { imgSize: 256 });
-    const info = await parseMcubootImageInfo(image);
-    const transport = new MockTransport(() => [
-      { slot: 0, hash: hashActive, active: true, confirmed: true },
-      { slot: 1, hash: hashOldSlot1 },
-    ]);
-    // Fail the first upload chunk with EBADSTATE (6).
-    transport.exchange = async (frame) => {
-      const req = parseSmpFrame(frame);
-      if (req.group === MGMT_GROUP_IMAGE && req.id === IMG_MGMT_UPLOAD) {
-        return buildSmpFrame(3, req.group, req.id, req.seq, { rc: 6 });
-      }
-      return buildSmpFrame(3, req.group, req.id, req.seq, {
-        images: [
-          { slot: 0, hash: hashActive, active: true, confirmed: true },
-          { slot: 1, hash: hashOldSlot1 },
-        ],
-      });
+    const image = await parseMcubootImage(makeMcubootImage({ imageHash: hash }));
+    const device = new FakeSmpDevice();
+    device.slots.push({ slot: 1, hash });
+
+    const { done } = await upload(device, image);
+    await done;
+
+    expect(device.requests.some((r) => r.id === IMG_MGMT_UPLOAD)).toBe(false);
+    expect(device.requests[device.requests.length - 2]).toMatchObject({
+      payload: { hash, confirm: false },
+    });
+    expect(device.requests[device.requests.length - 1]).toMatchObject({
+      id: OS_MGMT_RESET,
+    });
+  });
+
+  it("confirms an unconfirmed running image before uploading", async () => {
+    const image = await parseMcubootImage(makeMcubootImage());
+    const device = new FakeSmpDevice();
+    device.slots[0].confirmed = false;
+
+    const { done } = await upload(device, image);
+    await done;
+
+    expect(device.requests[1]).toMatchObject({
+      id: IMG_MGMT_STATE,
+      payload: { hash: RUNNING, confirm: true },
+    });
+    expect(device.received).toEqual(image.bytes);
+  });
+
+  it("resends from the offset the device asks for", async () => {
+    const image = await parseMcubootImage(makeMcubootImage({ bodySize: 300 }));
+    const device = new FakeSmpDevice();
+    let dropped = false;
+    device.onUpload = (payload) => {
+      if (payload.off !== 128 || dropped) return undefined;
+      dropped = true;
+      return { rc: 0, off: 128 };
     };
 
-    await expect(smpUploadImage(transport, image, info, 128, noHooks)).rejects.toThrow(
-      /error 6/
-    );
+    const { done } = await upload(device, image, { chunkSize: 128 });
+    await done;
+
+    expect(device.received).toEqual(image.bytes);
+  });
+
+  it("gives up on a device that stops accepting data", async () => {
+    const image = await parseMcubootImage(makeMcubootImage());
+    const device = new FakeSmpDevice();
+    device.onUpload = () => ({ rc: 0, off: 0 });
+
+    const { done } = await upload(device, image);
+
+    await expect(done).rejects.toThrow("stopped accepting data at offset 0");
+    expect(device.requests.filter((r) => r.id === IMG_MGMT_UPLOAD)).toHaveLength(3);
+  });
+
+  it.each([
+    ["an error code", { rc: 5 }, "device returned error 5"],
+    ["no offset", { rc: 0 }, "missing offset"],
+  ])("fails when a chunk is answered with %s", async (_name, reply, message) => {
+    const image = await parseMcubootImage(makeMcubootImage());
+    const device = new FakeSmpDevice();
+    device.onUpload = () => reply;
+
+    const { done } = await upload(device, image);
+
+    await expect(done).rejects.toThrow(message);
+  });
+
+  it("fails when the uploaded image is not in the update slot", async () => {
+    const image = await parseMcubootImage(makeMcubootImage({ bodySize: 10 }));
+    const device = new FakeSmpDevice();
+    device.onUpload = () => ({ rc: 0, off: image.bytes.length });
+
+    const { done } = await upload(device, image);
+
+    await expect(done).rejects.toThrow("secondary slot image not found");
+  });
+
+  it("stops at an abort", async () => {
+    const image = await parseMcubootImage(makeMcubootImage({ bodySize: 600 }));
+    const device = new FakeSmpDevice();
+    const abort = new AbortController();
+    device.onUpload = (payload) => {
+      if (payload.off === 128) abort.abort(new Error("cancelled"));
+      return undefined;
+    };
+
+    const { done } = await upload(device, image, { signal: abort.signal });
+
+    await expect(done).rejects.toThrow("cancelled");
+    expect(device.received.length).toBeLessThan(image.bytes.length);
   });
 });

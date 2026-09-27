@@ -1,7 +1,6 @@
 /**
- * Minimal CBOR encoder and decoder for the SMP (Simple Management Protocol).
- * Based on the MIT-licensed cbor.js by Patrick Gansterer <paroga@paroga.com>.
- * Only the subset needed by SMP image management is implemented.
+ * The subset of CBOR the SMP image commands use. Based on the MIT-licensed
+ * cbor.js by Patrick Gansterer <paroga@paroga.com>.
  */
 
 function writeTypeLen(type: number, len: number, out: number[]): void {
@@ -87,8 +86,14 @@ const BREAK = Symbol("cbor-break");
 export function cborDecode(data: Uint8Array): unknown {
   let offset = 0;
 
+  // A truncated reply would otherwise decode as NaN and undefined.
+  function need(bytes: number): void {
+    if (offset + bytes > data.length) throw new Error("CBOR: truncated input");
+  }
+
   function readLen(info: number): number {
     if (info < 24) return info;
+    need(info === 24 ? 1 : info === 25 ? 2 : info === 26 ? 4 : 8);
     if (info === 24) return data[offset++];
     if (info === 25) {
       const v = (data[offset] << 8) | data[offset + 1];
@@ -125,6 +130,7 @@ export function cborDecode(data: Uint8Array): unknown {
   }
 
   function decodeItem(): unknown | typeof BREAK {
+    need(1);
     const initial = data[offset++];
     const major = initial >> 5;
     const info = initial & 0x1f;
@@ -134,7 +140,7 @@ export function cborDecode(data: Uint8Array): unknown {
       if (info === 21) return true;
       if (info === 22) return null;
       if (info === 31) return BREAK; // break code for indefinite-length items
-      // Float16/32/64 - skip, not needed for SMP responses
+      // Floats are skipped; no SMP response carries one.
       if (info === 25) {
         offset += 2;
         return 0;
@@ -150,7 +156,7 @@ export function cborDecode(data: Uint8Array): unknown {
       throw new Error(`CBOR: unsupported simple value ${info}`);
     }
 
-    // Indefinite-length array (0x9f) or map (0xbf) — read until break.
+    // An indefinite-length array (0x9f) or map (0xbf) runs until a break.
     if (info === 31) {
       if (major === 4) {
         const arr: unknown[] = [];
@@ -181,11 +187,13 @@ export function cborDecode(data: Uint8Array): unknown {
       case 1:
         return -1 - len;
       case 2: {
+        need(len);
         const slice = data.slice(offset, offset + len);
         offset += len;
         return slice;
       }
       case 3: {
+        need(len);
         const slice = data.slice(offset, offset + len);
         offset += len;
         return new TextDecoder().decode(slice);
