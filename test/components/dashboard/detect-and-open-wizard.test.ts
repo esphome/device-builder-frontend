@@ -215,5 +215,10 @@ describe("detectAndOpenWizard", () => {
     });
     warn.mockRestore();
     expect(dialog.openAtBoardStep).toHaveBeenCalledWith({ label: "RTL8720C" });
+    // The board it named is not dropped without a trace.
+    expect(toast.info).toHaveBeenCalledWith(
+      "wizard.connect_your_board_unknown_catalog_board",
+      expect.anything()
+    );
   });
 });

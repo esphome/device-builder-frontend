@@ -634,7 +634,7 @@
     "connect_your_board_detecting": "Detecting the connected board…",
     "connect_your_board_detect_failed": "Could not detect the connected board. Check the cable and try another port.",
     "connect_your_board_unrecognized": "Could not tell which board this is from its USB ids. Pick it from the list below.",
-    "connect_your_board_unknown_catalog_board": "This board calls itself \"{board}\", which is not in the catalog yet. Pick the closest board below.",
+    "connect_your_board_unknown_catalog_board": "This board calls itself \"{board}\", but no catalog board by that name could be found. Pick the closest board below.",
     "detected_chip_family": "{family} detected — pick your specific board",
     "show_all_boards": "Show all boards",
     "how_create": "How would you like to create your project?",

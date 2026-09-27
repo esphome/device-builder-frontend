@@ -244,8 +244,11 @@ describe("wizard step-board platform chips", () => {
           mcu: "rtl8720c",
           board: "kit",
         })
-      ).toEqual({ preset: { label: "RTL8720C" } });
-      expect(await resolveDetection(api, { kind: "unknown" })).toEqual({ preset: null });
+      ).toEqual({ preset: { label: "RTL8720C" }, missedBoard: "kit" });
+      expect(await resolveDetection(api, { kind: "unknown" })).toEqual({
+        preset: null,
+        missedBoard: undefined,
+      });
       warn.mockRestore();
     });
   });

@@ -136,16 +136,20 @@ export function detectionPreset(detection: BoardDetection): WizardBoardPreset | 
 /**
  * Where a detection lands: the catalog board it named (a factory firmware's
  * app descriptor, or the boot banner), else the picker's preset for what it
- * found. A catalog miss (older dashboard, unreleased product) or a request
- * failure (``fetchBoard`` logs it and resolves null) falls through to the
- * preset rather than failing, so the user still gets a useful onboarding
- * path. Both entry points go through here so they behave alike.
+ * found, with the board id the lookup did not find (a catalog miss, or a
+ * request failure, which ``fetchBoard`` logs and resolves null all the same)
+ * so the caller can say the board was named but not found. Both entry
+ * points go through here so they behave alike.
  */
 export async function resolveDetection(
   api: ESPHomeAPI,
   detection: BoardDetection
-): Promise<{ board: BoardCatalogEntry } | { preset: WizardBoardPreset | null }> {
+): Promise<
+  | { board: BoardCatalogEntry }
+  | { preset: WizardBoardPreset | null; missedBoard?: string }
+> {
   const boardId = detectedBoardId(detection);
   const board = boardId ? await fetchBoard(api, boardId) : null;
-  return board ? { board } : { preset: detectionPreset(detection) };
+  if (board) return { board };
+  return { preset: detectionPreset(detection), missedBoard: boardId };
 }

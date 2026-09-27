@@ -201,6 +201,44 @@ describe("readBootBanner", () => {
     warn.mockRestore();
   });
 
+  it("bounds the open too, and closes a port that opened late", async () => {
+    const { port, raw } = fakePort([]);
+    let openLate: () => void = () => {};
+    raw.open.mockImplementationOnce(() => new Promise<void>((r) => (openLate = r)));
+    const pending = readBootBanner(port);
+    const assertion = expect(pending).rejects.toThrow("Boot banner not read");
+    await vi.advanceTimersByTimeAsync(3000);
+    await assertion;
+    expect(raw.close).not.toHaveBeenCalled();
+    openLate();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(raw.close).toHaveBeenCalledOnce();
+    expect(raw.setSignals).not.toHaveBeenCalled();
+  });
+
+  it("retries releasing reset once when the release fails after the assert, and warns", async () => {
+    const { port, raw } = fakePort([]);
+    raw.setSignals
+      .mockImplementationOnce(async () => {})
+      .mockImplementationOnce(async () => {
+        throw new DOMException("glitch", "NetworkError");
+      });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const pending = readBootBanner(port);
+    await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
+    await pending;
+    expect(raw.setSignals).toHaveBeenCalledTimes(3);
+    expect(raw.setSignals).toHaveBeenLastCalledWith({
+      dataTerminalReady: false,
+      requestToSend: false,
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("Could not release reset"),
+      expect.anything()
+    );
+    warn.mockRestore();
+  });
+
   it("rejects when the port will not open", async () => {
     const { port, raw } = fakePort([]);
     raw.open.mockRejectedValue(new DOMException("held", "NetworkError"));

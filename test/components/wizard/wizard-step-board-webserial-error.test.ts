@@ -150,5 +150,30 @@ describe("wizard-step-board WebSerial detect errors", () => {
     expect(detectError(el)?.textContent).toContain('calls itself "some-new-kit"');
     expect(esptool.connectToPort).not.toHaveBeenCalled();
   });
+
+  it("says the named board was not found even when the chip narrowed the picker", async () => {
+    banner.readBootBanner.mockResolvedValueOnce({
+      platform: "rtl87xx",
+      mcu: "rtl8720c",
+      board: "some-new-kit",
+    });
+    seams.requestSerialPort.mockResolvedValueOnce({
+      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+    } as SerialPort);
+    const el = await mount();
+    (el as any)._api.getBoard = async () => {
+      throw new Error("no such board");
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await (el as any)._connectViaWebSerial();
+    await el.updateComplete;
+    warn.mockRestore();
+
+    expect(detectError(el)?.textContent).toContain('calls itself "some-new-kit"');
+    expect(el.shadowRoot!.querySelector(".detection-banner")?.textContent).toContain(
+      "RTL8720C"
+    );
+  });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

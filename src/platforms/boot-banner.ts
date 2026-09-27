@@ -71,15 +71,14 @@ const isSettled = (hit: BootBannerMatch | null): boolean =>
  * Reset the board behind *port* (RTS pulse, DTR released, the plain reset a
  * bridge's auto-reset circuit gives) and read what it prints at 115200 for
  * up to ``BOOT_BANNER_MS``, stopping early once the text is conclusive. The
- * port is opened here and closed after. Resolves what the text named, or
- * null; rejects only when the port cannot be opened (marked, so the copy can
- * say it is held elsewhere) or the whole thing outlives its deadline, after
- * which the abandoned read touches the port no further: esptool may have it
- * by then.
+ * port is opened here and closed after, all under one deadline. Resolves
+ * what the text named, or null; rejects only when the port cannot be opened
+ * (marked, so the copy can say it is held elsewhere) or the whole thing
+ * outlives its deadline, after which the abandoned read touches the port no
+ * further than closing what it opened late: esptool may have it by then.
  */
 export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch | null> {
-  await openSerialPort(port, { baudRate: BOOT_BANNER_BAUD });
-  const session: BannerSession = { abandoned: false };
+  const session: BannerSession = { abandoned: false, opened: false };
   try {
     return await withDeadline(
       readAfterReset(port, session),
@@ -90,48 +89,50 @@ export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch 
       }
     );
   } finally {
-    // A reader the abandoned read still holds would keep the port from
-    // closing, and a teardown that hangs must not hold the detect either;
-    // both are worth knowing about, since esptool's open fails next and its
-    // copy would blame another program.
-    const teardown = (async () => {
-      await session.reader?.cancel().catch(() => {});
-      await port.close().catch((err: unknown) => {
-        console.warn(
-          "[detect] Could not close the port after the boot banner read:",
-          err
-        );
-      });
-    })();
-    if (!(await settledWithin(teardown, TEARDOWN_MS))) {
-      console.warn(
-        `[detect] The port did not close in ${TEARDOWN_MS} ms after the boot banner read`
-      );
-    }
+    if (session.opened) await teardown(port, session);
   }
 }
 
 interface BannerSession {
   /** The deadline passed; the port is no longer ours to touch. */
   abandoned: boolean;
+  /** Our open went through, so the close is ours to do. */
+  opened: boolean;
   reader?: ReadableStreamDefaultReader<Uint8Array>;
+}
+
+/**
+ * Cancel any reader the read still holds and close the port, in a bounded
+ * time: a teardown that hangs must not hold the detect, and one that fails
+ * is worth knowing about, since esptool's open fails next and its copy would
+ * blame another program.
+ */
+async function teardown(port: SerialPort, session: BannerSession): Promise<void> {
+  const release = (async () => {
+    await session.reader?.cancel().catch(() => {});
+    await port.close().catch((err: unknown) => {
+      console.warn("[detect] Could not close the port after the boot banner read:", err);
+    });
+  })();
+  if (!(await settledWithin(release, TEARDOWN_MS))) {
+    console.warn(
+      `[detect] The port did not close in ${TEARDOWN_MS} ms after the boot banner read`
+    );
+  }
 }
 
 async function readAfterReset(
   port: SerialPort,
   session: BannerSession
 ): Promise<BootBannerMatch | null> {
-  // An adapter without control lines cannot reset the board; whatever it
-  // prints on its own is still worth a look, so a refused pulse is logged,
-  // not fatal. The pulse checks between its two line changes: past the
-  // deadline the port may be esptool's, and its lines are esptool's too.
-  try {
-    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-    if (session.abandoned) return null;
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-  } catch (err) {
-    console.debug("[detect] Could not pulse reset for the boot banner:", err);
+  await openSerialPort(port, { baudRate: BOOT_BANNER_BAUD });
+  session.opened = true;
+  if (session.abandoned) {
+    // Opened only after the deadline: nobody is waiting, so close it now.
+    await teardown(port, session);
+    return null;
   }
+  await pulseReset(port, session);
   if (session.abandoned) return null;
   const reader = port.readable!.getReader();
   session.reader = reader;
@@ -155,4 +156,32 @@ async function readAfterReset(
     session.reader = undefined;
   }
   return hit;
+}
+
+/**
+ * The reset pulse, RTS up then down with DTR released. An adapter without
+ * control lines cannot reset the board; whatever it prints on its own is
+ * still worth a look, so a refused pulse is logged, not fatal. Between the
+ * two line changes the pulse checks whether the deadline passed: past it
+ * the port may be esptool's, and its lines are esptool's too. A release
+ * that fails after the assert went through would leave the board held in
+ * reset, so it is tried once more and warned about.
+ */
+async function pulseReset(port: SerialPort, session: BannerSession): Promise<void> {
+  try {
+    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+  } catch (err) {
+    console.debug("[detect] Could not pulse reset for the boot banner:", err);
+    return;
+  }
+  if (session.abandoned) return;
+  const release = () =>
+    port.setSignals({ dataTerminalReady: false, requestToSend: false });
+  await release().catch(async (err: unknown) => {
+    console.warn(
+      "[detect] Could not release reset after the boot banner pulse; trying once more:",
+      err
+    );
+    await release().catch(() => {});
+  });
 }

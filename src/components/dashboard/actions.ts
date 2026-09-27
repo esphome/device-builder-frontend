@@ -11,6 +11,7 @@ import { navigate } from "../../util/navigation.js";
 import {
   LONG_TOAST_DURATION_MS,
   notifyError,
+  notifyInfo,
   type NotifyOptions,
   notifySuccess,
 } from "../../util/notify.js";
@@ -375,6 +376,15 @@ export async function detectAndOpenWizard(
     }
     createDialog.openWithBoard(landing.board);
     return;
+  }
+  // A board that named itself but was not found is said so before the
+  // picker opens, rather than vanishing without a trace.
+  if (landing.missedBoard && options.localize) {
+    notifyInfo(
+      options.localize("wizard.connect_your_board_unknown_catalog_board", {
+        board: landing.missedBoard,
+      })
+    );
   }
   createDialog.openAtBoardStep(landing.preset);
 }

@@ -217,14 +217,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
                   ${this._localize("wizard.dont_know_board")}
                 </a>
               </div>
-              ${
-                this._detectError
-                  ? html`<div class="detect-error" role="alert">
-                      ${this._detectError}
-                    </div>`
-                  : nothing
-              }
             `
+      }
+      ${
+        this._detectError
+          ? html`<div class="detect-error" role="alert">${this._detectError}</div>`
+          : nothing
       }
 
       <esphome-wizard-step-board-list
@@ -316,16 +314,18 @@ export class ESPHomeWizardStepBoard extends LitElement {
       return;
     }
     this._applyDetection(landing.preset);
-    // Nothing to narrow to: say which kind of nothing, rather than look like
-    // nothing happened. A board that named itself but is not in the catalog
-    // is a different story from a device we could not tell at all.
-    if (!landing.preset) {
-      const named = detection.kind === "named" ? detection.board : undefined;
-      this._detectError = named
-        ? this._localize("wizard.connect_your_board_unknown_catalog_board", {
-            board: named,
-          })
-        : this._localize("wizard.connect_your_board_unrecognized");
+    // A board that named itself but was not found is said so, whether or not
+    // a chip or platform narrowed the picker; a device we could not tell at
+    // all is a different story, and gets its own line (#1856).
+    if (landing.missedBoard) {
+      this._detectError = this._localize(
+        "wizard.connect_your_board_unknown_catalog_board",
+        {
+          board: landing.missedBoard,
+        }
+      );
+    } else if (detection.kind === "unknown") {
+      this._detectError = this._localize("wizard.connect_your_board_unrecognized");
     }
     void this._fetchBoards();
   }
