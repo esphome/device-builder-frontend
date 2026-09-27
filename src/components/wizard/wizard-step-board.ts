@@ -17,7 +17,7 @@ import { type DeploymentEnvironment, detectEnvironment } from "../../util/enviro
 import { fireEvent } from "../../util/fire-event.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { portInUseMessage } from "../../util/serial-open-error.js";
+import { namedConnectFailure } from "../../util/serial-open-error.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import {
@@ -296,7 +296,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       this._detectError =
         err instanceof EngineLoadError
           ? this._localize("firmware.engine_load_failed")
-          : (portInUseMessage(err, this._localize) ??
+          : (namedConnectFailure(err, this._localize) ??
             this._extractErrorDetail(
               err,
               this._localize("wizard.connect_your_board_detect_failed")

@@ -57,21 +57,17 @@ export async function pickPortAndLoadEsptool(): Promise<{
 }
 
 /**
- * Release a connected session without ever throwing: a failed
- * ``transport.disconnect()`` falls back to closing the port directly, as
- * ``connectToPort`` does, so a teardown hiccup neither replaces the caller's
- * result nor leaks an open port into the next ``port.open``.
+ * Release a connected session without ever throwing, so a teardown hiccup
+ * never replaces the caller's result. The engine's ``disconnect`` is itself
+ * bounded and falls back to closing the port directly.
  */
 export async function releaseSerial(
   esptool: Esptool,
   detected: DetectedChip
 ): Promise<void> {
-  try {
-    await esptool.disconnect(detected.transport);
-  } catch (err) {
-    console.warn("[esptool] Disconnect failed, closing the port directly:", err);
-    await detected.port.close().catch(() => {});
-  }
+  await esptool.disconnect(detected.transport).catch((err: unknown) => {
+    console.warn("[esptool] Release failed:", err);
+  });
 }
 
 export interface DetectedBoard {

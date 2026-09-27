@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   markOpenFailure,
+  namedConnectFailure,
   openFailureMessage,
   openSerialPort,
   portInUseMessage,
+  SerialConnectTimeoutError,
 } from "../../src/util/serial-open-error.js";
 
 const localize = (k: string, v?: Record<string, string | number>) =>
@@ -42,5 +44,12 @@ describe("serial-open-error", () => {
     const port = { open: async () => Promise.reject(err) } as unknown as SerialPort;
     await expect(openSerialPort(port, { baudRate: 115200 })).rejects.toBe(err);
     expect(portInUseMessage(err, localize)).toBe(IN_USE);
+  });
+
+  it("names a connect that timed out, in seconds, ahead of the fallback", () => {
+    const late = new SerialConnectTimeoutError(30_000);
+    const TIMED_OUT = 'serial.connect_timed_out {"seconds":30}';
+    expect(openFailureMessage(late, localize, "serial.connect_failed")).toBe(TIMED_OUT);
+    expect(namedConnectFailure(new Error("no sync"), localize)).toBeUndefined();
   });
 });
