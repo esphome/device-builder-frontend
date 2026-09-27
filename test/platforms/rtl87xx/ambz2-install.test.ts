@@ -44,6 +44,7 @@ import {
   LT_TAG,
   UF2_FAMILY_AMBZ,
 } from "../../../src/platforms/rtl87xx/libretiny-uf2.js";
+import { PickerActivationError } from "../../../src/util/picker-activation.js";
 import {
   asHost,
   bin,
@@ -193,6 +194,12 @@ describe("rtlDoFlash", () => {
     await rtlDoFlash(asHost(host));
     expect(host._statusMessage).toBe("firmware.browser_flash_connect_failed");
     expect(host._errorMessage).toBe("no serial");
+
+    mocks.requestSerialPort.mockRejectedValue(
+      new PickerActivationError(new Error("no gesture"))
+    );
+    await rtlDoFlash(asHost(host));
+    expect(host._errorMessage).toBe("serial.picker_needs_click");
   });
 
   it("walks the connect, strap-wait, flashing and done steps with the engine's hooks", async () => {

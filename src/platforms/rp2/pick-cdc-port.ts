@@ -1,6 +1,6 @@
 import type { LocalizeFunc } from "../../common/localize.js";
-import { getErrorMessage } from "../../util/error-message.js";
 import { notifyError } from "../../util/notify.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { PortNotAcceptedError, requestSerialPort } from "../../util/web-serial.js";
 import { RP2_SERIAL_PICK } from "./web-usb.js";
 
@@ -23,7 +23,7 @@ export async function pickRp2CdcPort(
     notifyError(
       err instanceof PortNotAcceptedError
         ? localize("firmware.rp2_not_a_pico")
-        : localize(failKey, { error: getErrorMessage(err) })
+        : openFailureMessage(err, localize, failKey)
     );
     return null;
   }

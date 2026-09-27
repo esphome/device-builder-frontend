@@ -17,6 +17,7 @@ import {
   BootloaderTouchError,
   touchIntoBootloader,
 } from "../../../util/serial-bootloader-touch.js";
+import { openFailureMessage } from "../../../util/serial-open-error.js";
 import { requestSerialPort } from "../../../util/web-serial.js";
 
 import {
@@ -161,12 +162,11 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       // A failed pick has nothing to do with the board; only the touch earns
       // the manual-bootloader hint.
       this._fail(
-        this._localize("web.connect.failed", {
-          error:
-            err instanceof BootloaderTouchError
-              ? withManualBootloaderHint(err, this._localize)
-              : getErrorMessage(err),
-        })
+        err instanceof BootloaderTouchError
+          ? this._localize("web.connect.failed", {
+              error: withManualBootloaderHint(err, this._localize),
+            })
+          : openFailureMessage(err, this._localize, "web.connect.failed")
       );
     }
   }
@@ -181,7 +181,7 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     try {
       port = await requestSerialPort();
     } catch (err) {
-      this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
+      this._fail(openFailureMessage(err, this._localize, "web.connect.failed"));
       return;
     } finally {
       this._pending = false;

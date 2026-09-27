@@ -3,6 +3,8 @@
  * picker. Re-enumeration lives in ``serial-reacquire.ts`` and the esptool
  * engine in ``src/platforms/esp/esptool.ts``.
  */
+import { pickerFailure } from "./picker-activation.js";
+
 export type LogCallback = (line: string) => void;
 
 /** Why Web Serial can or can't be used here. */
@@ -71,7 +73,7 @@ export async function requestSerialPort(
     if (isPortPickerCancel(err)) {
       return null; // User dismissed the port picker.
     }
-    throw err; // A real requestPort failure — let the caller surface it.
+    throw pickerFailure(err); // A real requestPort failure — let the caller surface it.
   }
   if (accept && !accept(port)) throw new PortNotAcceptedError(port);
   return port;

@@ -9,6 +9,7 @@ import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { notifyError } from "../../util/notify.js";
 import { resetToBootloader } from "../../util/serial-bootloader-touch.js";
+import { connectFailureDetail } from "../../util/serial-open-error.js";
 import { PortNotAcceptedError, requestSerialPort } from "../../util/web-serial.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
@@ -146,7 +147,7 @@ export async function touchIntoBootloaderStep(
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.browser_flash_connect_failed"),
-        (step.failureDetail ?? getErrorMessage)(err)
+        connectFailureDetail(err, host._localize, step.failureDetail)
       );
     }
     return;
@@ -172,7 +173,7 @@ export async function pickSerialPortOrFail(
     if (stillCurrent()) {
       host._fail(
         host._localize("firmware.browser_flash_connect_failed"),
-        getErrorMessage(err)
+        connectFailureDetail(err, host._localize)
       );
     }
     return null;

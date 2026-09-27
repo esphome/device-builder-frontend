@@ -37,6 +37,7 @@ vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => 
 import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { Ambz2ImageError } from "../../../../src/platforms/rtl87xx/libretiny-uf2.js";
+import { PickerActivationError } from "../../../../src/util/picker-activation.js";
 import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -226,6 +227,17 @@ describe("esphome-web-install-rtl-dialog", () => {
     await el.updateComplete;
     expect(pickerText(el)).toEqual({ name: "firmware.uf2", status: "", error: "" });
     expect(installDisabled(el)).toBe(false);
+  });
+
+  it("says to click again for a picker refused after the click ran out", async () => {
+    const el = await mountDialog();
+    mocks.requestSerialPort.mockRejectedValue(
+      new PickerActivationError(new Error("no gesture"))
+    );
+    await el._flash();
+    await el.updateComplete;
+    expect(card(el).state).toBe("error");
+    expect(card(el).statusMessage).toBe("serial.picker_needs_click");
   });
 
   it("goes back to the setup step when the picker is dismissed, and reports a failed flash", async () => {

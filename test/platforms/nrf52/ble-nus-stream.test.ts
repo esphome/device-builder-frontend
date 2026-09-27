@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { withWebBluetooth } from "../../_web-serial.js";
+import {
+  pickerRefused,
+  withUserActivation,
+  withWebBluetooth,
+} from "../../_web-serial.js";
 
 import {
   BLE_NUS_SERVICE_UUID,
@@ -300,6 +304,22 @@ describe("requestBleNusDevice", () => {
     expect(requestDevice).toHaveBeenCalledWith({
       acceptAllDevices: true,
       optionalServices: [BLE_NUS_SERVICE_UUID],
+    });
+  });
+
+  it("names a chooser refused after the click ran out", async () => {
+    const activation = withUserActivation(false);
+    const bluetooth = withWebBluetooth({
+      requestDevice: vi.fn(async () => {
+        throw pickerRefused();
+      }),
+    });
+    restore = () => {
+      activation();
+      bluetooth();
+    };
+    await expect(requestBleNusDevice(["x"])).rejects.toMatchObject({
+      name: "PickerActivationError",
     });
   });
 

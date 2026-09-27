@@ -1,5 +1,6 @@
 import type { LocalizeFunc } from "../common/localize.js";
 import { getErrorMessage } from "./error-message.js";
+import { PickerActivationError } from "./picker-activation.js";
 
 // The copy for a failed serial open or connect, and the errors it names.
 //
@@ -83,14 +84,16 @@ export class SerialPortHeldError extends Error {
 }
 
 /**
- * The copy for a failed connect that can be named: the port held elsewhere,
- * the device never answering, the port never opening, or the port not
- * releasing; undefined for anything else.
+ * The copy for a failed pick or connect that can be named: a picker refused
+ * for a click that ran out, the port held elsewhere, the device never
+ * answering, the port never opening, or the port not releasing; undefined
+ * for anything else.
  */
 export function namedConnectFailure(
   err: unknown,
   localize: LocalizeFunc
 ): string | undefined {
+  if (err instanceof PickerActivationError) return localize("serial.picker_needs_click");
   if (err instanceof SerialConnectTimeoutError) {
     return localize("serial.connect_timed_out", { seconds: err.seconds });
   }
@@ -111,4 +114,13 @@ export function openFailureMessage(
     namedConnectFailure(err, localize) ??
     localize(fallbackKey, { error: getErrorMessage(err) })
   );
+}
+
+/** The detail under a failure's title: its name when it has one, else what ``fallback`` makes of the error. */
+export function connectFailureDetail(
+  err: unknown,
+  localize: LocalizeFunc,
+  fallback: (err: unknown) => string = getErrorMessage
+): string {
+  return namedConnectFailure(err, localize) ?? fallback(err);
 }

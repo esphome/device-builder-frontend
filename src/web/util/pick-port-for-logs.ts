@@ -2,8 +2,8 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
-import { getErrorMessage } from "../../util/error-message.js";
 import { fireEvent } from "../../util/fire-event.js";
+import { openFailureMessage } from "../../util/serial-open-error.js";
 import { requestSerialPort } from "../../util/web-serial.js";
 import { openPortForLogs } from "../logs/open-port-for-logs.js";
 import { releaseOrphanedPort } from "./release-port.js";
@@ -44,7 +44,7 @@ export async function pickPortForLogs(
   try {
     port = await requestSerialPort();
   } catch (err) {
-    toast.error(localize("web.connect.failed", { error: getErrorMessage(err) }));
+    toast.error(openFailureMessage(err, localize, "web.connect.failed"));
     return null;
   }
   if (!port) return null;

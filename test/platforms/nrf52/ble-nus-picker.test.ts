@@ -24,6 +24,7 @@ import {
   BleUnavailableError,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../../../src/platforms/nrf52/ble-nus-stream.js";
+import { PickerActivationError } from "../../../src/util/picker-activation.js";
 
 const localize = (key: string) => key;
 
@@ -88,5 +89,13 @@ describe("pickBleNusDevice", () => {
     expect(mocks.notifyError).toHaveBeenLastCalledWith(
       "dashboard.logs_ble_nus_open_failed"
     );
+  });
+
+  it("says to click again for a chooser refused after the click ran out", async () => {
+    mocks.requestBleNusDevice.mockRejectedValue(
+      new PickerActivationError(new Error("no gesture"))
+    );
+    await expect(pickBleNusDevice(localize, [])).resolves.toBeNull();
+    expect(mocks.notifyError).toHaveBeenLastCalledWith("serial.picker_needs_click");
   });
 });

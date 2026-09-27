@@ -15,6 +15,7 @@ import {
   PicoFlashError,
   picoFlashFailureCopy,
 } from "../../../src/platforms/rp2/rp2-flash.js";
+import { PickerActivationError } from "../../../src/util/picker-activation.js";
 import { UF2_FAMILY_RP2040 } from "../../../src/util/uf2.js";
 
 const image = { familyId: UF2_FAMILY_RP2040, ranges: [], totalBytes: 0 };
@@ -171,5 +172,15 @@ describe("picoFlashFailureCopy", () => {
     expect(
       picoFlashFailureCopy(new PicoFlashError("access-denied", cause), localize).title
     ).toBe("firmware.rp2_usb_access_denied");
+  });
+
+  it("says to click again for a chooser refused after the click ran out", () => {
+    const refused = new PickerActivationError(new Error("no gesture"));
+    expect(
+      picoFlashFailureCopy(new PicoFlashError("connect", refused), localize)
+    ).toEqual({
+      title: "firmware.browser_flash_connect_failed",
+      detail: "serial.picker_needs_click",
+    });
   });
 });

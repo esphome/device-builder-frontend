@@ -10,7 +10,8 @@ import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
-import { isPortPickerCancel, webSerialAvailability } from "../../util/web-serial.js";
+import { namedConnectFailure } from "../../util/serial-open-error.js";
+import { requestSerialPort, webSerialAvailability } from "../../util/web-serial.js";
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
 import { cardActionsRowStyles } from "../dashboard/card-actions-row.js";
@@ -316,15 +317,17 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._logPort = undefined;
     this._resetLog();
 
-    let port: SerialPort;
+    let port: SerialPort | null = null;
     try {
-      port = await navigator.serial.requestPort();
+      port = await requestSerialPort();
+      if (!port) this._resetForRetry();
     } catch (err) {
-      if (!isPortPickerCancel(err)) {
-        this._setState("error", this._localize("web.flash.no_port"));
-      } else {
-        this._resetForRetry();
-      }
+      this._setState(
+        "error",
+        namedConnectFailure(err, this._localize) ?? this._localize("web.flash.no_port")
+      );
+    }
+    if (!port) {
       this._busy = false;
       return;
     }

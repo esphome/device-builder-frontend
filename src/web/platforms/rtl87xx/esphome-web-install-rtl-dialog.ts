@@ -13,6 +13,7 @@ import {
 } from "../../../platforms/rtl87xx/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
+import { openFailureMessage } from "../../../util/serial-open-error.js";
 import { requestSerialPort } from "../../../util/web-serial.js";
 
 import {
@@ -164,7 +165,7 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
       try {
         port = await requestSerialPort();
       } catch (err) {
-        this._fail(this._localize("web.connect.failed", { error: getErrorMessage(err) }));
+        this._fail(openFailureMessage(err, this._localize, "web.connect.failed"));
         return;
       }
       if (!port) return;
