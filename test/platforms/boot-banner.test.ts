@@ -251,6 +251,24 @@ describe("readBootBanner", () => {
     });
   });
 
+  it("keeps back a port it could not release even when the read itself failed", async () => {
+    // Streams gone after open (the device dropped): the read throws a
+    // non-recoverable error, and the close fails too.
+    const { port, raw } = fakePort([]);
+    raw.open.mockImplementation(async () => {
+      raw.readable = new ReadableStream<Uint8Array>({
+        start: (c) => c.error(new DOMException("lost", "NetworkError")),
+      });
+    });
+    raw.close.mockRejectedValue(new DOMException("stuck", "InvalidStateError"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const pending = readBootBanner(port);
+    const assertion = expect(pending).rejects.toBeInstanceOf(BannerTeardownError);
+    await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
+    await assertion;
+    warn.mockRestore();
+  });
+
   it("refuses to hand on a port it could not release when nothing was found", async () => {
     const { port, raw } = fakePort([]);
     raw.close.mockRejectedValue(new DOMException("stuck", "InvalidStateError"));
