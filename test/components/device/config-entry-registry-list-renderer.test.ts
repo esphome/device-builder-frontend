@@ -666,6 +666,24 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     expect(renderEntry).not.toHaveBeenCalled();
   });
 
+  it.each(["float", "integer", "string", "lambda"])(
+    "leaves a mapping on a fieldless %s filter alone",
+    async (valueType) => {
+      // Only a duration has a mapping form; a lambda widget would show
+      // the mapping as "[object Object]".
+      const renderEntry = vi.fn();
+      const catalog = [
+        { id: "multiply", name: "Multiply", config_entries: [], value_type: valueType },
+      ] as unknown as LightEffect[];
+      const { el } = mount(
+        { filters: [{ multiply: { factor: 2 } }] },
+        { key: "filters", registry: "filter", catalog, renderEntry }
+      );
+      await el.updateComplete;
+      expect(renderEntry).not.toHaveBeenCalled();
+    }
+  );
+
   it("renders the value entry for a mapping on a filter that has no fields", async () => {
     // ``throttle: {seconds: 5}`` is the duration's own mapping form; with no
     // catalog fields there is no sub-form it could be mistaken for.
