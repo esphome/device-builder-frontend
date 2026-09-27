@@ -629,10 +629,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  treated atomically (required if any member is) so its members stay
    *  contiguous and ``orderExclusiveGroups`` folds them at the same slot. */
   protected willUpdate(changed: PropertyValues) {
-    // A different entry list means the form was re-targeted to a
-    // different component (e.g. the dep-flow detour swapping
-    // ES7210 for i2c). Drop transient unit picks from the previous
-    // shape so they don't bleed into unrelated paths.
+    // The form was re-targeted to other entries (e.g. the dep-flow detour
+    // swapping ES7210 for i2c), or its values were read again from a YAML
+    // edited outside it: drop what could write a value at a path that may
+    // now be another field.
     const previous = changed.get("entries") as ConfigEntry[] | undefined;
     const retargeted = changed.has("entries") && previous !== undefined;
     const reread = changed.has("valuesRead");
