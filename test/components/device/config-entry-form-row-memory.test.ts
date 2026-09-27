@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { mountControlledForm } from "./_config-entry-form-host.js";
 
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
+import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 const STEPS = makeConfigEntry({
@@ -68,8 +69,7 @@ describe("config-entry-form list rows", () => {
 
   it("keeps an opened option list with its row", async () => {
     const { form } = await mountControlledForm([STEPS], { steps: [{}, {}, {}] });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ctx = () => (form as any)._buildCtx();
+    const ctx = () => (form as unknown as { _buildCtx(): RenderCtx })._buildCtx();
 
     ctx().expandOptions(["steps", "2", "value"]);
     ctx().rowRemoved(["steps"], 0);

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { fieldKeyAttr } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { rowMemoryCtx } from "../../../src/components/device/config-entry-renderers/row-memory-ctx.js";
 import {
+  fieldKeyRowRekeyer,
   rekeyStore,
   rowRekeyer,
 } from "../../../src/components/device/config-entry-renderers/row-memory.js";
@@ -37,6 +39,28 @@ describe("rowRekeyer", () => {
   });
 });
 
+describe("fieldKeyRowRekeyer", () => {
+  const key = (...path: string[]) => fieldKeyAttr(path);
+  const rekey = fieldKeyRowRekeyer(["filters"], 1);
+
+  it.each([
+    ["the removed row's key", key("filters", "1", "x"), null],
+    ["a row above", key("filters", "0", "x"), key("filters", "0", "x")],
+    ["a row below", key("filters", "2", "x"), key("filters", "1", "x")],
+    ["another list", key("effects", "2", "x"), key("effects", "2", "x")],
+    ["the list itself", key("filters"), key("filters")],
+  ])("handles %s", (_name, from, expected) => {
+    expect(rekey(from)).toBe(expected);
+  });
+
+  it("keeps a map key that holds a dot apart from a row", () => {
+    // ``logs["i2c.2"]`` reads like row 2 of ``logs.i2c`` in a dotted key.
+    const dotted = fieldKeyRowRekeyer(["logs", "i2c"], 0);
+    expect(dotted(key("logs", "i2c.2"))).toBe(key("logs", "i2c.2"));
+    expect(dotted(key("logs", "i2c", "2"))).toBe(key("logs", "i2c", "1"));
+  });
+});
+
 describe("rekeyStore", () => {
   it("moves a map's values to their new keys", () => {
     const store = new Map([
@@ -68,9 +92,12 @@ describe("rowMemoryCtx", () => {
       ["filters.2.x", "c"],
     ]);
     const clusters = { rekeyChoices: vi.fn() };
-    const ctx = rowMemoryCtx({}, clusters as unknown as ConstraintClusterController, [
-      store,
-    ]);
+    const ctx = rowMemoryCtx(
+      {},
+      clusters as unknown as ConstraintClusterController,
+      new Set(),
+      [store]
+    );
     return { store, clusters, ctx };
   }
 

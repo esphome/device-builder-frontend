@@ -294,7 +294,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   private _unsubscribeProviders?: () => void;
 
-  /** Dotted paths of the lazy option lists the user has opened. */
+  /** Field keys (``fieldKeyAttr``) of lazy option lists the user has opened. */
   private _expandedOptionFields: Set<string> = new Set();
 
   /** Scrolls the YAML-cursor-selected field into view (the structured side
@@ -1079,10 +1079,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
       resolveInterfaceProviders: (interfaceName) =>
         this._resolveInterfaceProviders(interfaceName),
       catalogById: () => this._catalogIndex.byId(),
-      isOptionsExpanded: (path) => this._expandedOptionFields.has(path.join(".")),
+      isOptionsExpanded: (path) => this._expandedOptionFields.has(fieldKeyAttr(path)),
       expandOptions: (path) => {
-        if (this._expandedOptionFields.has(path.join("."))) return;
-        this._expandedOptionFields.add(path.join("."));
+        const key = fieldKeyAttr(path);
+        if (this._expandedOptionFields.has(key)) return;
+        this._expandedOptionFields.add(key);
         this.requestUpdate();
       },
       scopeValues: (path) => this._scopeValues(path),
@@ -1107,12 +1108,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
       clearEditingMagnitude: (path) => {
         this._editingMagnitudes.delete(path.join("."));
       },
-      ...rowMemoryCtx(this, this._constraintClusters, [
+      ...rowMemoryCtx(this, this._constraintClusters, this._expandedOptionFields, [
         this._pendingUnits,
         this._editingMagnitudes,
         this._nestedOpenSections,
         this._seededNestedOpen,
-        this._expandedOptionFields,
       ]),
       getClusterChoice: (clusterId) => this._constraintClusters.getChoice(clusterId),
       setClusterChoice: (clusterId, altId) =>

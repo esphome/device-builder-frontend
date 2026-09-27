@@ -6,6 +6,7 @@
  * are renumbered to follow them and the removed row's are dropped.
  */
 import { isIndexSegment } from "../../../util/nested-values.js";
+import { fieldKeyAttr, parseFieldKey } from "../config-entry-renderers-shared.js";
 
 /** New key for a remembered entry; ``null`` drops the entry. */
 export type Rekey = (key: string) => string | null;
@@ -23,6 +24,21 @@ export function rowRekeyer(path: string[], index: number): Rekey {
     if (row === index) return null;
     if (row < index) return key;
     return `${prefix}${row - 1}${rest.slice(segment.length)}`;
+  };
+}
+
+/** ``rowRekeyer`` for keys in the ``fieldKeyAttr`` form, which keeps a
+ *  path's segments apart where a dotted key cannot. */
+export function fieldKeyRowRekeyer(path: string[], index: number): Rekey {
+  return (key) => {
+    const segments = parseFieldKey(key);
+    const segment = segments?.[path.length];
+    if (!segments || segment === undefined || !isIndexSegment(segment)) return key;
+    if (!path.every((part, i) => segments[i] === part)) return key;
+    const row = Number(segment);
+    if (row === index) return null;
+    if (row < index) return key;
+    return fieldKeyAttr([...path, String(row - 1), ...segments.slice(path.length + 1)]);
   };
 }
 
