@@ -77,10 +77,25 @@ export class SerialOpenTimeoutError extends Error {
 
 /** The device went away (unplugged, or it dropped off the bus) while it was in use. */
 export class SerialDeviceLostError extends Error {
-  constructor() {
+  constructor(
+    // Error.cause needs lib ES2022; the field is declared here instead.
+    readonly cause?: unknown
+  ) {
     super("The device disconnected during the operation");
     this.name = "SerialDeviceLostError";
   }
+}
+
+/**
+ * ``err`` as a lost device when it is one: the browser fails a read or a
+ * write on a device that went away with ``NetworkError``, as it does a
+ * failed open, which is not a lost device. Undefined for anything else.
+ */
+export function deviceLostFrom(err: unknown): SerialDeviceLostError | undefined {
+  if (err instanceof SerialDeviceLostError) return err;
+  const lost =
+    err instanceof DOMException && err.name === "NetworkError" && !openFailures.has(err);
+  return lost ? new SerialDeviceLostError(err) : undefined;
 }
 
 /** A write did not return by its deadline; the device is there but not taking data. */
@@ -104,7 +119,7 @@ export class SerialPortHeldError extends Error {
 }
 
 /**
- * The copy for a failed pick or connect that can be named: a picker refused
+ * The copy for a failed pick, connect or write that can be named: a picker refused
  * for a click that ran out, the port held elsewhere, the device never
  * answering, the port never opening, the port not releasing, or the device
  * lost or gone quiet during a write; undefined for anything else.

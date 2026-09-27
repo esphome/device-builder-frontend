@@ -6,6 +6,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import "./_mock-transport-guard.js";
+
 interface TerminalLike {
   clean: () => void;
   writeLine: (line: string) => void;
@@ -23,13 +25,6 @@ const state: {
 } = {
   main: () => Promise.reject(new Error("unset")),
 };
-
-// The session guard has its own tests; these ports are bare fakes.
-const guard = vi.hoisted(() => ({
-  guardTransport: vi.fn(),
-  releaseTransportGuard: vi.fn(),
-}));
-vi.mock("../../../src/platforms/esp/transport-guard.js", () => guard);
 
 vi.mock("esptool-js", () => {
   class Transport {

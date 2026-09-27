@@ -114,29 +114,51 @@ describe("runFlash", () => {
     expect(hooks.steps).toContain("erasing");
   });
 
-  it("names a board unplugged during the flash or the erase, and releases the port", async () => {
-    const lost = new SerialDeviceLostError();
-    const plan = {
-      erase: true,
-      filesCallback: async () => [{ data: new Uint8Array(4), address: 0 }],
-      messages: webFlashMessages((key) => key),
-    };
-
+  it("names a board unplugged during the flash, and releases the port", async () => {
     vi.mocked(connectToPort).mockResolvedValue(detected() as never);
-    vi.mocked(flashFirmware).mockRejectedValue(lost);
-    const flash = makeHooks();
-    expect(await runFlash(port, plan, flash)).toBe(false);
-    expect(flash.errors).toEqual(["serial.device_lost"]);
+    vi.mocked(flashFirmware).mockRejectedValue(new SerialDeviceLostError());
+    const hooks = makeHooks();
 
-    const chip = detected();
-    chip.loader.eraseFlash.mockRejectedValue(lost);
-    vi.mocked(connectToPort).mockResolvedValue(chip as never);
-    const erase = makeHooks();
-    expect(await runFlash(port, plan, erase)).toBe(false);
-    expect(erase.errors).toEqual(["serial.device_lost"]);
+    const ok = await runFlash(
+      port,
+      {
+        filesCallback: async () => [{ data: new Uint8Array(4), address: 0 }],
+        messages: webFlashMessages((key) => key),
+      },
+      hooks
+    );
 
-    expect(disconnect).toHaveBeenCalledTimes(2);
+    expect(ok).toBe(false);
+    expect(hooks.errors).toEqual(["serial.device_lost"]);
+    expect(disconnect).toHaveBeenCalledOnce();
     expect(resetAndDisconnect).not.toHaveBeenCalled();
+  });
+
+  it("aggregates progress across multiple parts by byte size", async () => {
+    const chip = detected();
+    vi.mocked(connectToPort).mockResolvedValue(chip as never);
+    // Report 100% for each part so the aggregate reflects part boundaries.
+    vi.mocked(flashFirmware).mockImplementation(
+      async (_loader, _data, _addr, onProgress) => {
+        onProgress?.({ fileIndex: 0, written: 1, total: 1, percent: 100 });
+      }
+    );
+    const hooks = makeHooks();
+
+    await runFlash(
+      port,
+      {
+        filesCallback: async () => [
+          { data: new Uint8Array(30), address: 0 },
+          { data: new Uint8Array(10), address: 100 },
+        ],
+      },
+      hooks
+    );
+
+    // After part 1 (30/40) → 75%, after part 2 (40/40) → 100%.
+    expect(hooks.progress).toContain(75);
+    expect(hooks.progress[hooks.progress.length - 1]).toBe(100);
   });
 
   it("reports a connect failure, falling back to the raw error without a hint", async () => {

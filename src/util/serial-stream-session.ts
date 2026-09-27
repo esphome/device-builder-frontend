@@ -9,6 +9,8 @@
  * that was unplugged it can stay pending, and the engine would wait on it
  * without end (#1896).
  */
+import { deviceLostFrom } from "./serial-open-error.js";
+import { type PortLost, watchPortLost } from "./serial-port-lost.js";
 import { sleep } from "./sleep.js";
 
 // Upper bound on stream teardown so a dead device can't hold the port open.
@@ -19,15 +21,16 @@ export abstract class SerialStreamSession {
   private readonly writer: WritableStreamDefaultWriter<Uint8Array>;
   // Rejects on abort, never settles otherwise.
   private readonly aborted: Promise<never>;
-  // Rejects with ``readEnded`` once the device is gone, never settles otherwise.
+  // Rejects with ``readEnded`` once the session ended, never settles otherwise.
   private readonly gone: Promise<never>;
   private markGone: (err: Error) => void = () => {};
+  private readonly watch: PortLost;
   private active = true;
-  /** Why the read loop stopped (device gone, port error); set before ``onEnded``. */
+  /** Why the session ended (device gone, port error); set before ``onEnded``. */
   protected readEnded: Error | null = null;
 
   constructor(
-    private readonly port: SerialPort,
+    port: SerialPort,
     protected readonly signal?: AbortSignal
   ) {
     if (!port.readable || !port.writable) {
@@ -43,15 +46,12 @@ export abstract class SerialStreamSession {
     this.aborted.catch(() => {});
     this.gone = new Promise<never>((_, reject) => (this.markGone = reject));
     this.gone.catch(() => {});
-    // The read loop ends by itself when the device goes; the event is for a
-    // read that stays pending too. Worded as the read's own error is.
-    port.addEventListener("disconnect", this.onDisconnect);
+    // The read loop ends by itself when the device goes; the port's own
+    // report is for a read that stays pending too.
+    this.watch = watchPortLost(port);
+    this.watch.gone.catch((err: Error) => this.end(err));
     void this.readLoop();
   }
-
-  private onDisconnect = (): void => {
-    this.end(new DOMException("The device has been lost.", "NetworkError"));
-  };
 
   /** Bytes as they arrive; runs on the read loop. */
   protected abstract onBytes(bytes: Uint8Array): void;
@@ -88,9 +88,11 @@ export abstract class SerialStreamSession {
   private end(err: Error): void {
     // The first reason stands: a read that fails after the event adds nothing.
     if (this.readEnded) return;
-    this.readEnded = err;
-    this.markGone(err);
-    this.onEnded(err);
+    // One error for a lost device, however it was noticed.
+    const reason = deviceLostFrom(err) ?? err;
+    this.readEnded = reason;
+    this.markGone(reason);
+    this.onEnded(reason);
   }
 
   /**
@@ -102,7 +104,7 @@ export abstract class SerialStreamSession {
    */
   async close(failure?: unknown): Promise<void> {
     this.active = false;
-    this.port.removeEventListener("disconnect", this.onDisconnect);
+    this.watch.dispose();
     const writer =
       failure !== undefined ? this.writer.abort(failure) : this.writer.close();
     // Best effort: a dead port rejects these or never settles them.

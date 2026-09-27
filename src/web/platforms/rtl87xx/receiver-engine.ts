@@ -11,6 +11,7 @@ import {
   RTL87XX_SERIAL_LOGS,
   runAmbz2,
 } from "../../../platforms/rtl87xx/index.js";
+import { connectFailureDetail } from "../../../util/serial-open-error.js";
 import type { ReceiverEngine } from "../../flash-receiver/receiver-engine.js";
 import { parseFailureCopy } from "../../install/preparation.js";
 
@@ -49,7 +50,7 @@ export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
         if ("detail" in result) {
           hooks.onState(
             "error",
-            `${localize("firmware.rtl_flash_failed")}: ${result.detail}`
+            `${localize("firmware.rtl_flash_failed")}: ${connectFailureDetail(result.error, localize, () => result.detail)}`
           );
           return null;
         }

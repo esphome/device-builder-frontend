@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { makeDisconnectPort } from "../_web-serial.js";
+import { SerialDeviceLostError } from "../../src/util/serial-open-error.js";
 import { SerialStreamSession } from "../../src/util/serial-stream-session.js";
 
 class Session extends SerialStreamSession {
@@ -42,8 +43,8 @@ describe("SerialStreamSession", () => {
     const session = new Session(port);
     const write = session.write(new Uint8Array([1]));
     port.fire();
-    await expect(write).rejects.toMatchObject({ name: "NetworkError" });
-    expect(session.ended).toMatchObject({ name: "NetworkError" });
+    await expect(write).rejects.toBeInstanceOf(SerialDeviceLostError);
+    expect(session.ended).toBeInstanceOf(SerialDeviceLostError);
   });
 
   it("fails a write that never returns when the read ends first", async () => {
@@ -52,7 +53,9 @@ describe("SerialStreamSession", () => {
     const write = session.write(new Uint8Array([1]));
     const gone = lost();
     failRead(gone);
-    await expect(write).rejects.toBe(gone);
+    // One error for a lost device, however it was noticed.
+    await expect(write).rejects.toBeInstanceOf(SerialDeviceLostError);
+    await expect(write).rejects.toMatchObject({ cause: gone });
   });
 
   it("fails a later write at once, and keeps the first reason", async () => {
@@ -60,9 +63,20 @@ describe("SerialStreamSession", () => {
     const session = new Session(port);
     const gone = lost();
     failRead(gone);
-    await expect(session.write(new Uint8Array([1]))).rejects.toBe(gone);
+    await expect(session.write(new Uint8Array([1]))).rejects.toMatchObject({
+      cause: gone,
+    });
+    const first = session.ended;
     port.fire();
-    expect(session.ended).toBe(gone);
+    expect(session.ended).toBe(first);
+  });
+
+  it("keeps a read that ended for another reason as it is", async () => {
+    const { port, failRead } = stuckPort();
+    const session = new Session(port);
+    const framing = new DOMException("Framing error", "FramingError");
+    failRead(framing);
+    await expect(session.write(new Uint8Array([1]))).rejects.toBe(framing);
   });
 
   it("stops listening to the port when it is closed", async () => {

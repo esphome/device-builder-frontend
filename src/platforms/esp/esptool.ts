@@ -40,6 +40,9 @@ const CONNECT_DEADLINE_MS = 30_000;
 /** How long releasing the port gets before the caller moves on without it. */
 const RELEASE_DEADLINE_MS = 5_000;
 
+/** How long the reset after a flash gets; it takes well under a second. */
+const RESET_DEADLINE_MS = 10_000;
+
 /** GET_SECURITY_INFO ROM command opcode (esptool.py's ``ESP_GET_SECURITY_INFO``). */
 const ESP_GET_SECURITY_INFO = 0x14;
 
@@ -284,8 +287,8 @@ export async function readDeviceManifest(
 /**
  * Flash firmware binary data to a connected ESP device.
  * Assumes connectToPort() was already called and the loader is connected.
- * Throws ``SerialDeviceLostError`` when the device goes away during the
- * write and ``SerialWriteStalledError`` when it stops taking data (see
+ * Throws ``SerialDeviceLostError`` when the device goes away meanwhile and
+ * ``SerialWriteStalledError`` when it stops taking data (see
  * ``guardTransport``).
  */
 export async function flashFirmware(
@@ -507,10 +510,15 @@ export async function resetAndDisconnect(
 ): Promise<void> {
   markSerialActivity();
   // A chip on its own USB drops off the bus as it resets, which is the
-  // reset working; the reset keeps its own best effort handling.
+  // reset working and no lost device. The reset is bounded as a whole: a
+  // line change on a board unplugged just now can stay pending.
   releaseTransportGuard(transport);
   try {
-    await hardResetChip(loader, transport, port);
+    await withDeadline(
+      hardResetChip(loader, transport, port),
+      RESET_DEADLINE_MS,
+      () => new Error("The reset did not finish in time")
+    );
   } finally {
     await releasePort(transport);
     // hard_reset triggers a USB re-enumeration on native-USB chips;

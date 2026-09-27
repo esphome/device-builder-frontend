@@ -7,18 +7,13 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import "./_mock-transport-guard.js";
+
 const state = vi.hoisted(() => ({
   main: (): Promise<string> => new Promise(() => {}),
   disconnect: (): Promise<void> => Promise.resolve(),
 }));
 const loaderOptions = vi.hoisted(() => ({ last: undefined as unknown }));
-
-// The session guard has its own tests; these ports are bare fakes.
-const guard = vi.hoisted(() => ({
-  guardTransport: vi.fn(),
-  releaseTransportGuard: vi.fn(),
-}));
-vi.mock("../../../src/platforms/esp/transport-guard.js", () => guard);
 
 vi.mock("esptool-js", () => {
   class Transport {
@@ -60,6 +55,7 @@ import {
   disconnect,
   resetAndDisconnect,
 } from "../../../src/platforms/esp/esptool.js";
+import { guardTransport } from "../../../src/platforms/esp/transport-guard.js";
 import { SerialConnectTimeoutError } from "../../../src/util/serial-open-error.js";
 
 const port = { close: vi.fn(async () => {}) } as unknown as SerialPort;
@@ -121,7 +117,7 @@ describe("connectToPort deadline", () => {
     const detected = await connectToPort(port);
     expect(detected).toMatchObject({ chipName: "ESP32" });
     // The session is the caller's from here, so it is guarded from here.
-    expect(guard.guardTransport).toHaveBeenCalledExactlyOnceWith(detected.transport);
+    expect(guardTransport).toHaveBeenCalledExactlyOnceWith(detected.transport);
   });
 });
 

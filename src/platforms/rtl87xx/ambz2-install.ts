@@ -15,6 +15,7 @@ import {
   pickUf2,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
+import { connectFailureDetail } from "../../util/serial-open-error.js";
 import type { HandoffSpec } from "../handoff.js";
 import {
   type BrowserInstall,
@@ -101,7 +102,10 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   if (host._flashAbort === abort) host._flashAbort = null;
   if (!stillCurrent()) return;
   if ("detail" in result) {
-    host._fail(host._localize("firmware.rtl_flash_failed"), result.detail);
+    host._fail(
+      host._localize("firmware.rtl_flash_failed"),
+      connectFailureDetail(result.error, host._localize, () => result.detail)
+    );
     return;
   }
   const { rebooted } = result;
