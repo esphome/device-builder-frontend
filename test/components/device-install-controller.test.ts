@@ -56,6 +56,23 @@ describe("DeviceInstallController.deviceState", () => {
   });
 });
 
+describe("DeviceInstallController.deviceMcu", () => {
+  it("returns the device's chip, which picks the flash row with its platform", () => {
+    const ctrl = new DeviceInstallController(
+      makeHost(makeConfiguredDevice({ target_platform: "rp2", mcu: "rp2350" }))
+    );
+    expect(ctrl.deviceTargetPlatform).toBe("rp2");
+    expect(ctrl.deviceMcu).toBe("rp2350");
+  });
+
+  it("is null for a device without one and with no device loaded", () => {
+    expect(
+      new DeviceInstallController(makeHost(makeConfiguredDevice())).deviceMcu
+    ).toBeNull();
+    expect(new DeviceInstallController(makeHost(null)).deviceMcu).toBeNull();
+  });
+});
+
 describe("DeviceInstallController.methodMode", () => {
   it("defaults to install", () => {
     expect(new DeviceInstallController(makeHost(null)).methodMode).toBe("install");
