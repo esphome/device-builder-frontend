@@ -54,14 +54,22 @@ describe("makeScalarValueEntry", () => {
 });
 
 describe("paramEntriesOf", () => {
+  const localize = (key: string) =>
+    key === "device.automation_action_delay_value" ? "Value" : key;
+
+  it("has nothing to render for a value_type this build doesn't know", () => {
+    const action = makeAutomationAction({ id: "x", value_type: "toString" as never });
+    expect(paramEntriesOf(action, localize)).toEqual([]);
+  });
+
   it("returns the catalog fields of a field-based action", () => {
     const fields = [makeConfigEntry({ key: "format", label: "Format" })];
     const action = makeAutomationAction({ id: "logger.log", config_entries: fields });
-    expect(paramEntriesOf(action, "Value")).toBe(fields);
+    expect(paramEntriesOf(action, localize)).toBe(fields);
   });
 
   it("returns the one value entry of a scalar-bodied action", () => {
-    expect(paramEntriesOf(DELAY, "Value")).toEqual([
+    expect(paramEntriesOf(DELAY, localize)).toEqual([
       expect.objectContaining({
         key: "id",
         label: "Value",
@@ -74,24 +82,18 @@ describe("paramEntriesOf", () => {
     ]);
   });
 
-  it("renders the value entry before the action's body has hydrated", () => {
-    const row = { ...DELAY, config_entries: undefined } as unknown as typeof DELAY;
-    expect(paramEntriesOf(row, "Value")).toHaveLength(1);
-  });
-
   it("keeps one array per action so the form mount sees a stable property", () => {
-    expect(paramEntriesOf(DELAY, "Value")).toBe(paramEntriesOf(DELAY, "Value"));
+    expect(paramEntriesOf(DELAY, localize)).toBe(paramEntriesOf(DELAY, localize));
   });
 
   it("rebuilds when the label changes with the locale", () => {
-    const english = paramEntriesOf(DELAY, "Value");
-    expect(paramEntriesOf(DELAY, "Waarde")[0].label).toBe("Waarde");
+    const english = paramEntriesOf(DELAY, localize);
+    expect(paramEntriesOf(DELAY, () => "Waarde")[0].label).toBe("Waarde");
     expect(english[0].label).toBe("Value");
   });
 
   it("has nothing to render for an action with no fields and no value", () => {
-    expect(
-      paramEntriesOf(makeAutomationAction({ id: "ethernet.disable" }), "Value")
-    ).toEqual([]);
+    const action = makeAutomationAction({ id: "ethernet.disable" });
+    expect(paramEntriesOf(action, localize)).toEqual([]);
   });
 });

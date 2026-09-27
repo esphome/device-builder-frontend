@@ -6,9 +6,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  intervalUnits,
+  durationMappingAsScalar,
   looksLikeTimePeriodScalar,
-  parseDurationMapping,
   parseTimePeriodScalar,
   serializeTimePeriod,
   TIME_PERIOD_UNITS,
@@ -93,23 +92,16 @@ describe("timePeriodUnitsFor", () => {
   });
 });
 
-describe("intervalUnits", () => {
-  it("is millisecond precision, as ESPHome validates interval", () => {
-    expect(intervalUnits()).toEqual(["ms", "s", "min", "h", "d"]);
-    expect(intervalUnits("s")).not.toContain("us");
-  });
-});
-
-describe("parseDurationMapping", () => {
+describe("durationMappingAsScalar", () => {
   it.each([
-    [{ seconds: 2 }, { value: "2", unit: "s" }],
-    [{ milliseconds: "250" }, { value: "250", unit: "ms" }],
-    [{ minutes: 1.5 }, { value: "1.5", unit: "min" }],
-    [{ microseconds: 4 }, { value: "4", unit: "us" }],
-    [{ hours: 1 }, { value: "1", unit: "h" }],
-    [{ days: 7 }, { value: "7", unit: "d" }],
+    [{ seconds: 2 }, "2s"],
+    [{ milliseconds: "250" }, "250ms"],
+    [{ minutes: 1.5 }, "1.5min"],
+    [{ microseconds: 4 }, "4us"],
+    [{ hours: 1 }, "1h"],
+    [{ days: 7 }, "7d"],
   ])("reads %j", (raw, expected) => {
-    expect(parseDurationMapping(raw)).toEqual(expected);
+    expect(durationMappingAsScalar(raw)).toBe(expected);
   });
 
   it.each([
@@ -124,6 +116,6 @@ describe("parseDurationMapping", () => {
     ["a scalar", "2s"],
     ["null", null],
   ])("is null for %s", (_label, raw) => {
-    expect(parseDurationMapping(raw)).toBeNull();
+    expect(durationMappingAsScalar(raw)).toBeNull();
   });
 });

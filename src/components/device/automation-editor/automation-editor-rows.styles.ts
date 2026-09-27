@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-/** Action/condition rows: container, header, picker, controls, nested tree, and delay picker. */
+/** Action/condition rows: container, header, picker, controls, and nested tree. */
 export const automationEditorRowStyles = css`
   .ae-row {
     display: flex;

@@ -231,12 +231,9 @@ export class ESPHomeAutomationConditionTree extends LitElement {
               : nothing
           }
           ${
-            def && (def.value_type || def.config_entries.length > 0)
+            def && paramEntriesOf(def, this._localize).length > 0
               ? html`<esphome-config-entry-form
-                  .entries=${paramEntriesOf(
-                    def,
-                    this._localize("device.automation_action_delay_value")
-                  )}
+                  .entries=${paramEntriesOf(def, this._localize)}
                   .values=${node.params}
                   .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
                   .board=${this.board}
@@ -373,7 +370,9 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     const terminal =
       t.node.length > 1
         ? !def?.accepts_condition_list
-        : t.field.length === 0 || !def || def.config_entries.length === 0;
+        : t.field.length === 0 ||
+          !def ||
+          paramEntriesOf(def, this._localize).length === 0;
     if (!terminal) return;
     const row = this.shadowRoot?.querySelectorAll<HTMLElement>(".ae-row")[idx];
     if (row) scrollFlashRow(row);

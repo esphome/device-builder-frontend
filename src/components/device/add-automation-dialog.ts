@@ -40,7 +40,7 @@ import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { formatApiError } from "../../util/format-api-error.js";
 import { renderMarkdown } from "../../util/markdown.js";
-import { intervalUnits, type TimePeriodUnit } from "../../util/time-period.js";
+import { type TimePeriodUnit, timePeriodUnitsFor } from "../../util/time-period.js";
 import { bareTriggerKey } from "../../util/trigger-scopes.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { addAutomationDialogStyles } from "./add-automation-dialog.styles.js";
@@ -315,8 +315,8 @@ export class ESPHomeAddAutomationDialog extends LitElement {
 
   /**
    * Interval-only row: value + unit picker mirroring the inline
-   * TIME_PERIOD renderer's UX. Asks for the time up front so the
-   * user doesn't land in the editor with an empty interval block.
+   * TIME_PERIOD renderer's UX, asked up front so the editor doesn't open
+   * on an empty block. ESPHome validates ``interval:`` to milliseconds.
    */
   private _renderIntervalRow() {
     return html`<div class="field">
@@ -343,7 +343,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
               .value as typeof this._intervalUnit;
           }}
         >
-          ${intervalUnits(this._intervalUnit).map(
+          ${timePeriodUnitsFor("ms", this._intervalUnit).map(
             (u) =>
               html`<wa-option value=${u} ?selected=${u === this._intervalUnit}
                 >${this._localize(`device.automation_action_delay_unit_${u}`)}</wa-option

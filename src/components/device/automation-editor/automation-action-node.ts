@@ -82,12 +82,6 @@ function hasConditionGate(def: AutomationAction | undefined): boolean {
   return !!def?.has_condition_gate;
 }
 
-/** Whether the action has params to render: catalog fields, or the one
- *  value of a scalar-bodied action (``delay: 2s``). */
-function rendersParamsForm(def: AutomationAction | undefined): def is AutomationAction {
-  return !!def && (!!def.value_type || def.config_entries.length > 0);
-}
-
 @customElement("esphome-automation-action-node")
 export class ESPHomeAutomationActionNode extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -209,7 +203,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
     }
     if (t.field.length === 0) return true;
     // Field target with no catalog form to arm — degrade to the row flash.
-    return !rendersParamsForm(def);
+    return !def || paramEntriesOf(def, this._localize).length === 0;
   }
 
   protected render() {
@@ -427,13 +421,14 @@ export class ESPHomeAutomationActionNode extends LitElement {
    * renders its one value as a field, labelled "Value".
    */
   private _renderActionParams(def: AutomationAction | undefined) {
-    if (!rendersParamsForm(def)) return nothing;
+    const entries = def ? paramEntriesOf(def, this._localize) : [];
+    if (!def || entries.length === 0) return nothing;
     // The form owns the advanced section; an all-advanced action (no basic
     // fields) renders everything with no control, matching the old
     // force-open-no-toggle behaviour.
     const t = this.focusTarget;
     return html`<esphome-config-entry-form
-      .entries=${paramEntriesOf(def, this._localize("device.automation_action_delay_value"))}
+      .entries=${entries}
       .values=${this.value.params}
       .requiredGroups=${def.required_groups ?? NO_REQUIRED_GROUPS}
       .board=${this.board}

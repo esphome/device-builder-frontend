@@ -12,14 +12,24 @@ import {
   SCALAR_BODY_PARAM_KEY,
 } from "../../../api/types/automations.js";
 import { type ConfigEntry, ConfigEntryType } from "../../../api/types/config-entries.js";
+import type { LocalizeFunc } from "../../../common/localize.js";
 import { makeConfigEntry } from "../../../util/config-entry-defaults.js";
-import type { DurationMappingCarrier } from "../../../util/time-period.js";
 import { VALUE_TYPE_TO_CONFIG_TYPE } from "./registry-list-helpers.js";
 
 type ScalarValued = Pick<
   RegistryCatalogEntry,
   "value_type" | "templatable" | "duration_min_unit"
 >;
+
+/** UI-only marker on a scalar-value entry: the value is a whole body, so a
+ *  time period may arrive in its mapping form (`{seconds: 2}`). A regular
+ *  field never carries it and keeps the YAML-only notice for a mapping. */
+interface DurationMappingCarrier {
+  accepts_duration_mapping?: boolean;
+}
+
+export const acceptsDurationMapping = (entry: ConfigEntry): boolean =>
+  (entry as ConfigEntry & DurationMappingCarrier).accepts_duration_mapping === true;
 
 /** The widget type a catalog entry's ``value_type`` maps to, or null when
  *  it has none (or one this build doesn't know). */
@@ -54,6 +64,8 @@ export function makeScalarValueEntry(
 
 type ScalarBodied = AutomationAction | AutomationCondition;
 
+const VALUE_LABEL_KEY = "device.automation_action_delay_value";
+
 // One entries array per (def, label): a fresh array per render would defeat
 // Lit's change detection on the form mount.
 const _bodyEntries = new WeakMap<
@@ -62,22 +74,21 @@ const _bodyEntries = new WeakMap<
 >();
 
 /** The entries an action / condition's params form renders: its catalog
- *  fields, or for a scalar-bodied one the single value entry labelled
- *  *valueLabel*. */
-export function paramEntriesOf(def: ScalarBodied, valueLabel: string): ConfigEntry[] {
-  // ``config_entries`` is absent on a row whose body hasn't hydrated yet.
-  const fields = def.config_entries ?? [];
-  const type = fields.length > 0 ? null : scalarValueType(def);
-  if (type === null) return fields;
+ *  fields, or for a scalar-bodied one (``delay: 2s``) the single value
+ *  entry. Empty when it has neither. */
+export function paramEntriesOf(def: ScalarBodied, localize: LocalizeFunc): ConfigEntry[] {
+  const type = def.config_entries.length > 0 ? null : scalarValueType(def);
+  if (type === null) return def.config_entries;
+  const label = localize(VALUE_LABEL_KEY);
   const cached = _bodyEntries.get(def);
-  if (cached?.label === valueLabel) return cached.entries;
+  if (cached?.label === label) return cached.entries;
   const entries = [
     makeScalarValueEntry(type, def, {
       key: SCALAR_BODY_PARAM_KEY,
-      label: valueLabel,
+      label,
       required: true,
     }),
   ];
-  _bodyEntries.set(def, { label: valueLabel, entries });
+  _bodyEntries.set(def, { label, entries });
   return entries;
 }

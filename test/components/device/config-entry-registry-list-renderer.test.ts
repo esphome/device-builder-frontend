@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { LightEffect } from "../../../src/api/types/automations.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import "../../../src/components/device/config-entry-renderers/registry-list.js";
+import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { type ESPHomeRegistryList } from "../../../src/components/device/config-entry-renderers/registry-list.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
@@ -35,6 +36,7 @@ function mount(
     key?: string;
     catalog?: LightEffect[] | null;
     sectionKey?: string;
+    renderEntry?: RenderCtx["renderEntry"];
   } = {}
 ): { el: ESPHomeRegistryList; emit: EmitMock } {
   const emitFn = (options.emit ?? vi.fn()) as EmitMock;
@@ -48,7 +50,11 @@ function mount(
   });
   el.path = [key];
   el.ctx = makeRenderCtx(values, {
-    overrides: { emitChange: emitFn, sectionKey: options.sectionKey ?? "" },
+    overrides: {
+      emitChange: emitFn,
+      sectionKey: options.sectionKey ?? "",
+      ...(options.renderEntry ? { renderEntry: options.renderEntry } : {}),
+    },
   });
   document.body.append(el);
   // Mounting fires the element's connectedCallback which kicks the
@@ -613,21 +619,11 @@ describe("renderRegistryListField — per-row params sub-form", () => {
         value_type: "time_period",
         duration_min_unit: "ms",
       },
-    ];
-    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
-    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
-      key: "filters",
-      registry: "filter",
-      multi_value: true,
-    });
-    el.path = ["filters"];
-    el.ctx = makeRenderCtx(
+    ] as unknown as LightEffect[];
+    const { el } = mount(
       { filters: [{ throttle: "10s" }] },
-      { overrides: { renderEntry } }
+      { key: "filters", registry: "filter", catalog, renderEntry }
     );
-    document.body.append(el);
-    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
-    el.requestUpdate();
     await el.updateComplete;
     expect(renderEntry.mock.calls.map((c) => c[0])).toContainEqual(
       expect.objectContaining({
@@ -642,21 +638,13 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     // The slim index row carries ``value_type`` but no ``config_entries``
     // until its body arrives.
     const renderEntry = vi.fn();
-    const catalog = [{ id: "throttle", name: "Throttle", value_type: "time_period" }];
-    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
-    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
-      key: "filters",
-      registry: "filter",
-      multi_value: true,
-    });
-    el.path = ["filters"];
-    el.ctx = makeRenderCtx(
+    const catalog = [
+      { id: "throttle", name: "Throttle", value_type: "time_period" },
+    ] as unknown as LightEffect[];
+    const { el } = mount(
       { filters: [{ throttle: "10s" }] },
-      { overrides: { renderEntry } }
+      { key: "filters", registry: "filter", catalog, renderEntry }
     );
-    document.body.append(el);
-    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
-    el.requestUpdate();
     await el.updateComplete;
     expect(renderEntry.mock.calls.map((c) => c[1])).toEqual([
       ["filters", "0", "throttle"],
@@ -675,21 +663,11 @@ describe("renderRegistryListField — per-row params sub-form", () => {
         applies_to: [],
         value_type: "time_period",
       },
-    ];
-    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
-    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
-      key: "filters",
-      registry: "filter",
-      multi_value: true,
-    });
-    el.path = ["filters"];
-    el.ctx = makeRenderCtx(
+    ] as unknown as LightEffect[];
+    const { el } = mount(
       { filters: [{ throttle: { seconds: 5 } }] },
-      { overrides: { renderEntry } }
+      { key: "filters", registry: "filter", catalog, renderEntry }
     );
-    document.body.append(el);
-    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
-    el.requestUpdate();
     await el.updateComplete;
     const calls = renderEntry.mock.calls.map((c) => ({
       type: (c[0] as { type: string }).type,

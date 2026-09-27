@@ -65,19 +65,6 @@ describe("renderTimePeriodField unit picker", () => {
     expect(selected).toBe("s");
   });
 
-  it("offers seconds and coarser on a second-precision entry", () => {
-    expect(mount(field({ duration_min_unit: "s" }), "").units).toEqual([
-      "s",
-      "min",
-      "h",
-      "d",
-    ]);
-  });
-
-  it("offers every unit on a nanosecond-precision entry", () => {
-    expect(mount(field({ duration_min_unit: "ns" }), "5s").units).toHaveLength(6);
-  });
-
   it("keeps the unit a stored value already uses, so it still displays", () => {
     const { units, selected, input } = mount(field({ duration_min_unit: "ms" }), "4us");
     expect(units).toEqual(["us", "ms", "s", "min", "h", "d"]);

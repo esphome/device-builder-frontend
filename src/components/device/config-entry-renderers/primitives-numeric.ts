@@ -17,8 +17,7 @@ import {
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
 import {
-  acceptsDurationMapping,
-  parseDurationMapping,
+  durationMappingAsScalar,
   parseTimePeriodScalar,
   serializeTimePeriod,
   type TimePeriodUnit,
@@ -35,6 +34,7 @@ import {
   renderUnparseableScalarField,
   renderYamlOnlyFallbackIfNonPrimitive,
 } from "../config-entry-renderers-shared.js";
+import { acceptsDurationMapping } from "./scalar-value-entry.js";
 
 export function renderNumberField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   // A featured-entry preset can pin the choice to a short list — defer to
@@ -194,8 +194,8 @@ export function renderTimePeriodField(
   // A whole-body duration may arrive in its mapping form (``{seconds: 2}``).
   // A single unit reads as the scalar it is equivalent to, and an edit
   // writes that scalar; a multi-unit mapping falls to the bail below.
-  const mapping = acceptsDurationMapping(entry) ? parseDurationMapping(stored) : null;
-  const raw = mapping ? serializeTimePeriod(mapping.value, mapping.unit) : stored;
+  const raw =
+    (acceptsDurationMapping(entry) ? durationMappingAsScalar(stored) : null) ?? stored;
   // Bail above parseTimePeriodScalar — its ``String(raw).trim()`` would
   // turn a single-element list ``["5s"]`` into the parseable string
   // ``"5s"`` and a save would clobber the original list.
