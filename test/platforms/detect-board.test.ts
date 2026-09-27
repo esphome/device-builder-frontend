@@ -22,6 +22,7 @@ vi.mock("../../src/platforms/boot-banner.js", async (importOriginal) => ({
   readBootBanner: banner.readBootBanner,
 }));
 
+import { BannerOpenTimeoutError } from "../../src/platforms/boot-banner.js";
 import { detectBoard } from "../../src/platforms/detect-board.js";
 import { makeUsbPort as port } from "../web/_make-web-serial-port.js";
 
@@ -119,5 +120,13 @@ describe("detectBoard", () => {
   it("never reads a banner on Espressif's own USB", async () => {
     expect(await detectBoard(port(0x303a, 0x1001))).toMatchObject({ kind: "esp" });
     expect(banner.readBootBanner).not.toHaveBeenCalled();
+  });
+
+  it("does not hand on a port whose open never came back", async () => {
+    banner.readBootBanner.mockRejectedValueOnce(new BannerOpenTimeoutError(3000));
+    await expect(detectBoard(port(0x1a86, 0x7523))).rejects.toBeInstanceOf(
+      BannerOpenTimeoutError
+    );
+    expect(engine.connectToPort).not.toHaveBeenCalled();
   });
 });

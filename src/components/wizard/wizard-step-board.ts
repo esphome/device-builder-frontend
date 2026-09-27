@@ -11,7 +11,6 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { type BoardDetection, detectBoard } from "../../platforms/detect-board.js";
 import { EngineLoadError, preloadEsptool } from "../../platforms/esp/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { fetchBoard } from "../../util/board-body-cache.js";
 import { debounce } from "../../util/debounce.js";
 import { type DeploymentEnvironment, detectEnvironment } from "../../util/environment.js";
 import { fireEvent } from "../../util/fire-event.js";
@@ -21,7 +20,6 @@ import { namedConnectFailure } from "../../util/serial-open-error.js";
 import { SerialPortsPollController } from "../../util/serial-ports-poll-controller.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
 import {
-  chipPreset,
   resolveDetection,
   WIZARD_BOARD_PLATFORMS,
   type WizardBoardPreset,
@@ -303,20 +301,23 @@ export class ESPHomeWizardStepBoard extends LitElement {
     }
     if (!detection) return; // picker dismissed
 
-    // The board it named is added as itself; else the picker narrows to what
-    // was found and the user picks (a filtered picker beats auto-advancing to
-    // a generic board: they can still pick it explicitly, or one of several
-    // boards for their chip). A device we can't tell leaves it open and says
-    // so, since the user picked that port on purpose (#1856).
+    await this._landDetection(detection);
+  }
+
+  /**
+   * Add the board a detection named; else narrow the picker to what was
+   * found and let the user pick (a filtered picker beats auto-advancing to a
+   * generic board: they can still pick it explicitly, or one of several
+   * boards for their chip), saying so when a named board was not found, and
+   * when a device could not be told at all, since the user asked (#1856).
+   */
+  private async _landDetection(detection: BoardDetection): Promise<void> {
     const landing = await resolveDetection(this._api, detection);
     if ("board" in landing) {
       this._onAdd(landing.board);
       return;
     }
     this._applyDetection(landing.preset);
-    // A board that named itself but was not found is said so, whether or not
-    // a chip or platform narrowed the picker; a device we could not tell at
-    // all is a different story, and gets its own line (#1856).
     if (landing.missedBoard) {
       this._detectError = this._localize(
         "wizard.connect_your_board_unknown_catalog_board",
@@ -348,27 +349,18 @@ export class ESPHomeWizardStepBoard extends LitElement {
     this._detectError = "";
     try {
       const result = await this._api.detectChip(port);
-
-      if (result.board_id) {
-        try {
-          const knownBoard = await fetchBoard(this._api, result.board_id);
-          if (knownBoard) {
-            this._view = "boards";
-            this._onAdd(knownBoard);
-            return;
-          }
-        } catch {
-          // Catalog lookup failure shouldn't surface as a detect
-          // error — fall through to chip-family filtering instead.
-        }
-      }
-
-      // Resolve to an existing filter chip (same as the WebSerial path);
-      // a recognised-but-unfiltered variant (e.g. ESP32-S31) yields null,
-      // so the picker is left unfiltered instead of keeping a dead filter.
-      this._applyDetection(result.chip_family ? chipPreset(result.chip_family) : null);
+      // The backend's esptool answer, landed the same way as the browser's:
+      // the named board, else the chip's filter (a recognised but unfiltered
+      // variant, e.g. ESP32-S31, leaves the picker open).
       this._view = "boards";
-      void this._fetchBoards();
+      await this._landDetection({
+        kind: "esp",
+        board: {
+          chipName: result.chip_family ?? "",
+          mac: null,
+          manifest: result.board_id ? { board_id: result.board_id } : null,
+        },
+      });
     } catch (err) {
       this._detectError = this._extractErrorDetail(
         err,

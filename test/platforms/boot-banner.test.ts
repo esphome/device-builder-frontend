@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  BannerOpenTimeoutError,
   BOOT_BANNER_MS,
   matchBootBanner,
   readBootBanner,
@@ -216,7 +217,7 @@ describe("readBootBanner", () => {
     let openLate: () => void = () => {};
     raw.open.mockImplementationOnce(() => new Promise<void>((r) => (openLate = r)));
     const pending = readBootBanner(port);
-    const assertion = expect(pending).rejects.toThrow("Boot banner not read");
+    const assertion = expect(pending).rejects.toBeInstanceOf(BannerOpenTimeoutError);
     await vi.advanceTimersByTimeAsync(3000);
     await assertion;
     expect(raw.close).not.toHaveBeenCalled();

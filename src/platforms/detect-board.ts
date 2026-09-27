@@ -5,7 +5,11 @@
  * run the ESP detect only where an ESP can be.
  */
 import { requestSerialPort } from "../util/web-serial.js";
-import { type BootBannerMatch, readBootBanner } from "./boot-banner.js";
+import {
+  BannerOpenTimeoutError,
+  type BootBannerMatch,
+  readBootBanner,
+} from "./boot-banner.js";
 import { type DetectedBoard, detectEspBoard, preloadEsptool } from "./esp/index.js";
 import { mayCarryEsp, portFamily } from "./port-family.js";
 
@@ -56,10 +60,12 @@ export async function detectBoard(
     // A bridge or an id-less port fronts anything: one reset and a short
     // read of the boot log names most boards outright, and only an ESP (or
     // a silent board, such as an ESP8266 whose ROM speaks at 74880) goes on
-    // to esptool, whose chunk fetches meanwhile. A port that will not open
-    // is esptool's to report.
+    // to esptool, whose chunk fetches meanwhile. A port that refused to open
+    // is esptool's to report; one whose open never came back is not handed
+    // on at all, since it is still ours until that open settles.
     preloadEsptool();
     const hit = await readBootBanner(port).catch((err: unknown) => {
+      if (err instanceof BannerOpenTimeoutError) throw err;
       console.warn("[detect] Could not read the boot banner:", err);
       return null;
     });

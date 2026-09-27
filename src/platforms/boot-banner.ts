@@ -89,11 +89,25 @@ export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch 
       BOOT_BANNER_DEADLINE_MS,
       () => {
         session.abandoned = true;
-        return new Error(`Boot banner not read in ${BOOT_BANNER_DEADLINE_MS} ms`);
+        return session.opened
+          ? new Error(`Boot banner not read in ${BOOT_BANNER_DEADLINE_MS} ms`)
+          : new BannerOpenTimeoutError(BOOT_BANNER_DEADLINE_MS);
       }
     );
   } finally {
     if (session.opened) await teardown(port, session);
+  }
+}
+
+/**
+ * The port had not opened by the deadline. Nobody else can open it either
+ * while that open is pending, and the abandoned session closes it should it
+ * open late, so the caller must not hand the port on.
+ */
+export class BannerOpenTimeoutError extends Error {
+  constructor(deadlineMs: number) {
+    super(`The serial port did not open in ${Math.round(deadlineMs / 1000)} s`);
+    this.name = "BannerOpenTimeoutError";
   }
 }
 
