@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import { mountControlledForm } from "./_config-entry-form-host.js";
 
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
-import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { rowRemoved } from "../../../src/components/device/config-entry-renderers/row-memory.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
@@ -69,8 +68,7 @@ describe("config-entry-form list rows", () => {
   });
 
   it("keeps an opened option list with its row", async () => {
-    const { form } = await mountControlledForm([STEPS], { steps: [{}, {}, {}] });
-    const ctx = () => (form as unknown as { _buildCtx(): RenderCtx })._buildCtx();
+    const { ctx } = await mountControlledForm([STEPS], { steps: [{}, {}, {}] });
 
     ctx().expandOptions(["steps", "2", "value"]);
     ctx().rowsMoved(["steps"], rowRemoved(0));

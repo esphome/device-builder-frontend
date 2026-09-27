@@ -1,3 +1,5 @@
+import type { ReactiveControllerHost } from "lit";
+
 import type { RenderCtx } from "../config-entry-renderers-types.js";
 
 type ValueMemoryCtx = Pick<
@@ -11,57 +13,42 @@ type ValueMemoryCtx = Pick<
 
 /**
  * What a form holds of a value the user has started on and that is not in
- * the form's values yet. Both maps are keyed by dotted path. They are
- * dropped when the form shows other entries, and when the values were read
- * again from a YAML edited outside the form.
+ * the form's values yet: a unit picked on an empty field and the text of a
+ * number being typed, both keyed by dotted path. ``RenderCtx`` documents
+ * the calls.
  */
 export class ValueMemory {
-  /**
-   * Transient unit choice for FLOAT_WITH_UNIT entries the user picked
-   * before typing a numeric value. `chooseDisplayUnit` reads this layer
-   * before falling back to the catalog default, so the picker survives a
-   * rerender even when the form value is still `""`. Superseded once a
-   * non-empty `parsed.unit` from the form value beats the pending layer.
-   */
-  readonly units = new Map<string, string>();
+  private readonly _units = new Map<string, string>();
 
-  /**
-   * Transient raw-text buffer for FLOAT_WITH_UNIT magnitude inputs.
-   * `<input type="number">` reads `""` from `.value` for mid-typing
-   * intermediates (`"-"`, `"1e"`, `"1."`); Lit's `.value=` property
-   * binding then re-writes `""` over the partial text. The renderer reads
-   * from this buffer first so partial input survives until the user
-   * produces a parseable value (which lands in the form's values
-   * normally) or blurs.
-   */
-  readonly magnitudes = new Map<string, string>();
+  private readonly _magnitudes = new Map<string, string>();
+
+  /** The maps, for what renumbers the rows of a list. */
+  readonly stores = [this._units, this._magnitudes];
+
+  readonly ctx: ValueMemoryCtx = {
+    getPendingUnit: (path) => this._units.get(path.join(".")),
+    setPendingUnit: (path, unit) => {
+      this._units.set(path.join("."), unit);
+      // A unit-only pick doesn't reach the form's value-change cycle, no
+      // emit happens, so the picker needs the explicit re-render.
+      this._host.requestUpdate();
+    },
+    getEditingMagnitude: (path) => this._magnitudes.get(path.join(".")),
+    setEditingMagnitude: (path, text) => {
+      // No re-render: the @input handler that calls this also emits a
+      // value-change, which re-renders the form through the owner's value
+      // update. One here would double the work on every keystroke.
+      this._magnitudes.set(path.join("."), text);
+    },
+    clearEditingMagnitude: (path) => {
+      this._magnitudes.delete(path.join("."));
+    },
+  };
+
+  constructor(private readonly _host: ReactiveControllerHost) {}
 
   clear(): void {
-    this.units.clear();
-    this.magnitudes.clear();
-  }
-
-  /** The render context's side of the memory, for a form that re-renders
-   *  through *requestUpdate*. */
-  ctx(requestUpdate: () => void): ValueMemoryCtx {
-    return {
-      getPendingUnit: (path) => this.units.get(path.join(".")),
-      setPendingUnit: (path, unit) => {
-        this.units.set(path.join("."), unit);
-        // A unit-only pick doesn't reach the form's value-change cycle, no
-        // emit happens, so the picker needs the explicit re-render.
-        requestUpdate();
-      },
-      getEditingMagnitude: (path) => this.magnitudes.get(path.join(".")),
-      setEditingMagnitude: (path, text) => {
-        // No re-render: the @input handler that calls this also emits a
-        // value-change, which re-renders the form through the owner's
-        // value update. One here would double the work on every keystroke.
-        this.magnitudes.set(path.join("."), text);
-      },
-      clearEditingMagnitude: (path) => {
-        this.magnitudes.delete(path.join("."));
-      },
-    };
+    this._units.clear();
+    this._magnitudes.clear();
   }
 }

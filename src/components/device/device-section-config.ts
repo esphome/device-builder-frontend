@@ -216,6 +216,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   @state() _deleting = false;
 
   _loadId = 0;
+  /** Counts the times ``_values`` was read from the YAML, for the form. */
+  _valuesRead = 0;
   /** A retargeting load is in flight while the outgoing section is still
    *  on screen. The pane is inert meanwhile; the write fences cover
    *  programmatic dispatch, so nothing writes its values under the

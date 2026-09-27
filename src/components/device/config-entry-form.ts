@@ -69,7 +69,10 @@ import {
   parseFieldKey,
   renderYamlOnlyField,
 } from "./config-entry-renderers-shared.js";
-import { rowMemoryCtx } from "./config-entry-renderers/row-memory-ctx.js";
+import {
+  closePinAdvanced,
+  rowMemoryCtx,
+} from "./config-entry-renderers/row-memory-ctx.js";
 import { ValueMemory } from "./config-entry-renderers/value-memory.js";
 import { ConstraintClusterController } from "./constraint-cluster-controller.js";
 import { FieldFocusController } from "./field-focus-controller.js";
@@ -281,7 +284,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /** Counts the times the owner read ``values`` from the YAML. The YAML may
    *  have been edited outside the form, which is not told what moved, so
    *  on a new read the form forgets what could write a value the user did
-   *  not just enter: it could sit on another field by now. */
+   *  not just enter: it could sit on another field by now. What is only
+   *  shown, such as open groups, is kept. */
   @property({ attribute: false })
   valuesRead = 0;
 
@@ -313,7 +317,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  of the sync); owns its own listener lifecycle. */
   protected readonly _fieldFocus = new FieldFocusController(this);
 
-  private readonly _valueMemory = new ValueMemory();
+  private readonly _valueMemory = new ValueMemory(this);
 
   /** Either/or constraint-cluster (radio chooser) choice + stash state and the
    *  post-render radio-group sync; kept in a controller so this file doesn't
@@ -632,25 +636,26 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // ES7210 for i2c). Drop transient unit picks from the previous
     // shape so they don't bleed into unrelated paths.
     const previous = changed.get("entries") as ConfigEntry[] | undefined;
-    if (changed.has("entries") && previous !== undefined) {
-      // A stash holds what the user typed on the side they left, so it is
-      // dropped only for another target, not for the same one rebuilt.
-      if (!sameEntryTarget(previous, this.entries)) {
-        clearTemplatableStash(this);
-        clearEnableStash(this);
-      }
-      this._valueMemory.clear();
+    const retargeted = changed.has("entries") && previous !== undefined;
+    const reread = changed.has("valuesRead");
+    // A stash holds what the user typed on the side they left, so it is
+    // dropped for another target and for values read again from the YAML,
+    // not for the same target rebuilt.
+    if (reread || (retargeted && !sameEntryTarget(previous, this.entries))) {
+      clearTemplatableStash(this);
+      clearEnableStash(this);
+    }
+    if (reread || retargeted) this._valueMemory.clear();
+    // A pin's open Advanced panel writes under the pin; on a pin that is
+    // short form by now that write would drop the GPIO.
+    if (reread) closePinAdvanced(this._nestedOpenSections, this._seededNestedOpen);
+    if (retargeted) {
       this._openAdvancedPlacement.clear();
       this._constraintClusters.reset();
       this._expandedOptionFields.clear();
       // Re-seed disclosures for the new component; a key like "pin:pin-advanced"
       // recurs across sections, and the form instance is reused.
       this._seededNestedOpen.clear();
-    }
-    if (changed.has("valuesRead")) {
-      clearTemplatableStash(this);
-      clearEnableStash(this);
-      this._valueMemory.clear();
     }
     // Closing the advanced section drops the frozen placement so the next
     // open re-freezes from the then-current YAML state.
@@ -1075,10 +1080,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
       requiredGroups: this.requiredGroups,
-      ...this._valueMemory.ctx(() => this.requestUpdate()),
+      ...this._valueMemory.ctx,
       ...rowMemoryCtx(this, this._constraintClusters, this._expandedOptionFields, [
-        this._valueMemory.units,
-        this._valueMemory.magnitudes,
+        ...this._valueMemory.stores,
         this._nestedOpenSections,
         this._seededNestedOpen,
       ]),

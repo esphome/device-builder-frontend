@@ -13,7 +13,6 @@ import { mountControlledForm as mountForm } from "./_config-entry-form-host.js";
 
 import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
-import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 const valueEntry = (label: string): ConfigEntry[] => [
@@ -83,13 +82,29 @@ describe("config-entry-form literal / lambda stash", () => {
   });
 
   it("keeps a group the user opened through a new read of the values", async () => {
-    const { form } = await mountForm(valueEntry("Delay"), { id: "1s" });
+    const { form, ctx } = await mountForm(valueEntry("Delay"), { id: "1s" });
     form.openNested("group");
 
     form.valuesRead++;
     await form.updateComplete;
 
-    const ctx = (form as unknown as { _buildCtx(): RenderCtx })._buildCtx();
-    expect(ctx.nestedOpenSections.has("group")).toBe(true);
+    expect(ctx().nestedOpenSections.has("group")).toBe(true);
+  });
+
+  it("closes a pin's Advanced panel on a new read of the values", async () => {
+    // The panel writes under the pin; on a pin that is short form by now
+    // (the YAML was edited) that write would drop the GPIO.
+    const { form, ctx } = await mountForm(valueEntry("Delay"), { id: "1s" });
+    form.openNested("pin:pin-advanced");
+    ctx().seedNestedOpen("other.pin:pin-advanced");
+    expect(ctx().nestedOpenSections.has("other.pin:pin-advanced")).toBe(true);
+
+    form.valuesRead++;
+    await form.updateComplete;
+
+    expect([...ctx().nestedOpenSections]).toEqual([]);
+    // It may open on its own again, where the pin has values to show.
+    ctx().seedNestedOpen("other.pin:pin-advanced");
+    expect(ctx().nestedOpenSections.has("other.pin:pin-advanced")).toBe(true);
   });
 });

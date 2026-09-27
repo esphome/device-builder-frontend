@@ -20,6 +20,7 @@ import {
   type ConfigEntryValueChange,
   ESPHomeConfigEntryForm,
 } from "../../../src/components/device/config-entry-form.js";
+import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { setIn } from "../../../src/util/nested-values.js";
 
 export async function mountControlledForm(
@@ -47,5 +48,7 @@ export async function mountControlledForm(
       [side === "literal" ? 0 : 1].click();
     await form.updateComplete;
   };
-  return { form, changes, toggle };
+  /** The render context, which the form builds anew for each render. */
+  const ctx = () => (form as unknown as { _buildCtx(): RenderCtx })._buildCtx();
+  return { form, changes, toggle, ctx };
 }

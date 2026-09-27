@@ -210,21 +210,30 @@ describe("section reload keeps the form mounted", () => {
 
     it("tells the form the values were read again", async () => {
       const { c } = await firstLoad();
-      const before = form(c).valuesRead;
+      expect(form(c).valuesRead).toBe(1);
 
       await reloadWith(c, EDITED);
 
-      expect(form(c).valuesRead).toBeGreaterThan(before);
+      expect(form(c).valuesRead).toBe(2);
     });
 
     it("does not for the YAML the section wrote itself", async () => {
       const { c, inner } = await firstLoad();
-      const before = form(c).valuesRead;
 
       inner._lastSelfWrittenYaml = EDITED;
       await reloadWith(c, EDITED);
 
-      expect(form(c).valuesRead).toBe(before);
+      expect(form(c).valuesRead).toBe(1);
+    });
+
+    it("counts a read when the values are there, not when the load starts", async () => {
+      const { c, settle } = await firstLoad();
+
+      await switchToSwitch(c);
+      expect(form(c).valuesRead).toBe(1);
+
+      await settle("switch.template");
+      expect(form(c).valuesRead).toBe(2);
     });
   });
 });

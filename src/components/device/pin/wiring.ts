@@ -44,6 +44,9 @@ import { renderCustomEditor, renderLongFormChild, wiringDiagram } from "./mode-e
 
 registerMdiIcons({ tune: mdiTune });
 
+/** Ends the key of a pin's Advanced disclosure in the form's open groups. */
+export const PIN_ADVANCED_SUFFIX = ":pin-advanced";
+
 export interface PinWiringOptions {
   entry: ConfigEntry;
   path: string[];
@@ -166,7 +169,7 @@ export function renderPinWiring(opts: PinWiringOptions): TemplateResult | typeof
       : ctx.localize("device.pin_wiring_summary", { value: summaryValue });
   }
 
-  const advancedKey = `${path.join(".")}:pin-advanced`;
+  const advancedKey = `${path.join(".")}${PIN_ADVANCED_SUFFIX}`;
   // Seed open only when the summary line can't carry the state: raw
   // disclosure fields with values, or a flag combination no preset
   // names. A preset-matched pin stays collapsed — the summary announces
