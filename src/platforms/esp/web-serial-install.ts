@@ -196,7 +196,7 @@ export async function startWebSerialInstall(
     const target = pickFlashTarget(detected.chipName, binaries);
     if (!target) {
       await releaseSerial(esptool, detected);
-      host._fail(host._localize("serial.no_firmware"));
+      if (stillCurrent()) host._fail(host._localize("serial.no_firmware"));
       return;
     }
     flashAddress = target.address;

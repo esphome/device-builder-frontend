@@ -305,6 +305,7 @@ export function waitForRunningJob(
   jobId: string,
   failKey = "firmware.download_failed"
 ): Promise<boolean> {
+  const run = host._installRun;
   const stillCurrent = runGuard(host);
   return new Promise((resolve) => {
     host._compileReject = () => resolve(false);
@@ -330,8 +331,12 @@ export function waitForRunningJob(
         onConnectionLost: () => {
           host._streamId = "";
           resumeFollowOnReady(host._api, {
-            // A dismissal settled the wait and nulled the reject hook.
-            isStale: () => host._compileReject === null || host._streamId !== "",
+            // A dismissal settled the wait and nulled the reject hook; a
+            // reopen started the next run, whose hook this is not.
+            isStale: () =>
+              host._installRun !== run ||
+              host._compileReject === null ||
+              host._streamId !== "",
             resume: () => {
               host._log.reset();
               follow();
@@ -353,6 +358,7 @@ export function compileAndWait(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<void> {
+  const run = host._installRun;
   return new Promise((resolve, reject) => {
     // Capture reject on the dialog so a mid-flight detach (header-X / Escape /
     // reopen) can settle this promise. followJob callbacks clear the hook to
@@ -416,6 +422,10 @@ export function compileAndWait(
     // where the constructor expects a void-returning one.
     const start = async () => {
       const job = await host._api.firmwareCompile(configuration);
+      // A reopen while the submit was out started the next run, whose _init
+      // settled this promise; the job is not that run's to follow. A plain
+      // dismissal still records it, so the after-hide can say it goes on.
+      if (host._installRun !== run) return;
       host._jobId = job.job_id;
       // Capture so a compile failure can pick the right hint variant:
       // local jobs get the link-to-reset, remote jobs get the plain-text

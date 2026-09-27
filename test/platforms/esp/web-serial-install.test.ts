@@ -655,6 +655,55 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     expect(host._step).toBe("connecting");
   });
 
+  it("does not follow a compile submitted for the run before a reopen", async () => {
+    const { host, api } = ready();
+    api.firmwareCompile.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+      host._compileReject?.(new Error("Install dialog dismissed"));
+      return { job_id: "j-old", source: JobSource.LOCAL, source_label: "" };
+    });
+
+    await run(host);
+
+    expect(api.firmwareFollowJob).not.toHaveBeenCalled();
+    expect(host._jobId).toBe("");
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("still records a compile submitted for a run that was only dismissed", async () => {
+    const { host, api } = ready();
+    api.firmwareCompile.mockImplementationOnce(async () => {
+      dismiss(host);
+      host._compileReject?.(new Error("Install dialog dismissed"));
+      return { job_id: "j-old", source: JobSource.LOCAL, source_label: "" };
+    });
+    // The build keeps running; the after-hide detaches this follow later.
+    api.firmwareFollowJob.mockImplementationOnce(() => "s1");
+
+    await run(host);
+
+    // The after-hide's "continues in the background" notice needs the id.
+    expect(host._jobId).toBe("j-old");
+    expect(api.firmwareFollowJob).toHaveBeenCalledWith("j-old", expect.anything());
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("does not mark a reopened dialog with the run before's missing image", async () => {
+    const { host, api } = ready();
+    api.firmwareGetBinaries.mockResolvedValueOnce([]);
+    esptool.disconnect.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledTimes(1);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
   it("stands down when the same device was reopened during the connect", async () => {
     const { host, api } = ready();
     esptool.connectToPort.mockImplementationOnce(async () => {
