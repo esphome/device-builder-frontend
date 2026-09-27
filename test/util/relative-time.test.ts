@@ -142,6 +142,9 @@ describe("getNumberFormatter", () => {
   });
 });
 
+const MID_2027 = Date.UTC(2027, 5, 15, 12);
+const MID_2028 = Date.UTC(2028, 5, 15, 12);
+
 describe("formatDuration", () => {
   it("renders the compact variant by default", () => {
     expect(formatDuration(45)).toBe("45s");
@@ -155,14 +158,28 @@ describe("formatDuration", () => {
     expect(formatDuration(86400)).toBe("1d");
     expect(formatDuration(7 * 86400 + 12 * 60)).toBe("7d");
     expect(formatDuration(51 * 86400 + 5 * 3600)).toBe("51d 5h");
-    expect(formatDuration(364 * 86400 + 23 * 3600)).toBe("364d 23h");
+    expect(formatDuration(364 * 86400 + 23 * 3600, { nowMs: MID_2027 })).toBe("364d 23h");
     expect(formatDuration(86400 + 3600, { variant: "counter" })).toBe("25h 00m");
   });
 
-  it("switches the compact variant to years past 365 days", () => {
-    expect(formatDuration(365 * 86400)).toBe("1y");
-    expect(formatDuration(400 * 86400 + 23 * 3600)).toBe("1y 35d");
-    expect(formatDuration(1234 * 86400)).toBe("3y 139d");
+  it("switches the compact variant to calendar years", () => {
+    // 2026-06-15 to 2027-06-15 crosses no leap day: 365 days.
+    expect(formatDuration(365 * 86400, { nowMs: MID_2027 })).toBe("1y");
+    expect(formatDuration(400 * 86400 + 23 * 3600, { nowMs: MID_2027 })).toBe("1y 35d");
+  });
+
+  it("counts a year that spans a leap day as 366 days", () => {
+    // 2027-06-15 to 2028-06-15 crosses 2028-02-29.
+    expect(formatDuration(365 * 86400 + 3600, { nowMs: MID_2028 })).toBe("365d 1h");
+    expect(formatDuration(366 * 86400, { nowMs: MID_2028 })).toBe("1y");
+    expect(formatDuration(367 * 86400, { nowMs: MID_2028 })).toBe("1y 1d");
+  });
+
+  it("stays exact across several leap years", () => {
+    // 2020-06-15 to 2028-06-15: 8 years, three leap days (2020 is past Feb).
+    const seconds = (MID_2028 - Date.UTC(2020, 5, 15, 12)) / 1000;
+    expect(formatDuration(seconds, { nowMs: MID_2028 })).toBe("8y");
+    expect(formatDuration(seconds + 10 * 86400, { nowMs: MID_2028 })).toBe("8y 10d");
   });
 
   it("keeps the finer unit in the counter variant, padding hour-range minutes", () => {

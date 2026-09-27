@@ -82,7 +82,7 @@ describe("OfflineClockController", () => {
   });
 
   it("repaints once a day past a year", () => {
-    const { host, clock } = makeClock(Date.now() - 365 * 86_400_000);
+    const { host, clock } = makeClock(Date.now() - 366 * 86_400_000);
     vi.mocked(host.requestUpdate).mockImplementation(() => clock.hostUpdated());
 
     vi.advanceTimersByTime(86_399_000);

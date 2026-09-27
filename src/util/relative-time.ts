@@ -173,13 +173,29 @@ export function getNumberFormatter(
   return formatter;
 }
 
-const YEAR_SECONDS = 365 * 86400;
+/**
+ * Whole calendar years in the *seconds* ending at *nowMs*, and the days
+ * left over. Counted from the start date, so leap years are exact; in UTC,
+ * so a DST shift can't shorten a day.
+ */
+function calendarYears(seconds: number, nowMs: number): { years: number; days: number } {
+  const startMs = nowMs - seconds * 1000;
+  const anniversary = new Date(startMs);
+  let years = new Date(nowMs).getUTCFullYear() - anniversary.getUTCFullYear();
+  anniversary.setUTCFullYear(anniversary.getUTCFullYear() + years);
+  if (anniversary.getTime() > nowMs) {
+    years--;
+    anniversary.setTime(startMs);
+    anniversary.setUTCFullYear(anniversary.getUTCFullYear() + years);
+  }
+  return { years, days: Math.floor((nowMs - anniversary.getTime()) / 86_400_000) };
+}
 
 /**
  * Format a duration in seconds as a compact readout. The ``compact``
  * variant (default) reads as a static value: ``45s`` / ``8m`` / ``1h 14m``
  * / ``2d 3h`` / ``1y 35d`` (zero minor unit dropped: ``1h``, ``2d``,
- * ``1y``; a year is 365 days). The ``counter``
+ * ``1y``; years are calendar years back from *nowMs*). The ``counter``
  * variant is for a live
  * ticking readout: seconds kept in the minute range (``4m 32s``) and
  * hour-range minutes zero-padded (``1h 05m``, stable width per minute tick).
@@ -191,7 +207,8 @@ export function formatDuration(
   {
     variant = "compact",
     language,
-  }: { variant?: "counter" | "compact"; language?: string } = {}
+    nowMs = Date.now(),
+  }: { variant?: "counter" | "compact"; language?: string; nowMs?: number } = {}
 ): string {
   const counter = variant === "counter";
   const total = Math.max(0, Math.floor(seconds));
@@ -203,11 +220,12 @@ export function formatDuration(
       ? `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`
       : `${fmt.format(minutes)}m`;
   }
-  if (!counter && total >= YEAR_SECONDS) {
-    const years = Math.floor(total / YEAR_SECONDS);
-    const days = Math.floor((total % YEAR_SECONDS) / 86400);
-    return days > 0
-      ? `${fmt.format(years)}y ${fmt.format(days)}d`
+  // No calendar year is shorter than 365 days, so skip the date math below it.
+  const { years, days: yearDays } =
+    counter || total < 365 * 86400 ? { years: 0, days: 0 } : calendarYears(total, nowMs);
+  if (years > 0) {
+    return yearDays > 0
+      ? `${fmt.format(years)}y ${fmt.format(yearDays)}d`
       : `${fmt.format(years)}y`;
   }
   if (!counter && total >= 86400) {

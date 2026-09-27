@@ -13,9 +13,10 @@ function tick(): void {
 }
 
 // ``formatDuration``'s granularity; the label is the same within a step.
+// Hourly until 366 days, since a year spanning a leap day is that long.
 function shownStep(seconds: number): number {
   const whole = Math.max(0, Math.floor(seconds));
-  const unit = whole < 60 ? 1 : whole < 86400 ? 60 : whole < 365 * 86400 ? 3600 : 86400;
+  const unit = whole < 60 ? 1 : whole < 86400 ? 60 : whole < 366 * 86400 ? 3600 : 86400;
   return whole - (whole % unit);
 }
 
