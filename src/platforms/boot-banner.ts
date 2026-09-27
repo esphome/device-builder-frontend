@@ -103,12 +103,12 @@ export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch 
     failure = err;
   }
   const released = session.opened ? await teardown(port, session) : true;
+  // A port still held outranks whatever else went wrong: with nothing found
+  // it would go to esptool next, which must not happen. A board the banner
+  // named is a result whatever the port did afterwards.
+  const named = hit !== null && hit.platform !== "esp";
+  if (!released && !named) throw new BannerTeardownError();
   if (failure !== undefined) throw failure;
-  // A board the banner named is a result whatever the port did afterwards;
-  // with nothing found the port would go to esptool, which must not happen
-  // while it is still held.
-  if (!released && (hit === null || hit.platform === "esp"))
-    throw new BannerTeardownError();
   return hit;
 }
 
