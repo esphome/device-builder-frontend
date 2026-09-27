@@ -72,6 +72,30 @@ describe("renderTimePeriodField unit picker", () => {
     expect(input!.value).toBe("4");
   });
 
+  it("starts an empty field on the finest unit the entry accepts", () => {
+    const { units, selected, input, emitChange } = mount(
+      field({ duration_min_unit: "min" }),
+      ""
+    );
+    expect(units).toEqual(["min", "h", "d"]);
+    expect(selected).toBe("min");
+    input!.value = "5";
+    input!.dispatchEvent(new Event("input"));
+    expect(emitChange).toHaveBeenCalledWith(PATH, "5min");
+  });
+
+  it("starts an empty field on its default's unit when the entry accepts it", () => {
+    const entry = field({ duration_min_unit: "ms", default_value: "5min" });
+    expect(mount(entry, undefined).selected).toBe("min");
+  });
+
+  it("clamps a default's unit that is finer than the entry accepts", () => {
+    const entry = field({ duration_min_unit: "s", default_value: "500ms" });
+    const { units, selected } = mount(entry, undefined);
+    expect(units).toEqual(["s", "min", "h", "d"]);
+    expect(selected).toBe("s");
+  });
+
   it("labels the unit picker for assistive tech", () => {
     const { host } = mount(field(), "5s");
     expect(host.querySelector("wa-select")!.getAttribute("aria-label")).toBe(

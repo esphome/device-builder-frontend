@@ -17,6 +17,7 @@ import {
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { coerceIntFieldValue } from "../../../util/int-input.js";
 import {
+  clampTimePeriodUnit,
   durationMappingAsScalar,
   parseTimePeriodScalar,
   serializeTimePeriod,
@@ -220,13 +221,15 @@ export function renderTimePeriodField(
     defaultParsed && defaultParsed.parseable ? defaultParsed.value : "";
   // When the user hasn't touched the field yet, seed the unit
   // picker with the default's unit so the round-tripped widget
-  // matches what they'd see if they typed the catalog default.
-  const displayUnit =
-    raw !== undefined && raw !== null && raw !== ""
-      ? parsed.unit
-      : defaultParsed?.parseable
-        ? defaultParsed.unit
-        : parsed.unit;
+  // matches what they'd see if they typed the catalog default. Only a
+  // stored value keeps a unit finer than the entry accepts.
+  const hasValue = raw !== undefined && raw !== null && raw !== "";
+  const displayUnit = hasValue
+    ? parsed.unit
+    : clampTimePeriodUnit(
+        defaultParsed?.parseable ? defaultParsed.unit : parsed.unit,
+        entry.duration_min_unit
+      );
   return html`
     <div class="field time-period" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx, { path })}
@@ -252,7 +255,10 @@ export function renderTimePeriodField(
             ctx.emitChange(path, serializeTimePeriod(parsed.value, nextUnit));
           }}
         >
-          ${timePeriodUnitsFor(entry.duration_min_unit, displayUnit).map(
+          ${timePeriodUnitsFor(
+            entry.duration_min_unit,
+            hasValue ? displayUnit : undefined
+          ).map(
             (u) =>
               html`<wa-option value=${u} ?selected=${u === displayUnit}
                 >${ctx.localize(`device.automation_action_delay_unit_${u}`)}</wa-option

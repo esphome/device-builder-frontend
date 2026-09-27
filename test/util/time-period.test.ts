@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clampTimePeriodUnit,
   durationMappingAsScalar,
   looksLikeTimePeriodScalar,
   parseTimePeriodScalar,
@@ -117,5 +118,18 @@ describe("durationMappingAsScalar", () => {
     ["null", null],
   ])("is null for %s", (_label, raw) => {
     expect(durationMappingAsScalar(raw)).toBeNull();
+  });
+});
+
+describe("clampTimePeriodUnit", () => {
+  it.each([
+    ["s", "min", "min"],
+    ["us", "ms", "ms"],
+    ["s", "ms", "s"],
+    ["h", "min", "h"],
+    ["s", undefined, "s"],
+    ["us", "ns", "us"],
+  ] as const)("%s on a %s-precision field is %s", (unit, minUnit, expected) => {
+    expect(clampTimePeriodUnit(unit, minUnit)).toBe(expected);
   });
 });

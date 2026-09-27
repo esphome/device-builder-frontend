@@ -34,6 +34,16 @@ export function timePeriodUnitsFor(
   return TIME_PERIOD_UNITS.filter((u, i) => i >= first || u === inUse);
 }
 
+/** *unit*, or *minUnit* when *unit* is finer than the field accepts: the
+ *  unit an empty field starts on, so a first keystroke can't write one
+ *  ESPHome rejects. */
+export function clampTimePeriodUnit(
+  unit: TimePeriodUnit,
+  minUnit: string | null | undefined
+): TimePeriodUnit {
+  return timePeriodUnitsFor(minUnit).includes(unit) ? unit : (minUnit as TimePeriodUnit);
+}
+
 /** Every time-unit suffix ESPHome accepts, mapped to its canonical
  *  picker unit. Mirrors `cv.time_period_str_unit`'s `unit_to_kwarg`. */
 const TIME_PERIOD_UNIT_ALIASES: Record<string, TimePeriodUnit> = {
