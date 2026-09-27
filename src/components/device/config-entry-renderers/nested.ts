@@ -20,6 +20,7 @@ import {
 } from "../config-entry-renderers-shared.js";
 import { renderConstraintBanners } from "./constraint-banner-view.js";
 import { collectUnsatisfiedConstraints } from "./constraint-banners.js";
+import { type Rekey, rekeyStore } from "./row-memory.js";
 import { nextIdFor } from "./seed-identity.js";
 
 // Stash of the values a sub-reading held when its enable switch was
@@ -34,6 +35,12 @@ const _enableStashes = new WeakMap<object, Map<string, Record<string, unknown>>>
  *  ``clearTemplatableStash``. */
 export function clearEnableStash(owner: object): void {
   _enableStashes.delete(owner);
+}
+
+/** Renumber *owner*'s stash after a list row left; see ``row-memory``. */
+export function rekeyEnableStash(owner: object, rekey: Rekey): void {
+  const stash = _enableStashes.get(owner);
+  if (stash) rekeyStore(stash, rekey);
 }
 
 function _enableStash(ctx: RenderCtx): Map<string, Record<string, unknown>> {

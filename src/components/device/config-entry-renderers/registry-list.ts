@@ -487,25 +487,25 @@ export class ESPHomeRegistryList extends LitElement {
   }
 
   private _removeAt(index: number) {
+    this.ctx.rowRemoved(this.path, index);
     this._mutateEditable((items) => items.filter((_, i) => i !== index));
   }
 
   private _renameRow(index: number, nextId: string) {
-    this._mutateEditable((items) => {
-      // Reject empty: an empty id would synthesize ``{ "": null }``
-      // and collide with itemId()'s unselected-placeholder sentinel.
-      if (!nextId) return items;
-      const target = items[index];
-      if (!target) return items;
-      const oldId = itemId(target);
-      if (oldId === nextId) return items;
-      // Discard non-null params on type change: each entry type has
-      // its own schema and carrying ``{delta: 0.5}`` over to ``throttle``
-      // would silently produce a scalar where the new type expects a
-      // time string. V1 has no sub-form to surface the mismatch, so
-      // emit ``{nextId: null}`` and let the user reconfigure.
-      return items.map((it, i) => (i === index ? { [nextId]: null } : it));
-    });
+    // Reject empty: an empty id would synthesize ``{ "": null }``
+    // and collide with itemId()'s unselected-placeholder sentinel.
+    if (!nextId) return;
+    const target = editableEntries(asList(this.ctx.getAt(this.path))).items[index];
+    if (!target || itemId(target) === nextId) return;
+    // Discard non-null params on type change: each entry type has
+    // its own schema and carrying ``{delta: 0.5}`` over to ``throttle``
+    // would silently produce a scalar where the new type expects a
+    // time string. V1 has no sub-form to surface the mismatch, so
+    // emit ``{nextId: null}`` and let the user reconfigure.
+    this.ctx.rowKindChanged(this.path, index);
+    this._mutateEditable((items) =>
+      items.map((it, i) => (i === index ? { [nextId]: null } : it))
+    );
   }
 }
 

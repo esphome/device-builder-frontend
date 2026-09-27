@@ -1,5 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
+import { type Rekey, rekeyStore } from "./config-entry-renderers/row-memory.js";
+
 interface RadioGroupElement extends HTMLElement {
   syncRadioElements?: () => void | Promise<void>;
   updateComplete?: Promise<unknown>;
@@ -36,6 +38,12 @@ export class ConstraintClusterController implements ReactiveController {
   reset(): void {
     this._choices.clear();
     this._stash.clear();
+  }
+
+  /** Renumber the choices kept per field path (a pin's wiring) after a
+   *  list row left. Cluster choices carry no path and pass through. */
+  rekeyChoices(rekey: Rekey): void {
+    rekeyStore(this._choices, rekey);
   }
 
   getChoice(clusterId: string): string | undefined {

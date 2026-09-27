@@ -25,6 +25,7 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { fieldKeyAttr, type RenderCtx } from "../config-entry-renderers-shared.js";
 import { renderLambdaField } from "./lambda.js";
 import { renderLiteralLambdaToggle } from "./literal-lambda-toggle.js";
+import { type Rekey, rekeyStore } from "./row-memory.js";
 
 interface StashEntry {
   /** Last literal value the user typed before flipping to lambda. */
@@ -64,6 +65,12 @@ function stashFor(ctx: RenderCtx, path: string[]): StashEntry {
  *  ``id``) must not restore a value typed for them. */
 export function clearTemplatableStash(owner: object): void {
   _stashes.delete(owner);
+}
+
+/** Renumber *owner*'s stash after a list row left; see ``row-memory``. */
+export function rekeyTemplatableStash(owner: object, rekey: Rekey): void {
+  const stash = _stashes.get(owner);
+  if (stash) rekeyStore(stash, rekey);
 }
 
 /**

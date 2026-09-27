@@ -1,4 +1,5 @@
-import type { ReactiveController, ReactiveControllerHost } from "lit";
+import type { ReactiveControllerHost } from "lit";
+import { ActiveListenerController } from "./active-listener-controller.js";
 import { EscapeController } from "./escape-controller.js";
 
 export interface LightDismissOptions {
@@ -30,9 +31,11 @@ export interface LightDismissOptions {
  * binds only while active, so the click that opened the popover (whose
  * capture phase has already run by the time the host flips the flag)
  * can't self-dismiss it.
+ *
+ * A disconnect drops the listeners but keeps what the host asked for, so
+ * a host reconnected while still open is bound again.
  */
-export class LightDismissController implements ReactiveController {
-  private _bound = false;
+export class LightDismissController extends ActiveListenerController {
   private readonly _escape: EscapeController;
 
   constructor(
@@ -40,6 +43,7 @@ export class LightDismissController implements ReactiveController {
     private readonly _onDismiss: () => void,
     private readonly _options: LightDismissOptions = {}
   ) {
+    super(_host);
     this._escape = new EscapeController(
       _host,
       (e) => {
@@ -49,22 +53,19 @@ export class LightDismissController implements ReactiveController {
       },
       { target: _options.escapeTarget, capture: _options.escapeCapture }
     );
-    _host.addController(this);
   }
 
-  hostDisconnected(): void {
-    this.set(false);
-  }
-
-  set(active: boolean): void {
+  override set(active: boolean): void {
     this._escape.set(active);
-    if (active === this._bound) return;
-    if (active) {
-      document.addEventListener("click", this._onDocumentClick, true);
-    } else {
-      document.removeEventListener("click", this._onDocumentClick, true);
-    }
-    this._bound = active;
+    super.set(active);
+  }
+
+  protected bind(): void {
+    document.addEventListener("click", this._onDocumentClick, true);
+  }
+
+  protected unbind(): void {
+    document.removeEventListener("click", this._onDocumentClick, true);
   }
 
   private _onDocumentClick = (e: MouseEvent): void => {

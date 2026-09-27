@@ -74,13 +74,13 @@ describe("renderMultiValueField numeric coercion", () => {
     expect(inputs[0][".value"]).toBe("0042");
   });
 
-  it("invalidates row edit buffers when a row is removed", () => {
+  it("reports the removed row so what is remembered follows the rows", () => {
     const ctx = makeRenderCtx({ field: [1, 2] });
     const tpl = renderMultiValueField(makeEntry(ConfigEntryType.INTEGER), ["field"], ctx);
     const removeButtons = findElementBindings(tpl, "button");
 
     (removeButtons[0]["@click"] as () => void)();
-    expect(ctx.clearEditingMagnitudesUnder).toHaveBeenCalledWith(["field"]);
+    expect(ctx.rowRemoved).toHaveBeenCalledWith(["field"], 0);
     expect(ctx.emitChange).toHaveBeenCalledWith(["field"], [2]);
   });
 

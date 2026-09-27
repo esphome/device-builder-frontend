@@ -31,7 +31,7 @@ vi.mock("../../../src/util/post-install-dispatch.js", () => ({
 }));
 
 import { identityLocalize } from "../../_dom.js";
-import { fakeLogBuffer } from "../../_fake-host.js";
+import { fakeBuildState, fakeLogBuffer } from "../../_fake-host.js";
 import { lapsedPick } from "../../_web-serial.js";
 import { JobSource, JobStatus } from "../../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
@@ -39,13 +39,15 @@ import { startWebSerialInstall } from "../../../src/platforms/esp/web-serial-ins
 import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
 import { markOpenFailure } from "../../../src/util/serial-open-error.js";
 
+type Follow = { onResult: (d: unknown) => void; onError: (e: string) => void };
+
 function makeHost() {
   const api = {
     getBoard: vi.fn(),
     firmwareCompile: vi
       .fn()
       .mockResolvedValue({ job_id: "j1", source: JobSource.LOCAL, source_label: "" }),
-    firmwareFollowJob: vi.fn((_id: string, cbs: { onResult: (d: unknown) => void }) => {
+    firmwareFollowJob: vi.fn((_id: string, cbs: Follow) => {
       cbs.onResult({ status: JobStatus.COMPLETED });
       return "s1";
     }),
@@ -78,6 +80,7 @@ function makeHost() {
     _jobSourceLabel: "",
     _compileReject: null as null | ((e: unknown) => void),
     _localize: identityLocalize,
+    ...fakeBuildState(),
     _fail: vi.fn(),
     _close: vi.fn(),
   };
@@ -317,5 +320,74 @@ describe("Web Serial install — HTTP byte download", () => {
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
     expect(host._failureKind).toBe(null);
+  });
+});
+
+describe("Web Serial install while someone else's build runs (#1893)", () => {
+  type Output = Follow & { onOutput: (line: string) => void };
+
+  function busyHost() {
+    const made = makeHost();
+    made.host._activeJobs.set("device.yaml", { job_id: "foreign-1" });
+    esptool.connectToPort.mockResolvedValue(CHIP);
+    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.flashFirmware.mockResolvedValue(undefined);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
+    return made;
+  }
+  const run = (host: unknown) =>
+    startWebSerialInstall(host as ESPHomeFirmwareInstallDialog);
+
+  it("asks for the port in the click itself, with nothing awaited before it", async () => {
+    const { host } = busyHost();
+    // Not awaited: the picker has to be asked for before the click's turn ends.
+    const install = run(host);
+    expect(seams.requestSerialPort).toHaveBeenCalledOnce();
+    await install;
+  });
+
+  it("waits the build out after the connect, then compiles as if nothing ran", async () => {
+    const { host, api } = busyHost();
+    const seen: string[] = [];
+    api.firmwareFollowJob.mockImplementation((id: string, cbs: Follow) => {
+      seen.push(`${id} ${host._step}: ${host._statusMessage}`);
+      // A followed build replays its lines, which move the step on.
+      (cbs as Output).onOutput("Compiling .pio/build/main.cpp.o");
+      if (id === "j1") seen.push(`${id} ${host._step}: ${host._statusMessage}`);
+      cbs.onResult({ status: JobStatus.COMPLETED });
+      return "s1";
+    });
+
+    await run(host);
+
+    expect(seen).toEqual([
+      "foreign-1 queued: firmware.status_waiting_build",
+      "j1 queued: firmware.status_queued",
+      "j1 compiling: firmware.status_compiling",
+    ]);
+    // The clocks the other build's lines started are not this compile's.
+    expect(host._timer.reset).toHaveBeenCalledOnce();
+    expect(host._timer.reset.mock.invocationCallOrder[0]).toBeLessThan(
+      api.firmwareCompile.mock.invocationCallOrder[0]
+    );
+    expect(esptool.connectToPort.mock.invocationCallOrder[0]).toBeLessThan(
+      api.firmwareFollowJob.mock.invocationCallOrder[0]
+    );
+    expect(host._step).toBe("done");
+  });
+
+  it("releases the port and does not compile when the wait fails", async () => {
+    const { host, api } = busyHost();
+    api.firmwareFollowJob.mockImplementation((_id: string, cbs: Follow) => {
+      cbs.onError("stream lost");
+      return "s1";
+    });
+
+    await run(host);
+
+    expect(host._fail).toHaveBeenCalledWith("firmware.install_failed");
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(esptool.disconnect).toHaveBeenCalled();
+    expect(esptool.flashFirmware).not.toHaveBeenCalled();
   });
 });

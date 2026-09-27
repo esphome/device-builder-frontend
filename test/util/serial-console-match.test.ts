@@ -66,11 +66,12 @@ describe("serialPortCannotCarryConsole", () => {
     expect(serialPortCannotCarryConsole("UART0", port({}))).toBe(false);
   });
 
-  it("fails open for the ESP-USB-Bridge (0x303a but not the on-chip device)", () => {
+  it("treats the ESP-USB-Bridge as a bridge despite the Espressif vendor id", () => {
     expect(serialPortCannotCarryConsole("UART0", port(ESP_USB_BRIDGE))).toBe(false);
     expect(serialPortCannotCarryConsole("USB_SERIAL_JTAG", port(ESP_USB_BRIDGE))).toBe(
-      false
+      true
     );
+    expect(serialPortCannotCarryConsole("USB_CDC", port(ESP_USB_BRIDGE))).toBe(true);
   });
 
   it("unknown interface never claims a mismatch", () => {

@@ -69,6 +69,7 @@ import {
   parseFieldKey,
   renderYamlOnlyField,
 } from "./config-entry-renderers-shared.js";
+import { rowMemoryCtx } from "./config-entry-renderers/row-memory-ctx.js";
 import { ConstraintClusterController } from "./constraint-cluster-controller.js";
 import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";
@@ -1107,13 +1108,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
       clearEditingMagnitude: (path) => {
         this._editingMagnitudes.delete(path.join("."));
       },
-      clearEditingMagnitudesUnder: (path) => {
-        const key = path.join(".");
-        const prefix = `${key}.`;
-        for (const k of [...this._editingMagnitudes.keys()]) {
-          if (k === key || k.startsWith(prefix)) this._editingMagnitudes.delete(k);
-        }
-      },
+      ...rowMemoryCtx(this, this._constraintClusters, this._expandedOptionFields, [
+        this._pendingUnits,
+        this._editingMagnitudes,
+        this._nestedOpenSections,
+        this._seededNestedOpen,
+      ]),
       getClusterChoice: (clusterId) => this._constraintClusters.getChoice(clusterId),
       setClusterChoice: (clusterId, altId) =>
         this._constraintClusters.setChoice(clusterId, altId),
