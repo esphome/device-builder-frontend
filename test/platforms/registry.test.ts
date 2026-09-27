@@ -116,17 +116,15 @@ describe("PLATFORMS", () => {
   );
 
   function installCopyKeys(install: AnyBrowserInstall): string[] {
-    {
-      const keys = [
-        `dashboard.install_method_${install.methodKey}`,
-        `dashboard.install_method_${install.methodKey}_desc`,
-        ...Object.values<FlasherStepView>(install.steps).flatMap(detailKeys),
-      ];
-      if (install.downloadReady) {
-        keys.push(install.downloadReady.titleKey, install.downloadReady.bodyKey);
-      }
-      return keys;
+    const keys = [
+      `dashboard.install_method_${install.methodKey}`,
+      `dashboard.install_method_${install.methodKey}_desc`,
+      ...Object.values<FlasherStepView>(install.steps).flatMap(detailKeys),
+    ];
+    if (install.downloadReady) {
+      keys.push(install.downloadReady.titleKey, install.downloadReady.bodyKey);
     }
+    return keys;
   }
 
   // The behaviour each platform's logs policy must keep: the RTS pulse only
