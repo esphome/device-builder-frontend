@@ -59,6 +59,13 @@ function stashFor(ctx: RenderCtx, path: string[]): StashEntry {
   return s;
 }
 
+/** Forget every stashed other-side value of *owner*'s fields: the form was
+ *  re-targeted, and a path shared with the previous entries (an action's
+ *  ``id``) must not restore a value typed for them. */
+export function clearTemplatableStash(owner: object): void {
+  _stashes.delete(owner);
+}
+
 /**
  * Render the literal/lambda toggle + the active body. Dispatched from
  * ``ESPHomeConfigEntryForm._renderEntryUnsafe`` when the entry is

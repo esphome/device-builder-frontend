@@ -114,7 +114,10 @@ import {
 } from "./config-entry-renderers.js";
 import { renderConstraintBanners } from "./config-entry-renderers/constraint-banner-view.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
-import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
+import {
+  clearTemplatableStash,
+  renderTemplatableField,
+} from "./config-entry-renderers/templatable.js";
 import "./password-input.js";
 import "./secret-picker.js";
 
@@ -638,10 +641,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected willUpdate(changed: PropertyValues) {
     // A different entry list means the form was re-targeted to a
     // different component (e.g. the dep-flow detour swapping
-    // ES7210 for i2c). Drop transient unit picks from the previous
-    // shape so they don't bleed into unrelated paths.
+    // ES7210 for i2c). Drop transient unit picks and literal / lambda
+    // stashes from the previous shape so they don't bleed into unrelated
+    // paths.
     if (changed.has("entries") && changed.get("entries") !== undefined) {
       this._pendingUnits.clear();
+      clearTemplatableStash(this);
       this._editingMagnitudes.clear();
       this._openAdvancedPlacement.clear();
       this._constraintClusters.reset();
