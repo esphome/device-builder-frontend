@@ -56,20 +56,45 @@ export class ReceiverPreparation {
     private readonly _onSettled: (error: string | null) => void
   ) {}
 
-  start(input: PreparationInput): void {
+  /**
+   * Prepare ``input``, or what it resolves to when it still has to be read (a
+   * picked file); a read that fails rejects with the line to show.
+   */
+  start(input: PreparationInput | Promise<PreparationInput>): void {
     const generation = ++this._generation;
     this._set({ kind: "pending" });
-    void this._prepare(input).then((outcome) => {
+    void this._settle(input).then(({ state, logs, error }) => {
       if (generation !== this._generation) return;
-      if ("run" in outcome) {
-        this.logs = outcome.logs;
-        this._set({ kind: "ready", run: outcome.run });
-      } else {
-        // An image that failed its check fails it again; only a load is retried.
-        this._set(outcome.retryable ? { kind: "retryable", input } : { kind: "idle" });
-      }
-      this._onSettled("error" in outcome ? outcome.error : null);
+      if (logs) this.logs = logs;
+      this._set(state);
+      this._onSettled(error);
     });
+  }
+
+  private async _settle(pending: PreparationInput | Promise<PreparationInput>): Promise<{
+    state: PreparationState;
+    logs?: SerialLogsPolicy;
+    error: string | null;
+  }> {
+    let input: PreparationInput;
+    try {
+      input = await pending;
+    } catch (err) {
+      return { state: { kind: "idle" }, error: getErrorMessage(err) };
+    }
+    const outcome = await this._prepare(input);
+    if ("run" in outcome) {
+      return {
+        state: { kind: "ready", run: outcome.run },
+        logs: outcome.logs,
+        error: null,
+      };
+    }
+    // An image that failed its check fails it again; only a load is retried.
+    return {
+      state: outcome.retryable ? { kind: "retryable", input } : { kind: "idle" },
+      error: outcome.error,
+    };
   }
 
   /** Run a preparation that a chunk failed to load for again. */

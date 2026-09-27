@@ -233,7 +233,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   // Manual mode: the picked file is read and prepared here, not on the click.
-  private async _onFileChange(): Promise<void> {
+  private _onFileChange(): void {
     const file = this._fileInput?.files?.[0];
     // The primary button is disabled once a flash is done. Picking another
     // file starts a fresh attempt, so clear the done state — otherwise a
@@ -242,25 +242,22 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._resetForRetry();
     this._preparation.clear();
     if (!file) return;
-    // Said before the read, which takes a moment for a large file.
     this._setState("connecting", this._localize("web.install.preparing"));
-    let data: Uint8Array;
-    try {
-      data = new Uint8Array(await file.arrayBuffer());
-    } catch (err) {
-      // The file changed or went away after it was picked.
-      console.error("[flash receiver] Could not read the picked file:", err);
-      if (this._fileInput?.files?.[0] !== file) return;
-      this._setState("error", this._localize("web.flash.choose_file"));
-      return;
-    }
-    // A newer pick overtook this read.
-    if (this._fileInput?.files?.[0] !== file) return;
-    this._preparation.start({
-      parts: [{ data, address: 0 }],
-      erase: true,
-      flasher: DEFAULT_HANDOFF_FLASHER,
-    });
+    // The read is part of the preparation, which a newer pick supersedes.
+    this._preparation.start(
+      file.arrayBuffer().then(
+        (bytes) => ({
+          parts: [{ data: new Uint8Array(bytes), address: 0 }],
+          erase: true,
+          flasher: DEFAULT_HANDOFF_FLASHER,
+        }),
+        (err: unknown) => {
+          // The file changed or went away after it was picked.
+          console.error("[flash receiver] Could not read the picked file:", err);
+          throw new Error(this._localize("web.flash.choose_file"));
+        }
+      )
+    );
   }
 
   private async _onPrimary(): Promise<void> {

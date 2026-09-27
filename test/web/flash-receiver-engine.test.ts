@@ -352,6 +352,9 @@ describe("esphome-web-flash-receiver engines", () => {
     const picked = (el as any)._onFileChange();
     await el.updateComplete;
     expect((el as any)._statusMessage).toBe("web.install.preparing");
+    // The read is part of the work: the line comes with its spinner.
+    expect(preparation(el)).toBe("pending");
+    expect(el.shadowRoot!.querySelector(".status wa-spinner")).not.toBeNull();
     expect(primaryButton(el).disabled).toBe(true);
     expect(engines.esp.prepare).not.toHaveBeenCalled();
     read(new ArrayBuffer(4));
