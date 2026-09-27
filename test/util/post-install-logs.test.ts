@@ -525,7 +525,7 @@ describe("attachBleLogs with the nRF52 Bluetooth logs", () => {
     // would fail this.
     const other = { ...nrfBle, disconnectedKey: "dashboard.logs_reset_failed" };
     await attachBleLogs(dialog as never, defaultLocalize, other, device, () => false);
-    expect(dialog.setSerialOpenFailed).toHaveBeenCalledWith(
+    expect(dialog.triggerBleReconnect).toHaveBeenCalledWith(
       defaultLocalize("dashboard.logs_reset_failed")
     );
   });

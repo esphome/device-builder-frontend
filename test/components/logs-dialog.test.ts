@@ -170,7 +170,7 @@ describe("logs-dialog header source chip", () => {
   });
 
   it.each([
-    ["ble", true],
+    ["ble", false],
     ["serial", false],
   ] as const)(
     "shows the connecting banner while a %s session connects: %s",
