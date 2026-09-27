@@ -74,23 +74,31 @@ export class BleUnavailableError extends Error {
 }
 
 /**
- * Chooser for a peripheral with *service*. ESPHome advertises the node name,
- * so the chooser matches on the given names; with no name known at all it
- * lists every device. The service is listed as optional so GATT access to it
- * is granted after the user picks a device. Returns null when the chooser is
- * dismissed.
+ * Chooser for a peripheral with *service*. It matches on the given names, as
+ * ESPHome advertises the node name, and on the services in *advertised*: a
+ * name is what the OS remembers the device by, which after a rename is its
+ * old one, where a service it advertises finds it under any name. With no
+ * name known, it lists every device unless *service* itself is advertised,
+ * when that alone finds them all. The service is listed as optional so GATT
+ * access to it is granted after the user picks a device. Returns null when
+ * the chooser is dismissed.
  */
 export async function requestBleDevice(
   names: string[],
-  service: string
+  service: string,
+  advertised: readonly string[] = []
 ): Promise<BluetoothDevice | null> {
   const known = [...new Set(names.filter(Boolean))];
-  const options: RequestDeviceOptions = known.length
-    ? {
-        filters: known.map((name) => ({ name })),
+  const listAll = known.length === 0 && !advertised.includes(service);
+  const options: RequestDeviceOptions = listAll
+    ? { acceptAllDevices: true, optionalServices: [service] }
+    : {
+        filters: [
+          ...known.map((name) => ({ name })),
+          ...advertised.map((uuid) => ({ services: [uuid] })),
+        ],
         optionalServices: [service],
-      }
-    : { acceptAllDevices: true, optionalServices: [service] };
+      };
   try {
     return await navigator.bluetooth.requestDevice(options);
   } catch (err) {

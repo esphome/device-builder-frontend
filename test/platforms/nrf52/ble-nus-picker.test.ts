@@ -26,6 +26,7 @@ import {
   BleUnavailableError,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../../../src/platforms/nrf52/ble-nus-stream.js";
+import { SMP_BLE_SERVICE_UUID } from "../../../src/platforms/nrf52/smp-ble-service.js";
 
 const localize = (key: string) => key;
 
@@ -39,7 +40,12 @@ describe("pickBleNusDevice", () => {
     const device = {};
     mocks.requestBleDevice.mockResolvedValue(device);
     await expect(pickBleNusDevice(localize, ["a", "b"])).resolves.toBe(device);
-    expect(mocks.requestBleDevice).toHaveBeenCalledWith(["a", "b"], BLE_NUS_SERVICE_UUID);
+    // With the mcumgr service a build with that OTA advertises.
+    expect(mocks.requestBleDevice).toHaveBeenCalledWith(
+      ["a", "b"],
+      BLE_NUS_SERVICE_UUID,
+      [SMP_BLE_SERVICE_UUID]
+    );
     expect(mocks.notifyError).not.toHaveBeenCalled();
   });
 

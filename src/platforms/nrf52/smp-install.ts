@@ -150,12 +150,7 @@ const flashOverBle = (host: ESPHomeFirmwareInstallDialog): Promise<void> =>
   runSmpFlash(
     host,
     bleFlow,
-    () =>
-      pickBleDevice(
-        host._localize,
-        host._device ? [host._device.name] : [],
-        SMP_BLE_SERVICE_UUID
-      ),
+    () => pickBleDevice(host._localize, [], SMP_BLE_SERVICE_UUID, [SMP_BLE_SERVICE_UUID]),
     (engine, device, image, hooks) => engine.flashMcubootOverBle(device, image, hooks)
   );
 
