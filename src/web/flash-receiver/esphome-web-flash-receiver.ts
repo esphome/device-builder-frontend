@@ -317,6 +317,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     } catch (err) {
       // An engine broke its never-throws contract; the card must not stay busy.
       console.error("[flash receiver] The engine threw:", err);
+      this._waiting = null;
       this._setState("error", getErrorMessage(err));
       return null;
     } finally {

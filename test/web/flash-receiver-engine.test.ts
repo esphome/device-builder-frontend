@@ -562,10 +562,14 @@ describe("esphome-web-flash-receiver engines", () => {
       "frees the card and says why when the %s throws",
       async (_n, part, click) => {
         vi.spyOn(console, "error").mockImplementation(() => {});
-        engines.pico[part].mockRejectedValueOnce(new Error("boom"));
+        engines.pico[part].mockImplementationOnce(async (hooks) => {
+          hooks.onWaiting({ message: "now in BOOTSEL" });
+          throw new Error("boom");
+        });
         const { el, opener } = await handOff(pico, false);
         await (el as any)[click]();
         expect((el as any)._busy).toBe(false);
+        expect((el as any)._waiting).toBeNull();
         expect(last(states(opener))).toMatchObject({ state: "error", detail: "boom" });
       }
     );
