@@ -64,6 +64,8 @@ describe("matchBootBanner", () => {
     ).toEqual({
       board: "cb3s",
     });
+    // Not until the id is whole: a read can end anywhere.
+    expect(matchBootBanner("LibreTiny v1.13.0+sha.6514b26 on cb")).toBeNull();
   });
 
   it("says an ESP32 family ROM is esptool's, from the reset line or the IDF bootloader", () => {
@@ -132,6 +134,14 @@ describe("readBootBanner", () => {
       { dataTerminalReady: false, requestToSend: false },
     ]);
     expect(raw.close).toHaveBeenCalledOnce();
+  });
+
+  it("waits for the whole board id when a read ends inside it", async () => {
+    const cut = RTL_PLAIN.indexOf("on bw") + "on bw".length;
+    const { port } = fakePort([RTL_PLAIN.slice(0, cut), RTL_PLAIN.slice(cut)]);
+    const pending = readBootBanner(port);
+    await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS);
+    expect((await pending)?.board).toBe("bw15");
   });
 
   it("stops early once the text is conclusive", async () => {

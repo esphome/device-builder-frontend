@@ -42,8 +42,12 @@ const SIGNATURES: ReadonlyArray<{
     match: () => ({ platform: "rtl87xx", mcu: "rtl8720c" }),
   },
   // LibreTiny names its board: "LibreTiny v1.13.0+sha.6514b26 on bw15,
-  // compiled at ...". The catalog knows the board's family.
-  { pattern: /LibreTiny v\S+ on ([a-z0-9][a-z0-9_-]*)/, match: (m) => ({ board: m[1] }) },
+  // compiled at ...". The catalog knows the board's family. The comma is
+  // required: reads split anywhere, and "on bw" must not settle as "bw".
+  {
+    pattern: /LibreTiny v\S+ on ([a-z0-9][a-z0-9_-]*),/,
+    match: (m) => ({ board: m[1] }),
+  },
   // The ESP32 family's ROM ("rst:0x1 (POWERON_RESET),boot:0x13 ...") and the
   // IDF bootloader; esptool takes it from here. The ESP8266 ROM speaks at
   // 74880 and matches nothing, which lands it with esptool all the same.
@@ -182,6 +186,13 @@ async function pulseReset(port: SerialPort, session: BannerSession): Promise<voi
       "[detect] Could not release reset after the boot banner pulse; trying once more:",
       err
     );
-    if (!session.abandoned) await release().catch(() => {});
+    if (!session.abandoned) {
+      await release().catch((again: unknown) => {
+        console.warn(
+          "[detect] Reset still held after the retry; the board stays in reset:",
+          again
+        );
+      });
+    }
   });
 }
