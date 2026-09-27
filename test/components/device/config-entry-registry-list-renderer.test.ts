@@ -1037,16 +1037,27 @@ describe("renderRegistryListField — foreign-entry preservation", () => {
   });
 
   it("still counts the rows the user sees from one", async () => {
-    const { el } = mount(
+    const localize = vi.fn((key: string) => key);
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "effects",
+      registry: "light_effects",
+      multi_value: true,
+    });
+    el.path = ["effects"];
+    el.ctx = makeRenderCtx(
       { effects: [FOREIGN, { pulse: null }] },
-      { catalog: SPEED_CATALOG }
+      { overrides: { localize } }
     );
+    document.body.append(el);
+    (el as unknown as { _catalog: LightEffect[] })._catalog = SPEED_CATALOG;
+    el.requestUpdate();
     await el.updateComplete;
-    const picker = el.shadowRoot!.querySelector(".registry-list-row wa-select")!;
-    expect(picker.getAttribute("aria-label")).toBe("device.registry_list_row_label");
-    expect(
-      el.shadowRoot!.querySelector(".registry-list-item")!.getAttribute("data-row-index")
-    ).toBe("0");
+
+    // The row is second in the list and first among the rows shown.
+    expect(localize).toHaveBeenCalledWith("device.registry_list_row_label", {
+      index: "1",
+    });
   });
 
   it("Remove takes the row out where it is and keeps the order around it", async () => {

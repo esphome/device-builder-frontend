@@ -39,13 +39,13 @@ import {
   renderListRemoveButton,
 } from "./lists.js";
 import {
+  appendEditable,
   asList,
   editableEntries,
   formatRegistryId,
   itemId,
   REGISTRY_OPS,
   type RegistryOps,
-  spliceEditable,
 } from "./registry-list-helpers.js";
 import { rowForgotten, rowRemoved } from "./row-memory.js";
 import { makeScalarValueEntry, scalarValueType } from "./scalar-value-entry.js";
@@ -491,8 +491,8 @@ export class ESPHomeRegistryList extends LitElement {
     // so the backend rejects it on save. The picker shows a
     // placeholder until the user chooses; bare-dash placeholders
     // round-trip cleanly through ``serializeListItem``.
-    const { list, items, positions } = this._editable();
-    this.ctx.emitChange(this.path, spliceEditable(list, positions, [...items, {}]));
+    const { list, positions } = this._editable();
+    this.ctx.emitChange(this.path, appendEditable(list, positions, {}));
   }
 
   /** Remove the row by its place in the whole list, so the entries
@@ -520,9 +520,12 @@ export class ESPHomeRegistryList extends LitElement {
     // would silently produce a scalar where the new type expects a
     // time string. V1 has no sub-form to surface the mismatch, so
     // emit ``{nextId: null}`` and let the user reconfigure.
-    this.ctx.rowsMoved(this.path, rowForgotten(positions[index]));
-    const next = items.map((it, i) => (i === index ? { [nextId]: null } : it));
-    this.ctx.emitChange(this.path, spliceEditable(list, positions, next));
+    const position = positions[index];
+    this.ctx.rowsMoved(this.path, rowForgotten(position));
+    this.ctx.emitChange(
+      this.path,
+      list.map((it, i) => (i === position ? { [nextId]: null } : it))
+    );
   }
 }
 
