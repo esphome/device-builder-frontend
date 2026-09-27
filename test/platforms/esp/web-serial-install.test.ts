@@ -552,6 +552,23 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     else expect(esptool.disconnect).not.toHaveBeenCalled();
   });
 
+  it("does not mark a reopened dialog with a chip mismatch found for the run before", async () => {
+    const { host, api } = ready();
+    host._device.target_platform = "esp8266";
+    host._device.board_id = "esp8285";
+    api.getBoard.mockResolvedValue({ esphome: { platform: "esp8266" } });
+    esptool.disconnect.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledTimes(1);
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._failureKind).toBeNull();
+  });
+
   it("stands down when the same device was reopened during the connect", async () => {
     const { host, api } = ready();
     esptool.connectToPort.mockImplementationOnce(async () => {

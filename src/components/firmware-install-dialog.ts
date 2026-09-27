@@ -521,9 +521,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Escape, or a programmatic close). Same stream teardown as _close —
   // otherwise a header-X-then-reopen leaves the prior followJob attached and
   // lines duplicate into the new session. A compile still attached here was
-  // dismissed mid-build (a programmatic close already detached).
+  // dismissed mid-build (a programmatic close already detached). An after-hide
+  // that lands after a reopen belongs to the run before it, whose _init
+  // already tore down; the run on screen now is left alone.
   _onClose = () => {
-    this._open = false;
+    if (this._open) return;
     this._releaseJobToBackground();
   };
 
