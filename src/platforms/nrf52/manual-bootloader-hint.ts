@@ -1,5 +1,6 @@
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { BootloaderTouchError } from "../../util/serial-bootloader-touch.js";
 import { SerialDeviceLostError } from "../../util/serial-open-error.js";
 
 /**
@@ -18,4 +19,14 @@ export function withManualBootloaderHint(err: unknown, localize: LocalizeFunc): 
   return localize("firmware.nrf_manual_bootloader_hint", {
     error: message.replace(/\.\s*$/, ""),
   });
+}
+
+/**
+ * The detail of a failed step into the bootloader. A failed pick has nothing
+ * to do with the board; only the touch earns the manual-bootloader hint.
+ */
+export function touchFailureDetail(err: unknown, localize: LocalizeFunc): string {
+  return err instanceof BootloaderTouchError
+    ? withManualBootloaderHint(err, localize)
+    : getErrorMessage(err);
 }

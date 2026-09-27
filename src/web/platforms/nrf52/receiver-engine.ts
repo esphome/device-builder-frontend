@@ -9,17 +9,14 @@ import {
   loadDfuEngine,
   loadDfuPackage,
   NRF52_SERIAL_LOGS,
+  touchFailureDetail,
   withManualBootloaderHint,
 } from "../../../platforms/nrf52/index.js";
 import {
   FLASH_ACTION_KEY,
   RESET_ACTION_KEY,
 } from "../../../platforms/platform-support.js";
-import { getErrorMessage } from "../../../util/error-message.js";
-import {
-  BootloaderTouchError,
-  touchIntoBootloader,
-} from "../../../util/serial-bootloader-touch.js";
+import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";
 import { connectFailureDetail } from "../../../util/serial-open-error.js";
 import {
   type ReceiverEngine,
@@ -39,11 +36,8 @@ function bootloaderStep(localize: LocalizeFunc): ReceiverStep {
       try {
         if (!(await touchIntoBootloader({ onLog: hooks.onLog }))) return "dismissed";
       } catch (err) {
-        // Only the touch earns the manual hint, not a failed pick.
         const detail = connectFailureDetail(err, localize, (e) =>
-          e instanceof BootloaderTouchError
-            ? withManualBootloaderHint(e, localize)
-            : getErrorMessage(e)
+          touchFailureDetail(e, localize)
         );
         hooks.onState(
           "error",

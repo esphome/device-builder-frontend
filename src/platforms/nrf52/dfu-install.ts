@@ -10,8 +10,6 @@ import {
   pickSerialPortOrFail,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import { getErrorMessage } from "../../util/error-message.js";
-import { BootloaderTouchError } from "../../util/serial-bootloader-touch.js";
 import type { HandoffSpec } from "../handoff.js";
 import {
   type BrowserInstall,
@@ -20,7 +18,10 @@ import {
   RESET_ACTION_KEY,
 } from "../platform-support.js";
 import { type DfuPackage, loadDfuEngine, loadDfuPackage } from "./index.js";
-import { withManualBootloaderHint } from "./manual-bootloader-hint.js";
+import {
+  touchFailureDetail,
+  withManualBootloaderHint,
+} from "./manual-bootloader-hint.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -97,12 +98,7 @@ export function nrfDoReset(host: ESPHomeFirmwareInstallDialog): Promise<void> {
       host._step = "nrf-wait";
       host._statusMessage = host._localize("firmware.nrf_step2_title");
     },
-    // A failed pick has nothing to do with the board; only the touch earns
-    // the manual-bootloader hint.
-    failureDetail: (err) =>
-      err instanceof BootloaderTouchError
-        ? withManualBootloaderHint(err, host._localize)
-        : getErrorMessage(err),
+    failureDetail: (err) => touchFailureDetail(err, host._localize),
   });
 }
 
