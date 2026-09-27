@@ -136,6 +136,31 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     expect(editor.inert).toBe(false);
   });
 
+  it("stays held when the YAML was edited again while the reload read it", async () => {
+    const first = deferred<ParsedAutomation[]>();
+    const { editor, inner, api } = await mount({
+      parseDeviceAutomations: vi
+        .fn()
+        .mockReturnValueOnce(first.promise)
+        .mockResolvedValue([parsedEdited()]),
+    });
+    await editByHand(editor);
+    editor.reload();
+    editor.yaml = `${EDITED}\n`;
+    await editor.updateComplete;
+
+    first.resolve([parsedEdited()]);
+    await settled(editor);
+    expect(editor.inert).toBe(true);
+    inner._engine.withValue({ actions: [] });
+    await inner._engine.flushPending();
+    expect(api.upsertAutomation).not.toHaveBeenCalled();
+
+    editor.reload();
+    await settled(editor);
+    expect(editor.inert).toBe(false);
+  });
+
   it("is released when it leaves the page", async () => {
     const { editor } = await mount();
     await editByHand(editor);
@@ -160,6 +185,35 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
 
     editor.yaml = drafts[0];
     await editor.updateComplete;
+
+    expect(editor.inert).toBe(false);
+  });
+
+  it("is released when the edit is taken back to the YAML it wrote", async () => {
+    const { editor, inner } = await mount();
+    const parse = inner._api.parseDeviceAutomations;
+    parse.mockClear();
+    inner._engine._lastSelfWrittenYaml = YAML;
+    await editByHand(editor);
+    expect(editor.inert).toBe(true);
+
+    editor.yaml = YAML;
+    await editor.updateComplete;
+    expect(editor.inert).toBe(false);
+
+    editor.reload();
+    await settled(editor);
+    expect(parse).not.toHaveBeenCalled();
+    expect(editor.inert).toBe(false);
+  });
+
+  it("is released by a reload that has nothing to read", async () => {
+    const { editor, inner } = await mount();
+    await editByHand(editor);
+    inner._engine._lastSelfWrittenYaml = EDITED;
+
+    editor.reload();
+    await settled(editor);
 
     expect(editor.inert).toBe(false);
   });

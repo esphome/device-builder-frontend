@@ -138,7 +138,12 @@ describe("a form change right after a YAML edited outside the form (#1920)", () 
     c.flushPending();
     await c.updateComplete;
     expect(c.yaml).toBe(drafts[0]);
-    expect(inner._valuesStale).toBe(false);
+    const read = inner._values;
+
+    change(c, ["level"], "ERROR");
+
+    expect(inner._values).toEqual({ ...read, level: "ERROR" });
+    expect(inner._values.baud_rate).toBe(read.baud_rate);
   });
 
   it("keeps the values of a change on its way out when the edit lands", async () => {
@@ -147,21 +152,21 @@ describe("a form change right after a YAML edited outside the form (#1920)", () 
 
     await editByHand(c);
 
-    expect(inner._valuesStale).toBe(false);
     change(c, ["baud_rate"], 115200);
     expect(inner._values).toEqual({ level: "DEBUG", baud_rate: 115200 });
   });
 
-  it("is up to date again once the reload has read the values", async () => {
-    const { c, inner } = await mount();
+  it("builds on the values of the reload once it has read them", async () => {
+    const { c, inner, drafts } = await mount();
     await editByHand(c);
-    expect(inner._valuesStale).toBe(true);
 
     c.reload();
     await flush();
     await c.updateComplete;
-
-    expect(inner._valuesStale).toBe(false);
     expect(inner._values).toEqual({ level: "WARN" });
+
+    change(c, ["baud_rate"], 9600);
+    c.flushPending();
+    expect(drafts).toEqual(["logger:\n  level: WARN\n  baud_rate: 9600\n"]);
   });
 });

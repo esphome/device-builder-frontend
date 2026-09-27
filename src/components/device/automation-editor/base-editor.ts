@@ -233,13 +233,13 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       return;
     }
     const id = ++this._hydrateId;
+    const { configuration, yaml } = this;
     try {
       // Pass ``this.yaml`` so the parser sees the user's current
       // draft buffer — without it the post-add hydrate would read
       // the on-disk YAML, miss the just-inserted section, and
       // leave the form empty even though the YAML pane shows the
       // user's input.
-      const { configuration, yaml } = this;
       const parsed = await this._parses.fetch(`${configuration}\0${yaml}`, () =>
         this._api.parseDeviceAutomations(configuration, yaml)
       );
@@ -271,7 +271,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       this._dropStaleTree();
       this._error = formatApiError(err, this._localize, "device.automation_parse_error");
     } finally {
-      if (id === this._hydrateId) this._stale = false;
+      // Not for a YAML edited again since: its own reload is still to come.
+      if (id === this._hydrateId && yaml === this.yaml) this._stale = false;
     }
   }
 
@@ -311,16 +312,15 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       }
     }
     // As ``reload()``: an edit of the form on its way out keeps its tree.
-    if (
-      changed.has("yaml") &&
-      this.hasUpdated &&
-      !this.addMode &&
-      this.location &&
-      this.value !== null &&
-      !this._engine.dirty &&
-      !this._engine.shouldSkipReload()
-    ) {
-      this._stale = true;
+    // An edit taken back leaves the YAML the editor wrote, which no reload
+    // reads, so the hold ends here.
+    if (changed.has("yaml") && this.hasUpdated) {
+      this._stale =
+        !this.addMode &&
+        this.location !== null &&
+        this.value !== null &&
+        !this._engine.dirty &&
+        !this._engine.shouldSkipReload();
     }
     setHeld(this, this._held);
   }
@@ -356,7 +356,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
    */
   public reload(): void {
     if (this.addMode || !this.location) return;
-    if (this._engine.shouldSkipReload()) return;
+    if (this._engine.shouldSkipReload()) {
+      this._stale = false;
+      return;
+    }
     void this._hydrateFromBackend();
   }
 
