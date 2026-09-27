@@ -80,4 +80,16 @@ describe("OfflineClockController", () => {
     expect(repaints()).toBe(61);
     clock.hostDisconnected();
   });
+
+  it("repaints once an hour past a day", () => {
+    const { host, clock } = makeClock(Date.now() - 86_400_000);
+    vi.mocked(host.requestUpdate).mockImplementation(() => clock.hostUpdated());
+
+    vi.advanceTimersByTime(3_599_000);
+    expect(host.requestUpdate).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1000);
+    expect(host.requestUpdate).toHaveBeenCalledTimes(1);
+    clock.hostDisconnected();
+  });
 });

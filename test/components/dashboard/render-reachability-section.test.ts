@@ -119,7 +119,7 @@ describe("renderReachabilitySection — mDNS expiry wiring", () => {
   });
 });
 
-describe("renderReachabilitySection — offline duration row", () => {
+describe("renderReachabilitySection - offline duration row", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);

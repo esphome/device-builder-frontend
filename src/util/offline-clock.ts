@@ -15,7 +15,8 @@ function tick(): void {
 // ``formatDuration``'s granularity; the label is the same within a step.
 function shownStep(seconds: number): number {
   const whole = Math.max(0, Math.floor(seconds));
-  return whole < 60 ? whole : whole - (whole % 60);
+  const unit = whole < 60 ? 1 : whole < 86400 ? 60 : 3600;
+  return whole - (whole % unit);
 }
 
 export class OfflineClockController implements ReactiveController {
