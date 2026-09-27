@@ -125,15 +125,22 @@ describe("startRp2Uf2Install", () => {
     expect(host._api.firmwareDownloadBytes).not.toHaveBeenCalled();
   });
 
-  it("refuses an RP2350 image with the family in the detail", async () => {
+  it("takes an RP2350 image as it takes an RP2040 one", async () => {
     const host = makeHost({ uf2Family: UF2_FAMILY_RP2350_ARM_S });
     await startRp2Uf2Install(asHost(host));
-    expect(host._statusMessage).toBe("firmware.rp2_rp2350_unsupported");
-    expect(host._errorMessage).toContain("0xe48bff59");
+    expect(host._step).toBe("rp2-bootsel");
+    expect(rp2Image.get(asHost(host))?.familyId).toBe(UF2_FAMILY_RP2350_ARM_S);
+  });
+
+  it("refuses an image for a chip that is neither, with the family in the detail", async () => {
+    const host = makeHost({ uf2Family: 0x12345678 });
+    await startRp2Uf2Install(asHost(host));
+    expect(host._statusMessage).toBe("firmware.rp2_bad_uf2");
+    expect(host._errorMessage).toContain("0x12345678");
     expect(rp2Image.get(asHost(host))).toBeNull();
   });
 
-  it("treats a UF2 without a family id as a bad file, not an RP2350 image", async () => {
+  it("treats a UF2 without a family id as a bad file", async () => {
     const host = makeHost();
     vi.mocked(host._api.firmwareDownloadBytes).mockResolvedValue(
       makeUf2Block({ addr: 0x10000000, family: null }).buffer
@@ -225,7 +232,7 @@ describe("rp2DoFlash", () => {
       productId: 0x000f,
     });
     await rp2DoFlash(asHost(host));
-    expect(host._statusMessage).toBe("firmware.rp2_rp2350_device");
+    expect(host._statusMessage).toBe("firmware.rp2_wrong_board");
     expect(mocks.picobootOpen).not.toHaveBeenCalled();
   });
 

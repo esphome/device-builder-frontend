@@ -170,7 +170,8 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   // The shared copy, except where this page's own words fit better: its
-  // reset button has another name, and the image is this page's download.
+  // reset button has another name, the image is this page's download, and
+  // that download is for the one chip.
   private _failureCopy(err: unknown): [string, string] {
     if (!(err instanceof PicoFlashError)) {
       return [this._localize("firmware.rp2_flash_failed"), getErrorMessage(err)];
@@ -178,6 +179,9 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     if (err.kind === "image") {
       const error = getErrorMessage(err.cause);
       return [this._localize("web.pico.install_image_failed", { error }), ""];
+    }
+    if (err.kind === "wrong-board") {
+      return [this._localize("web.pico.install_wrong_board"), ""];
     }
     const { title, detail } = picoFlashFailureCopy(err, this._localize);
     return [

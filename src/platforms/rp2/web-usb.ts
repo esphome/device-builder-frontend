@@ -5,6 +5,7 @@
  */
 import { pickerFailure } from "../../util/picker-activation.js";
 import { isPortPickerCancel } from "../../util/web-serial.js";
+import type { PicoChip } from "./pico-uf2.js";
 
 /** Chromium only; Firefox has no WebUSB. */
 export const isWebUsbSupported = (): boolean => "usb" in navigator;
@@ -64,9 +65,7 @@ export const RP2_SERIAL_PICK: {
   accept: isRp2CdcPort,
 };
 
-export function classifyUsbDevice(
-  device: USBDevice
-): "rp2040" | "rp2350" | "not-bootsel" {
+export function classifyUsbDevice(device: USBDevice): PicoChip | "not-bootsel" {
   if (device.vendorId !== RASPBERRY_PI_USB_VID) return "not-bootsel";
   if (device.productId === RP2040_BOOTSEL_PID) return "rp2040";
   if (device.productId === RP2350_BOOTSEL_PID) return "rp2350";
@@ -81,7 +80,7 @@ export async function getPicobootDevices(): Promise<USBDevice[]> {
 
 /**
  * Chooser limited to RP2 bootloaders, so a Pico still running its app never
- * shows up; an RP2350 is listed so it can be refused with a specific message.
+ * shows up; both chips are listed, and the image decides which one it takes.
  * Returns null when the user dismisses the chooser (same DOMException as the
  * serial picker).
  */

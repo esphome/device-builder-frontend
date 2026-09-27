@@ -126,7 +126,7 @@ export const rp2PicobootReceiverEngine: ReceiverEngine = {
     if (!uf2) {
       return { error: `${localize("firmware.rp2_bad_uf2")} (not a single UF2 part)` };
     }
-    // Parsed for the download too: an RP2350 image is refused either way.
+    // Parsed for the download too: a bad file is refused either way.
     const parsed = parsePicoUf2(uf2);
     if ("key" in parsed) return { error: `${localize(parsed.key)} (${parsed.detail})` };
     const usb = isWebUsbSupported();

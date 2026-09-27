@@ -40,7 +40,10 @@ import { lapsedPick } from "../../../_web-serial.js";
 
 import { makeUsbPort } from "../../_make-web-serial-port.js";
 import { RP2_SERIAL_PICK } from "../../../../src/platforms/rp2/index.js";
-import { PicoFlashError } from "../../../../src/platforms/rp2/rp2-flash.js";
+import {
+  PicoFlashError,
+  PicoWrongBoardError,
+} from "../../../../src/platforms/rp2/rp2-flash.js";
 import { ESPHomeWebInstallPicoDialog } from "../../../../src/web/platforms/rp2/esphome-web-install-pico-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -280,10 +283,11 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     expect(mocks.loadPicoImage).toHaveBeenCalledTimes(2);
     button(el, "command.retry").click();
     await settle(el);
-    mocks.flashPico.mockRejectedValue(new PicoFlashError("rp2350"));
+    mocks.flashPico.mockRejectedValue(new PicoWrongBoardError("rp2350", "rp2040"));
     button(el, "dashboard.install").click();
     await settle(el);
-    expect(card(el).statusMessage).toBe("firmware.rp2_rp2350_device");
+    // This page's own line: its image is for the one chip.
+    expect(card(el).statusMessage).toBe("web.pico.install_wrong_board");
   });
 
   it("names this page's own reset action for a device that is not in BOOTSEL", async () => {

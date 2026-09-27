@@ -3,31 +3,31 @@ import {
   parseUf2Image,
   UF2_FAMILY_RP2040,
   UF2_FAMILY_RP2350_ARM_S,
-  Uf2FamilyError,
   type Uf2Image,
 } from "../../util/uf2.js";
 
+/** The chips PICOBOOT writes, as the backend names them. */
+export const PICO_CHIPS = ["rp2040", "rp2350"] as const;
+export type PicoChip = (typeof PICO_CHIPS)[number];
+
 /** Why a UF2 cannot be written to a Pico: the copy for the user and the detail. */
 export interface PicoUf2Failure {
-  key: "firmware.rp2_rp2350_unsupported" | "firmware.rp2_bad_uf2";
+  key: "firmware.rp2_bad_uf2";
   detail: string;
 }
 
-/**
- * A built UF2 as a Pico image; never throws. Only RP2040 images are
- * flashable from the browser, so an RP2350 one is refused here.
- */
+/** A built UF2 as a Pico image, for either chip; never throws. */
 export function parsePicoUf2(bytes: Uint8Array): { image: Uf2Image } | PicoUf2Failure {
   try {
-    return { image: parseUf2Image(bytes, [UF2_FAMILY_RP2040]) };
-  } catch (err) {
-    // Only a real RP2350 image gets the copy-to-drive advice; a missing or
-    // unknown family is just a bad file.
-    const rp2350 =
-      err instanceof Uf2FamilyError && err.familyId === UF2_FAMILY_RP2350_ARM_S;
     return {
-      key: rp2350 ? "firmware.rp2_rp2350_unsupported" : "firmware.rp2_bad_uf2",
-      detail: getErrorMessage(err),
+      image: parseUf2Image(bytes, [UF2_FAMILY_RP2040, UF2_FAMILY_RP2350_ARM_S]),
     };
+  } catch (err) {
+    return { key: "firmware.rp2_bad_uf2", detail: getErrorMessage(err) };
   }
+}
+
+/** The chip ``image`` was built for, which the board it is written to has to be. */
+export function picoChipOf(image: Uf2Image): PicoChip {
+  return image.familyId === UF2_FAMILY_RP2350_ARM_S ? "rp2350" : "rp2040";
 }

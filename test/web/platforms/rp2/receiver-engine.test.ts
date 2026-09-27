@@ -26,7 +26,10 @@ vi.mock("../../../../src/util/download-text.js", async (importOriginal) => ({
 
 import { recordingHooks as hooks, last } from "../../_receiver-hooks.js";
 import { makeUf2Block } from "../../../_make-uf2-block.js";
-import { PicoFlashError } from "../../../../src/platforms/rp2/rp2-flash.js";
+import {
+  PicoFlashError,
+  PicoWrongBoardError,
+} from "../../../../src/platforms/rp2/rp2-flash.js";
 import { RP2_SERIAL_LOGS } from "../../../../src/platforms/rp2/serial-logs.js";
 import { RP2_SERIAL_PICK } from "../../../../src/platforms/rp2/web-usb.js";
 import { UF2_FAMILY_RP2350_ARM_S } from "../../../../src/util/uf2.js";
@@ -62,11 +65,13 @@ describe("rp2PicobootReceiverEngine", () => {
     );
   });
 
-  it("refuses an RP2350 image, and a file that is no UF2", async () => {
+  it("takes an RP2350 image, and refuses a file that is no UF2", async () => {
     const rp2350 = makeUf2Block({ addr: 0x10000000, family: UF2_FAMILY_RP2350_ARM_S });
-    const refused = await engine.prepare([{ address: 0, data: rp2350 }], false, localize);
-    expect(refused).toMatchObject({
-      error: expect.stringContaining("firmware.rp2_rp2350_unsupported"),
+    const plan = await engine.prepare([{ address: 0, data: rp2350 }], false, localize);
+    if ("error" in plan) throw new Error(plan.error);
+    await plan.run(hooks());
+    expect(mocks.flashPico.mock.calls[0][0]).toMatchObject({
+      familyId: UF2_FAMILY_RP2350_ARM_S,
     });
     const bad = await engine.prepare(
       [{ address: 0, data: new Uint8Array(512) }],
@@ -138,7 +143,6 @@ describe("rp2PicobootReceiverEngine", () => {
 
   it.each([
     ["not-bootsel", "error:firmware.rp2_not_bootsel"],
-    ["rp2350", "error:firmware.rp2_rp2350_device"],
     ["device-lost", "error:firmware.rp2_flash_failed: firmware.rp2_device_lost"],
   ] as const)("names a write that failed as %s", async (kind, line) => {
     const { run } = await prepared();
@@ -146,6 +150,14 @@ describe("rp2PicobootReceiverEngine", () => {
     const h = hooks();
     expect(await run(h)).toBeNull();
     expect(last(h.states)).toBe(line);
+  });
+
+  it("names the board and the image that do not match", async () => {
+    const { run } = await prepared();
+    mocks.flashPico.mockRejectedValue(new PicoWrongBoardError("rp2350", "rp2040"));
+    const h = hooks();
+    expect(await run(h)).toBeNull();
+    expect(last(h.states)).toBe("error:firmware.rp2_wrong_board");
   });
 
   it("names a failure the flash did not, as a failed flash", async () => {

@@ -213,13 +213,14 @@ describe("install-method-dialog platform gating", () => {
     expect(hasNrfDfuRow(d)).toBe(false);
   });
 
-  // One platform, two chips: the row is for the chip the flasher writes, and
-  // a chip the backend could not name is not offered it.
-  it.each([
-    ["rp2", "rp2350"],
-    ["rp2", null],
-  ])("hides the Pico row for %s with chip %s", async (platform, mcu) => {
-    const d = await mount(platform, "install", mcu);
+  // One platform, two chips, both written by the one flasher.
+  it("shows the Pico row for an RP2350", async () => {
+    expect(hasRp2Row(await mount("rp2", "install", "rp2350"))).toBe(true);
+  });
+
+  // A chip the backend could not name is not offered the row.
+  it("hides the Pico row for rp2 with no chip", async () => {
+    const d = await mount("rp2", "install", null);
     expect(hasRp2Row(d)).toBe(false);
     expect(hasServerSerialRow(d)).toBe(true);
   });
@@ -290,9 +291,8 @@ describe("install-method-dialog platform gating", () => {
     expect(selected).toEqual(["web-flash"]);
     expect(hasRp2Row(await mount("rp2"))).toBe(true);
     expect(hasNrfDfuRow(await mount("nrf52"))).toBe(true);
-    // The hand-off row is the same row: not for the RTL8710B or the RP2350.
+    // The hand-off row is the same row: not for the RTL8710B.
     expect(hasRtlRow(await mount("rtl87xx", "install", "rtl8710b"))).toBe(false);
-    expect(hasRp2Row(await mount("rp2", "install", "rp2350"))).toBe(false);
   });
 });
 

@@ -24,7 +24,7 @@ import {
   RESET_ACTION_KEY,
 } from "../platform-support.js";
 import { pickRp2CdcPort } from "./pick-cdc-port.js";
-import { parsePicoUf2 } from "./pico-uf2.js";
+import { parsePicoUf2, PICO_CHIPS } from "./pico-uf2.js";
 import { flashPico, picoFlashFailureCopy } from "./rp2-flash.js";
 import { isWebUsbSupported, RP2_SERIAL_PICK } from "./web-usb.js";
 
@@ -39,10 +39,7 @@ const NO_UF2_KEY = "firmware.no_uf2";
 /** The parsed UF2, kept for Retry. */
 export const rp2Image = new FlashImageSlot<Uf2Image>();
 
-/**
- * Compile, download and parse the UF2, then hand off to the BOOTSEL step.
- * Only RP2040 images are flashable here; an RP2350 UF2 is refused up front.
- */
+/** Compile, download and parse the UF2, then hand off to the BOOTSEL step. */
 export async function startRp2Uf2Install(
   host: ESPHomeFirmwareInstallDialog
 ): Promise<void> {
@@ -130,7 +127,7 @@ export async function rp2DoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   else host._step = "done";
 }
 
-/** Step 2 without WebUSB: save the UF2 for a manual copy onto the RPI-RP2 drive. */
+/** Step 2 without WebUSB: save the UF2 for a manual copy onto the Pico's drive. */
 export function rp2DoDownload(host: ESPHomeFirmwareInstallDialog): void {
   const file = host._binaries[0]?.file;
   if (!file || host._flashBusy) return;
@@ -152,8 +149,8 @@ function bootselFooter(): FlasherFooter {
 const withoutWebUsb = (key: string) => () =>
   isWebUsbSupported() ? key : `${key}_download`;
 
-// Handed whole to web.esphome.io's rp2-picoboot engine; parsed first so an
-// RP2350 image is refused before a tab opens. PICOBOOT erases what it writes.
+// Handed whole to web.esphome.io's rp2-picoboot engine; parsed first so a bad
+// file is refused before a tab opens. PICOBOOT erases what it writes.
 const RP2_PICOBOOT_HANDOFF: HandoffSpec = {
   flasher: "rp2-picoboot",
   erase: false,
@@ -168,8 +165,8 @@ const RP2_PICOBOOT_HANDOFF: HandoffSpec = {
 export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   id: "rp2-uf2",
   methodKey: "rp2_uf2",
-  // The RP2350 is the same platform; its image and BOOTSEL device are refused.
-  chips: ["rp2040"],
+  // The chips PICOBOOT writes; one the backend could not name is not offered.
+  chips: PICO_CHIPS,
   // Only the WebUSB write can end in logs; the UF2 download path never does.
   get holdsPort() {
     return isWebUsbSupported();

@@ -8,6 +8,7 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { formatUsbId } from "../../util/flash-log.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
 import type { Uf2Image } from "../../util/uf2.js";
+import { type PicoChip, picoChipOf } from "./pico-uf2.js";
 import {
   classifyUsbDevice,
   isUsbAccessDenied,
@@ -16,9 +17,12 @@ import {
   requestPicobootDevice,
 } from "./web-usb.js";
 
+// Part numbers, the same in every language.
+const CHIP_NAME: Record<PicoChip, string> = { rp2040: "RP2040", rp2350: "RP2350" };
+
 /** Why the write stopped; ``picoFlashFailureCopy`` has the words. */
 export type PicoFlashFailure =
-  | "rp2350"
+  | "wrong-board"
   | "not-bootsel"
   | "access-denied"
   | "image"
@@ -37,6 +41,16 @@ export class PicoFlashError extends Error {
   }
 }
 
+/** The board that was picked is not the chip the image was built for. */
+export class PicoWrongBoardError extends PicoFlashError {
+  constructor(
+    readonly board: PicoChip,
+    readonly image: PicoChip
+  ) {
+    super("wrong-board");
+  }
+}
+
 export interface PicoFlashHooks {
   onProgress: (percent: number) => void;
   /** One line per step, for a details log. */
@@ -52,8 +66,9 @@ export interface PicoFlashHooks {
  * Pick the RP2 Boot device, open it and write ``image``; the Pico reboots
  * into the firmware afterwards. The chooser runs first, inside the click's
  * activation, so an image still downloading may be handed in as a promise;
- * a rejection is reported as the ``image`` kind. False when the chooser was
- * dismissed or the caller moved on. Throws ``PicoFlashError``.
+ * a rejection is reported as the ``image`` kind. An image for the other chip
+ * is refused unwritten. False when the chooser was dismissed or the caller
+ * moved on. Throws ``PicoFlashError``.
  */
 export async function flashPico(
   image: Uf2Image | Promise<Uf2Image>,
@@ -67,14 +82,13 @@ export async function flashPico(
     throw new PicoFlashError("connect", err);
   }
   if (!usb || cancelled()) return false;
-  // The image is RP2040-only, so an RP2350 here is the wrong board, not an
-  // unsupported image.
-  const kind = classifyUsbDevice(usb);
-  if (kind !== "rp2040")
-    throw new PicoFlashError(kind === "rp2350" ? "rp2350" : "not-bootsel");
+  const board = classifyUsbDevice(usb);
+  if (board === "not-bootsel") throw new PicoFlashError("not-bootsel");
   const uf2 = await Promise.resolve(image).catch((err: unknown) => {
     throw new PicoFlashError("image", err);
   });
+  const chip = picoChipOf(uf2);
+  if (chip !== board) throw new PicoWrongBoardError(board, chip);
   const { PicobootDevice, flashUf2 } = await loadPicoboot().catch((err: unknown) => {
     throw new PicoFlashError("connect", err);
   });
@@ -113,9 +127,16 @@ export function picoFlashFailureCopy(
   if (!(err instanceof PicoFlashError)) {
     return { title: localize("firmware.rp2_flash_failed"), detail: getErrorMessage(err) };
   }
+  if (err instanceof PicoWrongBoardError) {
+    return {
+      title: localize("firmware.rp2_wrong_board", {
+        board: CHIP_NAME[err.board],
+        image: CHIP_NAME[err.image],
+      }),
+      detail: "",
+    };
+  }
   switch (err.kind) {
-    case "rp2350":
-      return { title: localize("firmware.rp2_rp2350_device"), detail: "" };
     case "not-bootsel":
       return { title: localize("firmware.rp2_not_bootsel"), detail: "" };
     case "access-denied":
@@ -138,6 +159,8 @@ export function picoFlashFailureCopy(
         title: localize("firmware.rp2_flash_failed"),
         detail: localize("firmware.rp2_device_lost"),
       };
+    // The pair is named above; the bare kind has nothing more to say.
+    case "wrong-board":
     case "flash":
       return {
         title: localize("firmware.rp2_flash_failed"),

@@ -257,15 +257,27 @@ describe("startUsbFlash artifact", () => {
     expect(host._step).toBe("download-ready");
   });
 
-  it("refuses an RP2350 image in the dashboard, before any flasher tab is offered", async () => {
+  it("sends the UF2 for an RP2350 the same way", async () => {
+    const host = flowHost("rp2040", "rp2350");
+    const bytes = makeUf2Block({ addr: 0x10000000, family: UF2_FAMILY_RP2350_ARM_S });
+    steps.downloadBuildArtifact.mockResolvedValue({
+      binary: { file: "firmware.uf2", title: "UF2" },
+      bytes,
+    });
+    await startUsbFlash(asHost(host));
+    expect(host._usbFirmware).toBe(bytes.buffer);
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("refuses a file that is no Pico UF2 in the dashboard, before any flasher tab is offered", async () => {
     const host = flowHost("rp2040", "rp2040");
     steps.downloadBuildArtifact.mockResolvedValue({
       binary: { file: "firmware.uf2", title: "UF2" },
-      bytes: makeUf2Block({ addr: 0x10000000, family: UF2_FAMILY_RP2350_ARM_S }),
+      bytes: makeUf2Block({ addr: 0x10000000, family: 0x12345678 }),
     });
     await startUsbFlash(asHost(host));
     expect(host._step).toBe("error");
-    expect(host._statusMessage).toBe("firmware.rp2_rp2350_unsupported");
+    expect(host._statusMessage).toBe("firmware.rp2_bad_uf2");
     expect(host._usbFirmware).toBeNull();
   });
 
@@ -282,7 +294,6 @@ describe("startUsbFlash artifact", () => {
   it.each([
     ["rtl87xx", "rtl8710b"],
     ["rtl87xx", null],
-    ["rp2040", "rp2350"],
     ["rp2040", null],
   ])("refuses %s with chip %s before the build", async (platform, mcu) => {
     const host = flowHost(platform, mcu);

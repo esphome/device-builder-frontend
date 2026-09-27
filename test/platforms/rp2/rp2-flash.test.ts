@@ -15,10 +15,13 @@ import {
   flashPico,
   PicoFlashError,
   picoFlashFailureCopy,
+  PicoWrongBoardError,
 } from "../../../src/platforms/rp2/rp2-flash.js";
-import { UF2_FAMILY_RP2040 } from "../../../src/util/uf2.js";
+import { UF2_FAMILY_RP2040, UF2_FAMILY_RP2350_ARM_S } from "../../../src/util/uf2.js";
 
 const image = { familyId: UF2_FAMILY_RP2040, ranges: [], totalBytes: 0 };
+const image2350 = { familyId: UF2_FAMILY_RP2350_ARM_S, ranges: [], totalBytes: 0 };
+const RP2350_PID = 0x000f;
 const bootsel = (productId = 0x0003) => ({ vendorId: 0x2e8a, productId }) as USBDevice;
 const engine = (open: () => Promise<unknown>, flashUf2 = vi.fn(async () => {})) =>
   mocks.loadPicoboot.mockResolvedValue({ PicobootDevice: { open }, flashUf2 });
@@ -103,17 +106,44 @@ describe("flashPico", () => {
     expect(flashUf2).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { name: "an RP2350 bootloader", device: bootsel(0x000f), kind: "rp2350" },
-    {
-      name: "a device not in BOOTSEL",
-      device: { vendorId: 1, productId: 1 },
-      kind: "not-bootsel",
-    },
-  ])("refuses $name before opening it", async ({ device, kind }) => {
-    mocks.requestPicobootDevice.mockResolvedValue(device);
+  it("refuses a device not in BOOTSEL before opening it", async () => {
+    mocks.requestPicobootDevice.mockResolvedValue({ vendorId: 1, productId: 1 });
     await expect(flashPico(image, { onProgress: () => {} })).rejects.toMatchObject({
-      kind,
+      kind: "not-bootsel",
+    });
+    expect(mocks.loadPicoboot).not.toHaveBeenCalled();
+  });
+
+  it("writes an RP2350 image to an RP2350", async () => {
+    const dev = { close: vi.fn(async () => {}) };
+    const flashUf2 = vi.fn(async () => {});
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel(RP2350_PID));
+    engine(async () => dev, flashUf2);
+    await expect(flashPico(image2350, { onProgress: () => {} })).resolves.toBe(true);
+    expect(flashUf2).toHaveBeenCalledWith(dev, image2350, expect.anything());
+  });
+
+  it.each([
+    {
+      name: "an RP2040 image on an RP2350",
+      uf2: image,
+      pid: RP2350_PID,
+      board: "rp2350",
+      chip: "rp2040",
+    },
+    {
+      name: "an RP2350 image on an RP2040",
+      uf2: image2350,
+      pid: 0x0003,
+      board: "rp2040",
+      chip: "rp2350",
+    },
+  ])("refuses $name before opening it", async ({ uf2, pid, board, chip }) => {
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel(pid));
+    await expect(flashPico(uf2, { onProgress: () => {} })).rejects.toMatchObject({
+      kind: "wrong-board",
+      board,
+      image: chip,
     });
     expect(mocks.loadPicoboot).not.toHaveBeenCalled();
   });
@@ -155,9 +185,13 @@ describe("flashPico", () => {
 describe("picoFlashFailureCopy", () => {
   it("pairs each failure with the dashboard's title and detail", () => {
     const cause = new Error("why");
-    expect(picoFlashFailureCopy(new PicoFlashError("rp2350"), localize)).toEqual({
-      title: "firmware.rp2_rp2350_device",
-      detail: "",
+    const named = vi.fn((key: string) => key);
+    expect(
+      picoFlashFailureCopy(new PicoWrongBoardError("rp2350", "rp2040"), named)
+    ).toEqual({ title: "firmware.rp2_wrong_board", detail: "" });
+    expect(named).toHaveBeenCalledWith("firmware.rp2_wrong_board", {
+      board: "RP2350",
+      image: "RP2040",
     });
     expect(
       picoFlashFailureCopy(new PicoFlashError("device-lost", cause), localize)
