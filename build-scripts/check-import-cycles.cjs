@@ -19,10 +19,11 @@ const path = require("path");
 const SRC_DIR = path.join(__dirname, "..", "src");
 
 // A static import or re-export with a relative source, or a side-effect
-// import. Group 1: the `type` keyword; 2: what is imported; 3 and 4: the
+// import. Indentation is allowed: a statement keeps the blank a stripped
+// comment leaves in front of it. Group 1: the `type` keyword; 2: what is imported; 3 and 4: the
 // source.
 const STATEMENT =
-  /^(?:import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*["'](\.[^"']+)["']|^import\s+["'](\.[^"']+)["']/gm;
+  /^[ \t]*(?:import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*["'](\.[^"']+)["']|^[ \t]*import\s+["'](\.[^"']+)["']/gm;
 // Comments that start a line, which is where a commented-out import sits.
 // Anchored so a `/*` inside a string ("image/*", a glob) cannot swallow the
 // imports after it.

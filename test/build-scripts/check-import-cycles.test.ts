@@ -46,6 +46,20 @@ describe("runtimeImports", () => {
       )
     ).toEqual([]);
   });
+  it("reads an import behind a comment on its own line, and an indented one", async () => {
+    const { runtimeImports } = await load();
+    expect(
+      runtimeImports(
+        [
+          '/* generated */ import { value } from "./value.js";',
+          '  import "./indented.js";',
+          '  const lazy = import("./lazy.js");',
+          '  import("./bare-lazy.js");',
+        ].join("\n")
+      )
+    ).toEqual(["./value.js", "./indented.js"]);
+  });
+
   it("reads a specifier list with a comment after a name", async () => {
     const { runtimeImports } = await load();
     expect(
