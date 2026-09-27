@@ -22,11 +22,11 @@ vi.mock("../../src/platforms/boot-banner.js", async (importOriginal) => ({
   readBootBanner: banner.readBootBanner,
 }));
 
-import {
-  BannerOpenTimeoutError,
-  BannerTeardownError,
-} from "../../src/platforms/boot-banner.js";
 import { detectBoard } from "../../src/platforms/detect-board.js";
+import {
+  SerialOpenTimeoutError,
+  SerialPortHeldError,
+} from "../../src/util/serial-open-error.js";
 import { makeUsbPort as port } from "../web/_make-web-serial-port.js";
 
 beforeEach(() => {
@@ -126,13 +126,13 @@ describe("detectBoard", () => {
   });
 
   it("does not hand on a port whose open never came back, or that would not release", async () => {
-    banner.readBootBanner.mockRejectedValueOnce(new BannerOpenTimeoutError(3000));
+    banner.readBootBanner.mockRejectedValueOnce(new SerialOpenTimeoutError(3000));
     await expect(detectBoard(port(0x1a86, 0x7523))).rejects.toBeInstanceOf(
-      BannerOpenTimeoutError
+      SerialOpenTimeoutError
     );
-    banner.readBootBanner.mockRejectedValueOnce(new BannerTeardownError());
+    banner.readBootBanner.mockRejectedValueOnce(new SerialPortHeldError());
     await expect(detectBoard(port(0x1a86, 0x7523))).rejects.toBeInstanceOf(
-      BannerTeardownError
+      SerialPortHeldError
     );
     expect(engine.connectToPort).not.toHaveBeenCalled();
   });

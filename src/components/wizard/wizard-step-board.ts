@@ -14,6 +14,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { type DeploymentEnvironment, detectEnvironment } from "../../util/environment.js";
 import { fireEvent } from "../../util/fire-event.js";
+import { notifyInfo } from "../../util/notify.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { namedConnectFailure } from "../../util/serial-open-error.js";
@@ -312,6 +313,11 @@ export class ESPHomeWizardStepBoard extends LitElement {
    * when a device could not be told at all, since the user asked (#1856).
    */
   private async _landDetection(detection: BoardDetection): Promise<void> {
+    // The port would not release after the banner read: the board is still
+    // named, but it has to be replugged before anything opens the port again.
+    if (detection.kind === "named" && detection.portHeld) {
+      notifyInfo(this._localize("serial.port_held"));
+    }
     const landing = await resolveDetection(this._api, detection);
     if ("board" in landing) {
       this._onAdd(landing.board);

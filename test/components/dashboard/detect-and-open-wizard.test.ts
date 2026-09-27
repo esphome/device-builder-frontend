@@ -221,4 +221,17 @@ describe("detectAndOpenWizard", () => {
       expect.anything()
     );
   });
+
+  it("says a board on a port that would not release must be replugged, and still lands on it", async () => {
+    const dialog = makeDialog();
+    banner.readBootBanner.mockResolvedValueOnce({ board: "bw15", portHeld: true });
+    const bw15 = { id: "bw15", name: "BW15" };
+    const api = { getBoard: vi.fn(async () => bw15) };
+    await detectAndOpenWizard(api as unknown as ESPHomeAPI, dialog, {
+      port: makeUsbPort(0x1a86, 0x7523),
+      localize,
+    });
+    expect(toast.info).toHaveBeenCalledWith("serial.port_held", expect.anything());
+    expect(dialog.openWithBoard).toHaveBeenCalledWith(bw15);
+  });
 });

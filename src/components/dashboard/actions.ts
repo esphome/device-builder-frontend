@@ -361,6 +361,11 @@ export async function detectAndOpenWizard(
     }
   }
 
+  // The port would not release after the banner read: the board is still
+  // named, but it has to be replugged before anything opens the port again.
+  if (detection.kind === "named" && detection.portHeld && options.localize) {
+    notifyInfo(options.localize("serial.port_held"));
+  }
   // The board it named, else the picker narrowed to what was found (a
   // platform from the USB ids or the banner, neither of which ran esptool,
   // which would sit on a Pico's CDC waiting for a ROM loader, #1856; the

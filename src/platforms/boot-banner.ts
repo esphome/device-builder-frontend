@@ -6,7 +6,11 @@
  * lines in the table (#1866). The Device Builder's detect reads it; nothing
  * here touches the DOM or an engine, so ESPHome Web can share it.
  */
-import { openSerialPort } from "../util/serial-open-error.js";
+import {
+  openSerialPort,
+  SerialOpenTimeoutError,
+  SerialPortHeldError,
+} from "../util/serial-open-error.js";
 import { settledWithin, withDeadline } from "../util/with-deadline.js";
 
 /** What a banner said: the platform (``"esp"`` means run esptool), its chip
@@ -15,6 +19,8 @@ export interface BootBannerMatch {
   platform?: string;
   mcu?: string;
   board?: string;
+  /** The port could not be released after the read; it stays held until replugged. */
+  portHeld?: boolean;
 }
 
 /** The ROM's own lines arrive within a few hundred ms; LibreTiny's banner
@@ -77,12 +83,13 @@ const isSettled = (hit: BootBannerMatch | null): boolean =>
  * up to ``BOOT_BANNER_MS``, stopping early once the text is conclusive. The
  * port is opened here and closed after, all under one deadline. Resolves
  * what the text named, or null. Rejects when the port cannot be opened
- * (marked, so the copy can say it is held elsewhere), when the whole thing
- * outlives its deadline, or when the port could not be released afterwards
- * and nothing was found: the caller must not hand it on then, since the next
- * open fails and its copy would blame another program. After the deadline
- * the abandoned read touches the port no further than closing what it
- * opened late: esptool may have it by then.
+ * (marked, so the copy can say it is held elsewhere), when it had not
+ * opened by the deadline (``SerialOpenTimeoutError``: the caller must not
+ * hand it on, since nobody else can open it either and the abandoned
+ * session closes it should it open late), when the whole read outlives the
+ * deadline, or when the port could not be released afterwards and nothing
+ * was found (``SerialPortHeldError``: the next open fails and its copy would
+ * blame another program).
  */
 export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch | null> {
   const session: BannerSession = { abandoned: false, opened: false };
@@ -96,7 +103,7 @@ export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch 
         session.abandoned = true;
         return session.opened
           ? new Error(`Boot banner not read in ${BOOT_BANNER_DEADLINE_MS} ms`)
-          : new BannerOpenTimeoutError(BOOT_BANNER_DEADLINE_MS);
+          : new SerialOpenTimeoutError(BOOT_BANNER_DEADLINE_MS);
       }
     );
   } catch (err) {
@@ -105,31 +112,12 @@ export async function readBootBanner(port: SerialPort): Promise<BootBannerMatch 
   const released = session.opened ? await teardown(port, session) : true;
   // A port still held outranks whatever else went wrong: with nothing found
   // it would go to esptool next, which must not happen. A board the banner
-  // named is a result whatever the port did afterwards.
+  // named is a result whatever the port did afterwards, marked so the caller
+  // can say the board must be replugged before it is flashed.
   const named = hit !== null && hit.platform !== "esp";
-  if (!released && !named) throw new BannerTeardownError();
+  if (!released && !named) throw new SerialPortHeldError();
   if (failure !== undefined) throw failure;
-  return hit;
-}
-
-/**
- * The port had not opened by the deadline. Nobody else can open it either
- * while that open is pending, and the abandoned session closes it should it
- * open late, so the caller must not hand the port on.
- */
-export class BannerOpenTimeoutError extends Error {
-  constructor(deadlineMs: number) {
-    super(`The serial port did not open in ${Math.round(deadlineMs / 1000)} s`);
-    this.name = "BannerOpenTimeoutError";
-  }
-}
-
-/** The port could not be released after the read; it stays held until replugged. */
-export class BannerTeardownError extends Error {
-  constructor() {
-    super("The serial port could not be released after reading the boot banner");
-    this.name = "BannerTeardownError";
-  }
+  return released ? hit : { ...hit, portHeld: true };
 }
 
 interface BannerSession {

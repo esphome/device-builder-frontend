@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  BannerOpenTimeoutError,
-  BannerTeardownError,
   BOOT_BANNER_MS,
   matchBootBanner,
   readBootBanner,
 } from "../../src/platforms/boot-banner.js";
+import {
+  SerialOpenTimeoutError,
+  SerialPortHeldError,
+} from "../../src/util/serial-open-error.js";
 
 // Captured on the bench (#1866): a plain RTS pulse with DTR released, 115200.
 const RTL_PLAIN = `
@@ -231,7 +233,7 @@ describe("readBootBanner", () => {
     raw.close.mockImplementation(() => new Promise<void>(() => {}));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pending = readBootBanner(port);
-    const assertion = expect(pending).rejects.toBeInstanceOf(BannerTeardownError);
+    const assertion = expect(pending).rejects.toBeInstanceOf(SerialPortHeldError);
     await vi.advanceTimersByTimeAsync(5000);
     await assertion;
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("did not close"));
@@ -263,7 +265,7 @@ describe("readBootBanner", () => {
     raw.close.mockRejectedValue(new DOMException("stuck", "InvalidStateError"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pending = readBootBanner(port);
-    const assertion = expect(pending).rejects.toBeInstanceOf(BannerTeardownError);
+    const assertion = expect(pending).rejects.toBeInstanceOf(SerialPortHeldError);
     await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
     await assertion;
     warn.mockRestore();
@@ -274,7 +276,7 @@ describe("readBootBanner", () => {
     raw.close.mockRejectedValue(new DOMException("stuck", "InvalidStateError"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const pending = readBootBanner(port);
-    const assertion = expect(pending).rejects.toBeInstanceOf(BannerTeardownError);
+    const assertion = expect(pending).rejects.toBeInstanceOf(SerialPortHeldError);
     await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
     await assertion;
     // A board that named itself is still a result.
@@ -282,7 +284,7 @@ describe("readBootBanner", () => {
     found.raw.close.mockRejectedValue(new DOMException("stuck", "InvalidStateError"));
     const p2 = readBootBanner(found.port);
     await vi.advanceTimersByTimeAsync(BOOT_BANNER_MS + 10);
-    expect((await p2)?.board).toBe("bw15");
+    expect(await p2).toMatchObject({ board: "bw15", portHeld: true });
     warn.mockRestore();
   });
 
@@ -291,7 +293,7 @@ describe("readBootBanner", () => {
     let openLate: () => void = () => {};
     raw.open.mockImplementationOnce(() => new Promise<void>((r) => (openLate = r)));
     const pending = readBootBanner(port);
-    const assertion = expect(pending).rejects.toBeInstanceOf(BannerOpenTimeoutError);
+    const assertion = expect(pending).rejects.toBeInstanceOf(SerialOpenTimeoutError);
     await vi.advanceTimersByTimeAsync(3000);
     await assertion;
     expect(raw.close).not.toHaveBeenCalled();

@@ -1,3 +1,7 @@
+import {
+  SerialOpenTimeoutError,
+  SerialPortHeldError,
+} from "../util/serial-open-error.js";
 /**
  * The Device Builder's board detection behind "Set it up" and the wizard's
  * "Connect your board": pick a port when none is in hand, say what the port
@@ -5,12 +9,7 @@
  * run the ESP detect only where an ESP can be.
  */
 import { requestSerialPort } from "../util/web-serial.js";
-import {
-  BannerOpenTimeoutError,
-  BannerTeardownError,
-  type BootBannerMatch,
-  readBootBanner,
-} from "./boot-banner.js";
+import { type BootBannerMatch, readBootBanner } from "./boot-banner.js";
 import { type DetectedBoard, detectEspBoard, preloadEsptool } from "./esp/index.js";
 import { mayCarryEsp, portFamily } from "./port-family.js";
 
@@ -67,7 +66,7 @@ export async function detectBoard(
     // next open would fail with copy that blames another program.
     preloadEsptool();
     const hit = await readBootBanner(port).catch((err: unknown) => {
-      if (err instanceof BannerOpenTimeoutError || err instanceof BannerTeardownError)
+      if (err instanceof SerialOpenTimeoutError || err instanceof SerialPortHeldError)
         throw err;
       console.warn("[detect] Could not read the boot banner:", err);
       return null;
