@@ -13,9 +13,7 @@ export const isStatusUntracked = (
   nameAddMacSuffix: boolean
 ): boolean => nameAddMacSuffix && state !== DeviceState.ONLINE;
 
-/** Seconds the device has been offline, or `null` when no duration
- *  applies: it isn't OFFLINE, the verdict is untracked, or the backend
- *  has no `offline_since` for it. */
+/** Seconds offline, or `null` when no duration applies. */
 export const offlineSeconds = (
   state: DeviceState,
   nameAddMacSuffix: boolean,

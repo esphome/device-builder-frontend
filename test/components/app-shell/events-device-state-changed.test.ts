@@ -71,7 +71,6 @@ describe("handleEvent DEVICE_STATE_CHANGED", () => {
 
     dispatch(host, "kitchen.yaml", DeviceState.ONLINE, null);
 
-    // Otherwise the next outage renders the previous one's duration.
     expect(host._devices[0].runtime_state.offline_since).toBeNull();
   });
 });

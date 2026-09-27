@@ -77,7 +77,6 @@ export class ESPHomeDeviceCard extends LitElement {
   _localize: LocalizeFunc = (key) => key;
   @consume({ context: labelsContext, subscribe: true }) @state() _labelCatalog: Label[] =
     [];
-  // Mirrors ``runtime_state.offline_since``.
   @property({ attribute: false }) offlineSince: number | null = null;
 
   get _offlineSeconds(): number | null {

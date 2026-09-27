@@ -127,7 +127,6 @@ export function renderEncryptionIcon(
     <wa-tooltip for="ind-encryption">${tooltip}</wa-tooltip>`;
 }
 
-/** "Offline", or "Offline 2h" once the backend knows when it went away. */
 function offlineLabel(card: ESPHomeDeviceCard): string {
   const seconds = card._offlineSeconds;
   if (seconds === null) return card._localize("dashboard.offline");

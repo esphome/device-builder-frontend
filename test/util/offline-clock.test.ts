@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeHost } from "../_fake-host.js";
 import { OfflineClockController } from "../../src/util/offline-clock.js";
 
-// A host showing a duration that started *since* (epoch ms), or none.
 function makeClock(since: number | null = Date.now()) {
   const host = fakeHost();
   const shown = { since };
@@ -42,7 +41,7 @@ describe("OfflineClockController", () => {
   it("leaves when the host stops showing a duration", () => {
     const { host, clock, shown } = makeClock();
 
-    // Device came back: the host re-renders without a duration.
+    // Device came back.
     shown.since = null;
     clock.hostUpdated();
 

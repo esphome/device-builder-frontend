@@ -276,8 +276,7 @@ export interface DeviceEventData {
 export interface DeviceStateChangedEventData {
   configuration: string;
   state: DeviceState;
-  /** Mirrors ``runtime_state.offline_since``; carried on the narrow event so
-   *  folding it can't keep a previous outage's anchor or miss a fresh one. */
+  /** Mirrors ``runtime_state.offline_since``. */
   offline_since: number | null;
 }
 

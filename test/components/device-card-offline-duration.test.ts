@@ -1,8 +1,5 @@
 /**
  * @vitest-environment happy-dom
- *
- * The offline pill's duration suffix: shown once the backend knows when the
- * device went away, and ticking without a fresh listing.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -19,8 +16,7 @@ function badgeText(el: HTMLElement): string {
 
 const nowSeconds = () => Date.now() / 1000;
 
-// The default stub returns the key and drops params; the duration is
-// interpolated into the localized string, so echo the values instead.
+// The default stub drops params; echo them so the duration is visible.
 const localize = (key: string, values?: Record<string, string | number>) =>
   values === undefined ? key : `${key}:${Object.values(values).join(",")}`;
 
@@ -66,7 +62,6 @@ describe("device-card offline duration", () => {
     });
     expect(badgeText(el)).toContain("30s");
 
-    // The shared clock repaints the card; nothing re-sends the device.
     await vi.advanceTimersByTimeAsync(61_000);
     await el.updateComplete;
     expect(badgeText(el)).toContain("1m");
@@ -83,11 +78,10 @@ describe("device-card offline duration", () => {
     expect(badgeText(el)).toContain("2h");
 
     await vi.advanceTimersByTimeAsync(600_000);
-    // Same absolute stamp re-delivered, as a fresh listing would.
+    // As a fresh listing would re-deliver it.
     el.offlineSince = since;
     await el.updateComplete;
 
-    // 2h10m, not back to 2h: the value is absolute, not an age plus anchor.
     expect(badgeText(el)).toContain("2h 10m");
   });
 });

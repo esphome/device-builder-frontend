@@ -81,9 +81,8 @@ export function renderReachabilitySection(
   ];
   const anySignal = rows.some((row) => row.age !== null);
 
-  // Independent of the per-source rows: a device asleep since before the
-  // dashboard started has no per-source ages at all, which is exactly when
-  // "how long has it been gone" is the only thing worth showing.
+  // Not a per-source row: those are all absent for a device that has been
+  // unreachable since before the dashboard started.
   const device = host.device;
   const offlineFor = device
     ? offlineSeconds(
