@@ -3,7 +3,9 @@
  *
  * The error-screen Retry bypasses the page-level seam guards, so it waits
  * out a foreign running build (never claiming it) before re-running the
- * install flow (#1202).
+ * install flow (#1202). The Web Serial install is the exception: its port
+ * picker needs the click, so it starts at once and waits before its compile
+ * (#1893).
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -44,7 +46,7 @@ function makeDialog(busy: boolean) {
   });
   Object.assign(dialog, {
     _device: { configuration: "device.yaml" } as ConfiguredDevice,
-    _installer: "web-serial",
+    _installer: "web-flash",
     _step: "error",
     _log: failedRunLog(),
     _localize: identityLocalize,
@@ -60,10 +62,10 @@ function makeDialog(busy: boolean) {
 
 describe("install-dialog Retry while a foreign build runs", () => {
   it("waits out the running job (without claiming it), then retries", async () => {
-    const { dialog, followJob, installWebSerial } = makeDialog(true);
+    const { dialog, followJob, installUsbFlash } = makeDialog(true);
     await dialog._retry();
     expect(followJob).toHaveBeenCalledWith("foreign-1", expect.anything());
-    expect(installWebSerial).toHaveBeenCalledTimes(1);
+    expect(installUsbFlash).toHaveBeenCalledTimes(1);
     // Never claims the foreign job: dismissal must not cancel it.
     expect(dialog._jobId).toBe("");
     // The failed run's log was dropped, not concatenated with the wait's.
@@ -77,16 +79,20 @@ describe("install-dialog Retry while a foreign build runs", () => {
     expect(reset).toHaveBeenCalled();
   });
 
-  it("routes a web-flash retry through the USB flow after the wait", async () => {
-    const { dialog, installUsbFlash, installWebSerial } = makeDialog(true);
-    dialog._installer = "web-flash";
-    await dialog._retry();
-    expect(installUsbFlash).toHaveBeenCalledTimes(1);
-    expect(installWebSerial).not.toHaveBeenCalled();
+  it("starts a Web Serial retry in the click, leaving the wait to the install", () => {
+    const { dialog, followJob, installUsbFlash, installWebSerial } = makeDialog(true);
+    dialog._installer = "web-serial";
+    // Not awaited: the install asks for the port before the click's turn ends.
+    void dialog._retry();
+    expect(installWebSerial).toHaveBeenCalledTimes(1);
+    expect(followJob).not.toHaveBeenCalled();
+    expect(installUsbFlash).not.toHaveBeenCalled();
+    // The failed run's log is the install's to drop, as on any start.
+    expect(dialog._step).toBe("error");
   });
 
   it("fails with the install message and does not retry on a stream error", async () => {
-    const { dialog, followJob, installWebSerial } = makeDialog(true);
+    const { dialog, followJob, installUsbFlash } = makeDialog(true);
     followJob.mockImplementationOnce((_id: string, cbs: FollowCbs) => {
       cbs.onError?.("stream lost");
       return "s1";
@@ -94,23 +100,23 @@ describe("install-dialog Retry while a foreign build runs", () => {
     await dialog._retry();
     expect(dialog._step).toBe("error");
     expect(dialog._statusMessage).toBe("firmware.install_failed");
-    expect(installWebSerial).not.toHaveBeenCalled();
+    expect(installUsbFlash).not.toHaveBeenCalled();
   });
 
   it("bails when dismissed mid-wait", async () => {
-    const { dialog, followJob, installWebSerial } = makeDialog(true);
+    const { dialog, followJob, installUsbFlash } = makeDialog(true);
     followJob.mockImplementationOnce(() => "s1"); // never completes
     const flow = dialog._retry();
     expect(dialog._compileReject).not.toBeNull();
     dialog._compileReject!(new Error("Install dialog dismissed"));
     await flow;
-    expect(installWebSerial).not.toHaveBeenCalled();
+    expect(installUsbFlash).not.toHaveBeenCalled();
   });
 
   it("retries immediately when nothing is running", async () => {
-    const { dialog, followJob, installWebSerial } = makeDialog(false);
+    const { dialog, followJob, installUsbFlash } = makeDialog(false);
     await dialog._retry();
     expect(followJob).not.toHaveBeenCalled();
-    expect(installWebSerial).toHaveBeenCalledTimes(1);
+    expect(installUsbFlash).toHaveBeenCalledTimes(1);
   });
 });

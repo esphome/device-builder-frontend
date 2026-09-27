@@ -470,6 +470,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _retry = async () => {
     const device = this._device;
     if (!device) return;
+    // The Web Serial install asks for the port first, which needs this click;
+    // it waits out a foreign build itself, before it compiles (#1893).
+    if (this._installer !== "web-flash" && !this._flasher) {
+      this.installWebSerial(device);
+      return;
+    }
     // A foreign build may have started while the error screen sat open;
     // Retry bypasses the page-level seam guards, so re-running now would
     // supersede it (#1202). Wait it out like the download flow instead.
@@ -489,9 +495,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       );
       if (!settled) return;
     }
-    if (this._installer === "web-flash") this.installUsbFlash(device);
-    else if (this._flasher) this._retryFlasher(this._flasher, device);
-    else this.installWebSerial(device);
+    if (this._flasher) this._retryFlasher(this._flasher, device);
+    else this.installUsbFlash(device);
   };
 
   // A failed reset or flash (device dropped mid-transfer, wrong port picked)
