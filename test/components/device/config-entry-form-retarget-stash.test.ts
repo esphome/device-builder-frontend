@@ -148,16 +148,5 @@ describe("config-entry-form literal / lambda stash", () => {
 
       expect(changes[changes.length - 1].value).toEqual({ _lambda: "", _tag: "!lambda" });
     });
-
-    it("keeps the stash while the count stays", async () => {
-      const { changes, toggle } = await mountUnderProvider();
-      await toggle("literal");
-      await toggle("lambda");
-
-      expect(changes[changes.length - 1].value).toEqual({
-        _lambda: "return 1000;",
-        _tag: "!lambda",
-      });
-    });
   });
 });

@@ -66,11 +66,6 @@ describe("RowKeys", () => {
     expect(keysOf(keys, replaceAt(rows, 0, row("other kind")))).toEqual([a, b, c]);
   });
 
-  it("keeps keys by position when every row is re-parsed", () => {
-    const { keys, a, b, c } = seeded("a", "b", "c");
-    expect(keysOf(keys, [row("a"), row("b"), row("c")])).toEqual([a, b, c]);
-  });
-
   it("gives a row added above the others a new key, not the one its index had", () => {
     const { keys, rows, a, b, c } = seeded("a", "b", "c");
     const next = keysOf(keys, [row("d"), ...rows]);
@@ -106,6 +101,24 @@ describe("RowKeys", () => {
 
   describe("a list read again, every row a new object", () => {
     const reread = (...names: string[]) => names.map(row);
+
+    it("keeps every key when nothing changed", () => {
+      const { keys, a, b, c } = seeded("a", "b", "c");
+      expect(keysOf(keys, reread("a", "b", "c"))).toEqual([a, b, c]);
+    });
+
+    it("knows a row whose fields come in another order", () => {
+      const keys = new RowKeys<object>();
+      const [a, b] = keys.keysFor([
+        { kind: "delay", params: { id: "1s", extra: true } },
+        { kind: "delay", params: { id: "2s" } },
+      ]);
+      const next = keys.keysFor([
+        { kind: "delay", params: { id: "2s" } },
+        { params: { extra: true, id: "1s" }, kind: "delay" },
+      ]);
+      expect(next).toEqual([b, a]);
+    });
 
     it("keeps the rows' keys when a row is added above them", () => {
       const { keys, a, b, c } = seeded("a", "b", "c");

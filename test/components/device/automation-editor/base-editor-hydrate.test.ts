@@ -212,35 +212,88 @@ describe("base editor relocation hydrate", () => {
     const reads = (editor: ESPHomeScriptEditor): number => (editor as any)._valuesRead;
     const EDITED = "script:\n  - id: a # by hand\n";
 
-    it("counts a YAML edited outside the editor, and again the tree read from it", async () => {
-      const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
-      const { editor } = await mountAt("a", parse);
-      const before = reads(editor);
-
-      (editor as any).yaml = EDITED;
+    async function outsideEdit(editor: ESPHomeScriptEditor, yaml: string) {
+      (editor as any).yaml = yaml;
       await editor.updateComplete;
-      expect(reads(editor)).toBe(before + 1);
+    }
 
+    async function reloaded(editor: ESPHomeScriptEditor) {
       editor.reload();
       await flushMicrotasks(5);
       await editor.updateComplete;
+    }
+
+    async function mounted() {
+      const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
+      const { editor } = await mountAt("a", parse);
+      return { editor, before: reads(editor) };
+    }
+
+    it("counts a YAML edited outside the editor, and again the tree read from it", async () => {
+      const { editor, before } = await mounted();
+
+      await outsideEdit(editor, EDITED);
+      expect(reads(editor)).toBe(before + 1);
+
+      await reloaded(editor);
       expect(reads(editor)).toBe(before + 2);
     });
 
+    it("counts a burst of outside edits once, until the tree is read", async () => {
+      const { editor, before } = await mounted();
+
+      await outsideEdit(editor, EDITED);
+      await outsideEdit(editor, `${EDITED}# more\n`);
+      await outsideEdit(editor, `${EDITED}# and more\n`);
+      expect(reads(editor)).toBe(before + 1);
+
+      await reloaded(editor);
+      await outsideEdit(editor, EDITED);
+      expect(reads(editor)).toBe(before + 3);
+    });
+
     it("does not count the YAML the editor wrote itself", async () => {
-      const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
-      const { editor } = await mountAt("a", parse);
-      const before = reads(editor);
-      expect(before).toBeGreaterThan(0);
+      const { editor, before } = await mounted();
 
       (editor as any)._engine._lastSelfWrittenYaml = EDITED;
-      (editor as any).yaml = EDITED;
-      await editor.updateComplete;
-      editor.reload();
-      await flushMicrotasks(5);
-      await editor.updateComplete;
-
+      await outsideEdit(editor, EDITED);
+      await reloaded(editor);
       expect(reads(editor)).toBe(before);
+
+      // The same steps count for a YAML it did not write.
+      await outsideEdit(editor, `${EDITED}# by hand\n`);
+      expect(reads(editor)).toBe(before + 1);
+    });
+
+    it("keeps the caret target it had while the tree shown is from before the edit", async () => {
+      const { editor } = await mounted();
+      const focus = () => (editor as any)._currentFocus();
+      (editor as any).focusYamlPath = ["script", 0, "mode"];
+      await editor.updateComplete;
+      expect(focus()).toEqual({ node: [], field: ["mode"] });
+
+      // The caret moves with the edit; the old tree is not asked where to.
+      await outsideEdit(editor, EDITED);
+      (editor as any).focusYamlPath = ["script", 0, "max_runs"];
+      await editor.updateComplete;
+      expect(focus()).toEqual({ node: [], field: ["mode"] });
+
+      await reloaded(editor);
+      expect(focus()).toEqual({ node: [], field: ["max_runs"] });
+    });
+
+    it("follows the caret again when the reload has nothing to read", async () => {
+      const { editor } = await mounted();
+      const focus = () => (editor as any)._currentFocus();
+      (editor as any).focusYamlPath = ["script", 0, "mode"];
+      await outsideEdit(editor, EDITED);
+      (editor as any).focusYamlPath = ["script", 0, "max_runs"];
+
+      // The editor wrote in between, so the reload returns early.
+      (editor as any)._engine._lastSelfWrittenYaml = EDITED;
+      await reloaded(editor);
+
+      expect(focus()).toEqual({ node: [], field: ["max_runs"] });
     });
   });
 });

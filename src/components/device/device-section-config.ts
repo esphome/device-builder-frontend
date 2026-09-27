@@ -217,8 +217,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement implements SectionEdi
   @state() _deleting = false;
 
   _loadId = 0;
-  /** For the form: goes up when the YAML was edited outside it, which is
-   *  up to a second before the reload, and when ``_values`` was read. */
+  /** Provided as ``valuesReadContext``. */
   @provide({ context: valuesReadContext }) _valuesRead = 0;
   /** A retargeting load is in flight while the outgoing section is still
    *  on screen. The pane is inert meanwhile; the write fences cover

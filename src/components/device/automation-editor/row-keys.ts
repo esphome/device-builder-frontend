@@ -26,9 +26,12 @@ export class RowKeys<T extends object> {
     // One object can be listed more than once, so each holds a queue.
     const previous = new Map<T, number[]>();
     this._items.forEach((item, i) => queue(previous, item, this._keys[i]));
-    const kept = items.map((item) => previous.get(item)?.shift());
+    const same = items.map((item) => previous.get(item)?.shift());
+    const gone = [...previous].flatMap(([item, keys]) =>
+      keys.map((key) => ({ item, key }))
+    );
+    const kept = this._matchContent(items, same, gone);
     const taken = new Set(kept);
-    this._matchContent(items, kept, taken);
     this._keys = kept.map((key, i) => {
       if (key !== undefined) return key;
       const inPlace = this._keys[i];
@@ -40,24 +43,22 @@ export class RowKeys<T extends object> {
     return this._keys;
   }
 
-  /** Give the rows of *items* that have no key yet the key of a previous
-   *  row with the same content that no row has claimed. */
+  /** *keys* with the rows that have none given the key of a row in *gone*
+   *  with the same content. */
   private _matchContent(
     items: readonly T[],
-    kept: (number | undefined)[],
-    taken: Set<number | undefined>
-  ): void {
-    if (!kept.includes(undefined)) return;
-    const gone = new Map<string, number[]>();
-    this._items.forEach((item, i) => {
-      if (!taken.has(this._keys[i])) queue(gone, JSON.stringify(item), this._keys[i]);
-    });
-    if (gone.size === 0) return;
-    items.forEach((item, i) => {
-      if (kept[i] !== undefined) return;
-      kept[i] = gone.get(JSON.stringify(item))?.shift();
-      taken.add(kept[i]);
-    });
+    keys: readonly (number | undefined)[],
+    gone: readonly { item: T; key: number }[]
+  ): (number | undefined)[] {
+    const open = keys.flatMap((key, i) => (key === undefined ? [i] : []));
+    // One row replaced where it is, as on every keystroke in a field:
+    // position gives it its key, and its content is another by now.
+    const inPlace =
+      open.length === 1 && gone.length === 1 && this._keys[open[0]] === gone[0].key;
+    if (open.length === 0 || gone.length === 0 || inPlace) return [...keys];
+    const byContent = new Map<string, number[]>();
+    for (const { item, key } of gone) queue(byContent, contentOf(item), key);
+    return keys.map((key, i) => key ?? byContent.get(contentOf(items[i]))?.shift());
   }
 }
 
@@ -65,4 +66,16 @@ function queue<K>(queues: Map<K, number[]>, of: K, key: number): void {
   const held = queues.get(of);
   if (held) held.push(key);
   else queues.set(of, [key]);
+}
+
+/** What *item* holds, with the keys of each mapping in one order: a field
+ *  set in the form is stored last, the YAML has it where it was written. */
+function contentOf(item: object): string {
+  return JSON.stringify(item, (_key, value: unknown) =>
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        )
+      : value
+  );
 }

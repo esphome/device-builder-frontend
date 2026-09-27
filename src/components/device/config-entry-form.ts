@@ -287,7 +287,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /** See ``valuesReadContext``: on a new count the form forgets what could
    *  write a value. What is only shown, such as open groups, is kept. */
   @consume({ context: valuesReadContext, subscribe: true })
-  @property({ attribute: false })
+  @state()
   valuesRead = 0;
 
   /** Instance-relative field path to scroll into view, from the YAML cursor. */

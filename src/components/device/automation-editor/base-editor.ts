@@ -109,23 +109,32 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
   protected _target = 0;
   private _retargeted = false;
 
-  /** For the forms under the editor: goes up when the YAML was edited
-   *  outside it, which is up to a second before the reload, and when the
-   *  tree was read from it. */
+  /** Provided as ``valuesReadContext``. */
   @provide({ context: valuesReadContext }) private _valuesRead = 0;
+
+  /** The YAML was edited outside the editor and the tree shown is from
+   *  before that edit; the read follows up to a second later. */
+  @state() private _stale = false;
 
   /** "Show advanced settings" of the editor's own form; collapsed again
    *  for each automation the editor is pointed at. */
   @state() protected _showAdvanced = false;
 
-  /** Focus target for the current caret; none while a stale tree is shown. */
+  /** Focus target for the current caret; none while the tree of another
+   *  automation is shown. While the tree is from before an outside edit it
+   *  stays the target it was: the caret would land on the row that had its
+   *  place before the edit. */
   protected _currentFocus() {
-    return this._resolveFocus(
+    if (this._stale) return this._focus;
+    this._focus = this._resolveFocus(
       this._hydrating ? null : this.value,
       this.location,
       this.focusYamlPath
     );
+    return this._focus;
   }
+
+  private _focus: ReturnType<typeof this._resolveFocus> = null;
 
   /** Renders read-only + blocks auto-apply for a parse-errored
    *  section so its empty tree can't overwrite the real YAML. */
@@ -257,6 +266,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         this._retargeted = false;
         // Not for the editor's own write, read back while this waited.
         if (!this._engine.shouldSkipReload()) this._valuesRead++;
+        this._stale = false;
         this.value = m.tree;
         this._hydrating = false;
         // The re-read tree replaced the form state, failed edit
@@ -264,10 +274,12 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         // leave over an edit that no longer exists.
         this._engine.notifyHydrated();
       } else {
+        this._stale = false;
         this._dropStaleTree();
       }
     } catch (err) {
       if (id !== this._hydrateId) return;
+      this._stale = false;
       this._dropStaleTree();
       this._error = formatApiError(err, this._localize, "device.automation_parse_error");
     }
@@ -307,7 +319,12 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         this._retargeted = true;
       }
     }
-    if (changed.has("yaml") && !this._engine.shouldSkipReload()) this._valuesRead++;
+    // Once for a burst of edits: each count renders every form below.
+    const edited = changed.get("yaml") !== undefined && !this.addMode;
+    if (edited && !this._stale && !this._engine.shouldSkipReload()) {
+      this._stale = true;
+      this._valuesRead++;
+    }
     setHeld(this, this._hydrating);
   }
 
@@ -341,8 +358,10 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
    * pattern so editing YAML in the pane updates the visual editor.
    */
   public reload(): void {
+    this._stale = false;
     if (this.addMode || !this.location) return;
     if (this._engine.shouldSkipReload()) return;
+    this._stale = true;
     void this._hydrateFromBackend();
   }
 
