@@ -68,13 +68,23 @@ function queue<K>(queues: Map<K, number[]>, of: K, key: number): void {
   else queues.set(of, [key]);
 }
 
-/** What *item* holds, with the keys of each mapping in one order: a field
- *  set in the form is stored last, the YAML has it where it was written. */
+const isEmpty = (value: unknown): boolean =>
+  value !== null && typeof value === "object" && Object.keys(value).length === 0;
+
+/**
+ * What *item* holds, in one form whichever way it came to be. A field set
+ * in the form is stored last where the YAML has it where it was written,
+ * so the keys of each mapping are put in one order. A node made in the
+ * editor has its empty lists and mappings where a parsed one leaves them
+ * out, so those are left out.
+ */
 function contentOf(item: object): string {
   return JSON.stringify(item, (_key, value: unknown) =>
     value !== null && typeof value === "object" && !Array.isArray(value)
       ? Object.fromEntries(
-          Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          Object.entries(value)
+            .filter(([, held]) => !isEmpty(held))
+            .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
         )
       : value
   );

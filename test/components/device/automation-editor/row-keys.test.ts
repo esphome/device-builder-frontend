@@ -120,6 +120,32 @@ describe("RowKeys", () => {
       expect(next).toEqual([b, a]);
     });
 
+    it("knows a row made in the editor, read back without its empty lists", () => {
+      const keys = new RowKeys<object>();
+      const [a, b] = keys.keysFor([
+        { action_id: "delay", params: { id: "1s" }, children: {}, conditions: [] },
+        { action_id: "logger.log", params: {}, children: {}, conditions: [] },
+      ]);
+      const next = keys.keysFor([
+        { action_id: "logger.log" },
+        { action_id: "delay", params: { id: "1s" } },
+      ]);
+      expect(next).toEqual([b, a]);
+    });
+
+    it("tells a row with a child list from one without", () => {
+      const keys = new RowKeys<object>();
+      const [a, b] = keys.keysFor([
+        { action_id: "if", children: { then: [{ action_id: "delay" }] } },
+        { action_id: "if", children: {} },
+      ]);
+      const next = keys.keysFor([
+        { action_id: "if" },
+        { action_id: "if", children: { then: [{ action_id: "delay" }] } },
+      ]);
+      expect(next).toEqual([b, a]);
+    });
+
     it("keeps the rows' keys when a row is added above them", () => {
       const { keys, a, b, c } = seeded("a", "b", "c");
       const next = keysOf(keys, reread("new", "a", "b", "c"));
