@@ -569,6 +569,28 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     expect(host._failureKind).toBeNull();
   });
 
+  it.each([
+    { name: "dismissed", reopened: false },
+    { name: "dismissed and reopened for the same device", reopened: true },
+  ])("stands down quietly when $name during the compile", async ({ reopened }) => {
+    const { host, api } = ready();
+    api.firmwareFollowJob.mockImplementationOnce(() => {
+      queueMicrotask(() => {
+        dismiss(host);
+        if (reopened) reopen(host);
+        host._compileReject?.(new Error("Install dialog dismissed"));
+      });
+      return "s1";
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(esptool.flashFirmware).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._failureKind).toBeNull();
+  });
+
   it("stands down when the same device was reopened during the connect", async () => {
     const { host, api } = ready();
     esptool.connectToPort.mockImplementationOnce(async () => {

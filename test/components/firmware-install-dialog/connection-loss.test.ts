@@ -41,6 +41,8 @@ function makeHost() {
     }),
     _jobId: "",
     _streamId: "",
+    _open: true,
+    _installRun: 0,
     _compileReject: null as (() => void) | null,
     _step: "queued",
     _statusMessage: "",

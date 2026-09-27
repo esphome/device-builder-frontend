@@ -65,6 +65,16 @@ export function showOtaLogs(host: ESPHomeFirmwareInstallDialog): void {
   if (handled) host._open = false;
 }
 
+/**
+ * Whether the dialog is still open on the install run it is on now. A
+ * dismissal only flips the open flag; a reopen, for the same device or
+ * another, starts the next run.
+ */
+export function runGuard(host: ESPHomeFirmwareInstallDialog): () => boolean {
+  const run = host._installRun;
+  return () => host._installRun === run && host._open;
+}
+
 // Compile, surfacing a failure on the dialog. Returns false so the caller bails.
 // A build someone else started for the device is waited out first: compiling
 // now would supersede it (#1202). The wait sits here, behind whatever the flow
@@ -77,11 +87,15 @@ export async function compileOrFail(
     host._installer === "binary-download"
       ? "firmware.download_failed"
       : "firmware.install_failed";
+  const stillCurrent = runGuard(host);
   if (!(await runningBuildSettled(host, configuration, failKey))) return false;
   try {
     await compileAndWait(host, configuration);
     return true;
   } catch (err) {
+    // A dismissal settles the compile by rejecting it; the dialog it would
+    // be reported on is gone, or on its next run already.
+    if (!stillCurrent()) return false;
     // ??= so a "validate" already recorded off the output stream survives.
     host._failureKind ??= "compile";
     host._fail(host._localize("firmware.compile_failed"), compileFailureDetail(err));

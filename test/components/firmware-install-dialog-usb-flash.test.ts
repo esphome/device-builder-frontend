@@ -43,6 +43,8 @@ function makeHost(opts: { compileOk: boolean; binaries?: FirmwareBinary[] }) {
     ...fakeBuildState(),
     _jobId: "",
     _streamId: "",
+    _open: true,
+    _installRun: 0,
     _compileReject: null,
     _jobSource: 0,
     _jobSourceLabel: "",

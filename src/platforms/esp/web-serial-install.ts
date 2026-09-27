@@ -5,13 +5,11 @@
  */
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
-import {
-  installLog,
-  runGuard,
-} from "../../components/firmware-install-dialog/browser-flash-steps.js";
+import { installLog } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import {
   compileOrFail,
   finishWithLogsPort,
+  runGuard,
 } from "../../components/firmware-install-dialog/install-flow.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";

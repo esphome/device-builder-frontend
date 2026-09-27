@@ -79,6 +79,8 @@ function makeHost(getBinariesResults: FirmwareBinary[][]) {
     _streamId: "",
     _jobSource: JobSource.LOCAL,
     _jobSourceLabel: "",
+    _open: true,
+    _installRun: 0,
     _compileReject: null as null | ((e: unknown) => void),
     ...fakeBuildState(),
     _localize: identityLocalize,
