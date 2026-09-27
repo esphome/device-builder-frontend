@@ -135,6 +135,7 @@ describe("renderReachabilitySection - offline duration row", () => {
       offline_since: OFFLINE_SINCE,
     });
     expect(hasRow(calls)).toBe(true);
+    expect(calls.some(([k]) => k === "dashboard.drawer_offline_for_tooltip")).toBe(true);
   });
 
   it("shows before any reachability snapshot has arrived", () => {

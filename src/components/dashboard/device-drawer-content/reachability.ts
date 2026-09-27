@@ -19,7 +19,6 @@ import {
   renderMdnsStaleWarning,
   renderMdnsTxtRecords,
 } from "../device-drawer-render.js";
-import { renderRow } from "./render-sections.js";
 
 interface ReachabilityRowSpec {
   source: "mdns" | "ping" | "mqtt";
@@ -57,13 +56,35 @@ export function renderReachabilitySection(
       ${
         offlineFor === null
           ? nothing
-          : renderRow(
-              "clock-outline",
-              host._localize("dashboard.drawer_offline_for"),
-              formatDuration(offlineFor, { language: lang })
-            )
+          : renderOfflineForRow(offlineFor, lang, host._localize)
       }
       ${r === null ? nothing : renderSourceRows(host, r, now, lang)}
+    </div>
+  `;
+}
+
+function renderOfflineForRow(
+  seconds: number,
+  lang: string | undefined,
+  localize: LocalizeFunc
+): TemplateResult {
+  return html`
+    <div class="row">
+      <div class="icon">
+        <wa-icon library="mdi" name="clock-outline"></wa-icon>
+      </div>
+      <div class="content">
+        <div class="label">${localize("dashboard.drawer_offline_for")}</div>
+        <div class="value">
+          <span id="offline-for" class="offline-for" tabindex="0">
+            ${formatDuration(seconds, { language: lang })}
+            <wa-icon library="mdi" name="information-outline"></wa-icon>
+          </span>
+          <wa-tooltip for="offline-for" placement="bottom">
+            ${localize("dashboard.drawer_offline_for_tooltip")}
+          </wa-tooltip>
+        </div>
+      </div>
     </div>
   `;
 }

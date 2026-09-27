@@ -67,6 +67,7 @@ import {
 import { deviceDrawerContentStyles } from "./device-drawer-content/styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 import "../labels/device-labels-editor.js";
 
 registerMdiIcons({

@@ -293,6 +293,7 @@
     "drawer_device_online": "Device Online",
     "drawer_device_offline": "Device Offline",
     "drawer_offline_for": "Offline for",
+    "drawer_offline_for_tooltip": "Counted from when Device Builder last saw this device online. It only covers the time the device has been configured here, so it may have been offline for longer.",
     "drawer_device_unknown": "Status Unknown",
     "drawer_edit": "Edit",
     "drawer_update": "Update",
