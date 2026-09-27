@@ -5,7 +5,7 @@
  * most one family.
  */
 import { isUartBridgePort } from "../util/uart-bridge-ids.js";
-import { ESPRESSIF_USB_VID } from "./esp/esp-usb.js";
+import { ESPRESSIF_USB_VID, isEspressifUsbBridgePort } from "./esp/esp-usb.js";
 import { isNrf52Port } from "./nrf52/nrf-platform.js";
 import { isRp2CdcPort } from "./rp2/web-usb.js";
 
@@ -17,7 +17,9 @@ export type PortFamily = "esp" | "rp2" | "nrf52";
  * can front anything), a port without USB ids, or a device we don't know.
  */
 export function portFamily(port: SerialPort): PortFamily | undefined {
-  if (port.getInfo().usbVendorId === ESPRESSIF_USB_VID) return "esp";
+  if (port.getInfo().usbVendorId === ESPRESSIF_USB_VID) {
+    return isEspressifUsbBridgePort(port) ? undefined : "esp";
+  }
   if (isRp2CdcPort(port)) return "rp2";
   if (isNrf52Port(port)) return "nrf52";
   return undefined;
@@ -25,7 +27,8 @@ export function portFamily(port: SerialPort): PortFamily | undefined {
 
 /**
  * Whether an ESP can be behind the port, so the ESP detect is worth running:
- * Espressif's own USB, a UART bridge, or a port with no USB ids to go by.
+ * anything under Espressif's vendor id, a UART bridge, or a port with no USB
+ * ids to go by.
  * Any other native-USB device is some other board, and esptool would sit on
  * its console waiting for a ROM loader that never answers (#1856).
  */

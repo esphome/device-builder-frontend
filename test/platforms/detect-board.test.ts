@@ -107,6 +107,14 @@ describe("detectBoard", () => {
     expect(engine.connectToPort).not.toHaveBeenCalled();
   });
 
+  it("reads the boot banner on an ESP-USB-Bridge, as on any other bridge", async () => {
+    banner.readBootBanner.mockResolvedValueOnce({ platform: "rtl87xx" });
+    const bridge = port(0x303a, 0x1002);
+    expect(await detectBoard(bridge)).toEqual({ kind: "named", platform: "rtl87xx" });
+    expect(banner.readBootBanner).toHaveBeenCalledWith(bridge);
+    expect(engine.connectToPort).not.toHaveBeenCalled();
+  });
+
   it("runs esptool when the banner says ESP, says nothing, or cannot be read", async () => {
     const bridge = port(0x1a86, 0x7523);
     banner.readBootBanner.mockResolvedValueOnce({ platform: "esp" });
