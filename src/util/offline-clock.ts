@@ -15,7 +15,7 @@ function tick(): void {
 // ``formatDuration``'s granularity; the label is the same within a step.
 function shownStep(seconds: number): number {
   const whole = Math.max(0, Math.floor(seconds));
-  const unit = whole < 60 ? 1 : whole < 86400 ? 60 : 3600;
+  const unit = whole < 60 ? 1 : whole < 86400 ? 60 : whole < 365 * 86400 ? 3600 : 86400;
   return whole - (whole % unit);
 }
 

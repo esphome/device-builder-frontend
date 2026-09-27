@@ -173,10 +173,13 @@ export function getNumberFormatter(
   return formatter;
 }
 
+const YEAR_SECONDS = 365 * 86400;
+
 /**
  * Format a duration in seconds as a compact readout. The ``compact``
  * variant (default) reads as a static value: ``45s`` / ``8m`` / ``1h 14m``
- * / ``2d 3h`` (zero minor unit dropped: ``1h``, ``2d``). The ``counter``
+ * / ``2d 3h`` / ``1y 35d`` (zero minor unit dropped: ``1h``, ``2d``,
+ * ``1y``; a year is 365 days). The ``counter``
  * variant is for a live
  * ticking readout: seconds kept in the minute range (``4m 32s``) and
  * hour-range minutes zero-padded (``1h 05m``, stable width per minute tick).
@@ -199,6 +202,13 @@ export function formatDuration(
     return counter
       ? `${fmt.format(minutes)}m ${fmt.format(total % 60)}s`
       : `${fmt.format(minutes)}m`;
+  }
+  if (!counter && total >= YEAR_SECONDS) {
+    const years = Math.floor(total / YEAR_SECONDS);
+    const days = Math.floor((total % YEAR_SECONDS) / 86400);
+    return days > 0
+      ? `${fmt.format(years)}y ${fmt.format(days)}d`
+      : `${fmt.format(years)}y`;
   }
   if (!counter && total >= 86400) {
     const days = Math.floor(total / 86400);

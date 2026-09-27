@@ -155,7 +155,14 @@ describe("formatDuration", () => {
     expect(formatDuration(86400)).toBe("1d");
     expect(formatDuration(7 * 86400 + 12 * 60)).toBe("7d");
     expect(formatDuration(51 * 86400 + 5 * 3600)).toBe("51d 5h");
+    expect(formatDuration(364 * 86400 + 23 * 3600)).toBe("364d 23h");
     expect(formatDuration(86400 + 3600, { variant: "counter" })).toBe("25h 00m");
+  });
+
+  it("switches the compact variant to years past 365 days", () => {
+    expect(formatDuration(365 * 86400)).toBe("1y");
+    expect(formatDuration(400 * 86400 + 23 * 3600)).toBe("1y 35d");
+    expect(formatDuration(1234 * 86400)).toBe("3y 139d");
   });
 
   it("keeps the finer unit in the counter variant, padding hour-range minutes", () => {
