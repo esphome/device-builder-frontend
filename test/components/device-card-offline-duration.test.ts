@@ -67,6 +67,21 @@ describe("device-card offline duration", () => {
     expect(badgeText(el)).toContain("1m");
   });
 
+  it("stops repainting while the busy badge covers the pill", async () => {
+    vi.useFakeTimers();
+    const el = await mount({
+      _localize: localize,
+      state: DeviceState.OFFLINE,
+      offlineSince: nowSeconds() - 30,
+      busy: true,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+
+    el.busy = false;
+    await el.updateComplete;
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
   it("does not drift when an unrelated listing arrives", async () => {
     vi.useFakeTimers();
     const since = nowSeconds() - 7200;

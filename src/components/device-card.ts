@@ -83,9 +83,9 @@ export class ESPHomeDeviceCard extends LitElement {
     return offlineSeconds(this.state, this.nameAddMacSuffix, this.offlineSince);
   }
 
-  protected readonly _offlineClock = new OfflineClockController(
-    this,
-    () => this._offlineSeconds
+  // The busy badge covers the status pill, so there is nothing to repaint.
+  protected readonly _offlineClock = new OfflineClockController(this, () =>
+    this.busy ? null : this._offlineSeconds
   );
 
   // Resolved against the catalog at render time so a recolor / rename in
