@@ -1,14 +1,14 @@
 import type { RenderCtx } from "../config-entry-renderers-types.js";
-/**
- * The form's side of ``row-memory``: the two context calls a list renderer
- * makes when a row leaves or changes kind, applied to every place the form
- * remembers something by field path.
- */
 import type { ConstraintClusterController } from "../constraint-cluster-controller.js";
 import { rekeyEnableStash } from "./nested.js";
 import { type Rekey, rekeyStore, rowRekeyer } from "./row-memory.js";
 import { rekeyTemplatableStash } from "./templatable.js";
 
+/**
+ * The form's side of ``row-memory``: the two context calls a list renderer
+ * makes when a row leaves or changes kind, applied to every place the form
+ * remembers something by field path.
+ */
 export function rowMemoryCtx(
   owner: object,
   clusters: ConstraintClusterController,
@@ -21,7 +21,11 @@ export function rowMemoryCtx(
     clusters.rekeyChoices(rekey);
   };
   return {
-    rowRemoved: (path, index) => forget(rowRekeyer(path, index, true)),
-    rowKindChanged: (path, index) => forget(rowRekeyer(path, index, false)),
+    rowRemoved: (path, index) => forget(rowRekeyer(path, index)),
+    // The row stays where it is, so nothing moves: only its own keys go.
+    rowKindChanged: (path, index) => {
+      const rekey = rowRekeyer(path, index);
+      forget((key) => (rekey(key) === null ? null : key));
+    },
   };
 }

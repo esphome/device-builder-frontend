@@ -69,7 +69,7 @@ import {
   parseFieldKey,
   renderYamlOnlyField,
 } from "./config-entry-renderers-shared.js";
-import { rowMemoryCtx } from "./config-entry-renderers/forget-row.js";
+import { rowMemoryCtx } from "./config-entry-renderers/row-memory-ctx.js";
 import { ConstraintClusterController } from "./constraint-cluster-controller.js";
 import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";

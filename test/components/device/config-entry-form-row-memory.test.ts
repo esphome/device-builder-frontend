@@ -5,24 +5,11 @@
  * row's index (esphome/device-builder-frontend#1886). Removing a row moves
  * the rows below it up, and what was remembered for them has to follow.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/option/option.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/select/select.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
-vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
-vi.mock(
-  "../../../src/components/device/config-entry-renderers/lambda-editor.js",
-  () => ({})
-);
+import { mountControlledForm } from "./_config-entry-form-host.js";
 
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
-import {
-  type ConfigEntryValueChange,
-  ESPHomeConfigEntryForm,
-} from "../../../src/components/device/config-entry-form.js";
-import { setIn } from "../../../src/util/nested-values.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 const STEPS = makeConfigEntry({
@@ -37,26 +24,11 @@ const STEPS = makeConfigEntry({
 const lambda = (body: string) => ({ _lambda: body, _tag: "!lambda" });
 
 async function mountForm(steps: Record<string, unknown>[]) {
-  const form = new ESPHomeConfigEntryForm();
-  form.entries = [STEPS];
-  form.values = { steps };
-  // The form is controlled: the owner applies each change, as the section
-  // editor does.
-  form.addEventListener("value-change", (e) => {
-    const { path, value } = (e as CustomEvent<ConfigEntryValueChange>).detail;
-    form.values = setIn(form.values, path, value);
-  });
-  document.body.appendChild(form);
-  await form.updateComplete;
+  const { form, toggle: toggleIn } = await mountControlledForm([STEPS], { steps });
   const rows = () => [
     ...form.shadowRoot!.querySelectorAll<HTMLElement>(".nested-list-item"),
   ];
-  const toggle = async (row: number, side: "literal" | "lambda") => {
-    rows()
-      [row].querySelectorAll<HTMLButtonElement>(".templatable-toggle button")
-      [side === "literal" ? 0 : 1].click();
-    await form.updateComplete;
-  };
+  const toggle = (row: number, side: "literal" | "lambda") => toggleIn(side, rows()[row]);
   const remove = async (row: number) => {
     rows()
       [row].querySelector<HTMLButtonElement>(".nested-list-item-header button")!
@@ -92,18 +64,5 @@ describe("config-entry-form list rows", () => {
     await toggle(0, "lambda");
 
     expect(values()).toEqual([lambda("return 2222;")]);
-  });
-
-  it("leaves the rows above a removed row alone", async () => {
-    const { toggle, remove, values } = await mountForm([
-      { value: lambda("return 1111;") },
-      { value: "two" },
-    ]);
-
-    await toggle(0, "literal");
-    await remove(1);
-    await toggle(0, "lambda");
-
-    expect(values()).toEqual([lambda("return 1111;")]);
   });
 });

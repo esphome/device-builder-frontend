@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { rowMemoryCtx } from "../../../src/components/device/config-entry-renderers/row-memory-ctx.js";
 import {
   rekeyStore,
   rowRekeyer,
 } from "../../../src/components/device/config-entry-renderers/row-memory.js";
+import type { ConstraintClusterController } from "../../../src/components/device/constraint-cluster-controller.js";
 
-const removed = (index: number) => rowRekeyer(["filters"], index, true);
+const removed = (index: number) => rowRekeyer(["filters"], index);
 
 describe("rowRekeyer", () => {
   it.each([
@@ -29,16 +31,9 @@ describe("rowRekeyer", () => {
   });
 
   it("renumbers a list inside a row by its own path", () => {
-    const rekey = rowRekeyer(["filters", "1", "steps"], 0, true);
+    const rekey = rowRekeyer(["filters", "1", "steps"], 0);
     expect(rekey("filters.1.steps.1.value")).toBe("filters.1.steps.0.value");
     expect(rekey("filters.2.steps.1.value")).toBe("filters.2.steps.1.value");
-  });
-
-  it("forgets a row whose kind changed and leaves the others where they are", () => {
-    const rekey = rowRekeyer(["filters"], 1, false);
-    expect(rekey("filters.1.multiply")).toBeNull();
-    expect(rekey("filters.0.multiply")).toBe("filters.0.multiply");
-    expect(rekey("filters.2.multiply")).toBe("filters.2.multiply");
   });
 });
 
@@ -62,5 +57,39 @@ describe("rekeyStore", () => {
     const store = new Set(["filters.1.group", "filters.2.group"]);
     rekeyStore(store, removed(1));
     expect([...store]).toEqual(["filters.1.group"]);
+  });
+});
+
+describe("rowMemoryCtx", () => {
+  function setup() {
+    const store = new Map([
+      ["filters.0.x", "a"],
+      ["filters.1.x", "b"],
+      ["filters.2.x", "c"],
+    ]);
+    const clusters = { rekeyChoices: vi.fn() };
+    const ctx = rowMemoryCtx({}, clusters as unknown as ConstraintClusterController, [
+      store,
+    ]);
+    return { store, clusters, ctx };
+  }
+
+  it("drops a removed row and moves the rows below it up", () => {
+    const { store, clusters, ctx } = setup();
+    ctx.rowRemoved(["filters"], 1);
+    expect([...store]).toEqual([
+      ["filters.0.x", "a"],
+      ["filters.1.x", "c"],
+    ]);
+    expect(clusters.rekeyChoices).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets a row whose kind changed and leaves the others where they are", () => {
+    const { store, ctx } = setup();
+    ctx.rowKindChanged(["filters"], 1);
+    expect([...store]).toEqual([
+      ["filters.0.x", "a"],
+      ["filters.2.x", "c"],
+    ]);
   });
 });
