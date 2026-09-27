@@ -35,6 +35,14 @@ export const SMP_CHUNK_SIZE_DEFAULT = 128;
 // device counts as stuck.
 const MAX_STALLED_CHUNKS = 3;
 
+/** The device answered and refused, as opposed to the link failing. */
+export class SmpError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SmpError";
+  }
+}
+
 export interface SmpDeviceParams {
   /** Maximum SMP frame the device can receive, including the 8-byte header. */
   bufSize: number;
@@ -64,7 +72,8 @@ export async function smpQueryDeviceParams(
     ) {
       return { bufSize, bufCount };
     }
-  } catch {
+  } catch (err) {
+    if (signal?.aborted) throw err;
     // Older firmware has no such command; the caller falls back.
   }
   return null;
@@ -220,6 +229,9 @@ export async function parseMcubootImage(bytes: Uint8Array): Promise<McubootImage
   const minor = view.getUint8(21);
   const revision = view.getUint16(22, true);
   const version = `${major}.${minor}.${revision}`;
+  if (hdrSize + imageSize + protectTlvSize > bytes.length) {
+    throw new Error("Invalid MCUboot image (truncated)");
+  }
 
   const slice = bytes.buffer.slice(
     bytes.byteOffset,
@@ -259,11 +271,11 @@ class SmpClient {
     const frame = buildSmpFrame(op, group, id, this.seq++, payload);
     const reply = parseSmpFrame(await this.transport.exchange(frame, this.signal));
     if (reply.group !== group || reply.id !== id) {
-      throw new Error(`SMP: unexpected reply while ${failed}`);
+      throw new SmpError(`SMP: unexpected reply while ${failed}`);
     }
     const rc = reply.payload.rc;
     if (typeof rc === "number" && rc !== 0) {
-      throw new Error(`SMP: ${failed} failed (rc=${rc})`);
+      throw new SmpError(`SMP: ${failed} failed (rc=${rc})`);
     }
     return reply;
   }
@@ -371,7 +383,7 @@ async function sendChunks(
 async function testAndReset(
   client: SmpClient,
   hash: Uint8Array,
-  { onProgress, onLog }: SmpUploadHooks
+  { onProgress, onLog, signal }: SmpUploadHooks
 ): Promise<void> {
   onProgress(96);
   onLog?.("Marking uploaded image for test boot");
@@ -382,8 +394,11 @@ async function testAndReset(
   onLog?.("Resetting device to boot the new image");
   await client
     .request(MGMT_OP_WRITE, MGMT_GROUP_OS, OS_MGMT_RESET, {}, "resetting")
-    // The device resets before its reply arrives.
-    .catch(() => {});
+    .catch((err: unknown) => {
+      // The device resets before its reply arrives, so a dead link is the
+      // expected outcome; a refusal or a cancel is not.
+      if (err instanceof SmpError || signal?.aborted) throw err;
+    });
   onLog?.("Done; the device is rebooting into the new firmware");
   onProgress(100);
 }
@@ -440,6 +455,9 @@ export async function smpUploadImage(
   onLog?.("Fetching image list");
   const after = await readImageState(client);
   if (!after.update) throw new Error("SMP: secondary slot image not found after upload");
+  if (info.imageHash && !bytesEqual(after.update, info.imageHash)) {
+    throw new Error("SMP: the update slot holds a different image after upload");
+  }
   // Marking the running image for test would fail.
   if (alreadyRunning(after, after.update)) return;
   await testAndReset(client, after.update, hooks);

@@ -29,6 +29,7 @@ export class FakeSmpDevice implements SmpTransport {
   /** The hash the device gives an uploaded image. */
   uploadedHash = new Uint8Array(32).fill(0xab);
   resetDropsLink = false;
+  resetReply: object = {};
   /** What the device answers a parameters query with; an error when unset. */
   params?: { buf_size: number; buf_count: number };
 
@@ -43,7 +44,7 @@ export class FakeSmpDevice implements SmpTransport {
     }
     if (req.group === MGMT_GROUP_OS && req.id === OS_MGMT_RESET) {
       if (this.resetDropsLink) throw new Error("link dropped");
-      return reply({});
+      return reply(this.resetReply);
     }
     if (req.group === MGMT_GROUP_IMAGE && req.id === IMG_MGMT_STATE) {
       const hash = req.payload.hash;

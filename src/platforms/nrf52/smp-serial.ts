@@ -152,6 +152,8 @@ class SmpSerialSession extends SerialStreamSession implements SmpTransport {
       this.resolve = null;
       this.reject = null;
     });
+    // A write that fails after the read loop ended leaves this unawaited.
+    response.catch(() => {});
     await this.writeBytes(encodeSerialFrame(frame));
     // A frame that fails its CRC is dropped, so a garbled reply would
     // otherwise wait forever.

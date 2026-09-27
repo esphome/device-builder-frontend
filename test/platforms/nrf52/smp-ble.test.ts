@@ -155,6 +155,7 @@ describe("flashMcubootOverBle", () => {
     const { done } = await flash(peripheral);
 
     await expect(done).rejects.toBeInstanceOf(SmpBleServiceNotFoundError);
+    expect(peripheral.disconnect).toHaveBeenCalled();
   });
 
   it("fails when the device never answers", async () => {

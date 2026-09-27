@@ -98,6 +98,7 @@ describe("parseMcubootImage", () => {
       makeMcubootImage({ loadAddress: 0x1000 }),
       "non-zero load address",
     ],
+    ["its end cut off", makeMcubootImage({ imageHash: null }).slice(0, 200), "truncated"],
   ])("rejects an image with %s", async (_name, bytes, message) => {
     await expect(parseMcubootImage(bytes)).rejects.toThrow(message);
   });
@@ -123,6 +124,16 @@ describe("device parameters", () => {
     ["answers without them", () => Promise.resolve(buildSmpFrame(1, 0, 6, 0, { rc: 8 }))],
   ])("is null when the device %s", async (_name, exchange) => {
     expect(await smpQueryDeviceParams({ exchange })).toBeNull();
+  });
+
+  it("passes a cancel on instead of falling back", async () => {
+    const abort = new AbortController();
+    abort.abort(new Error("cancelled"));
+    const exchange = () => Promise.reject(new Error("cancelled"));
+
+    await expect(smpQueryDeviceParams({ exchange }, abort.signal)).rejects.toThrow(
+      "cancelled"
+    );
   });
 
   it("leaves room for the first chunk's header and fields", () => {
@@ -174,6 +185,28 @@ describe("smpUploadImage", () => {
 
     await expect(done).resolves.toBeUndefined();
     expect(progress[progress.length - 1]).toBe(100);
+  });
+
+  it("fails when the device refuses the reset", async () => {
+    const image = await parseMcubootImage(makeMcubootImage());
+    const device = new FakeSmpDevice();
+    device.resetReply = { rc: 8 };
+
+    const { done, progress } = await upload(device, image);
+
+    await expect(done).rejects.toThrow("resetting failed (rc=8)");
+    expect(progress).not.toContain(100);
+  });
+
+  it("fails when the update slot holds another image after the upload", async () => {
+    const image = await parseMcubootImage(makeMcubootImage());
+    const device = new FakeSmpDevice();
+    device.uploadedHash = new Uint8Array(32).fill(0x99);
+
+    const { done } = await upload(device, image);
+
+    await expect(done).rejects.toThrow("update slot holds a different image");
+    expect(device.requests.some((r) => r.id === OS_MGMT_RESET)).toBe(false);
   });
 
   it("sends nothing to a device already running the image", async () => {

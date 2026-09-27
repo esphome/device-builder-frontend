@@ -77,7 +77,7 @@ describe("cborDecode", () => {
     expect(hex(decoded)).toBe("01020304");
   });
 
-  it.each(["", "19", "4401", "6449", "8301", "a16161"])(
+  it.each(["", "19", "4401", "6449", "8301", "a16161", "fb3ff0", "fa00"])(
     "rejects the truncated input %j",
     (input) => {
       expect(() => cborDecode(bytes(input))).toThrow("CBOR: truncated input");

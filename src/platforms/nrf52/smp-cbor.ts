@@ -141,16 +141,10 @@ export function cborDecode(data: Uint8Array): unknown {
       if (info === 22) return null;
       if (info === 31) return BREAK; // break code for indefinite-length items
       // Floats are skipped; no SMP response carries one.
-      if (info === 25) {
-        offset += 2;
-        return 0;
-      }
-      if (info === 26) {
-        offset += 4;
-        return 0;
-      }
-      if (info === 27) {
-        offset += 8;
+      const floatBytes = info === 25 ? 2 : info === 26 ? 4 : info === 27 ? 8 : 0;
+      if (floatBytes) {
+        need(floatBytes);
+        offset += floatBytes;
         return 0;
       }
       throw new Error(`CBOR: unsupported simple value ${info}`);

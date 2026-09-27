@@ -64,6 +64,8 @@ class SmpBleTransport implements SmpTransport {
 
   async exchange(frame: Uint8Array, signal?: AbortSignal): Promise<Uint8Array> {
     const onAbort = () => this.pending?.settle(signal?.reason as Error);
+    // Whatever an earlier exchange left behind is not this one's reply.
+    this.rxBuf = new Uint8Array(0);
     const response = new Promise<Uint8Array>((resolve, reject) => {
       this.pending = {
         seq: frame[6],
@@ -74,6 +76,8 @@ class SmpBleTransport implements SmpTransport {
         },
       };
     });
+    // A write that fails after the link dropped leaves this unawaited.
+    response.catch(() => {});
     signal?.addEventListener("abort", onAbort, { once: true });
     try {
       if (signal?.aborted) throw signal.reason;
@@ -121,17 +125,22 @@ class SmpBleTransport implements SmpTransport {
 async function connectSmpBle(device: BluetoothDevice): Promise<SmpBleTransport> {
   if (!device.gatt) throw new Error("SMP: the device has no GATT server");
   const server = await device.gatt.connect();
-  const service = await server
-    .getPrimaryService(SMP_BLE_SERVICE_UUID)
-    .catch((err: unknown) => {
-      if (err instanceof DOMException && err.name === "NotFoundError") {
-        throw new SmpBleServiceNotFoundError();
-      }
-      throw err;
-    });
-  const characteristic = await service.getCharacteristic(SMP_BLE_CHARACTERISTIC_UUID);
-  await characteristic.startNotifications();
-  return new SmpBleTransport(characteristic, device);
+  try {
+    const service = await server
+      .getPrimaryService(SMP_BLE_SERVICE_UUID)
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "NotFoundError") {
+          throw new SmpBleServiceNotFoundError();
+        }
+        throw err;
+      });
+    const characteristic = await service.getCharacteristic(SMP_BLE_CHARACTERISTIC_UUID);
+    await characteristic.startNotifications();
+    return new SmpBleTransport(characteristic, device);
+  } catch (err) {
+    device.gatt.disconnect();
+    throw err;
+  }
 }
 
 /** Connect to *device*, upload *image* and boot it; the link is closed either way. */
