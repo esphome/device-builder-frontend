@@ -326,6 +326,10 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     }
     if (outcome !== "dismissed") return outcome;
     this._resetForRetry();
+    // The opener saw what the engine said ahead of its chooser; take it back.
+    if (this._state !== "idle") {
+      this._handshake?.postState(this._state, this._statusMessage);
+    }
     return null;
   }
 

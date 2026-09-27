@@ -517,10 +517,18 @@ describe("esphome-web-flash-receiver engines", () => {
     });
 
     it("goes back to the ready line when the step's chooser is dismissed", async () => {
-      engines.pico.before.mockResolvedValueOnce("dismissed");
-      const { el } = await handOff({ ...pico, name: "fw.uf2" }, false);
+      engines.pico.before.mockImplementationOnce(async (hooks) => {
+        hooks.onState("connecting", "resetting");
+        return "dismissed";
+      });
+      const { el, opener } = await handOff({ ...pico, name: "fw.uf2" }, false);
       await (el as any)._onBefore();
       expect((el as any)._statusMessage).toBe("web.flash.firmware_ready_named");
+      // The opener mirrors the receiver, so it is told as well.
+      expect(last(states(opener))).toMatchObject({
+        state: "connecting",
+        detail: "web.flash.firmware_ready_named",
+      });
     });
 
     it("asks no serial port for the install, and follows no logs without one", async () => {
