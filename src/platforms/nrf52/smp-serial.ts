@@ -9,6 +9,7 @@
  * The CRC is Zephyr's crc16_itu_t with seed 0, which is CRC-16/XMODEM.
  */
 import { arrayBufferToBase64 } from "../../util/base64.js";
+import { SerialDeviceLostError } from "../../util/serial-open-error.js";
 import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { SerialStreamSession } from "../../util/serial-stream-session.js";
 import { crc16Xmodem } from "../../util/xmodem.js";
@@ -16,6 +17,7 @@ import {
   awaitReply,
   type McubootImage,
   SMP_CHUNK_SIZE_DEFAULT,
+  SmpNoReplyError,
   type SmpTransport,
   type SmpUploadHooks,
   smpUploadImage,
@@ -171,6 +173,12 @@ class SmpSerialSession extends SerialStreamSession implements SmpTransport {
       this.pending = null;
     }
   }
+}
+
+/** The device went away, whether a write or the wait for a reply found out. */
+export function isSerialDeviceLost(err: unknown): boolean {
+  const reason = err instanceof SmpNoReplyError ? err.cause : err;
+  return reason instanceof SerialDeviceLostError;
 }
 
 /** Open *port*, upload *image* and boot it; the port is closed either way. */

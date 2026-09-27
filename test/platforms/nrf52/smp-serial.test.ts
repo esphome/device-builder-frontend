@@ -7,6 +7,7 @@ import {
 import {
   encodeSerialFrame,
   flashMcubootOverSerial,
+  isSerialDeviceLost,
   SmpSerialDecoder,
 } from "../../../src/platforms/nrf52/smp-serial.js";
 import { FakeSmpDevice } from "./_fake-smp-device.js";
@@ -213,5 +214,35 @@ describe("flashMcubootOverSerial", () => {
 
     await expect(done).rejects.toThrow("no response from the device");
     expect(fake.mock.close).toHaveBeenCalled();
+    await expect(done).rejects.not.toSatisfy(isSerialDeviceLost);
+  });
+
+  it("names a device that is unplugged while a reply is awaited", async () => {
+    const fake = makePort({ silent: true });
+    const image = await parseMcubootImage(makeMcubootImage());
+    const done = flashMcubootOverSerial(fake.port, image, { onProgress: () => {} });
+    done.catch(() => {});
+    await vi.advanceTimersByTimeAsync(100);
+    fake.mock.fire();
+
+    await expect(done).rejects.toSatisfy(isSerialDeviceLost);
+    expect(fake.mock.close).toHaveBeenCalled();
+  });
+
+  it("takes the device leaving the bus as the reset it asked for", async () => {
+    const smp = new FakeSmpDevice();
+    const fake = makePort({ smp });
+    const exchange = smp.exchange.bind(smp);
+    smp.exchange = (frame) => {
+      // Group 0, command 5: the reset, which the device leaves the bus on.
+      if (frame[3] === 0 && frame[7] === 5) {
+        fake.mock.fire();
+        return new Promise(() => {});
+      }
+      return exchange(frame);
+    };
+    const { done } = await flashOverSerial(fake);
+
+    await expect(done).resolves.toBeUndefined();
   });
 });
