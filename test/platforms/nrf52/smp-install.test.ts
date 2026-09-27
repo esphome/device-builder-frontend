@@ -29,6 +29,7 @@ import { SMP_BLE_SERVICE_UUID } from "../../../src/platforms/nrf52/smp-ble-servi
 import {
   SmpBleServiceNotFoundError,
   SmpNoReplyError,
+  SmpRestartNeededError,
 } from "../../../src/platforms/nrf52/smp-engine.js";
 import {
   nrfSmpBleInstall,
@@ -209,6 +210,18 @@ describe("MCUboot install over Bluetooth", () => {
 
 describe("MCUboot install over serial", () => {
   const lost = new SerialDeviceLostError();
+
+  it("asks for a restart when the reset could not be sent", async () => {
+    const host = makeHost();
+    await nrfSmpSerialInstall.start(asHost(host));
+    mocks.flashMcubootOverSerial.mockRejectedValue(new SmpRestartNeededError(lost));
+
+    await flash(nrfSmpSerialInstall, host);
+
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.nrf_smp_restart_needed_title");
+    expect(host._errorMessage).toBe("firmware.nrf_smp_restart_needed");
+  });
 
   it.each([
     ["a write", lost],

@@ -227,6 +227,9 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
     if (err instanceof engine.SmpBleServiceNotFoundError) {
       return this._localize("firmware.nrf_smp_ble_service_not_found");
     }
+    if (err instanceof engine.SmpRestartNeededError) {
+      return this._localize("firmware.nrf_smp_restart_needed");
+    }
     if (engine.isSerialDeviceLost(err)) return this._localize("serial.device_lost");
     // Only a device that never answered: one that stopped part way has the
     // transport.

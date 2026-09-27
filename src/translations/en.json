@@ -582,6 +582,8 @@
     "nrf_smp_serial_ready_desc": "Click Flash and pick the device's serial port.",
     "nrf_smp_ble_failed": "Bluetooth update failed",
     "nrf_smp_serial_failed": "Serial update failed",
+    "nrf_smp_restart_needed_title": "Restart the device to finish",
+    "nrf_smp_restart_needed": "The new firmware is on the device, but the device could not be restarted. Restart or power cycle it to start the new firmware.",
     "nrf_smp_ble_service_not_found": "This device does not have the mcumgr Bluetooth service. Make sure you selected the right device and that its firmware has the mcumgr Bluetooth transport.",
     "status_done": "Installation complete!",
     "status_failed": "Installation failed",

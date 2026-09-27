@@ -44,6 +44,7 @@ import { SMP_BLE_SERVICE_UUID } from "../../../../src/platforms/nrf52/smp-ble-se
 import {
   SmpBleServiceNotFoundError,
   SmpNoReplyError,
+  SmpRestartNeededError,
   SmpSilentDeviceError,
 } from "../../../../src/platforms/nrf52/smp-engine.js";
 import { SerialDeviceLostError } from "../../../../src/util/serial-open-error.js";
@@ -163,6 +164,16 @@ describe.each(TRANSPORTS)(
 
       expect(el._state).toBe("error");
       expect(el._errorMessage).toBe("web.nrf.update_no_reply");
+    });
+
+    it("asks for a restart when the reset could not be sent", async () => {
+      const el = await mountDialog();
+      flash.mockRejectedValue(new SmpRestartNeededError(new Error("write failed")));
+
+      await el[run]();
+
+      expect(el._state).toBe("error");
+      expect(el._errorMessage).toBe("firmware.nrf_smp_restart_needed");
     });
 
     it("says so when the update tools cannot be loaded", async () => {
