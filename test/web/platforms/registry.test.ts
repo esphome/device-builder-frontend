@@ -76,6 +76,7 @@ describe("webPlatformOfPort", () => {
   it("says nothing for a UART bridge, which fronts an ESP as readily as an RTL8720C", () => {
     expect(familyOf(port(0x1a86, 0x7523))).toBeNull();
     expect(familyOf(port(0x10c4, 0xea60))).toBeNull();
+    expect(familyOf(port(0x303a, 0x1002))).toBeNull(); // ESP-USB-Bridge
   });
 
   it("says nothing for an unknown vendor or a non-USB port", () => {

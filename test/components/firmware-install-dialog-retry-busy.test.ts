@@ -1,9 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * The error-screen Retry bypasses the page-level seam guards, so it waits
- * out a foreign running build (never claiming it) before re-running the
- * install flow (#1202).
+ * The error-screen Retry re-runs the install in the click, awaiting nothing:
+ * the Web Serial install asks for its port first, and a port picker needs the
+ * click (#1893). A build someone else started meanwhile is waited out by the
+ * compile, not here (#1202).
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,100 +18,66 @@ vi.mock("../../src/platforms/esp/esptool.js", () => ({
 }));
 
 import { identityLocalize } from "../_dom.js";
-import { fakeLogBuffer } from "../_fake-host.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-
-// The log as the failed run left it, so Retry has something to drop.
-const failedRunLog = () => {
-  const log = fakeLogBuffer();
-  log.append(["old failure line"]);
-  return log;
-};
-
-type FollowCbs = {
-  onResult?: (d: unknown) => void;
-  onError?: (e: string) => void;
-};
+import type { Installer } from "../../src/components/firmware-install-dialog/types.js";
 
 const runningJob = { job_id: "foreign-1", configuration: "device.yaml" } as FirmwareJob;
 
-function makeDialog(busy: boolean) {
+function makeDialog(installer: Installer) {
   const dialog = new ESPHomeFirmwareInstallDialog();
-  const followJob = vi.fn((_id: string, cbs: FollowCbs) => {
-    cbs.onResult?.({ status: "completed" });
-    return "s1";
-  });
+  const followJob = vi.fn(() => "s1");
   Object.assign(dialog, {
     _device: { configuration: "device.yaml" } as ConfiguredDevice,
-    _installer: "web-serial",
+    _installer: installer,
     _step: "error",
-    _log: failedRunLog(),
     _localize: identityLocalize,
-    _activeJobs: busy ? new Map([["device.yaml", runningJob]]) : new Map(),
+    _activeJobs: new Map([["device.yaml", runningJob]]),
     _api: { firmwareFollowJob: followJob },
   });
-  const installWebSerial = vi.fn();
-  const installUsbFlash = vi.fn();
-  dialog.installWebSerial = installWebSerial;
-  dialog.installUsbFlash = installUsbFlash;
-  return { dialog, followJob, installWebSerial, installUsbFlash };
+  const installs = {
+    installWebSerial: vi.fn(),
+    installUsbFlash: vi.fn(),
+    installBrowserFlasher: vi.fn(),
+  };
+  Object.assign(dialog, installs);
+  return { dialog, followJob, ...installs };
 }
 
 describe("install-dialog Retry while a foreign build runs", () => {
-  it("waits out the running job (without claiming it), then retries", async () => {
-    const { dialog, followJob, installWebSerial } = makeDialog(true);
-    await dialog._retry();
-    expect(followJob).toHaveBeenCalledWith("foreign-1", expect.anything());
-    expect(installWebSerial).toHaveBeenCalledTimes(1);
-    // Never claims the foreign job: dismissal must not cancel it.
-    expect(dialog._jobId).toBe("");
-    // The failed run's log was dropped, not concatenated with the wait's.
-    expect(dialog._log.lines).not.toContain("old failure line");
+  it.each([
+    ["web-serial", "installWebSerial"],
+    ["web-flash", "installUsbFlash"],
+  ] as const)("re-runs a %s install in the click", (installer, install) => {
+    const made = makeDialog(installer);
+    // Not awaited: the install has to start before the click's turn ends.
+    void made.dialog._retry();
+    expect(made[install]).toHaveBeenCalledTimes(1);
+    expect(made.followJob).not.toHaveBeenCalled();
   });
 
-  it("resets the compile clocks before streaming the foreign build", async () => {
-    const { dialog } = makeDialog(true);
-    const reset = vi.spyOn(dialog._timer, "reset");
-    await dialog._retry();
-    expect(reset).toHaveBeenCalled();
+  it("re-runs a platform flasher that has no image yet", () => {
+    const made = makeDialog("web-serial");
+    const flasher = { id: "rtl-ambz2", image: { get: () => null } };
+    Object.assign(made.dialog, { _installer: flasher.id, _flasher: flasher });
+    void made.dialog._retry();
+    expect(made.installBrowserFlasher).toHaveBeenCalledTimes(1);
+    expect(made.installWebSerial).not.toHaveBeenCalled();
+    expect(made.followJob).not.toHaveBeenCalled();
   });
 
-  it("routes a web-flash retry through the USB flow after the wait", async () => {
-    const { dialog, installUsbFlash, installWebSerial } = makeDialog(true);
-    dialog._installer = "web-flash";
-    await dialog._retry();
-    expect(installUsbFlash).toHaveBeenCalledTimes(1);
-    expect(installWebSerial).not.toHaveBeenCalled();
+  it("opens no port picker for an install that is not the Web Serial one", () => {
+    const made = makeDialog("binary-download");
+    void made.dialog._retry();
+    expect(made.installWebSerial).not.toHaveBeenCalled();
+    expect(made.installUsbFlash).not.toHaveBeenCalled();
   });
 
-  it("fails with the install message and does not retry on a stream error", async () => {
-    const { dialog, followJob, installWebSerial } = makeDialog(true);
-    followJob.mockImplementationOnce((_id: string, cbs: FollowCbs) => {
-      cbs.onError?.("stream lost");
-      return "s1";
-    });
-    await dialog._retry();
-    expect(dialog._step).toBe("error");
-    expect(dialog._statusMessage).toBe("firmware.install_failed");
-    expect(installWebSerial).not.toHaveBeenCalled();
-  });
-
-  it("bails when dismissed mid-wait", async () => {
-    const { dialog, followJob, installWebSerial } = makeDialog(true);
-    followJob.mockImplementationOnce(() => "s1"); // never completes
-    const flow = dialog._retry();
-    expect(dialog._compileReject).not.toBeNull();
-    dialog._compileReject!(new Error("Install dialog dismissed"));
-    await flow;
-    expect(installWebSerial).not.toHaveBeenCalled();
-  });
-
-  it("retries immediately when nothing is running", async () => {
-    const { dialog, followJob, installWebSerial } = makeDialog(false);
-    await dialog._retry();
-    expect(followJob).not.toHaveBeenCalled();
-    expect(installWebSerial).toHaveBeenCalledTimes(1);
+  it("does nothing without a device", () => {
+    const made = makeDialog("web-serial");
+    made.dialog._device = null;
+    void made.dialog._retry();
+    expect(made.installWebSerial).not.toHaveBeenCalled();
   });
 });

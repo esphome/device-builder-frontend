@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 import { identityLocalize } from "../../_dom.js";
-import { fakeLogBuffer } from "../../_fake-host.js";
+import { fakeBuildState, fakeLogBuffer } from "../../_fake-host.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
@@ -41,6 +41,7 @@ export function makeFlashHost<E extends object>(
     _statusMessage: "",
     _errorMessage: "",
     _log: fakeLogBuffer(),
+    ...fakeBuildState(),
     _jobId: "",
     _streamId: "",
     _compileReject: null,

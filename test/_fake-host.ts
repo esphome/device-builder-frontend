@@ -36,3 +36,12 @@ export function fakeLogBuffer(): LogBuffer {
   buffer.enqueue = (line: string) => void buffer.append([line]);
   return buffer;
 }
+
+/**
+ * What an install dialog knows of its device's builds, for flow tests: the
+ * running jobs (none) and the compile clocks.
+ */
+export const fakeBuildState = () => ({
+  _activeJobs: new Map<string, { job_id: string }>(),
+  _timer: { noteLine: vi.fn(), reset: vi.fn() },
+});

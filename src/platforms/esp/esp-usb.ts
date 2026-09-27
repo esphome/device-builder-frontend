@@ -20,6 +20,15 @@ export function isEspressifUsbJtagPort(port: SerialPort): boolean {
   return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_JTAG_PID;
 }
 
+/** Espressif's own UART bridge, the ESP-USB-Bridge, which can front any board. */
+const ESPRESSIF_USB_BRIDGE_PID = 0x1002;
+
+/** Whether *port* is an ESP-USB-Bridge, a UART bridge under Espressif's vendor id. */
+export function isEspressifUsbBridgePort(port: SerialPort): boolean {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  return usbVendorId === ESPRESSIF_USB_VID && usbProductId === ESPRESSIF_USB_BRIDGE_PID;
+}
+
 export interface FlashProgress {
   fileIndex: number;
   written: number;

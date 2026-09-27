@@ -12,8 +12,8 @@ authoritative coding standard for this repo, set and maintained
 by the human maintainers; everything in this CLAUDE.md sits on
 top of them. When a rule in README.md and a rule here disagree,
 README.md wins; flag the conflict in the PR so this file can be
-brought back into line. Read [README.md → "Contributing — keep it
-simple"](README.md#contributing--keep-it-simple) too: it is the
+brought back into line. Read [README.md → "Contributing - keep it
+simple"](README.md#contributing---keep-it-simple) too: it is the
 product policy on flags and settings, and it decides whether a PR
 is accepted at all.
 
@@ -81,8 +81,8 @@ is to pick one behaviour, not to add a switch.
 ## Keep the UI simple: no new flags
 
 Product policy set by the maintainers; the full text is in
-[README.md → "Contributing — keep it
-simple"](README.md#contributing--keep-it-simple). ESPHome is
+[README.md → "Contributing - keep it
+simple"](README.md#contributing---keep-it-simple). ESPHome is
 already hard enough to onboard into, and the dashboard must not
 add to that, so flags, preferences and toggles that gate
 behaviour need a very strong justification and maintainer

@@ -66,10 +66,18 @@ export function showOtaLogs(host: ESPHomeFirmwareInstallDialog): void {
 }
 
 // Compile, surfacing a failure on the dialog. Returns false so the caller bails.
+// A build someone else started for the device is waited out first: compiling
+// now would supersede it (#1202). The wait sits here, behind whatever the flow
+// asked the user for, so a port picker still opens in its click (#1893).
 export async function compileOrFail(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<boolean> {
+  const failKey =
+    host._installer === "binary-download"
+      ? "firmware.download_failed"
+      : "firmware.install_failed";
+  if (!(await runningBuildSettled(host, configuration, failKey))) return false;
   try {
     await compileAndWait(host, configuration);
     return true;
@@ -227,11 +235,40 @@ async function artifactsSettled(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<boolean> {
-  const running = host._activeJobs.get(configuration);
-  if (!running) return true;
-  host._statusMessage = host._localize("firmware.status_waiting_build");
-  if (!(await waitForRunningJob(host, running.job_id))) return false;
+  if (!(await runningBuildSettled(host, configuration, "firmware.download_failed"))) {
+    return false;
+  }
   host._statusMessage = host._localize("firmware.status_downloading");
+  return true;
+}
+
+/**
+ * Wait out a running job for *configuration*, if there is one, and leave the
+ * dialog as a flow that has not compiled yet: the followed build's lines
+ * moved the step on and started the compile clocks, which the flow's own
+ * compile would otherwise inherit. True to proceed, as ``waitForRunningJob``.
+ */
+async function runningBuildSettled(
+  host: ESPHomeFirmwareInstallDialog,
+  configuration: string,
+  failKey: string
+): Promise<boolean> {
+  let waited = "";
+  // A build queued behind the one waited for takes the slot when that one
+  // ends, so the slot is read again. The same job still listed is the map
+  // not having caught up, not another build.
+  for (;;) {
+    const running = host._activeJobs.get(configuration);
+    if (!running || running.job_id === waited) break;
+    waited = running.job_id;
+    host._step = "queued";
+    host._statusMessage = host._localize("firmware.status_waiting_build");
+    if (!(await waitForRunningJob(host, waited, failKey))) return false;
+  }
+  if (!waited) return true;
+  host._step = "queued";
+  host._timer.reset();
+  host._statusMessage = host._localize("firmware.status_queued");
   return true;
 }
 

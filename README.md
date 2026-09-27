@@ -38,7 +38,7 @@ The new-issue chooser on this repo only surfaces redirect links — there's no w
 - **🐛 Bugs** → [backend issue tracker](https://github.com/esphome/device-builder/issues). UI bugs go there too so we can triage everything in one place.
 - **💡 Feature ideas** → [ESPHome org discussions](https://github.com/orgs/esphome/discussions) or the [dashboard Discord channel](https://discord.gg/Rf2jWGVjaK) where the new UI is actively discussed and feedback is being collected. Once a request is shaped enough to be actionable a maintainer adds it to the backlog above.
 
-## Contributing — keep it simple
+## Contributing - keep it simple
 
 ESPHome is already a lot to take in for someone setting up their first device. The dashboard's job is to make that easier, not to add to it, so we keep the UI small and opinionated. We do not add flags, preferences or toggles to gate behaviour without a very strong justification and sign-off from the maintainers.
 
