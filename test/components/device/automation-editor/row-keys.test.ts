@@ -103,4 +103,49 @@ describe("RowKeys", () => {
     keys.keysFor(edited);
     expect(keysOf(keys, removeAt(edited, 0))).toEqual([b, c]);
   });
+
+  describe("a list read again, every row a new object", () => {
+    const reread = (...names: string[]) => names.map(row);
+
+    it("keeps the rows' keys when a row is added above them", () => {
+      const { keys, a, b, c } = seeded("a", "b", "c");
+      const next = keysOf(keys, reread("new", "a", "b", "c"));
+      expect(next.slice(1)).toEqual([a, b, c]);
+      expect([a, b, c]).not.toContain(next[0]);
+    });
+
+    it("keeps the rows' keys when a row is added between them", () => {
+      const { keys, a, b, c } = seeded("a", "b", "c");
+      const next = keysOf(keys, reread("a", "new", "b", "c"));
+      expect([next[0], next[2], next[3]]).toEqual([a, b, c]);
+      expect([a, b, c]).not.toContain(next[1]);
+    });
+
+    it("keeps the other rows' keys when a row is removed", () => {
+      const { keys, b, c } = seeded("a", "b", "c");
+      expect(keysOf(keys, reread("b", "c"))).toEqual([b, c]);
+    });
+
+    it("moves the keys with rows that swapped places", () => {
+      const { keys, a, b, c } = seeded("a", "b", "c");
+      expect(keysOf(keys, reread("b", "a", "c"))).toEqual([b, a, c]);
+    });
+
+    it("keeps the key of a row edited where it is", () => {
+      const { keys, a, b, c } = seeded("a", "b", "c");
+      expect(keysOf(keys, reread("a", "b edited", "c"))).toEqual([a, b, c]);
+    });
+
+    it("matches rows of the same content in order", () => {
+      const { keys, a, b, c } = seeded("same", "same", "c");
+      expect(keysOf(keys, reread("same", "same", "c"))).toEqual([a, b, c]);
+      expect(keysOf(keys, reread("same", "c"))).toEqual([a, c]);
+    });
+  });
+
+  it("keeps an edited row's own key when its new content is another row's", () => {
+    const { keys, rows, a, b, c } = seeded("a", "b", "c");
+    const next = replaceAt(rows, 0, row("b"));
+    expect(keysOf(keys, next)).toEqual([a, b, c]);
+  });
 });

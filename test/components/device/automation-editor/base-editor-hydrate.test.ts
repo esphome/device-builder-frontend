@@ -207,4 +207,40 @@ describe("base editor relocation hydrate", () => {
     expect(parse).toHaveBeenCalled();
     expect(actionList(editor)).toBe(before);
   });
+
+  describe("what the editor tells the forms under it", () => {
+    const reads = (editor: ESPHomeScriptEditor): number => (editor as any)._valuesRead;
+    const EDITED = "script:\n  - id: a # by hand\n";
+
+    it("counts a YAML edited outside the editor, and again the tree read from it", async () => {
+      const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
+      const { editor } = await mountAt("a", parse);
+      const before = reads(editor);
+
+      (editor as any).yaml = EDITED;
+      await editor.updateComplete;
+      expect(reads(editor)).toBe(before + 1);
+
+      editor.reload();
+      await flushMicrotasks(5);
+      await editor.updateComplete;
+      expect(reads(editor)).toBe(before + 2);
+    });
+
+    it("does not count the YAML the editor wrote itself", async () => {
+      const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
+      const { editor } = await mountAt("a", parse);
+      const before = reads(editor);
+      expect(before).toBeGreaterThan(0);
+
+      (editor as any)._engine._lastSelfWrittenYaml = EDITED;
+      (editor as any).yaml = EDITED;
+      await editor.updateComplete;
+      editor.reload();
+      await flushMicrotasks(5);
+      await editor.updateComplete;
+
+      expect(reads(editor)).toBe(before);
+    });
+  });
 });

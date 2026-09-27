@@ -255,4 +255,26 @@ describe("automation-condition-tree advanced section", () => {
 
     expect(forms(el)[0].hasAttribute("show-advanced")).toBe(false);
   });
+
+  it("keeps the flag with its condition when the list is read again with a row above", async () => {
+    const el = await mountTree([node("sensor.in_range"), node("number.in_range")]);
+    const opened = forms(el)[1];
+    toggleAdvanced(opened, true);
+    await el.updateComplete;
+
+    // Every node a new object, as after a parse of the YAML.
+    el.conditions = [
+      { condition_id: "sensor.in_range", params: { above: 5 } },
+      node("sensor.in_range"),
+      node("number.in_range"),
+    ];
+    await el.updateComplete;
+
+    expect(forms(el).map((form) => form.hasAttribute("show-advanced"))).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(forms(el)[2]).toBe(opened);
+  });
 });

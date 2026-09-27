@@ -84,7 +84,6 @@ export function renderStructuredFormBranch(
       .entries=${renderEntries}
       .requiredGroups=${config.required_groups}
       .values=${host._values}
-      .valuesRead=${host._valuesRead}
       .errors=${host._mergeErrors(
         host.backendErrors.fields,
         host._clearedBackendPaths,

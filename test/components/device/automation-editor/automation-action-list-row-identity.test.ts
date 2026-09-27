@@ -240,4 +240,52 @@ describe("automation-action-list row identity", () => {
     expect(list.actions).toEqual([delay("1s"), delay("9s")]);
     expect(nodes(list)).toEqual(before);
   });
+
+  describe("a list read again from the YAML, every action a new object", () => {
+    const collapsed = (list: ESPHomeAutomationActionList) =>
+      nodes(list).map(
+        (node) =>
+          nodeButton(node, "button[aria-expanded]").getAttribute("aria-expanded") ===
+          "false"
+      );
+
+    async function reread(list: ESPHomeAutomationActionList, actions: ActionNode[]) {
+      list.actions = actions;
+      await settle(list);
+    }
+
+    it("keeps a collapsed card collapsed when an action is added above it", async () => {
+      const list = await mountList([delay("1s"), delay("2s")]);
+      const second = nodes(list)[1];
+      nodeButton(second, "button[aria-expanded]").click();
+      await settle(list);
+
+      await reread(list, [delay("5s"), delay("1s"), delay("2s")]);
+
+      expect(collapsed(list)).toEqual([false, false, true]);
+      expect(nodes(list)[2]).toBe(second);
+    });
+
+    it("keeps a collapsed card collapsed when the action above it is removed", async () => {
+      const list = await mountList([delay("1s"), delay("2s")]);
+      nodeButton(nodes(list)[1], "button[aria-expanded]").click();
+      await settle(list);
+
+      await reread(list, [delay("2s")]);
+
+      expect(collapsed(list)).toEqual([true]);
+    });
+
+    it("does not restore a removed action's lambda into the one that remains", async () => {
+      const list = await mountList([delay(lambda("return 1111;")), delay("2s")]);
+      toggle(nodes(list)[0], "literal");
+      await settle(list);
+
+      await reread(list, [delay("2s")]);
+      toggle(nodes(list)[0], "lambda");
+      await settle(list);
+
+      expect(list.actions).toEqual([delay(lambda(""))]);
+    });
+  });
 });

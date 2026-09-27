@@ -5,7 +5,7 @@
  * error + confirm-gated delete footer. Subclasses own their body
  * render and lifecycle (hydrate, catalog lists, headers).
  */
-import { consume } from "@lit/context";
+import { consume, provide } from "@lit/context";
 import { type CSSResultGroup, html, LitElement, nothing } from "lit";
 import { property, state } from "lit/decorators.js";
 
@@ -18,7 +18,11 @@ import type {
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
-import { apiContext, localizeContext } from "../../../context/index.js";
+import {
+  apiContext,
+  localizeContext,
+  valuesReadContext,
+} from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles, heldStyles } from "../../../styles/shared.js";
 import { formatApiError } from "../../../util/format-api-error.js";
@@ -104,6 +108,11 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
    *  tree lands. */
   protected _target = 0;
   private _retargeted = false;
+
+  /** For the forms under the editor: goes up when the YAML was edited
+   *  outside it, which is up to a second before the reload, and when the
+   *  tree was read from it. */
+  @provide({ context: valuesReadContext }) private _valuesRead = 0;
 
   /** "Show advanced settings" of the editor's own form; collapsed again
    *  for each automation the editor is pointed at. */
@@ -246,6 +255,8 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
           this._showAdvanced = false;
         }
         this._retargeted = false;
+        // Not for the editor's own write, read back while this waited.
+        if (!this._engine.shouldSkipReload()) this._valuesRead++;
         this.value = m.tree;
         this._hydrating = false;
         // The re-read tree replaced the form state, failed edit
@@ -296,6 +307,7 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
         this._retargeted = true;
       }
     }
+    if (changed.has("yaml") && !this._engine.shouldSkipReload()) this._valuesRead++;
     setHeld(this, this._hydrating);
   }
 

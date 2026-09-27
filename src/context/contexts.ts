@@ -228,6 +228,15 @@ export const integrationDocsContext = createContext<Record<string, IntegrationDo
 export const labelsContext = createContext<Label[]>(Symbol("esphome-labels"));
 
 /**
+ * Context for a count of the times the editor above a form took its values
+ * from the YAML, or saw the YAML edited outside itself. Provided by the
+ * section editor and the automation editors. A form is not told what moved
+ * in the YAML, so on a new count it forgets what could write a value the
+ * user did not just enter.
+ */
+export const valuesReadContext = createContext<number>(Symbol("esphome-values-read"));
+
+/**
  * Context for whether onboarding still has work to do.
  *
  * App shell loads ``onboarding/get_state`` on (re)connect and

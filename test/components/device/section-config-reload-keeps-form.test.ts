@@ -208,7 +208,8 @@ describe("section reload keeps the form mounted", () => {
       await c.updateComplete;
     }
 
-    const reads = (c: ESPHomeDeviceSectionConfig): number => form(c).valuesRead;
+    // What the section provides to the form, which is a stub here.
+    const reads = (c: ESPHomeDeviceSectionConfig): number => (c as any)._valuesRead;
 
     it("tells the form at once, before the reload that follows a second later", async () => {
       const { c } = await firstLoad();
