@@ -85,6 +85,35 @@ describe("install-dialog dismissal", () => {
     expect(notifyInfo).not.toHaveBeenCalled();
   });
 
+  it("a reopen for the same device is a new install run", () => {
+    const { dialog } = makeDialog();
+    const device = { configuration: "d.yaml", name: "d", friendly_name: "D" };
+    dialog["_init"](device as never);
+    const run = dialog._installRun;
+    dialog._onClose();
+    dialog["_init"](device as never);
+    expect(dialog._installRun).toBe(run + 1);
+    expect(dialog._open).toBe(true);
+  });
+
+  it("an after-hide that lands after a reopen leaves the new run alone", () => {
+    const { dialog, api, reject } = makeDialog();
+    const device = { configuration: "d.yaml", name: "d", friendly_name: "D" };
+    dialog._onRequestClose();
+    // The reopen tears the old run down itself, before its after-hide fires.
+    dialog["_init"](device as never);
+    expect(reject).toHaveBeenCalledTimes(1);
+    const rejectNext = vi.fn();
+    Object.assign(dialog, { _jobId: "j2", _streamId: "s2", _compileReject: rejectNext });
+
+    dialog._onClose();
+
+    expect(dialog._open).toBe(true);
+    expect(dialog._jobId).toBe("j2");
+    expect(rejectNext).not.toHaveBeenCalled();
+    expect(api.stopStream).not.toHaveBeenCalledWith("s2");
+  });
+
   it("_close never cancels", () => {
     const { dialog, api } = makeDialog();
     dialog._close();

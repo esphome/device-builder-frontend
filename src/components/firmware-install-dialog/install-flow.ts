@@ -65,6 +65,16 @@ export function showOtaLogs(host: ESPHomeFirmwareInstallDialog): void {
   if (handled) host._open = false;
 }
 
+/**
+ * Whether the dialog is still open on the install run it is on now. A
+ * dismissal only flips the open flag; a reopen, for the same device or
+ * another, starts the next run.
+ */
+export function runGuard(host: ESPHomeFirmwareInstallDialog): () => boolean {
+  const run = host._installRun;
+  return () => host._installRun === run && host._open;
+}
+
 // Compile, surfacing a failure on the dialog. Returns false so the caller bails.
 // A build someone else started for the device is waited out first: compiling
 // now would supersede it (#1202). The wait sits here, behind whatever the flow
@@ -77,11 +87,19 @@ export async function compileOrFail(
     host._installer === "binary-download"
       ? "firmware.download_failed"
       : "firmware.install_failed";
-  if (!(await runningBuildSettled(host, configuration, failKey))) return false;
+  const stillCurrent = runGuard(host);
+  // A build that ends between a close and its after-hide is nobody's to carry
+  // on with: the dialog is going, and the rejection has not come yet.
+  if (!(await runningBuildSettled(host, configuration, failKey)) || !stillCurrent()) {
+    return false;
+  }
   try {
     await compileAndWait(host, configuration);
-    return true;
+    return stillCurrent();
   } catch (err) {
+    // A dismissal settles the compile by rejecting it; the dialog it would
+    // be reported on is gone, or on its next run already.
+    if (!stillCurrent()) return false;
     // ??= so a "validate" already recorded off the output stream survives.
     host._failureKind ??= "compile";
     host._fail(host._localize("firmware.compile_failed"), compileFailureDetail(err));
@@ -291,6 +309,8 @@ export function waitForRunningJob(
   jobId: string,
   failKey = "firmware.download_failed"
 ): Promise<boolean> {
+  const run = host._installRun;
+  const stillCurrent = runGuard(host);
   return new Promise((resolve) => {
     host._compileReject = () => resolve(false);
     const follow = (): void => {
@@ -309,21 +329,25 @@ export function waitForRunningJob(
         onError: () => {
           host._streamId = "";
           host._compileReject = null;
-          host._fail(host._localize(failKey));
+          if (stillCurrent()) host._fail(host._localize(failKey));
           resolve(false);
         },
         onConnectionLost: () => {
           host._streamId = "";
           resumeFollowOnReady(host._api, {
-            // A dismissal settled the wait and nulled the reject hook.
-            isStale: () => host._compileReject === null || host._streamId !== "",
+            // A dismissal settled the wait and nulled the reject hook; a
+            // reopen started the next run, whose hook this is not.
+            isStale: () =>
+              host._installRun !== run ||
+              host._compileReject === null ||
+              host._streamId !== "",
             resume: () => {
               host._log.reset();
               follow();
             },
             giveUp: () => {
               host._compileReject = null;
-              host._fail(host._localize(failKey));
+              if (stillCurrent()) host._fail(host._localize(failKey));
               resolve(false);
             },
           });
@@ -401,6 +425,11 @@ export function compileAndWait(
     // where the constructor expects a void-returning one.
     const start = async () => {
       const job = await host._api.firmwareCompile(configuration);
+      // A teardown while the submit was out (the after-hide of a dismissal,
+      // or the _init of a reopen) settled this promise and took the hook: the
+      // job is not this dialog's to follow. A dismissal whose after-hide is
+      // still to come records it, so that after-hide can say it goes on.
+      if (host._compileReject !== reject) return;
       host._jobId = job.job_id;
       // Capture so a compile failure can pick the right hint variant:
       // local jobs get the link-to-reset, remote jobs get the plain-text
@@ -411,7 +440,8 @@ export function compileAndWait(
       follow(job.job_id);
     };
     start().catch((err: unknown) => {
-      host._compileReject = null;
+      // After a teardown the hook on the dialog is gone, or the next run's.
+      if (host._compileReject === reject) host._compileReject = null;
       // Raw rejection: compileFailureDetail normalizes downstream.
       reject(err);
     });

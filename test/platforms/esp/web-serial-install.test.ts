@@ -74,6 +74,7 @@ function makeHost() {
     _flashPercent: 0,
     _log: fakeLogBuffer(),
     _open: true,
+    _installRun: 1,
     _showLogsAfterInstall: false,
     _detected: null as unknown,
     _failureKind: null,
@@ -438,5 +439,370 @@ describe("Web Serial install when the board is unplugged during the flash (#1896
 
     expect(host._fail).not.toHaveBeenCalled();
     expect(host._step).toBe("done");
+  });
+});
+
+describe("Web Serial install dismissed before the flash (#1900)", () => {
+  function ready() {
+    const made = makeHost();
+    esptool.connectToPort.mockResolvedValue(CHIP);
+    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.flashFirmware.mockResolvedValue(undefined);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
+    return made;
+  }
+  const run = (host: unknown) =>
+    startWebSerialInstall(host as ESPHomeFirmwareInstallDialog);
+  // X and Escape flip the open flag and leave the device in place.
+  const dismiss = (host: { _open: boolean }) => {
+    host._open = false;
+  };
+  // A reopen for the same device is a new install run on an open dialog.
+  const reopen = (host: { _open: boolean; _installRun: number; _step: string }) => {
+    host._installRun++;
+    host._open = true;
+    host._step = "connecting";
+  };
+
+  type Made = ReturnType<typeof ready>;
+  it.each([
+    {
+      name: "the port pick",
+      arm: ({ host }: Made) =>
+        seams.requestSerialPort.mockImplementationOnce(async () => {
+          dismiss(host);
+          return { getInfo: () => ({}) } as SerialPort;
+        }),
+      released: false,
+    },
+    {
+      name: "a port pick that then fails",
+      arm: ({ host }: Made) =>
+        seams.requestSerialPort.mockImplementationOnce(async () => {
+          dismiss(host);
+          throw lapsedPick();
+        }),
+      released: false,
+    },
+    {
+      name: "the connect",
+      arm: ({ host }: Made) =>
+        esptool.connectToPort.mockImplementationOnce(async () => {
+          dismiss(host);
+          return CHIP;
+        }),
+      released: true,
+    },
+    {
+      name: "a connect that then fails",
+      arm: ({ host }: Made) =>
+        esptool.connectToPort.mockImplementationOnce(async () => {
+          dismiss(host);
+          throw new Error("Failed to connect with the device");
+        }),
+      released: false,
+    },
+    {
+      name: "the chip check",
+      arm: ({ host, api }: Made) => {
+        host._device.board_id = "esp32dev";
+        api.getBoard.mockImplementationOnce(async () => {
+          dismiss(host);
+          return { esphome: { platform: "esp32" } };
+        });
+      },
+      released: true,
+    },
+    {
+      name: "the image listing",
+      arm: ({ host, api }: Made) =>
+        api.firmwareGetBinaries.mockImplementationOnce(async () => {
+          dismiss(host);
+          return [{ title: "Factory", file: "firmware.factory.bin" }];
+        }),
+      released: true,
+    },
+    {
+      name: "the image listing, which then finds none",
+      arm: ({ host, api }: Made) =>
+        api.firmwareGetBinaries.mockImplementationOnce(async () => {
+          dismiss(host);
+          return [];
+        }),
+      released: true,
+    },
+    {
+      name: "the wait for a build someone else started",
+      arm: ({ host, api }: Made) => {
+        host._activeJobs.set("device.yaml", { job_id: "foreign-1" });
+        api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: Follow) => {
+          dismiss(host);
+          cbs.onError("stream lost");
+          return "s1";
+        });
+      },
+      released: true,
+    },
+    {
+      name: "the download",
+      arm: ({ host, api }: Made) =>
+        api.firmwareDownloadBytes.mockImplementationOnce(async () => {
+          dismiss(host);
+          return new Uint8Array([1]).buffer;
+        }),
+      released: true,
+      downloads: true,
+    },
+    {
+      name: "a download that then fails",
+      arm: ({ host, api }: Made) =>
+        api.firmwareDownloadBytes.mockImplementationOnce(async () => {
+          dismiss(host);
+          throw new Error("boom");
+        }),
+      released: true,
+      downloads: true,
+    },
+  ])(
+    "stands down quietly when dismissed during $name",
+    async ({ arm, released, downloads }) => {
+      const made = ready();
+      arm(made);
+
+      await run(made.host);
+
+      expect(esptool.flashFirmware).not.toHaveBeenCalled();
+      expect(made.host._fail).not.toHaveBeenCalled();
+      expect(made.host._close).not.toHaveBeenCalled();
+      // A dismissal before the download never starts one.
+      if (!downloads) expect(made.api.firmwareDownloadBytes).not.toHaveBeenCalled();
+      if (released) expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+      else expect(esptool.disconnect).not.toHaveBeenCalled();
+    }
+  );
+
+  it("does not mark a reopened dialog with a chip mismatch found for the run before", async () => {
+    const { host, api } = ready();
+    host._device.target_platform = "esp8266";
+    host._device.board_id = "esp8285";
+    api.getBoard.mockResolvedValue({ esphome: { platform: "esp8266" } });
+    esptool.disconnect.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledTimes(1);
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._failureKind).toBeNull();
+  });
+
+  it.each([
+    { name: "dismissed", reopened: false },
+    { name: "dismissed and reopened for the same device", reopened: true },
+  ])("stands down quietly when $name during the compile", async ({ reopened }) => {
+    const { host, api } = ready();
+    api.firmwareFollowJob.mockImplementationOnce(() => {
+      queueMicrotask(() => {
+        dismiss(host);
+        if (reopened) reopen(host);
+        host._compileReject?.(new Error("Install dialog dismissed"));
+      });
+      return "s1";
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(esptool.flashFirmware).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._failureKind).toBeNull();
+  });
+
+  it("finishes a flash the same device was reopened during without painting on the new run", async () => {
+    const { host } = ready();
+    esptool.flashFirmware.mockImplementationOnce(async (_l, _d, _a, onProgress) => {
+      onProgress({ percent: 40 });
+      dismiss(host);
+      reopen(host);
+      onProgress({ percent: 100 });
+    });
+
+    await run(host);
+
+    // The board still gets its reset, so the new firmware boots.
+    expect(esptool.resetAndDisconnect).toHaveBeenCalledTimes(1);
+    expect(host._flashPercent).toBe(40);
+    expect(host._step).toBe("connecting");
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when a flash fails after the same device was reopened", async () => {
+    const { host } = ready();
+    esptool.flashFirmware.mockImplementationOnce(async (_l, _d, _a, onProgress) => {
+      onProgress({ percent: 40 });
+      dismiss(host);
+      reopen(host);
+      throw new SerialDeviceLostError();
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(esptool.resetAndDisconnect).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._step).toBe("connecting");
+  });
+
+  it("does not follow a compile submitted for the run before a reopen", async () => {
+    const { host, api } = ready();
+    api.firmwareCompile.mockImplementationOnce(async () => {
+      dismiss(host);
+      // The reopen's _init settles the compile and drops its hook.
+      host._compileReject?.(new Error("Install dialog dismissed"));
+      host._compileReject = null;
+      reopen(host);
+      return { job_id: "j-old", source: JobSource.LOCAL, source_label: "" };
+    });
+
+    await run(host);
+
+    expect(api.firmwareFollowJob).not.toHaveBeenCalled();
+    expect(host._jobId).toBe("");
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("does not carry on with a build that ended after a dismissal", async () => {
+    const { host, api } = ready();
+    api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: Follow) => {
+      // The close flipped the flag; its after-hide, and the rejection, come later.
+      dismiss(host);
+      cbs.onResult({ status: JobStatus.COMPLETED });
+      return "s1";
+    });
+
+    await run(host);
+
+    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("does not compile after a build it waited for ended past a dismissal", async () => {
+    const { host, api } = ready();
+    host._activeJobs.set("device.yaml", { job_id: "foreign-1" });
+    api.firmwareFollowJob.mockImplementationOnce((_id: string, cbs: Follow) => {
+      dismiss(host);
+      cbs.onResult({ status: JobStatus.COMPLETED });
+      return "s1";
+    });
+
+    await run(host);
+
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("leaves the next run's reject hook alone when the run before's submit fails", async () => {
+    const { host, api } = ready();
+    const nextHook = vi.fn();
+    api.firmwareCompile.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+      host._compileReject?.(new Error("Install dialog dismissed"));
+      // The next run has reached its own compile meanwhile.
+      host._compileReject = nextHook;
+      throw new Error("submit refused");
+    });
+
+    await run(host);
+
+    expect(host._compileReject).toBe(nextHook);
+    expect(nextHook).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("does not follow a compile whose dialog was torn down while the submit was out", async () => {
+    const { host, api } = ready();
+    api.firmwareCompile.mockImplementationOnce(async () => {
+      // The after-hide came before the submit returned: its teardown settled
+      // the compile and dropped the hook.
+      dismiss(host);
+      host._compileReject?.(new Error("Install dialog dismissed"));
+      host._compileReject = null;
+      return { job_id: "j-old", source: JobSource.LOCAL, source_label: "" };
+    });
+
+    await run(host);
+
+    expect(api.firmwareFollowJob).not.toHaveBeenCalled();
+    expect(host._jobId).toBe("");
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("still records a compile submitted for a run that was only dismissed", async () => {
+    const { host, api } = ready();
+    api.firmwareCompile.mockImplementationOnce(async () => {
+      dismiss(host);
+      host._compileReject?.(new Error("Install dialog dismissed"));
+      return { job_id: "j-old", source: JobSource.LOCAL, source_label: "" };
+    });
+    // The build keeps running; the after-hide detaches this follow later.
+    api.firmwareFollowJob.mockImplementationOnce(() => "s1");
+
+    await run(host);
+
+    // The after-hide's "continues in the background" notice needs the id.
+    expect(host._jobId).toBe("j-old");
+    expect(api.firmwareFollowJob).toHaveBeenCalledWith("j-old", expect.anything());
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("does not mark a reopened dialog with the run before's missing image", async () => {
+    const { host, api } = ready();
+    api.firmwareGetBinaries.mockResolvedValueOnce([]);
+    esptool.disconnect.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledTimes(1);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("stands down when the same device was reopened during the connect", async () => {
+    const { host, api } = ready();
+    esptool.connectToPort.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+      return CHIP;
+    });
+
+    await run(host);
+
+    expect(esptool.disconnect).toHaveBeenCalledWith(CHIP.transport);
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._detected).toBeNull();
+    expect(host._step).toBe("connecting");
+  });
+
+  it("does not close a reopened dialog when its own picker was dismissed", async () => {
+    const { host } = ready();
+    seams.requestSerialPort.mockImplementationOnce(async () => {
+      dismiss(host);
+      reopen(host);
+      return null;
+    });
+
+    await run(host);
+
+    expect(host._close).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
   });
 });

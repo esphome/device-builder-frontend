@@ -5,9 +5,11 @@
  */
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
+import { installLog } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import {
   compileOrFail,
   finishWithLogsPort,
+  runGuard,
 } from "../../components/firmware-install-dialog/install-flow.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
@@ -63,14 +65,15 @@ export async function startWebSerialInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
+  // The compile is the one await a dismissal settles; after every other one
+  // the flow checks that the dialog is still on this run.
+  const stillCurrent = runGuard(host);
 
   // Surface esptool-js chip-detect / flash-session output in the shared log,
   // the same buffer the compile phase streams to. Without this the WebSerial
   // install showed no esptool logs at all, unlike the OTA / server-serial
   // paths which stream the backend job output (#346).
-  const onLog = (line: string) => {
-    host._log.enqueue(line);
-  };
+  const onLog = installLog(host, stillCurrent);
 
   // 1. Pick the port in the click (the engine chunk fetches meanwhile), then
   // connect and detect the chip. A dismissed picker closes the dialog.
@@ -78,6 +81,7 @@ export async function startWebSerialInstall(
   try {
     picked = await pickPortAndLoadEsptool();
   } catch (err) {
+    if (!stillCurrent()) return;
     host._fail(
       err instanceof EngineLoadError
         ? host._localize("firmware.engine_load_failed")
@@ -87,6 +91,7 @@ export async function startWebSerialInstall(
     );
     return;
   }
+  if (!stillCurrent()) return;
   if (!picked) {
     host._close();
     return;
@@ -96,6 +101,7 @@ export async function startWebSerialInstall(
   try {
     detected = await esptool.connectToPort(port, onLog);
   } catch (err) {
+    if (!stillCurrent()) return;
     if (err instanceof UnsupportedChipError) {
       host._fail(host._localize("serial.unsupported_chip", { chip: err.chipName }));
       return;
@@ -108,6 +114,13 @@ export async function startWebSerialInstall(
     );
     return;
   }
+  // Past the connect a stand-down must also give the held session back.
+  const standDown = async () => {
+    if (stillCurrent()) return false;
+    await releaseSerial(esptool, detected);
+    return true;
+  };
+  if (await standDown()) return;
   host._detected = detected;
 
   // 2. Verify chip matches platform. device.target_platform only carries the
@@ -131,6 +144,7 @@ export async function startWebSerialInstall(
     } catch {
       // Network hiccup — fall back to target_platform.
     }
+    if (await standDown()) return;
   }
   // Fold the expected side through the same helper so a board catalog stamping
   // the esp8285 variant still matches a detected ESP8266/ESP8285. Idempotent on
@@ -145,6 +159,7 @@ export async function startWebSerialInstall(
     !(expectedIsCoarseEsp32 && detectedVariant.startsWith("esp32"))
   ) {
     await releaseSerial(esptool, detected);
+    if (!stillCurrent()) return;
     host._failureKind = "chip-mismatch";
     host._fail(
       host._localize("firmware.chip_mismatch", {
@@ -177,10 +192,11 @@ export async function startWebSerialInstall(
   let flashAddress: number;
   try {
     const binaries = await host._api.firmwareGetBinaries(device.configuration);
+    if (await standDown()) return;
     const target = pickFlashTarget(detected.chipName, binaries);
     if (!target) {
       await releaseSerial(esptool, detected);
-      host._fail(host._localize("serial.no_firmware"));
+      if (stillCurrent()) host._fail(host._localize("serial.no_firmware"));
       return;
     }
     flashAddress = target.address;
@@ -189,17 +205,23 @@ export async function startWebSerialInstall(
     );
   } catch {
     await releaseSerial(esptool, detected);
-    host._fail(host._localize("firmware.download_failed"));
+    if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
     return;
   }
+  if (await standDown()) return;
 
   // 5. Flash on the still-open session.
+  // The flash and the reset run to their end whatever the dialog does: a
+  // write cut short leaves the board without firmware. A dismissal only keeps
+  // them from painting on the dialog.
   host._step = "flashing";
   host._statusMessage = host._localize("firmware.status_flashing");
   host._flashPercent = 0;
+  let percent = 0;
   try {
     await esptool.flashFirmware(detected.loader, firmwareBytes, flashAddress, (p) => {
-      host._flashPercent = p.percent;
+      percent = p.percent;
+      if (stillCurrent()) host._flashPercent = percent;
     });
   } catch (err) {
     console.error("[Web Serial] Flash error:", err);
@@ -208,20 +230,22 @@ export async function startWebSerialInstall(
     // last blocks may not be written.
     const gone =
       err instanceof SerialDeviceLostError || err instanceof SerialWriteStalledError;
-    if (gone || host._flashPercent < 100) {
+    if (gone || percent < 100) {
       // The failure first: the release can take its whole deadline when the
       // write that hung still holds the port.
-      host._fail(
-        namedConnectFailure(err, host._localize) ??
-          formatApiError(err, host._localize, "firmware.flash_failed")
-      );
+      if (stillCurrent()) {
+        host._fail(
+          namedConnectFailure(err, host._localize) ??
+            formatApiError(err, host._localize, "firmware.flash_failed")
+        );
+      }
       await releaseSerial(esptool, detected);
       return;
     }
   }
 
   // 6. Reset
-  host._statusMessage = host._localize("firmware.status_resetting");
+  if (stillCurrent()) host._statusMessage = host._localize("firmware.status_resetting");
   try {
     await esptool.resetAndDisconnect(detected.loader, detected.transport, detected.port);
   } catch {
@@ -230,6 +254,7 @@ export async function startWebSerialInstall(
     await releaseSerial(esptool, detected);
   }
 
+  if (!stillCurrent()) return;
   host._statusMessage = host._localize("firmware.status_done");
   finishWithLogsPort(host, detected.port);
 }
