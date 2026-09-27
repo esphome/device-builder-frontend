@@ -98,7 +98,8 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
     // into the canonical mapping/list shape the renderers and dotted-path
     // edits address; left as a scalar it renders as an empty list and the
     // first edit clobbers it (#2397).
-    host._valuesRead++;
+    // Not for the section's own draft, written while this load was waiting.
+    if (yaml !== host._lastSelfWrittenYaml) host._valuesRead++;
     host._values = normalizeMaybeValues(
       normalizeHexValues(parsedValues, host._config.entries),
       host._config.entries

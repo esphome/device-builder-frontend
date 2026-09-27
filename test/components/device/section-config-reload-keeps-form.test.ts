@@ -240,6 +240,21 @@ describe("section reload keeps the form mounted", () => {
       expect(reads(c)).toBe(before);
     });
 
+    it("does not count a read of the draft the form wrote while the load waited", async () => {
+      const { c, inner } = await firstLoad();
+      c.yaml = EDITED;
+      await c.updateComplete;
+      const before = reads(c);
+
+      c.reload();
+      // The form emits a draft before the load has its component.
+      inner._lastSelfWrittenYaml = EDITED;
+      await flush();
+      await c.updateComplete;
+
+      expect(reads(c)).toBe(before);
+    });
+
     it("counts a read when the values are there, not when the load starts", async () => {
       const { c, settle } = await firstLoad();
       const before = reads(c);
