@@ -69,13 +69,19 @@ describe("runtimeImports", () => {
           "  type A, // why A",
           "  type B,",
           '} from "./types.js";',
+          "import { type E, // on the opening line",
+          "  type F,",
+          '} from "./more-types.js";',
+          "import { // it's before the first name",
+          "  g,",
+          '} from "./opened.js";',
           "import {",
           "  c, // it's needed at runtime",
           "  type C as D, // renamed",
           '} from "./runtime.js";',
         ].join("\n")
       )
-    ).toEqual(["./runtime.js"]);
+    ).toEqual(["./opened.js", "./runtime.js"]);
   });
 
   it("keeps the imports after a string that looks like a comment opening", async () => {

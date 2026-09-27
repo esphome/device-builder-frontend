@@ -32,6 +32,8 @@ const COMMENTS = /^\s*\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm;
 // would glue itself to the next name (a `type` list read as a runtime one)
 // or, with a quote in it, stop the statement from matching at all.
 const SPECIFIER_COMMENT = /^(\s*(?:type\s+)?[\w$]+(?:\s+as\s+[\w$]+)?\s*,?)\s*\/\/.*$/gm;
+// The same on the line that opens the list: `import { type A, // why`.
+const OPENING_COMMENT = /^([ \t]*(?:import|export)\b[^'"\n]*?[{,])\s*\/\/.*$/gm;
 
 /** Whether `{ type A, type B }` names types only. */
 function isTypeOnlyList(specifiers) {
@@ -45,7 +47,10 @@ function isTypeOnlyList(specifiers) {
 }
 
 function stripComments(source) {
-  return source.replace(COMMENTS, "").replace(SPECIFIER_COMMENT, "$1");
+  return source
+    .replace(COMMENTS, "")
+    .replace(SPECIFIER_COMMENT, "$1")
+    .replace(OPENING_COMMENT, "$1");
 }
 
 /** The relative sources a module imports at runtime. */
