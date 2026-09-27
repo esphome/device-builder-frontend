@@ -19,9 +19,11 @@
  */
 import type { TemplateResult } from "lit";
 
+import type { FirmwareBinary } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import type { SerialLineHooks } from "../util/serial-log-stream.js";
+import type { HandoffFlasher } from "./handoff.js";
 import type { SerialLogsPolicy } from "./serial-logs.js";
 
 type Host = ESPHomeFirmwareInstallDialog;
@@ -87,6 +89,18 @@ export interface BrowserInstall<Id extends FlasherId> {
   pickLogsPort?(localize: LocalizeFunc): Promise<SerialPort | null>;
   /** Copy for a download-ready step the flow reaches (the Pico UF2 fallback). */
   readonly downloadReady?: { titleKey: string; bodyKey: string };
+  /**
+   * How the dashboard hands this flasher's firmware to web.esphome.io when it
+   * cannot flash itself (an insecure origin): which built artifact to send,
+   * as one part at address 0, the copy for a build without one, and the
+   * receiver engine that takes it. Absent: no hand-off; the row needs Web
+   * Serial here.
+   */
+  readonly handoff?: {
+    flasher: HandoffFlasher;
+    artifact: (binary: FirmwareBinary) => boolean;
+    noArtifactKey: string;
+  };
 }
 
 export type AnyBrowserInstall = { [Id in FlasherId]: BrowserInstall<Id> }[FlasherId];

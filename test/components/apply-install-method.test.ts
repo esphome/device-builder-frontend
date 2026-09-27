@@ -3,6 +3,7 @@ import { PLATFORM_INSTALLS } from "../_platform-installs.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { applyInstallMethod } from "../../src/components/apply-install-method.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import { rtlAmbz2Install } from "../../src/platforms/rtl87xx/ambz2-install.js";
 
 const device = { configuration: "x.yaml", name: "x" } as ConfiguredDevice;
 
@@ -68,6 +69,23 @@ describe("applyInstallMethod", () => {
       expect(d.openInstall).not.toHaveBeenCalled();
     }
   );
+
+  it("web-flash:<id> hands a platform flasher's firmware to web.esphome.io", () => {
+    const d = deps();
+    applyInstallMethod("web-flash:rtl-ambz2", undefined, d);
+    expect(d.firmwareDialog.installUsbFlash).toHaveBeenCalledWith(
+      device,
+      rtlAmbz2Install
+    );
+    expect(d.firmwareDialog.installBrowserFlasher).not.toHaveBeenCalled();
+  });
+
+  it("does nothing for a hand-off of a flasher that cannot hand off", () => {
+    const d = deps();
+    applyInstallMethod("web-flash:nrf-dfu", undefined, d);
+    expect(d.firmwareDialog.installUsbFlash).not.toHaveBeenCalled();
+    expect(d.firmwareDialog.installBrowserFlasher).not.toHaveBeenCalled();
+  });
 
   it("ignores a method nothing handles", () => {
     const d = deps();

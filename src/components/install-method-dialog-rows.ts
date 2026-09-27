@@ -171,19 +171,31 @@ export function renderBleNusOption(
  * The in-app flasher row of a non-ESP platform (nRF52 DFU, Pico UF2, RTL8720C
  * ROM), install mode only and only with Web Serial; nothing for the rest.
  */
+/**
+ * The platform's own in-app flasher row (nRF52 DFU, Pico, RTL8720C). With Web
+ * Serial it flashes here; on an insecure origin a flasher that can hand off
+ * sends its firmware to web.esphome.io instead (``web-flash:<id>``), with
+ * ``handoffDesc`` in place of the in-app copy.
+ */
 export function renderPlatformFlashOption(
   ctx: MethodRowContext,
   platform: string | null | undefined,
-  hasWebSerial: boolean
+  hasWebSerial: boolean,
+  handoffDesc?: TemplateResult | string
 ): TemplateResult | typeof nothing {
-  if (ctx.mode === "logs" || !hasWebSerial) return nothing;
+  if (ctx.mode === "logs") return nothing;
   const install = platformFor(platform)?.install;
   if (!install) return nothing;
+  const viaHandoff =
+    !hasWebSerial && install.handoff !== undefined && handoffDesc !== undefined;
+  if (!hasWebSerial && !viaHandoff) return nothing;
   return renderMethodRow({
     icon: "chip",
     title: ctx.localize(`dashboard.install_method_${install.methodKey}`),
-    desc: ctx.localize(`dashboard.install_method_${install.methodKey}_desc`),
-    onClick: () => ctx.onSelect(install.id),
+    desc: viaHandoff
+      ? handoffDesc
+      : ctx.localize(`dashboard.install_method_${install.methodKey}_desc`),
+    onClick: () => ctx.onSelect(viaHandoff ? `web-flash:${install.id}` : install.id),
   });
 }
 

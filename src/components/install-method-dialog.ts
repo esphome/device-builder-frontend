@@ -261,11 +261,14 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const otaRow = renderOtaOption(ctx);
     const usbRow = showUsbRow ? this._renderUsbOption(availability) : nothing;
     const logsWebRow = showLogsWebRow ? this._renderLogsWebOption() : nothing;
-    // The nRF52 / Pico / RTL8720C in-app flashers (install mode, Web Serial).
+    // The nRF52 / Pico / RTL8720C in-app flashers (install mode, Web Serial),
+    // or, on an insecure origin, the hand-off to web.esphome.io for the ones
+    // that can, with the same copy the ESP USB row shows there.
     const platformRow = renderPlatformFlashOption(
       ctx,
       this.deviceTargetPlatform,
-      hasWebSerial
+      hasWebSerial,
+      availability === "insecure-context" ? this._renderUsbRemoteDesc() : undefined
     );
     const bleNusRow = showBleNusRow
       ? renderBleNusOption(ctx, this._bleProbe.state)

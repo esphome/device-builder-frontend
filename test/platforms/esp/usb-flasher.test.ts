@@ -11,6 +11,7 @@ function makeCallbacks(): FlasherCallbacks & {
   states: Array<{ state: string; detail: string }>;
   lost: number;
   unsupported: number;
+  reasons: string[];
   statuses: string[];
 } {
   const rec = {
@@ -31,8 +32,10 @@ function makeCallbacks(): FlasherCallbacks & {
     onLost() {
       this.lost += 1;
     },
-    onUnsupported() {
+    reasons: [] as string[],
+    onUnsupported(reason: string) {
       this.unsupported += 1;
+      this.reasons.push(reason);
     },
   };
   return rec;
@@ -84,6 +87,9 @@ describe("openFlasher", () => {
     expect(msg.name).toBe("firmware.factory.bin");
     expect(msg.deviceName).toBe("mys3t");
     expect(msg.parts[0].address).toBe(0);
+    // The default hand-off is esptool's whole-chip factory write.
+    expect(msg.flasher).toBe("esp");
+    expect(msg.erase).toBe(true);
     expect(targetOrigin).toBe(FLASHER_ORIGIN);
     expect(transfer).toHaveLength(1);
 
@@ -254,5 +260,52 @@ describe("openFlasher", () => {
     emit(fakeWin, { type: "esphome-web-flash:ready" });
     expect(fakeWin.postMessage).not.toHaveBeenCalled();
     expect(cb.lost).toBe(0);
+  });
+
+  it("hands an RTL8720C UF2 to a receiver that lists its flasher, without erase", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    const teardown = openFlasher(new ArrayBuffer(8), "f.uf2", "bw15", cb, "rtl-ambz2")!;
+    emit(fakeWin, {
+      type: "esphome-web-flash:ready",
+      version: 1,
+      webSerial: true,
+      flashers: ["esp", "rtl-ambz2"],
+    });
+    expect(fakeWin.postMessage).toHaveBeenCalledTimes(1);
+    const [msg] = fakeWin.postMessage.mock.calls[0];
+    expect(msg.flasher).toBe("rtl-ambz2");
+    expect(msg.erase).toBe(false);
+    teardown();
+  });
+
+  it("declines an RTL8720C hand-off to an older receiver that lists no flashers", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.uf2", "bw15", cb, "rtl-ambz2");
+    // web.esphome.io before this protocol addition: esptool only.
+    emit(fakeWin, { type: "esphome-web-flash:ready", version: 1, webSerial: true });
+    expect(cb.reasons).toEqual(["flasher"]);
+    expect(fakeWin.postMessage).not.toHaveBeenCalled();
+  });
+
+  it("declines when the receiver lists flashers but not this one", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.uf2", "bw15", cb, "rtl-ambz2");
+    emit(fakeWin, { type: "esphome-web-flash:ready", version: 1, flashers: ["esp"] });
+    expect(cb.reasons).toEqual(["flasher"]);
+  });
+
+  it("names the browser, not the flasher, when Web Serial is what is missing", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    const cb = makeCallbacks();
+    openFlasher(new ArrayBuffer(8), "f.bin", "dev", cb);
+    emit(fakeWin, { type: "esphome-web-flash:ready", version: 1, webSerial: false });
+    expect(cb.reasons).toEqual(["web-serial"]);
   });
 });

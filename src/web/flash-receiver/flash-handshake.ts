@@ -1,6 +1,7 @@
 import {
   type FirmwareMessage,
   type FlashState,
+  type HandoffFlasher,
   isFlashParts,
   MSG_FIRMWARE,
   MSG_PROGRESS,
@@ -50,6 +51,8 @@ export interface FlashHandshakeEnv {
    * instead of transferring firmware to a tab that can never use it.
    */
   webSerial: boolean;
+  /** The flashers this page has, advertised the same way. */
+  flashers: HandoffFlasher[];
 }
 
 /** How long to keep re-announcing ``ready`` before giving up (ms). */
@@ -120,6 +123,7 @@ export class FlashHandshake {
       type: MSG_READY,
       version: PROTOCOL_VERSION,
       webSerial: this.env.webSerial,
+      flashers: this.env.flashers,
     };
     this._post(msg);
   }

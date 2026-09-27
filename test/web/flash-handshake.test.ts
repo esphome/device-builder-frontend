@@ -1,5 +1,6 @@
-// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// @vitest-environment happy-dom
+import type { HandoffFlasher } from "../../src/platforms/handoff.js";
 
 import {
   FlashHandshake,
@@ -17,6 +18,7 @@ function makeEnv(origin: string | null = null, nonce = "n1", webSerial = true) {
       params: { nonce, origin },
       messageTarget: target,
       webSerial,
+      flashers: ["esp", "rtl-ambz2"] as HandoffFlasher[],
     },
   };
 }
@@ -77,6 +79,7 @@ describe("FlashHandshake", () => {
       type: "esphome-web-flash:ready",
       version: 1,
       webSerial: true,
+      flashers: ["esp", "rtl-ambz2"],
     });
     expect("nonce" in (ready[0][0] as object)).toBe(false);
   });
@@ -218,5 +221,11 @@ describe("FlashHandshake", () => {
     new FlashHandshake(env, { onFirmware: vi.fn(), onMalformed: vi.fn() }).start();
     // First attempt to the pinned origin threw; the catch retried to '*'.
     expect(opener.postMessage).toHaveBeenCalledWith(expect.anything(), "*");
+  });
+
+  it("advertises the flashers it has on ready, so a sender can decline up front", () => {
+    const { env, opener } = makeEnv();
+    new FlashHandshake(env, { onFirmware: vi.fn(), onMalformed: vi.fn() }).start();
+    expect(readyFrames(opener)[0][0]).toMatchObject({ flashers: ["esp", "rtl-ambz2"] });
   });
 });

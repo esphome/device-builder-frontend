@@ -594,6 +594,7 @@
     "usb_popup_blocked": "Allow pop-ups for this site to open the USB flasher",
     "usb_window_closed": "Lost contact with the flasher tab before flashing finished",
     "usb_unsupported_browser": "This browser doesn't support Web Serial. Open the dashboard in Chrome, Edge, or Firefox 151+ to install over USB.",
+    "usb_flasher_outdated": "web.esphome.io can't flash this kind of device yet. Try again later, or download the firmware and install it from web.esphome.io by hand.",
     "binary_download_done_title": "Firmware binary downloaded",
     "binary_download_done_body": "Saved as {filename}. Flash it to your device with your preferred tool.",
     "elf_download_done_title": "Debug symbols downloaded",

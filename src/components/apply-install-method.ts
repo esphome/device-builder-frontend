@@ -47,9 +47,19 @@ export function applyInstallMethod(
       h.firmwareDialog?.installBinaryDownload(h.device);
       break;
     default: {
-      // A platform's in-browser install (nRF52 DFU, Pico UF2, RTL8720C ROM).
-      const install = installForMethod(method);
-      if (install) h.firmwareDialog?.installBrowserFlasher(install, h.device);
+      // A platform's in-browser install (nRF52 DFU, Pico UF2, RTL8720C ROM),
+      // or its hand-off to web.esphome.io (``web-flash:<id>``) where this
+      // origin cannot flash.
+      const handoff = method.startsWith("web-flash:");
+      const install = installForMethod(
+        handoff ? method.slice("web-flash:".length) : method
+      );
+      if (!install) return;
+      if (handoff) {
+        if (install.handoff) h.firmwareDialog?.installUsbFlash(h.device, install);
+      } else {
+        h.firmwareDialog?.installBrowserFlasher(install, h.device);
+      }
     }
   }
 }

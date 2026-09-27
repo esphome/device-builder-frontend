@@ -18,19 +18,28 @@ export const MSG_FIRMWARE = "esphome-web-flash:firmware";
 export const MSG_STATE = "esphome-web-flash:state";
 export const MSG_PROGRESS = "esphome-web-flash:progress";
 
+import { DEFAULT_HANDOFF_FLASHER, type HandoffFlasher } from "../../platforms/handoff.js";
+
+export { DEFAULT_HANDOFF_FLASHER };
+export type { HandoffFlasher };
+
 /**
  * Receiver → opener: announced (and re-announced) until firmware arrives.
  *
- * ``webSerial`` is additive in v1: whether this receiver's browser can
- * actually flash (Web Serial present). Older receivers omit it, so the
- * sender only declines the hand-off on an explicit ``false`` — an absent
- * field falls back to handing off and letting the receiver surface the
- * error after the fact.
+ * Both optional fields are additive in v1, and web.esphome.io deploys on its
+ * own, so every dashboard version must keep working against every receiver:
+ * - ``webSerial``: whether this receiver's browser can actually flash (Web
+ *   Serial present). Older receivers omit it, so the sender only declines
+ *   the hand-off on an explicit ``false``.
+ * - ``flashers``: the flashers this receiver has. Older receivers omit it,
+ *   which means esptool only; a sender with anything else declines up front
+ *   rather than hand over an image the receiver would fail as a bad ESP one.
  */
 export interface ReadyMessage {
   type: typeof MSG_READY;
   version: number;
   webSerial?: boolean;
+  flashers?: HandoffFlasher[];
 }
 
 /** One image to write, bytes riding as a transferable ArrayBuffer. */
@@ -49,7 +58,19 @@ export interface FirmwareMessage {
   /** The device's friendly name, for the receiver's title. */
   deviceName?: string;
   erase?: boolean;
+  /**
+   * Which flasher writes ``parts``; absent means esptool, so older dashboards
+   * are unchanged and older receivers ignore it. For ``rtl-ambz2`` the parts
+   * are the LibreTiny UF2 as one part at address 0, which the receiver parses
+   * into flash runs itself.
+   */
+  flasher?: HandoffFlasher;
   parts: FlashPartMessage[];
+}
+
+/** The flasher a firmware frame names, defaulting the absent field. */
+export function handoffFlasherOf(msg: Pick<FirmwareMessage, "flasher">): HandoffFlasher {
+  return msg.flasher ?? DEFAULT_HANDOFF_FLASHER;
 }
 
 export type FlashState = "connecting" | "installing" | "done" | "error";

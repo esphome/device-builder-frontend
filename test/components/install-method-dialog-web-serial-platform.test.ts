@@ -152,6 +152,31 @@ describe("install-method-dialog platform gating", () => {
     setWebSerialEnv({ serial: false, secure: true, href: "http://localhost:6052/" });
     expect(hasRtlRow(await mount("rtl87xx"))).toBe(false);
   });
+
+  // The HA add-on over plain http: Web Serial exists but is blocked here, so
+  // the RTL8720C row hands the UF2 to web.esphome.io, as the ESP USB row does.
+  it("offers the RTL8720C hand-off on an insecure origin, and nothing for a Pico there", async () => {
+    // The browser hides navigator.serial on an insecure origin.
+    setWebSerialEnv({
+      serial: false,
+      secure: false,
+      href: "http://homeassistant.local:8123/",
+    });
+    const d = await mount("rtl87xx");
+    expect(hasRtlRow(d)).toBe(true);
+    const selected: string[] = [];
+    d.addEventListener("select-method", (e) =>
+      selected.push((e as CustomEvent<{ method: string }>).detail.method)
+    );
+    const row = [...d.shadowRoot!.querySelectorAll(".option")].find((el) =>
+      el
+        .querySelector(".title")
+        ?.textContent?.includes(defaultLocalize("dashboard.install_method_rtl_ambz2"))
+    ) as HTMLElement;
+    row.click();
+    expect(selected).toEqual(["web-flash:rtl-ambz2"]);
+    expect(hasRp2Row(await mount("rp2"))).toBe(false);
+  });
 });
 
 describe("install-method-dialog logs-mode platform gating", () => {

@@ -139,6 +139,13 @@ export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {
   image: rtlImage,
   start: startRtlAmbz2Install,
   showFirstStep: showReadyStep,
+  // The same UF2 the in-app flow parses, handed whole to web.esphome.io's
+  // rtl-ambz2 engine when this origin cannot flash.
+  handoff: {
+    flasher: "rtl-ambz2",
+    artifact: (b) => b.type === "uf2",
+    noArtifactKey: "firmware.no_uf2",
+  },
   steps: {
     // One click: the engine resets the board itself, or shows the strap guide.
     "rtl-ready": {

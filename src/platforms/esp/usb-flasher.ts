@@ -1,5 +1,6 @@
 import { FLASHER_ORIGIN, FLASHER_URL } from "../../common/docs.js";
 import { randomNonce } from "../../util/random-nonce.js";
+import type { HandoffFlasher } from "../handoff.js";
 
 // Message types, mirroring flasher/src/protocol.ts in the device-builder repo.
 // The nonce travels one way only (dashboard -> flasher).
@@ -29,11 +30,12 @@ export interface FlasherCallbacks {
   /** The flasher tab closed / crashed / went silent before a result. */
   onLost: () => void;
   /**
-   * The flasher tab loaded but its browser can't flash (no Web Serial —
-   * e.g. Safari), advertised on its ready frame. The firmware was never
-   * handed off; the dialog owns the messaging for this failure.
+   * The flasher tab loaded but can't take this hand-off, advertised on its
+   * ready frame: its browser has no Web Serial (e.g. Safari), or it is an
+   * older web.esphome.io without the flasher this firmware needs. The
+   * firmware was never handed off; the dialog owns the messaging.
    */
-  onUnsupported: () => void;
+  onUnsupported: (reason: "web-serial" | "flasher") => void;
 }
 
 /**
@@ -48,7 +50,8 @@ export function openFlasher(
   firmware: ArrayBuffer,
   name: string,
   deviceName: string,
-  cb: FlasherCallbacks
+  cb: FlasherCallbacks,
+  flasher: HandoffFlasher = "esp"
 ): (() => void) | null {
   const nonce = randomNonce();
   const win = window.open(
@@ -96,6 +99,7 @@ export function openFlasher(
       pct?: number;
       version?: number;
       webSerial?: boolean;
+      flashers?: string[];
     };
     if (!data?.type) return;
     if (data.type === MSG_READY) {
@@ -109,7 +113,15 @@ export function openFlasher(
       // the hand-off proceeds and the receiver reports the error itself.
       if (data.webSerial === false) {
         finish();
-        cb.onUnsupported();
+        cb.onUnsupported("web-serial");
+        return;
+      }
+      // Likewise for the flasher: an older receiver omits the list, which
+      // means esptool only, so anything else is declined rather than handed
+      // to a page that would fail it as a bad ESP image.
+      if (!(data.flashers ?? ["esp"]).includes(flasher)) {
+        finish();
+        cb.onUnsupported("flasher");
         return;
       }
       // Forward-compat: a flasher advertising a newer protocol still gets our
@@ -129,7 +141,10 @@ export function openFlasher(
             nonce,
             name,
             deviceName,
-            erase: true,
+            // The ROM downloaders have no erase; esptool's is the factory
+            // image's whole-chip write.
+            erase: flasher === "esp",
+            flasher,
             parts: [{ address: 0, data: bytes }],
           },
           FLASHER_ORIGIN,

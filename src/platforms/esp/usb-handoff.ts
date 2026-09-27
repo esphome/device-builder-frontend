@@ -42,9 +42,13 @@ export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise
   host._step = "downloading";
   const binaries = await fetchBinaries(host, device.configuration);
   if (!binaries) return;
-  const factory = pickFactoryBinary(device.target_platform, binaries);
+  const handoff = host._usbHandoff?.handoff;
+  const factory = handoff
+    ? binaries.find(handoff.artifact)
+    : pickFactoryBinary(device.target_platform, binaries);
   if (!factory) {
-    failNoBinaries(host, { isWebFlasher: true, isEmpty: binaries.length === 0 });
+    if (handoff && binaries.length > 0) host._fail(host._localize(handoff.noArtifactKey));
+    else failNoBinaries(host, { isWebFlasher: true, isEmpty: binaries.length === 0 });
     return;
   }
   try {
@@ -81,44 +85,55 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     host._errorMessage = "";
     host._statusMessage = host._localize("firmware.usb_flashing");
   };
-  const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, {
-    onProgress: (pct) => {
-      resumeFromError();
-      host._flashPercent = pct;
-    },
-    onStatus: (detail) => {
-      resumeFromError();
-      host._statusMessage = detail;
-    },
-    onState: (state, detail) => {
-      if (state === "done") {
+  const flasher = host._usbHandoff?.handoff?.flasher ?? "esp";
+  const teardown = openFlasher(
+    firmware,
+    host._usbFirmwareName,
+    deviceName,
+    {
+      onProgress: (pct) => {
+        resumeFromError();
+        host._flashPercent = pct;
+      },
+      onStatus: (detail) => {
+        resumeFromError();
+        host._statusMessage = detail;
+      },
+      onState: (state, detail) => {
+        if (state === "done") {
+          host._usbFlashTeardown = null;
+          host._step = "done";
+          host._statusMessage = host._localize("firmware.usb_done");
+        } else {
+          // Non-terminal: the flasher tab can retry in place, so keep the
+          // teardown live for a later success or close.
+          host._fail(host._localize("firmware.usb_failed"), detail);
+        }
+      },
+      onLost: () => {
         host._usbFlashTeardown = null;
-        host._step = "done";
-        host._statusMessage = host._localize("firmware.usb_done");
-      } else {
-        // Non-terminal: the flasher tab can retry in place, so keep the
-        // teardown live for a later success or close.
-        host._fail(host._localize("firmware.usb_failed"), detail);
-      }
+        host._fail(
+          host._localize("firmware.usb_failed"),
+          host._localize("firmware.usb_window_closed")
+        );
+      },
+      onUnsupported: (reason) => {
+        host._usbFlashTeardown = null;
+        // Retrying would recompile and re-open a tab that declines again for the
+        // same reason; suppress the Retry footer (mirrors chip-mismatch).
+        host._failureKind = "unsupported-browser";
+        host._fail(
+          host._localize("firmware.usb_failed"),
+          host._localize(
+            reason === "flasher"
+              ? "firmware.usb_flasher_outdated"
+              : "firmware.usb_unsupported_browser"
+          )
+        );
+      },
     },
-    onLost: () => {
-      host._usbFlashTeardown = null;
-      host._fail(
-        host._localize("firmware.usb_failed"),
-        host._localize("firmware.usb_window_closed")
-      );
-    },
-    onUnsupported: () => {
-      host._usbFlashTeardown = null;
-      // Retrying would recompile and re-open a tab that declines again for the
-      // same reason; suppress the Retry footer (mirrors chip-mismatch).
-      host._failureKind = "unsupported-browser";
-      host._fail(
-        host._localize("firmware.usb_failed"),
-        host._localize("firmware.usb_unsupported_browser")
-      );
-    },
-  });
+    flasher
+  );
   if (!teardown) {
     // Pop-up blocked: stay on download-ready with the firmware still in hand so
     // the user can allow pop-ups and click Open again, rather than being forced
