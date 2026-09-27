@@ -1,6 +1,7 @@
 /** The flash receiver's esptool engine: today's ESP hand-off, unchanged in behaviour. */
 import { ESP_SERIAL_LOGS } from "../../../platforms/esp/serial-logs.js";
 import type { ReceiverEngine } from "../../flash-receiver/receiver-engine.js";
+import { serialRun } from "../../flash-receiver/serial-run.js";
 import { validateEspImage } from "./image-magic.js";
 import { runFlash, webFlashMessages } from "./run-flash.js";
 
@@ -14,7 +15,7 @@ export const espReceiverEngine: ReceiverEngine = {
       messages: webFlashMessages(localize),
     };
     return {
-      run: async (port, hooks) => {
+      run: serialRun(localize, async (port, hooks) => {
         const ok = await runFlash(port, plan, {
           onStep: (step) => {
             if (step === "connecting") {
@@ -30,7 +31,7 @@ export const espReceiverEngine: ReceiverEngine = {
           onError: (message) => hooks.onState("error", message),
         });
         return ok ? { rebooted: true } : null;
-      },
+      }),
     };
   },
 };

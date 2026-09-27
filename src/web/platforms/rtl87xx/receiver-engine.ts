@@ -13,6 +13,7 @@ import {
 } from "../../../platforms/rtl87xx/index.js";
 import { connectFailureDetail } from "../../../util/serial-open-error.js";
 import type { ReceiverEngine } from "../../flash-receiver/receiver-engine.js";
+import { serialRun } from "../../flash-receiver/serial-run.js";
 import { parseFailureCopy } from "../../install/preparation.js";
 
 export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
@@ -37,7 +38,7 @@ export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
       label: localize("firmware.rtl_guide_link"),
     };
     return {
-      async run(port, hooks) {
+      run: serialRun(localize, async (port, hooks) => {
         hooks.onState("connecting", localize("firmware.rtl_connecting"));
         const result = await runAmbz2(port, image, {
           onLog: hooks.onLog,
@@ -61,7 +62,7 @@ export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
               rebooted: false,
               note: { message: localize("firmware.rtl_done_manual_reset") },
             };
-      },
+      }),
     };
   },
 };

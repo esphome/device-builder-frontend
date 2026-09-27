@@ -20,7 +20,7 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
 }));
 const engines = vi.hoisted(() => {
   type Hooks = {
-    onState: (s: string, m: string) => void;
+    onState: (s: "connecting" | "installing" | "done" | "error", m: string) => void;
     onWaiting: (note: { message: string }) => void;
   };
   type Result = { rebooted: boolean; note?: { message: string } };
@@ -48,12 +48,27 @@ const engines = vi.hoisted(() => {
   const load = { esp: vi.fn(async () => esp), rtl: vi.fn(async () => rtl) };
   return { esp, rtl, load };
 });
-vi.mock("../../src/web/flash-receiver/receiver-engine.js", () => ({
-  RECEIVER_ENGINES: {
-    esp: () => engines.load.esp(),
-    "rtl-ambz2": () => engines.load.rtl(),
-  },
-}));
+vi.mock("../../src/web/flash-receiver/receiver-engine.js", async () => {
+  // Both write over one serial port, picked by the helper as the real ones do.
+  const { serialRun } = await import("../../src/web/flash-receiver/serial-run.js");
+  type Engine = typeof engines.esp;
+  const picking = async (engine: Promise<Engine>) => {
+    const { prepare, logs } = await engine;
+    return {
+      logs,
+      prepare: async (parts: unknown, erase: boolean) => {
+        const plan = await prepare(parts, erase);
+        return "run" in plan ? { run: serialRun((k) => k, plan.run) } : plan;
+      },
+    };
+  };
+  return {
+    RECEIVER_ENGINES: {
+      esp: () => picking(engines.load.esp()),
+      "rtl-ambz2": () => picking(engines.load.rtl()),
+    },
+  };
+});
 
 import { pickerRefused, withUserActivation } from "../_web-serial.js";
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";

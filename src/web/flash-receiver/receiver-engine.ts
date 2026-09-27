@@ -21,25 +21,35 @@ export interface ReceiverNote {
   guide?: { url: string; label: string };
 }
 
-/** A finished write: whether the board is booting, and what is left to do by hand. */
+/** A finished write: what is left to do by hand, and where its logs are. */
 export interface ReceiverResult {
-  rebooted: boolean;
   note?: ReceiverNote;
+  /** Absent: no logs follow. */
+  logs?: ReceiverLogs;
+}
+
+/** The serial port a write went over, for the board's logs afterwards. */
+export interface ReceiverLogs {
+  port: SerialPort;
+  /** The ports authorized before the write, to tell the rebooted board's apart. */
+  knownPorts: SerialPort[];
+  /** Whether the board is booting; if not, the logs wait for a reset by hand. */
+  rebooted: boolean;
 }
 
 /**
- * Flash the prepared image over ``port`` (closed, authorized). Null when it
- * failed; the hooks carried the detail. Never throws.
+ * Flash the prepared image, from the click: the engine opens its own chooser
+ * first, with nothing awaited before it. ``"dismissed"`` when the chooser was
+ * closed, null when it failed; the hooks carried the detail. Never throws.
  */
 export type ReceiverRun = (
-  port: SerialPort,
   hooks: ReceiverRunHooks
-) => Promise<ReceiverResult | null>;
+) => Promise<ReceiverResult | "dismissed" | null>;
 
 /**
  * What the flash receiver needs from a flasher: check the hand-off's bytes
- * are its kind of image and plan the write, before the user picks a port,
- * so the click goes straight to the picker. One per hand-off flasher id,
+ * are its kind of image and plan the write, before the user picks a device,
+ * so the click goes straight to the chooser. One per hand-off flasher id,
  * registered in ``RECEIVER_ENGINES``, which holds every id the ``ready`` frame
  * advertises (``HANDOFF_FLASHERS``).
  */
