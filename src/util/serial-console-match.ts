@@ -1,6 +1,9 @@
 import type { LocalizeFunc } from "../common/localize.js";
-import { isEspressifUsbJtagPort } from "../platforms/esp/index.js";
-import { UART_BRIDGE_VENDOR_IDS } from "./uart-bridge-ids.js";
+import {
+  isEspressifUsbBridgePort,
+  isEspressifUsbJtagPort,
+} from "../platforms/esp/index.js";
+import { isUartBridgePort } from "./uart-bridge-ids.js";
 
 // Spellings come from the backend's logger_interface_values vocabulary
 // (platform_capabilities.index.json, snapshotted from esphome's logger) -
@@ -10,12 +13,6 @@ const USB_CONSOLE_INTERFACES = new Set(["USB_CDC", "USB_SERIAL_JTAG"]);
 // UART0 / UART1 / UART2 / UART0_SWAP. Anything matching neither family is
 // an interface this code doesn't know - fail open.
 const UART_CONSOLE_RE = /^UART\d/;
-
-/** A port from a dedicated USB-UART bridge chip, so wired to external UART pins. */
-function isUartBridgePort(port: SerialPort): boolean {
-  const { usbVendorId } = port.getInfo();
-  return usbVendorId !== undefined && UART_BRIDGE_VENDOR_IDS.has(usbVendorId);
-}
 
 /**
  * Whether a granted Web Serial port provably cannot carry the device's log
@@ -34,7 +31,7 @@ export function serialPortCannotCarryConsole(
     // A dedicated bridge chip can't be the chip's own USB device. An
     // unknown or absent vendor could be a native CDC console (RP2040's
     // 0x2e8a, nRF52) - assume it works.
-    return isUartBridgePort(port);
+    return isUartBridgePort(port) || isEspressifUsbBridgePort(port);
   }
   if (!UART_CONSOLE_RE.test(loggerInterface)) return false;
   // UART-family console: only the on-chip USB-Serial-JTAG device provably
