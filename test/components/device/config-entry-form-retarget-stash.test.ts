@@ -66,13 +66,38 @@ describe("config-entry-form literal / lambda stash", () => {
     });
   });
 
+  it("keeps the stash when the host rebuilds the same entries", async () => {
+    // A host that filters the catalog's entries on every render hands over
+    // a new array each time; that is the same form, not a re-target.
+    const { form, changes, toggle } = await mountForm(valueEntry("Delay"), {
+      id: { _lambda: "return 1000;", _tag: "!lambda" },
+    });
+    await toggle("literal");
+
+    form.entries = valueEntry("Delay");
+    await form.updateComplete;
+    await toggle("lambda");
+
+    expect(changes[changes.length - 1].value).toEqual({
+      _lambda: "return 1000;",
+      _tag: "!lambda",
+    });
+  });
+
   it("forgets the stash once the form is re-targeted to other entries", async () => {
     const { form, changes, toggle } = await mountForm(valueEntry("Delay"), {
       id: { _lambda: "return 1000;", _tag: "!lambda" },
     });
     await toggle("literal");
 
-    form.entries = valueEntry("Other action");
+    form.entries = [
+      makeConfigEntry({
+        key: "id",
+        type: ConfigEntryType.FLOAT,
+        label: "Other action",
+        templatable: true,
+      }),
+    ];
     form.values = {};
     await form.updateComplete;
     await toggle("lambda");

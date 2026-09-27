@@ -32,6 +32,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
+import { sameEntryShape } from "../../util/config-entry-shape.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
@@ -90,6 +91,7 @@ import {
   unitHasMaterialValue,
 } from "./config-entry-form-plan.js";
 import {
+  clearEnableStash,
   fieldRendererStyles,
   labelFor,
   renderBooleanField,
@@ -641,12 +643,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected willUpdate(changed: PropertyValues) {
     // A different entry list means the form was re-targeted to a
     // different component (e.g. the dep-flow detour swapping
-    // ES7210 for i2c). Drop transient unit picks and literal / lambda
-    // stashes from the previous shape so they don't bleed into unrelated
-    // paths.
-    if (changed.has("entries") && changed.get("entries") !== undefined) {
+    // ES7210 for i2c). Drop transient unit picks from the previous
+    // shape so they don't bleed into unrelated paths.
+    const previous = changed.get("entries") as ConfigEntry[] | undefined;
+    if (changed.has("entries") && previous !== undefined) {
+      // A stash holds what the user typed on the side they left, so it is
+      // dropped only for other fields, not for the same ones rebuilt.
+      if (!sameEntryShape(previous, this.entries)) {
+        clearTemplatableStash(this);
+        clearEnableStash(this);
+      }
       this._pendingUnits.clear();
-      clearTemplatableStash(this);
       this._editingMagnitudes.clear();
       this._openAdvancedPlacement.clear();
       this._constraintClusters.reset();
