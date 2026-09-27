@@ -45,7 +45,7 @@ export function renderReachabilitySection(
     ? offlineSeconds(
         device.runtime_state.state,
         device.name_add_mac_suffix,
-        device.runtime_state.offline_since,
+        device.runtime_state.offline_since ?? null,
         now
       )
     : null;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { DeviceState } from "../../src/api/types/devices.js";
-import { offlineSeconds } from "../../src/util/device-status.js";
+import { anchorOffline, offlineSeconds } from "../../src/util/device-status.js";
 
 const NOW_MS = 1_800_000_000_000;
 const SINCE = NOW_MS / 1000 - 7200;
@@ -20,5 +21,17 @@ describe("offlineSeconds", () => {
 
   it("is null while the offline verdict is untracked", () => {
     expect(offlineSeconds(DeviceState.OFFLINE, true, SINCE, NOW_MS)).toBeNull();
+  });
+});
+
+describe("anchorOffline", () => {
+  it("stamps the age against the browser clock", () => {
+    const device = makeConfiguredDevice({ runtime_state: { offline_seconds: 7200 } });
+    expect(anchorOffline(device, NOW_MS).runtime_state.offline_since).toBe(SINCE);
+  });
+
+  it("leaves no stamp without an age", () => {
+    const device = makeConfiguredDevice();
+    expect(anchorOffline(device, NOW_MS).runtime_state.offline_since).toBeNull();
   });
 });
