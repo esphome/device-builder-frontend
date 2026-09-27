@@ -65,4 +65,16 @@ describe("config-entry-form list rows", () => {
 
     expect(values()).toEqual([lambda("return 2222;")]);
   });
+
+  it("keeps an opened option list with its row", async () => {
+    const { form } = await mountControlledForm([STEPS], { steps: [{}, {}, {}] });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ctx = () => (form as any)._buildCtx();
+
+    ctx().expandOptions(["steps", "2", "value"]);
+    ctx().rowRemoved(["steps"], 0);
+
+    expect(ctx().isOptionsExpanded(["steps", "1", "value"])).toBe(true);
+    expect(ctx().isOptionsExpanded(["steps", "2", "value"])).toBe(false);
+  });
 });
