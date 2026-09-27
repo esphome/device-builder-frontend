@@ -63,6 +63,10 @@ export async function startWebSerialInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
+  // A dismissal (X, Escape) only closes the dialog; the device stays. The
+  // compile is the one await a dismissal settles, so after every other one
+  // the flow checks that the dialog is still open on this install.
+  const stillCurrent = () => host._device === device && host._open;
 
   // Surface esptool-js chip-detect / flash-session output in the shared log,
   // the same buffer the compile phase streams to. Without this the WebSerial
@@ -91,11 +95,13 @@ export async function startWebSerialInstall(
     host._close();
     return;
   }
+  if (!stillCurrent()) return;
   const { port, esptool } = picked;
   let detected: DetectedChip;
   try {
     detected = await esptool.connectToPort(port, onLog);
   } catch (err) {
+    if (!stillCurrent()) return;
     if (err instanceof UnsupportedChipError) {
       host._fail(host._localize("serial.unsupported_chip", { chip: err.chipName }));
       return;
@@ -106,6 +112,10 @@ export async function startWebSerialInstall(
       openFailureMessage(err, host._localize, "serial.connect_failed"),
       getErrorMessage(err)
     );
+    return;
+  }
+  if (!stillCurrent()) {
+    await releaseSerial(esptool, detected);
     return;
   }
   host._detected = detected;
@@ -130,6 +140,10 @@ export async function startWebSerialInstall(
       }
     } catch {
       // Network hiccup — fall back to target_platform.
+    }
+    if (!stillCurrent()) {
+      await releaseSerial(esptool, detected);
+      return;
     }
   }
   // Fold the expected side through the same helper so a board catalog stamping
@@ -189,7 +203,11 @@ export async function startWebSerialInstall(
     );
   } catch {
     await releaseSerial(esptool, detected);
-    host._fail(host._localize("firmware.download_failed"));
+    if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
+    return;
+  }
+  if (!stillCurrent()) {
+    await releaseSerial(esptool, detected);
     return;
   }
 
