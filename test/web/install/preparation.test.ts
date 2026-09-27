@@ -6,7 +6,7 @@ import { Preparation, type Prepared } from "../../../src/web/install/preparation
 function make(prepare: (input: string) => Promise<Prepared<string, string>>) {
   const host = fakeHost();
   const settled = vi.fn();
-  return { preparation: new Preparation(host, prepare, settled), host, settled };
+  return { preparation: new Preparation(host, prepare, settled, String), host, settled };
 }
 
 const done = (preparation: Preparation<string, string, string>) =>
@@ -37,6 +37,14 @@ describe("Preparation", () => {
     // Nothing is kept to try again.
     preparation.retry();
     expect(preparation.state).toEqual({ kind: "idle" });
+  });
+
+  it("drops an input whose preparation rejected, and says why", async () => {
+    const { preparation, settled } = make(() => Promise.reject("revoked"));
+    preparation.start("a");
+    await done(preparation);
+    expect(preparation.state).toEqual({ kind: "idle" });
+    expect(settled).toHaveBeenCalledExactlyOnceWith("revoked");
   });
 
   it("keeps an input a chunk failed to load for, and prepares it again", async () => {

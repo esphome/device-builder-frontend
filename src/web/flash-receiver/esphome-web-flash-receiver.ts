@@ -9,6 +9,7 @@ import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { warningBannerStyles } from "../../styles/banners.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { isPortPickerCancel, webSerialAvailability } from "../../util/web-serial.js";
 import "../dashboard/esphome-web-card.js";
 import "../dashboard/esphome-web-unsupported-card.js";
@@ -81,7 +82,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   >(
     this,
     (input) => prepareForReceiver(input, this._localize),
-    (error) => this._onPrepared(error)
+    (error) => this._onPrepared(error),
+    getErrorMessage
   );
   // The logs policy of the flasher that was last prepared. It outlives the
   // preparation, for the logs of a flash that is already done.

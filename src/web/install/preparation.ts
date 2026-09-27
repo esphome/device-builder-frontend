@@ -29,16 +29,21 @@ export class Preparation<I, T, F> {
 
   constructor(
     private readonly _host: ReactiveControllerHost,
-    /** Must not reject: a failure is a result. */
     private readonly _prepare: (input: I) => Promise<Prepared<T, F>>,
     /** A preparation ended: with why it failed, or null when ready. */
-    private readonly _onSettled: (failure: F | null) => void
+    private readonly _onSettled: (failure: F | null) => void,
+    /** Names a rejection of ``_prepare``, which drops the input. */
+    private readonly _failureOf: (err: unknown) => F
   ) {}
 
   start(input: I): void {
     const generation = ++this._generation;
     this._set({ kind: "pending" });
-    void this._prepare(input).then((result) => {
+    const prepared = this._prepare(input).catch((err: unknown): Prepared<T, F> => ({
+      failure: this._failureOf(err),
+      retryable: false,
+    }));
+    void prepared.then((result) => {
       if (generation !== this._generation) return;
       if ("value" in result) {
         this._set({ kind: "ready", value: result.value });

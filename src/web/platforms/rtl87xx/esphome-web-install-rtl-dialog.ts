@@ -71,22 +71,16 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
   private _image = new Preparation<File, LibreTinyImage, FilePickerError>(
     this,
     (file) => this._parse(file),
-    (failure) => this._onPrepared(failure)
+    (failure) => this._onPrepared(failure),
+    // A revoked file handle rejects the read.
+    (err) => ({
+      title: this._localize("firmware.rtl_bad_uf2"),
+      detail: getErrorMessage(err),
+    })
   );
 
   private async _parse(file: File): Promise<Prepared<LibreTinyImage, FilePickerError>> {
-    let bytes: Uint8Array;
-    try {
-      bytes = new Uint8Array(await file.arrayBuffer());
-    } catch (err) {
-      return {
-        failure: {
-          title: this._localize("firmware.rtl_bad_uf2"),
-          detail: getErrorMessage(err),
-        },
-        retryable: false,
-      };
-    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
     const parsed = await loadAmbz2Image(bytes);
     if ("image" in parsed) return { value: parsed.image };
     return {

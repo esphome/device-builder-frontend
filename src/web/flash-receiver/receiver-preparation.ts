@@ -26,19 +26,14 @@ export interface ReceiverPrepared {
 /**
  * Load the flasher's engine and have it check the image. ``pending`` is the
  * input, or what it resolves to when it still has to be read (a picked
- * file); a read that fails rejects with the line to show. The failure is
- * that line.
+ * file); a read that fails rejects with the line to show, and so does this.
+ * The failure is that line.
  */
 export async function prepareForReceiver(
   pending: ReceiverInput | Promise<ReceiverInput>,
   localize: LocalizeFunc
 ): Promise<Prepared<ReceiverPrepared, string>> {
-  let input: ReceiverInput;
-  try {
-    input = await pending;
-  } catch (err) {
-    return { failure: getErrorMessage(err), retryable: false };
-  }
+  const input = await pending;
   let engine: ReceiverEngine;
   try {
     engine = await RECEIVER_ENGINES[input.flasher]();
