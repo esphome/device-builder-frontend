@@ -22,8 +22,11 @@ export interface SectionConfigResponse {
 }
 
 /** Read the loaded section's values from *yaml*. */
-function readValues(host: ESPHomeDeviceSectionConfig, yaml: string): void {
-  if (!host._config) return;
+function readValues(
+  host: ESPHomeDeviceSectionConfig,
+  config: SectionConfigResponse,
+  yaml: string
+): void {
   // Asymmetric with save/delete paths: undefined here means "section
   // not in live yaml" — surface an empty form (silent), since this load
   // is reactive to external mutations, not explicit user intent.
@@ -38,8 +41,8 @@ function readValues(host: ESPHomeDeviceSectionConfig, yaml: string): void {
   // edits address; left as a scalar it renders as an empty list and the
   // first edit clobbers it (#2397).
   host._values = normalizeMaybeValues(
-    normalizeHexValues(parsedValues, host._config.entries),
-    host._config.entries
+    normalizeHexValues(parsedValues, config.entries),
+    config.entries
   );
   host._resolvedFromLine = resolvedFromLine;
   host._presentComponents = parseTopLevelComponents(yaml);
@@ -61,8 +64,8 @@ export function noteYamlChange(host: ESPHomeDeviceSectionConfig): void {
  *  (#1920). The form was told of the edit when it happened. Returns
  *  whether the values were read. */
 export function readStaleValues(host: ESPHomeDeviceSectionConfig): boolean {
-  if (!host._valuesStale) return false;
-  readValues(host, host.yaml);
+  if (!host._valuesStale || !host._config) return false;
+  readValues(host, host._config, host.yaml);
   return true;
 }
 
@@ -132,7 +135,7 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
     }
     // Not for the section's own draft, written while this load was waiting.
     if (yaml !== host._lastSelfWrittenYaml) host._valuesRead++;
-    readValues(host, yaml);
+    readValues(host, host._config, yaml);
   } catch (e) {
     if (id !== host._loadId) return;
     host._config = null;

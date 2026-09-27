@@ -120,6 +120,36 @@ describe("a form change right after a YAML edited outside the form (#1920)", () 
     expect(drafts).toEqual([]);
   });
 
+  const apply = (inner: any, changes: { path: string[]; value: unknown }[]) =>
+    inner._onApplySectionValues(
+      new CustomEvent("apply-section-values", { detail: { changes } })
+    );
+
+  it("drops a value of a notice under a value the edit made plain, keeps the rest", async () => {
+    const { c, inner, drafts } = await mount();
+    await editByHand(c);
+    const told = inner._valuesRead;
+
+    apply(inner, [
+      { path: ["level", "inverted"], value: true },
+      { path: ["baud_rate"], value: 9600 },
+    ]);
+
+    expect(inner._valuesRead).toBe(told + 1);
+    expect(drafts).toEqual(["logger:\n  level: WARN\n  baud_rate: 9600\n"]);
+  });
+
+  it("writes nothing when every value of a notice was dropped", async () => {
+    const { c, inner, drafts } = await mount();
+    await editByHand(c);
+
+    apply(inner, [{ path: ["level", "inverted"], value: true }]);
+
+    expect(inner._values).toEqual({ level: "WARN" });
+    expect(c.dirty).toBe(false);
+    expect(drafts).toEqual([]);
+  });
+
   it("reads the values once, the next change builds on the one before", async () => {
     const { c, inner, drafts } = await mount();
     await editByHand(c);

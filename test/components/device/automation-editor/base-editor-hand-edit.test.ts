@@ -85,12 +85,9 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     expect(inner.value.actions).toHaveLength(1);
   });
 
-  it.each([
-    ["finds no such section", () => Promise.resolve([])],
-    ["fails", () => Promise.reject(new Error("boom"))],
-  ])("is released when the reload %s", async (_name, parse) => {
+  it("is released when the reload finds no such section", async () => {
     const { editor } = await mount({
-      parseDeviceAutomations: vi.fn().mockImplementation(parse),
+      parseDeviceAutomations: vi.fn().mockResolvedValue([]),
     });
     await editByHand(editor);
     expect(editor.inert).toBe(true);
@@ -99,6 +96,30 @@ describe("an editor whose YAML was edited outside it (#1920)", () => {
     await settled(editor);
 
     expect(editor.inert).toBe(false);
+  });
+
+  it("stays held when the reload fails, until one reads the tree", async () => {
+    const { editor, inner, api } = await mount({
+      parseDeviceAutomations: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValue([parsedEdited()]),
+    });
+    await editByHand(editor);
+
+    editor.reload();
+    await settled(editor);
+    expect(editor.inert).toBe(true);
+    expect(inner._error).not.toBe("");
+    inner._engine.withValue({ actions: [] });
+    await inner._engine.flushPending();
+    expect(api.upsertAutomation).not.toHaveBeenCalled();
+
+    editor.reload();
+    await settled(editor);
+    expect(editor.inert).toBe(false);
+    expect(inner._error).toBe("");
+    expect(inner.value.actions).toHaveLength(1);
   });
 
   it("drops the tree of a section the edit took out of the YAML", async () => {

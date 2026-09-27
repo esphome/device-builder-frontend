@@ -273,10 +273,11 @@ export abstract class BaseAutomationEditor<L extends AutomationLocation>
       if (id !== this._hydrateId) return;
       this._dropStaleTree();
       this._error = formatApiError(err, this._localize, "device.automation_parse_error");
-    } finally {
-      // Not for a YAML edited again since: its own reload is still to come.
-      if (id === this._hydrateId && yaml === this.yaml) this._stale = false;
+      // The hold stays: the tree is still from before the edit.
+      return;
     }
+    // Not for a YAML edited again since: its own reload is still to come.
+    if (yaml === this.yaml) this._stale = false;
   }
 
   disconnectedCallback() {

@@ -85,19 +85,28 @@ function emitYamlDraft(host: ESPHomeDeviceSectionConfig, newYaml: string): strin
   return newYaml;
 }
 
+/** Reads the values first when they are stale, and returns the *changes*
+ *  that still have a place to write. What wrote them is from before the
+ *  edit, which may have left a plain value where they write (a pin in its
+ *  short form) that the write would replace. Those are dropped, the form
+ *  shows the values just read. */
+function writable<T extends { path: string[] }>(
+  host: ESPHomeDeviceSectionConfig,
+  changes: T[]
+): T[] {
+  if (!readStaleValues(host)) return changes;
+  const kept = changes.filter(({ path }) => !isUnderScalar(host._values, path));
+  if (kept.length !== changes.length) host._valuesRead++;
+  return kept;
+}
+
 export function onValueChange(
   host: ESPHomeDeviceSectionConfig,
   e: CustomEvent<ConfigEntryValueChange>
 ): void {
   if (host._reloading) return;
+  if (!writable(host, [e.detail]).length) return;
   const { path, value } = e.detail;
-  if (readStaleValues(host) && isUnderScalar(host._values, path)) {
-    // The control that wrote is from before the edit, which left a plain
-    // value where it writes (a pin in its short form): the write would
-    // replace that value. Drop it, the form shows the values just read.
-    host._valuesRead++;
-    return;
-  }
   host._values = setIn(host._values, path, value);
   host._setDirty(true);
   const errKey = path.join(".");
@@ -128,8 +137,9 @@ export function applySectionValues(
   changes: { path: string[]; value: unknown }[]
 ): void {
   if (host._reloading) return;
-  readStaleValues(host);
-  for (const { path, value } of changes) {
+  const kept = writable(host, changes);
+  if (!kept.length) return;
+  for (const { path, value } of kept) {
     host._values = setIn(host._values, path, value);
   }
   host._setDirty(true);
