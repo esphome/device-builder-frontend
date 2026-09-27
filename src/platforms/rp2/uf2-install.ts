@@ -7,6 +7,7 @@ import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-ins
 import {
   downloadBuildArtifact,
   installLog,
+  pickUf2,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import {
@@ -50,12 +51,7 @@ export async function startRp2Uf2Install(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const artifact = await downloadBuildArtifact(
-    host,
-    device,
-    (b) => b.type === "uf2",
-    "firmware.no_uf2"
-  );
+  const artifact = await downloadBuildArtifact(host, device, pickUf2, "firmware.no_uf2");
   if (!artifact) return;
   try {
     rp2Image.set(host, parseUf2Image(artifact.bytes, [UF2_FAMILY_RP2040]));

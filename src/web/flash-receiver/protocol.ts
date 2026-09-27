@@ -1,98 +1,11 @@
 /**
- * The postMessage flash contract between the Device Builder dashboard (the
- * opener, on any http/https origin) and this receiver (a fixed secure-context
- * origin, web.esphome.io). Mirrors the sender in ``src/platforms/esp/usb-flasher.ts``
- * and the reference in the device-builder repo's ``flasher/src/protocol.ts``.
- *
- * The opener origin is unknown (the HA add-on runs on an arbitrary http
- * origin), so the channel is authenticated by a one-time ``nonce`` plus an
- * ``event.source === window.opener`` check, never an origin allowlist. The
- * nonce travels one way only (opener → receiver): inbound firmware must carry
- * it, but no outbound frame (ready/state/progress) echoes it, so the
- * pre-handoff ``ready`` broadcast leaks no secret.
+ * The receiver's side of the flash hand-off contract: the shared frames and
+ * ids from ``src/platforms/handoff.ts`` plus the checks on the untrusted
+ * inbound payload.
  */
-export const PROTOCOL_VERSION = 1;
+import type { FlashPartMessage } from "../../platforms/handoff.js";
 
-export const MSG_READY = "esphome-web-flash:ready";
-export const MSG_FIRMWARE = "esphome-web-flash:firmware";
-export const MSG_STATE = "esphome-web-flash:state";
-export const MSG_PROGRESS = "esphome-web-flash:progress";
-
-import {
-  DEFAULT_HANDOFF_FLASHER,
-  type HandoffFlasher,
-  isHandoffFlasher,
-} from "../../platforms/handoff.js";
-
-export { DEFAULT_HANDOFF_FLASHER, isHandoffFlasher };
-export type { HandoffFlasher };
-
-/**
- * Receiver → opener: announced (and re-announced) until firmware arrives.
- *
- * Both optional fields are additive in v1, and web.esphome.io deploys on its
- * own, so every dashboard version must keep working against every receiver:
- * - ``webSerial``: whether this receiver's browser can actually flash (Web
- *   Serial present). Older receivers omit it, so the sender only declines
- *   the hand-off on an explicit ``false``.
- * - ``flashers``: the flashers this receiver has. Older receivers omit it,
- *   which means esptool only; a sender with anything else declines up front
- *   rather than hand over an image the receiver would fail as a bad ESP one.
- */
-export interface ReadyMessage {
-  type: typeof MSG_READY;
-  version: number;
-  webSerial?: boolean;
-  flashers?: HandoffFlasher[];
-}
-
-/** One image to write, bytes riding as a transferable ArrayBuffer. */
-export interface FlashPartMessage {
-  address: number;
-  data: ArrayBuffer;
-}
-
-/** Opener → receiver: the firmware handoff. */
-export interface FirmwareMessage {
-  type: typeof MSG_FIRMWARE;
-  nonce: string;
-  /** The opener's protocol version; absent means v1. */
-  version?: number;
-  name?: string;
-  /** The device's friendly name, for the receiver's title. */
-  deviceName?: string;
-  erase?: boolean;
-  /**
-   * Which flasher writes ``parts``; absent means esptool, so older dashboards
-   * are unchanged. An older receiver ignores the field and would write
-   * anything as ESP parts, so a sender puts a non-esp id only to a receiver
-   * whose ``flashers`` lists it. For ``rtl-ambz2`` the parts are the
-   * LibreTiny UF2 as one part at address 0, which the receiver parses into
-   * flash runs itself.
-   */
-  flasher?: HandoffFlasher;
-  parts: FlashPartMessage[];
-}
-
-/** The flasher a firmware frame names, defaulting the absent field. */
-export function handoffFlasherOf(msg: Pick<FirmwareMessage, "flasher">): HandoffFlasher {
-  return msg.flasher ?? DEFAULT_HANDOFF_FLASHER;
-}
-
-export type FlashState = "connecting" | "installing" | "done" | "error";
-
-/**
- * Receiver → opener: the state the dashboard mirrors. ``note`` rides with
- * ``done`` only: what the user still has to do by hand for the firmware to
- * start (an RTL8720C on an adapter without control lines needs a reset).
- * Additive in v1: older receivers omit it and older dashboards ignore it.
- */
-export interface StateMessage {
-  type: typeof MSG_STATE;
-  state: FlashState;
-  detail?: string;
-  note?: string;
-}
+export * from "../../platforms/handoff.js";
 
 // Sanity caps for the untrusted postMessage payload. A merged ESP factory image
 // is a handful of parts totalling a few MB; these ceilings reject absurd frames

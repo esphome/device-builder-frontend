@@ -174,7 +174,7 @@ describe("install-method-dialog platform gating", () => {
         ?.textContent?.includes(defaultLocalize("dashboard.install_method_rtl_ambz2"))
     ) as HTMLElement;
     row.click();
-    expect(selected).toEqual(["web-flash:rtl-ambz2"]);
+    expect(selected).toEqual(["web-flash"]);
     expect(hasRp2Row(await mount("rp2"))).toBe(false);
   });
 });

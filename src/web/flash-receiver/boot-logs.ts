@@ -9,9 +9,10 @@
 import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
+import { releaseControlLines } from "../../util/serial-control-lines.js";
+import { LOG_BAUD_RATE } from "../logs/serial-source.js";
 import { openLiveLogPort } from "./live-log-port.js";
 
-const LOG_BAUD_RATE = 115200;
 // Native-USB chips re-enumerate on reset; wait this long for the running
 // firmware's port to reappear before giving up on logs.
 const LOG_REOPEN_TIMEOUT_MS = 8000;
@@ -24,17 +25,7 @@ export interface BootLogsHost {
   _localize: LocalizeFunc;
 }
 
-/**
- * Open the logs dialog on the rebooted device. The dialog opens immediately
- * (its "Waiting…" placeholder covers the re-enumeration window) while
- * ``openLiveLogPort`` acquires and opens the live handle — its 8k buffer
- * holds the earliest boot bytes until the dialog's reader attaches, so
- * nothing is lost and the port is never reopened. Closing the dialog
- * mid-wait does NOT abort the acquisition — the handle still lands in
- * ``_logPort`` for the Logs button, so an early Escape and a late one
- * end the same way. Only a newer install or an unmount supersedes it,
- * via the generation counter.
- */
+/** Open the logs dialog on the rebooted device and land its port on the host. */
 export async function acquireBootLogs(
   host: BootLogsHost,
   oldPort: SerialPort,
@@ -63,22 +54,14 @@ export async function acquireBootLogs(
     return;
   }
   // Clear DTR/RTS so holding the port open doesn't reset the chip.
-  try {
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-  } catch {
-    // tolerate; the chip may already be fine
-  }
+  await releaseControlLines(port);
   // The stream can die during the await above (device yanked mid-hand-off);
   // a dead handle behind the dialog's "Waiting…" would never resolve.
   // Same contract as the !port branch: announced and parked regardless of
   // the dialog being open — openPortForLogs can often reopen a UA-closed
   // handle, so the Logs button stays a one-click recovery.
   if (!port.readable) {
-    try {
-      await port.close();
-    } catch {
-      // already closed
-    }
+    await port.close().catch(() => {});
     if (gen === host._bootLogsGen) {
       host._logsOpen = false;
       toast.error(
@@ -95,11 +78,7 @@ export async function acquireBootLogs(
   // Escape is a one-click recovery via the Logs button); park it unless
   // a newer install or an unmount superseded this acquisition.
   if (gen !== host._bootLogsGen || !host._logsOpen) {
-    try {
-      await port.close();
-    } catch {
-      // already closed
-    }
+    await port.close().catch(() => {});
   }
   if (gen === host._bootLogsGen) host._logPort = port;
 }

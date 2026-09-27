@@ -9,8 +9,8 @@ import {
   loadAmbz2Engine,
   loadAmbz2Image,
   RTL87XX_SERIAL_LOGS,
+  runAmbz2,
 } from "../../../platforms/rtl87xx/index.js";
-import { getErrorMessage } from "../../../util/error-message.js";
 import type { ReceiverEngine } from "../../flash-receiver/receiver-engine.js";
 
 export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
@@ -23,33 +23,38 @@ export const rtlAmbz2ReceiverEngine: ReceiverEngine = {
         : { key: "firmware.rtl_bad_uf2", detail: "not a single UF2 part" };
     if ("key" in parsed) return { error: `${localize(parsed.key)} (${parsed.detail})` };
     const { image } = parsed;
+    // Started with the parse so a failed engine fetch costs nothing later;
+    // runAmbz2 names it.
+    void loadAmbz2Engine().catch(() => {});
+    const guide = {
+      url: LIBRETINY_AMBZ2_GUIDE_URL,
+      label: localize("firmware.rtl_guide_link"),
+    };
     return {
       async run(port, hooks) {
         hooks.onState("connecting", localize("firmware.rtl_connecting"));
-        let rebooted: boolean;
-        try {
-          const { flashAmbz2 } = await loadAmbz2Engine();
-          rebooted = await flashAmbz2(port, image, {
-            onLog: hooks.onLog,
-            onProgress: hooks.onProgress,
-            onWaitingForStrap: () =>
-              hooks.onWaiting(
-                localize("firmware.rtl_wait_desc"),
-                LIBRETINY_AMBZ2_GUIDE_URL
-              ),
-            onLinked: () =>
-              hooks.onState("installing", localize("dashboard.status_installing")),
-          });
-        } catch (err) {
+        const result = await runAmbz2(port, image, {
+          onLog: hooks.onLog,
+          onProgress: hooks.onProgress,
+          onWaitingForStrap: () =>
+            hooks.onWaiting({ message: localize("firmware.rtl_wait_desc"), guide }),
+          onLinked: () =>
+            hooks.onState("installing", localize("firmware.status_flashing")),
+        });
+        if ("detail" in result) {
           hooks.onState(
             "error",
-            `${localize("firmware.rtl_flash_failed")}: ${getErrorMessage(err)}`
+            `${localize("firmware.rtl_flash_failed")}: ${result.detail}`
           );
-          return false;
+          return null;
         }
         // Without control lines the board is still sitting in the ROM downloader.
-        if (!rebooted) hooks.onWaiting(localize("firmware.rtl_done_manual_reset"));
-        return true;
+        return result.rebooted
+          ? result
+          : {
+              rebooted: false,
+              note: { message: localize("firmware.rtl_done_manual_reset") },
+            };
       },
     };
   },

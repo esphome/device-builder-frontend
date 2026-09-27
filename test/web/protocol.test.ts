@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  handoffFlasherOf,
-  isFlashParts,
-  isHandoffFlasher,
-} from "../../src/web/flash-receiver/protocol.js";
+import { isFlashParts, isHandoffFlasher } from "../../src/web/flash-receiver/protocol.js";
 
 const part = (address = 0, bytes = 8) => ({ address, data: new ArrayBuffer(bytes) });
 
@@ -42,13 +38,6 @@ describe("isFlashParts", () => {
     // Two 40 MiB parts → 80 MiB total, over the 64 MiB ceiling.
     const big = 40 * 1024 * 1024;
     expect(isFlashParts([part(0, big), part(0x1000, big)])).toBe(false);
-  });
-});
-
-describe("handoffFlasherOf", () => {
-  it("reads an absent flasher as esptool, so an older dashboard's frame is unchanged", () => {
-    expect(handoffFlasherOf({})).toBe("esp");
-    expect(handoffFlasherOf({ flasher: "rtl-ambz2" })).toBe("rtl-ambz2");
   });
 });
 

@@ -23,6 +23,7 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
 import toast from "sonner-js";
 
 import { ESP_SERIAL_LOGS } from "../../src/platforms/esp/serial-logs.js";
+import { acquireBootLogs } from "../../src/web/flash-receiver/boot-logs.js";
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
 import { openPortForLogs } from "../../src/web/logs/open-port-for-logs.js";
 import { makeWebSerialPort as makePort } from "./_make-web-serial-port.js";
@@ -52,7 +53,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
       return { port, error: null };
     });
 
-    await (el as any)._openBootLogs({}, []);
+    await acquireBootLogs(el as any, {} as SerialPort, []);
 
     expect((el as any)._logPort).toBe(port);
     expect((el as any)._logsOpen).toBe(true);
@@ -74,7 +75,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
       return { port, error: null };
     });
 
-    await (el as any)._openBootLogs({}, []);
+    await acquireBootLogs(el as any, {} as SerialPort, []);
 
     expect(port.close).toHaveBeenCalledOnce();
     expect((el as any)._logPort).toBe(port);
@@ -85,7 +86,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     const el = await mount();
     openLiveLogPort.mockResolvedValue({ port: null, error: "gone" });
 
-    await (el as any)._openBootLogs({}, []);
+    await acquireBootLogs(el as any, {} as SerialPort, []);
 
     expect((el as any)._logsOpen).toBe(false);
     expect(toast.error).toHaveBeenCalledOnce();
@@ -102,7 +103,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     });
     openLiveLogPort.mockResolvedValue({ port, error: null });
 
-    await (el as any)._openBootLogs({}, []);
+    await acquireBootLogs(el as any, {} as SerialPort, []);
 
     expect(port.close).toHaveBeenCalledOnce();
     expect((el as any)._logPort).toBe(port);
@@ -117,7 +118,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     });
     openLiveLogPort.mockResolvedValue({ port, error: null });
 
-    await (el as any)._openBootLogs({}, []);
+    await acquireBootLogs(el as any, {} as SerialPort, []);
 
     expect(port.close).toHaveBeenCalledOnce();
     expect((el as any)._logPort).toBeUndefined();
@@ -131,7 +132,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
     });
     openLiveLogPort.mockResolvedValue({ port, error: null });
 
-    await (el as any)._openBootLogs({}, []);
+    await acquireBootLogs(el as any, {} as SerialPort, []);
 
     expect(port.close).toHaveBeenCalledOnce();
     // Parked: openPortForLogs can often reopen a UA-closed handle, so the
@@ -159,7 +160,7 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
       return { port: null };
     });
 
-    await (el as any)._openBootLogs({}, []);
+    await acquireBootLogs(el as any, {} as SerialPort, []);
 
     expect(toast.error).not.toHaveBeenCalled();
   });

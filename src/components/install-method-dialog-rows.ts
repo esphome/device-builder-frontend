@@ -10,7 +10,7 @@ import {
   type BleProbeState,
   BRAVE_WEB_BLUETOOTH_FLAG,
 } from "../platforms/nrf52/index.js";
-import { handoffMethodFor, platformFor } from "../platforms/registry.js";
+import { platformFor } from "../platforms/registry.js";
 import type { DeploymentEnvironment } from "../util/environment.js";
 import { renderCopyAddress } from "./shared/pairing-address.js";
 
@@ -182,8 +182,7 @@ export function renderPlatformFlashOption(
   if (ctx.mode === "logs") return nothing;
   const install = platformFor(platform)?.install;
   if (!install) return nothing;
-  const viaHandoff =
-    !hasWebSerial && install.handoff !== undefined && handoffDesc !== undefined;
+  const viaHandoff = handoffDesc !== undefined && install.handoff !== undefined;
   if (!hasWebSerial && !viaHandoff) return nothing;
   return renderMethodRow({
     icon: "chip",
@@ -191,7 +190,7 @@ export function renderPlatformFlashOption(
     desc: viaHandoff
       ? handoffDesc
       : ctx.localize(`dashboard.install_method_${install.methodKey}_desc`),
-    onClick: () => ctx.onSelect(viaHandoff ? handoffMethodFor(install) : install.id),
+    onClick: () => ctx.onSelect(viaHandoff ? "web-flash" : install.id),
   });
 }
 

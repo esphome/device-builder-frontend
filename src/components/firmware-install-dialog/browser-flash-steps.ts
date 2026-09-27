@@ -13,6 +13,10 @@ import { PortNotAcceptedError, requestSerialPort } from "../../util/web-serial.j
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
 
+/** The build's UF2, the artifact the Pico and LibreTiny flows take. */
+export const pickUf2 = (binaries: FirmwareBinary[]): FirmwareBinary | undefined =>
+  binaries.find((b) => b.type === "uf2");
+
 export interface BuildArtifact {
   binary: FirmwareBinary;
   bytes: Uint8Array<ArrayBuffer>;
@@ -27,20 +31,23 @@ export interface BuildArtifact {
 export async function downloadBuildArtifact(
   host: ESPHomeFirmwareInstallDialog,
   device: ConfiguredDevice,
-  pick: (binary: FirmwareBinary) => boolean,
+  pick: (binaries: FirmwareBinary[]) => FirmwareBinary | undefined,
   noArtifactKey: string
 ): Promise<BuildArtifact | null> {
   const stale = () => host._device !== device;
   if (!(await compileOrFail(host, device.configuration)) || stale()) return null;
 
+  // Compile is done and the byte fetch can't be cancelled: the downloading
+  // step's footer offers Close, not a Stop aimed at a finished job.
   host._statusMessage = host._localize("firmware.status_downloading");
+  host._step = "downloading";
   const binaries = await fetchBinaries(host, device.configuration);
   if (!binaries || stale()) return null;
   if (binaries.length === 0) {
     failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
     return null;
   }
-  const binary = binaries.find(pick);
+  const binary = pick(binaries);
   if (!binary) {
     host._fail(host._localize(noArtifactKey));
     return null;

@@ -21,12 +21,13 @@ vi.mock("../../src/web/flash-receiver/live-log-port.js", () => ({
 const engines = vi.hoisted(() => {
   type Hooks = {
     onState: (s: string, m: string) => void;
-    onWaiting: (m: string) => void;
+    onWaiting: (note: { message: string }) => void;
   };
+  type Result = { rebooted: boolean; note?: { message: string } };
   const make = (name: string) => {
-    const run = vi.fn(async (_port: unknown, hooks: Hooks) => {
+    const run = vi.fn(async (_port: unknown, hooks: Hooks): Promise<Result | null> => {
       hooks.onState("installing", `${name} writing`);
-      return true;
+      return { rebooted: true };
     });
     return {
       logs: { reset: "rts-pulse" },
@@ -46,7 +47,6 @@ vi.mock("../../src/web/flash-receiver/receiver-engine.js", () => ({
     esp: async () => engines.esp,
     "rtl-ambz2": async () => engines.rtl,
   },
-  RECEIVER_FLASHERS: ["esp", "rtl-ambz2"],
 }));
 
 import { ESPHomeWebFlashReceiver } from "../../src/web/flash-receiver/esphome-web-flash-receiver.js";
@@ -171,10 +171,9 @@ describe("esphome-web-flash-receiver engines", () => {
   });
 
   it("sends the manual reset as the done note and parks the port for Logs", async () => {
-    engines.rtl.run.mockImplementationOnce(async (_port, hooks) => {
-      hooks.onState("installing", "writing");
-      hooks.onWaiting("firmware.rtl_done_manual_reset");
-      return true;
+    engines.rtl.run.mockResolvedValueOnce({
+      rebooted: false,
+      note: { message: "firmware.rtl_done_manual_reset" },
     });
     const { el, opener } = await handOff({ flasher: "rtl-ambz2" });
     const seen = states(opener);
@@ -184,5 +183,22 @@ describe("esphome-web-flash-receiver engines", () => {
     });
     expect((el as any)._logPort).toBe(port);
     expect((el as any)._logsOpen).toBe(false);
+  });
+
+  it("relays the strap instruction to the dashboard while the engine waits", async () => {
+    engines.rtl.run.mockImplementationOnce(async (_port, hooks) => {
+      hooks.onState("connecting", "linking");
+      hooks.onWaiting({ message: "firmware.rtl_wait_desc" });
+      return null;
+    });
+    const { opener } = await handOff({ flasher: "rtl-ambz2" });
+    expect(states(opener)).toContainEqual(
+      expect.objectContaining({ state: "connecting", note: "firmware.rtl_wait_desc" })
+    );
+  });
+
+  it("drops the handed-over bytes from the card's state once the run holds them", async () => {
+    const { el } = await handOff({ name: "fw.uf2" }, false);
+    expect((el as any)._firmware).toMatchObject({ name: "fw.uf2", parts: [] });
   });
 });

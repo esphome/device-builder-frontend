@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const rtl = vi.hoisted(() => ({ flashAmbz2: vi.fn(), loadAmbz2Image: vi.fn() }));
+const rtl = vi.hoisted(() => ({ runAmbz2: vi.fn(), loadAmbz2Image: vi.fn() }));
 vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  loadAmbz2Engine: async () => ({ flashAmbz2: rtl.flashAmbz2 }),
+  loadAmbz2Engine: async () => ({}),
+  runAmbz2: rtl.runAmbz2,
   loadAmbz2Image: rtl.loadAmbz2Image,
 }));
 
 import { RTL87XX_SERIAL_LOGS } from "../../../../src/platforms/rtl87xx/serial-logs.js";
 import type {
+  ReceiverNote,
   ReceiverRun,
   ReceiverRunHooks,
 } from "../../../../src/web/flash-receiver/receiver-engine.js";
@@ -26,7 +28,7 @@ function hooks(): ReceiverRunHooks & { states: string[]; waits: string[] } {
     onState: (state: string, message: string) => rec.states.push(`${state}:${message}`),
     onProgress: vi.fn(),
     onLog: vi.fn(),
-    onWaiting: (message: string) => rec.waits.push(message),
+    onWaiting: (note: ReceiverNote) => rec.waits.push(note.message),
   };
   return rec;
 }
@@ -66,38 +68,39 @@ describe("rtlAmbz2ReceiverEngine", () => {
 
   it("parses once and flashes that image, relaying the strap wait and the link", async () => {
     const run = await prepared();
-    rtl.flashAmbz2.mockImplementation(async (_port, _image, h) => {
+    rtl.runAmbz2.mockImplementation(async (_port, _image, h) => {
       h.onWaitingForStrap();
       h.onLinked();
       h.onProgress(50);
-      return true;
+      return { rebooted: true };
     });
     const h = hooks();
-    expect(await run(port, h)).toBe(true);
+    expect(await run(port, h)).toEqual({ rebooted: true });
     expect(rtl.loadAmbz2Image).toHaveBeenCalledOnce();
-    expect(rtl.flashAmbz2).toHaveBeenCalledWith(port, image, expect.anything());
+    expect(rtl.runAmbz2).toHaveBeenCalledWith(port, image, expect.anything());
     expect(h.waits).toEqual(["firmware.rtl_wait_desc"]);
     expect(h.states).toEqual([
       "connecting:firmware.rtl_connecting",
-      "installing:dashboard.status_installing",
+      "installing:firmware.status_flashing",
     ]);
     expect(h.onProgress).toHaveBeenCalledWith(50);
   });
 
   it("asks for a manual reset when the adapter could not reboot the board", async () => {
     const run = await prepared();
-    rtl.flashAmbz2.mockResolvedValue(false);
-    const h = hooks();
-    expect(await run(port, h)).toBe(true);
-    expect(h.waits).toEqual(["firmware.rtl_done_manual_reset"]);
+    rtl.runAmbz2.mockResolvedValue({ rebooted: false });
+    expect(await run(port, hooks())).toEqual({
+      rebooted: false,
+      note: { message: "firmware.rtl_done_manual_reset" },
+    });
   });
 
   it("reports a failed flash and the logs policy that releases the lines", async () => {
     const run = await prepared();
-    rtl.flashAmbz2.mockRejectedValue(new Error("no ROM"));
+    rtl.runAmbz2.mockResolvedValue({ detail: "no ROM" });
     const h = hooks();
-    expect(await run(port, h)).toBe(false);
-    expect(h.states[h.states.length - 1]).toContain("firmware.rtl_flash_failed");
+    expect(await run(port, h)).toBeNull();
+    expect(h.states[h.states.length - 1]).toBe("error:firmware.rtl_flash_failed: no ROM");
     expect(rtlAmbz2ReceiverEngine.logs).toBe(RTL87XX_SERIAL_LOGS);
   });
 });

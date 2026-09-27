@@ -21,7 +21,6 @@ import { fakeLogBuffer } from "../_fake-host.js";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { rtlAmbz2Install } from "../../src/platforms/rtl87xx/ambz2-install.js";
 
 // The log as the failed run left it, so Retry has something to drop.
 const failedRunLog = () => {
@@ -84,14 +83,6 @@ describe("install-dialog Retry while a foreign build runs", () => {
     await dialog._retry();
     expect(installUsbFlash).toHaveBeenCalledTimes(1);
     expect(installWebSerial).not.toHaveBeenCalled();
-  });
-
-  it("retries a platform flasher's hand-off as that hand-off, not the ESP image", async () => {
-    const { dialog, installUsbFlash } = makeDialog(false);
-    dialog._installer = "web-flash";
-    dialog._usbHandoff = rtlAmbz2Install;
-    await dialog._retry();
-    expect(installUsbFlash).toHaveBeenCalledWith(dialog._device, rtlAmbz2Install);
   });
 
   it("fails with the install message and does not retry on a stream error", async () => {

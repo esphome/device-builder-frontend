@@ -14,8 +14,8 @@ export const espReceiverEngine: ReceiverEngine = {
       messages: webFlashMessages(localize),
     };
     return {
-      run: (port, hooks) =>
-        runFlash(port, plan, {
+      run: async (port, hooks) => {
+        const ok = await runFlash(port, plan, {
           onStep: (step) => {
             if (step === "connecting") {
               hooks.onState("connecting", localize("firmware.status_connecting"));
@@ -28,7 +28,9 @@ export const espReceiverEngine: ReceiverEngine = {
           onProgress: hooks.onProgress,
           onLog: hooks.onLog,
           onError: (message) => hooks.onState("error", message),
-        }),
+        });
+        return ok ? { rebooted: true } : null;
+      },
     };
   },
 };

@@ -22,12 +22,12 @@ import {
   DEFAULT_HANDOFF_FLASHER,
   type FirmwareMessage,
   type FlashState,
+  HANDOFF_FLASHERS,
   type HandoffFlasher,
-  handoffFlasherOf,
 } from "./protocol.js";
 import {
   RECEIVER_ENGINES,
-  RECEIVER_FLASHERS,
+  type ReceiverNote,
   type ReceiverRun,
 } from "./receiver-engine.js";
 
@@ -68,10 +68,10 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   @state() _logPort?: SerialPort;
   // What the board needs from the user mid-flash (a strap, a reset), shown
   // with the flasher's guide until the engine moves on.
-  @state() private _waiting: { message: string; guideUrl?: string } | null = null;
+  @state() private _waiting: ReceiverNote | null = null;
   // The logs policy of the flasher that last ran, for the boot logs after.
   private _logsPolicy: SerialLogsPolicy = ESP_SERIAL_LOGS;
-  // The checked image's run, settled before the click (see _prepare).
+  // The handed-over image's run, settled before the click (see _prepare).
   private _prepared: Promise<ReceiverRun | null> = Promise.resolve(null);
 
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
@@ -114,7 +114,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           // Derived from the same one-time read that drives render()'s
           // unsupported card, so the two can never disagree.
           webSerial: !this._unsupported,
-          flashers: RECEIVER_FLASHERS,
+          flashers: [...HANDOFF_FLASHERS],
         },
         {
           onFirmware: (msg) => this._onFirmware(msg),
@@ -153,12 +153,13 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       );
       return;
     }
-    this._firmware = msg;
     this._prepared = this._prepare(
       msg.parts.map((p) => ({ data: new Uint8Array(p.data), address: p.address })),
       msg.erase !== false,
-      handoffFlasherOf(msg)
+      msg.flasher ?? DEFAULT_HANDOFF_FLASHER
     );
+    // The prepared run owns the bytes from here; the card only needs the names.
+    this._firmware = { ...msg, parts: [] };
     // Name the tab + card after the device so several concurrent flash tabs are
     // distinguishable (legacy did the same with the transmitted device name).
     if (msg.deviceName) {
@@ -176,13 +177,15 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   }
 
   // Update local state AND relay it to the opener so the dashboard mirrors it.
-  private _setState(state: FlashState, detail: string): void {
+  private _setState(state: FlashState, detail: string, note?: string): void {
     this._state = state;
     this._statusMessage = detail;
-    this._handshake?.postState(state, detail);
+    this._handshake?.postState(state, detail, note);
   }
 
   private _setProgress(pct: number): void {
+    // An engine reports per block; the percentage moves far less often.
+    if (pct === this._progress) return;
     this._progress = pct;
     this._handshake?.postProgress(pct);
   }
@@ -253,13 +256,12 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         this._setState("error", this._localize("web.flash.choose_file"));
         return;
       }
-      this._prepared = this._prepare(
-        [{ data, address: 0 }],
-        true,
-        DEFAULT_HANDOFF_FLASHER
+      await this._runInstall(
+        this._prepare([{ data, address: 0 }], true, DEFAULT_HANDOFF_FLASHER)
       );
+      return;
     }
-    await this._runInstall();
+    await this._runInstall(this._prepared);
   }
 
   /**
@@ -289,9 +291,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     }
   }
 
-  private async _runInstall(): Promise<void> {
+  private async _runInstall(prepared: Promise<ReceiverRun | null>): Promise<void> {
     this._busy = true;
-    const run = await this._prepared;
+    const run = await prepared;
     if (!run) {
       this._busy = false;
       return;
@@ -330,35 +332,36 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       // tolerate; openLiveLogPort falls back to VID/PID matching
     }
 
-    // What is left for the user's hands once the engine returns, if anything.
-    let note: string | undefined;
-    const ok = await run(port, {
+    const result = await run(port, {
       onState: (state, message) => {
-        note = undefined;
         this._waiting = null;
         this._setState(state, message);
       },
       onProgress: (pct) => this._setProgress(pct),
       onLog: (line) => this._enqueueLog(line),
-      onWaiting: (message, guideUrl) => {
-        note = message;
-        this._waiting = { message, guideUrl };
+      onWaiting: (note) => {
+        this._waiting = note;
+        // The dashboard shows the instruction too, on the state it mirrors.
+        if (this._state !== "idle") {
+          this._handshake?.postState(this._state, this._statusMessage, note.message);
+        }
       },
     });
 
     this._busy = false;
-    if (!ok) return;
+    if (!result) return;
 
     this._flashDone = true;
     this._progress = null;
-    // Still waiting after a finished write: the board needs a reset by hand.
-    // The opener gets that as the done note, so the dashboard says it too.
-    this._state = "done";
-    this._statusMessage = this._hasOpener
-      ? this._localize("web.flash.done_opener")
-      : this._localize("web.flash.done");
-    this._handshake?.postState("done", this._statusMessage, note);
-    if (note) {
+    this._waiting = result.note ?? null;
+    this._setState(
+      "done",
+      this._hasOpener
+        ? this._localize("web.flash.done_opener")
+        : this._localize("web.flash.done"),
+      result.note?.message
+    );
+    if (!result.rebooted) {
       // No reboot to follow: park the port so Logs opens it once the user
       // has reset the board.
       this._logPort = port;
@@ -366,12 +369,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     }
     // The engine already reset + disconnected the device; show its boot logs
     // in the shared logs dialog (reset / download / stop-start / reconnect).
-    await this._openBootLogs(port, before);
-  }
-
-  /** See ``acquireBootLogs``; kept as a method so a newer install or an unmount can supersede it. */
-  private _openBootLogs(oldPort: SerialPort, before: SerialPort[]): Promise<void> {
-    return acquireBootLogs(this, oldPort, before);
+    await acquireBootLogs(this, port, before);
   }
 
   // Reopen the boot-log dialog after the user closed it (the dialog closed
@@ -452,12 +450,12 @@ export class ESPHomeWebFlashReceiver extends LitElement {
               ? html`<p class="waiting" role="status">
                   ${this._waiting.message}
                   ${
-                    this._waiting.guideUrl
+                    this._waiting.guide
                       ? html` <a
-                          href=${this._waiting.guideUrl}
+                          href=${this._waiting.guide.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          >${this._localize("firmware.rtl_guide_link")}</a
+                          >${this._waiting.guide.label}</a
                         >`
                       : nothing
                   }

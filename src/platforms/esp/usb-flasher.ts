@@ -1,19 +1,23 @@
 import { FLASHER_ORIGIN, FLASHER_URL } from "../../common/docs.js";
 import { randomNonce } from "../../util/random-nonce.js";
-import type { HandoffFlasher } from "../handoff.js";
+import {
+  DEFAULT_HANDOFF_FLASHER,
+  type FirmwareMessage,
+  type HandoffSpec,
+  MSG_FIRMWARE,
+  MSG_PROGRESS,
+  MSG_READY,
+  MSG_STATE,
+  type ProgressMessage,
+  PROTOCOL_VERSION,
+  type ReadyMessage,
+  type StateMessage,
+} from "../handoff.js";
 
-// Message types, mirroring flasher/src/protocol.ts in the device-builder repo.
-// The nonce travels one way only (dashboard -> flasher).
-const MSG_READY = "esphome-web-flash:ready";
-const MSG_FIRMWARE = "esphome-web-flash:firmware";
-const MSG_STATE = "esphome-web-flash:state";
-const MSG_PROGRESS = "esphome-web-flash:progress";
-
-// The wire protocol version this dashboard speaks. Bumped only for a breaking
-// change; additive fields/messages don't need it (see protocol.ts). We send it
-// in the firmware frame and read the flasher's from "ready" so a future version
-// gate has both sides' versions to branch on.
-const PROTOCOL_VERSION = 1;
+/** Any frame the flasher tab sends; untrusted, so every field is optional. */
+type InboundFrame = Partial<
+  Omit<ReadyMessage, "type"> & Omit<StateMessage, "type"> & Omit<ProgressMessage, "type">
+> & { type?: string };
 
 // Give up if the flasher tab never reports "ready" (failed to load / crashed).
 const READY_TIMEOUT_MS = 60 * 1000;
@@ -50,7 +54,7 @@ export function openFlasher(
   firmware: ArrayBuffer,
   name: string,
   deviceName: string,
-  flasher: HandoffFlasher,
+  { flasher, erase }: Pick<HandoffSpec, "flasher" | "erase">,
   cb: FlasherCallbacks
 ): (() => void) | null {
   const nonce = randomNonce();
@@ -92,16 +96,7 @@ export function openFlasher(
 
   const onMessage = (ev: MessageEvent) => {
     if (ev.origin !== FLASHER_ORIGIN || ev.source !== win) return;
-    const data = ev.data as {
-      type?: string;
-      state?: string;
-      detail?: string;
-      pct?: number;
-      version?: number;
-      webSerial?: boolean;
-      flashers?: string[];
-      note?: string;
-    };
+    const data = ev.data as InboundFrame | undefined;
     if (!data?.type) return;
     if (data.type === MSG_READY) {
       clearTimeout(readyTimer);
@@ -120,7 +115,7 @@ export function openFlasher(
       // Likewise for the flasher: an older receiver omits the list, which
       // means esptool only, so anything else is declined rather than handed
       // to a page that would fail it as a bad ESP image.
-      if (!(data.flashers ?? ["esp"]).includes(flasher)) {
+      if (!(data.flashers ?? [DEFAULT_HANDOFF_FLASHER]).includes(flasher)) {
         finish();
         cb.onUnsupported("flasher");
         return;
@@ -135,22 +130,17 @@ export function openFlasher(
       }
       handedOff = true;
       try {
-        win.postMessage(
-          {
-            type: MSG_FIRMWARE,
-            version: PROTOCOL_VERSION,
-            nonce,
-            name,
-            deviceName,
-            // The ROM downloaders have no erase; esptool's is the factory
-            // image's whole-chip write.
-            erase: flasher === "esp",
-            flasher,
-            parts: [{ address: 0, data: bytes }],
-          },
-          FLASHER_ORIGIN,
-          [bytes]
-        );
+        const frame: FirmwareMessage = {
+          type: MSG_FIRMWARE,
+          version: PROTOCOL_VERSION,
+          nonce,
+          name,
+          deviceName,
+          erase,
+          flasher,
+          parts: [{ address: 0, data: bytes }],
+        };
+        win.postMessage(frame, FLASHER_ORIGIN, [bytes]);
       } catch (err) {
         // postMessage can throw (e.g. DataCloneError); converge to a terminal
         // state rather than leaving the dialog stuck flashing with timers armed.
@@ -179,11 +169,12 @@ export function openFlasher(
       errored = false;
       cb.onProgress(data.pct ?? 0);
     } else if (data.type === MSG_STATE) {
+      // What the user has to do by hand, if anything (see StateMessage).
+      const note = typeof data.note === "string" ? data.note : "";
       if (data.state === "done") {
         finish();
-        // The note is what the user still has to do by hand (see protocol.ts);
-        // the receiver's own done line is for its tab, not the dashboard.
-        cb.onState("done", typeof data.note === "string" ? data.note : "");
+        // The receiver's own done line is for its tab, not the dashboard.
+        cb.onState("done", note);
       } else if (data.state === "error") {
         errored = true;
         // Not terminal: the flasher tab stays open and the user can retry in
@@ -194,10 +185,10 @@ export function openFlasher(
         // retry. Closing the tab now is handled by the errored guard on the
         // close poll; an in-tab retry's progress re-arms above and clears it.
         cb.onState("error", data.detail || "");
-      } else if (data.detail) {
+      } else if (note || data.detail) {
         armWatchdog();
         errored = false;
-        cb.onStatus(data.detail);
+        cb.onStatus(note || data.detail || "");
       }
     }
   };

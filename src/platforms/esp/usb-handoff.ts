@@ -1,12 +1,8 @@
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
 import { downloadBuildArtifact } from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import {
-  compileOrFail,
-  failNoBinaries,
-  fetchBinaries,
-} from "../../components/firmware-install-dialog/install-flow.js";
-import { DEFAULT_HANDOFF_FLASHER } from "../handoff.js";
+import { DEFAULT_HANDOFF_FLASHER, type HandoffSpec } from "../handoff.js";
+import { platformFor } from "../registry.js";
 import { openFlasher } from "./usb-flasher.js";
 
 /**
@@ -32,52 +28,48 @@ export function pickFactoryBinary(
   );
 }
 
-// "Flash via USB" through the external flasher: compile + download the factory
-// image HERE (logs/errors visible, like the download flow), then land on the
+// The ESP hand-off: esptool on web.esphome.io, the from-scratch image, and a
+// whole-chip erase first.
+const ESP_HANDOFF: HandoffSpec = {
+  flasher: DEFAULT_HANDOFF_FLASHER,
+  erase: true,
+  pick: (binaries, targetPlatform) => pickFactoryBinary(targetPlatform, binaries),
+  noArtifactKey: "firmware.no_flashable_binary",
+};
+
+/**
+ * What the hand-off for a device's platform sends and to which flasher: the
+ * platform descriptor's, ESP's for a device with no descriptor (ESP has
+ * none), and nothing for a platform that cannot hand off.
+ */
+export function handoffFor(
+  targetPlatform: string | null | undefined
+): HandoffSpec | undefined {
+  const platform = platformFor(targetPlatform);
+  return platform ? platform.install?.handoff : ESP_HANDOFF;
+}
+
+// "Flash via USB" through the external flasher: compile + download the image
+// HERE (logs/errors visible, like the download flow), then land on the
 // download-ready step. The flasher tab is opened only afterwards, on the user's
 // click, so we never hand off until a working firmware exists.
 export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const device = host._device;
   if (!device) return;
-  // A platform flasher's hand-off sends the artifact its in-app flow builds.
-  const handoff = host._usbHandoff?.handoff;
-  if (handoff) {
-    const artifact = await downloadBuildArtifact(
-      host,
-      device,
-      handoff.artifact,
-      handoff.noArtifactKey
-    );
-    if (artifact) showDownloadReady(host, artifact.bytes.buffer, artifact.binary.file);
+  const handoff = handoffFor(device.target_platform);
+  if (!handoff) {
+    host._fail(host._localize("firmware.no_flashable_binary"));
     return;
   }
-  if (!(await compileOrFail(host, device.configuration))) return;
-  host._statusMessage = host._localize("firmware.status_downloading");
-  host._step = "downloading";
-  const binaries = await fetchBinaries(host, device.configuration);
-  if (!binaries) return;
-  const factory = pickFactoryBinary(device.target_platform, binaries);
-  if (!factory) {
-    failNoBinaries(host, { isWebFlasher: true, isEmpty: binaries.length === 0 });
-    return;
-  }
-  let firmware: ArrayBuffer;
-  try {
-    firmware = await host._api.firmwareDownloadBytes(device.configuration, factory.file);
-  } catch {
-    host._fail(host._localize("firmware.download_failed"));
-    return;
-  }
-  showDownloadReady(host, firmware, factory.file);
-}
-
-function showDownloadReady(
-  host: ESPHomeFirmwareInstallDialog,
-  firmware: ArrayBuffer,
-  name: string
-): void {
-  host._usbFirmware = firmware;
-  host._usbFirmwareName = name;
+  const artifact = await downloadBuildArtifact(
+    host,
+    device,
+    (binaries) => handoff.pick(binaries, device.target_platform),
+    handoff.noArtifactKey
+  );
+  if (!artifact) return;
+  host._usbFirmware = artifact.bytes.buffer;
+  host._usbFirmwareName = artifact.binary.file;
   host._step = "download-ready";
   host._statusMessage = "";
 }
@@ -102,8 +94,8 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     host._errorMessage = "";
     host._statusMessage = host._localize("firmware.usb_flashing");
   };
-  const flasher = host._usbHandoff?.handoff?.flasher ?? DEFAULT_HANDOFF_FLASHER;
-  const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, flasher, {
+  const handoff = handoffFor(host._device?.target_platform) ?? ESP_HANDOFF;
+  const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, handoff, {
     onProgress: (pct) => {
       resumeFromError();
       host._flashPercent = pct;

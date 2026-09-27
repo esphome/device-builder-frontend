@@ -45,17 +45,3 @@ export function serialLogsFor(
 export function installForMethod(method: string): AnyBrowserInstall | undefined {
   return PLATFORMS.find((p) => p.install?.id === method)?.install;
 }
-
-const HANDOFF_METHOD_PREFIX = "web-flash:";
-
-/** The install method that hands ``install``'s firmware to web.esphome.io. */
-export function handoffMethodFor(install: AnyBrowserInstall): string {
-  return `${HANDOFF_METHOD_PREFIX}${install.id}`;
-}
-
-/** The flasher a hand-off method is for; undefined for any other method. */
-export function installForHandoffMethod(method: string): AnyBrowserInstall | undefined {
-  if (!method.startsWith(HANDOFF_METHOD_PREFIX)) return undefined;
-  const install = installForMethod(method.slice(HANDOFF_METHOD_PREFIX.length));
-  return install?.handoff ? install : undefined;
-}

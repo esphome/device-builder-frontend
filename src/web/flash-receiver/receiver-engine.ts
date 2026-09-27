@@ -1,8 +1,7 @@
 import type { LocalizeFunc } from "../../common/localize.js";
-import type { HandoffFlasher } from "../../platforms/handoff.js";
 import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import type { FlashPart } from "../platforms/esp/firmware-build.js";
-import type { FlashState } from "./protocol.js";
+import type { FlashState, HandoffFlasher } from "./protocol.js";
 
 export interface ReceiverRunHooks {
   /** A state the opener mirrors, with the line the receiver shows for it. */
@@ -10,26 +9,39 @@ export interface ReceiverRunHooks {
   onProgress: (percent: number) => void;
   onLog: (line: string) => void;
   /**
-   * The board needs the user's hands (a strap, a reset) before or after the
-   * write; the receiver shows ``message`` with the guide link until the
-   * engine reports the next state, and relays it as the done note when it
-   * is what remains after a finished write.
+   * The board needs the user's hands before the engine can go on (a strap);
+   * the receiver shows the note until the engine reports the next state.
    */
-  onWaiting: (message: string, guideUrl?: string) => void;
+  onWaiting: (note: ReceiverNote) => void;
+}
+
+/** What the user has to do by hand, with the flasher's guide when it has one. */
+export interface ReceiverNote {
+  message: string;
+  guide?: { url: string; label: string };
+}
+
+/** A finished write: whether the board is booting, and what is left to do by hand. */
+export interface ReceiverResult {
+  rebooted: boolean;
+  note?: ReceiverNote;
 }
 
 /**
- * Flash the prepared image over ``port`` (closed, authorized). Resolves true
- * on a finished write, false when it failed; the hooks carry the detail.
- * Never throws.
+ * Flash the prepared image over ``port`` (closed, authorized). Null when it
+ * failed; the hooks carried the detail. Never throws.
  */
-export type ReceiverRun = (port: SerialPort, hooks: ReceiverRunHooks) => Promise<boolean>;
+export type ReceiverRun = (
+  port: SerialPort,
+  hooks: ReceiverRunHooks
+) => Promise<ReceiverResult | null>;
 
 /**
  * What the flash receiver needs from a flasher: check the hand-off's bytes
  * are its kind of image and plan the write, before the user picks a port,
  * so the click goes straight to the picker. One per hand-off flasher id,
- * registered in ``RECEIVER_ENGINES``; the ``ready`` frame advertises the keys.
+ * registered in ``RECEIVER_ENGINES``, which holds every id the ``ready`` frame
+ * advertises (``HANDOFF_FLASHERS``).
  */
 export interface ReceiverEngine {
   /** The serial logs policy for the rebooted board's logs afterwards. */
@@ -44,7 +56,7 @@ export interface ReceiverEngine {
 
 /**
  * The engines this receiver has, loaded on demand so the heavy ones stay out
- * of the main chunk. The keys are what the ``ready`` frame advertises.
+ * of the main chunk.
  */
 export const RECEIVER_ENGINES: Record<HandoffFlasher, () => Promise<ReceiverEngine>> = {
   esp: async () =>
@@ -52,5 +64,3 @@ export const RECEIVER_ENGINES: Record<HandoffFlasher, () => Promise<ReceiverEngi
   "rtl-ambz2": async () =>
     (await import("../platforms/rtl87xx/receiver-engine.js")).rtlAmbz2ReceiverEngine,
 };
-
-export const RECEIVER_FLASHERS = Object.keys(RECEIVER_ENGINES) as HandoffFlasher[];

@@ -43,7 +43,7 @@ export async function startNrfDfuInstall(
   const artifact = await downloadBuildArtifact(
     host,
     device,
-    (b) => b.file.endsWith(".zip"),
+    (binaries) => binaries.find((b) => b.file.endsWith(".zip")),
     "firmware.nrf_no_dfu_package"
   );
   if (!artifact) return;

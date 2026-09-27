@@ -184,9 +184,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // (nulled) once transferred to the flasher tab.
   _usbFirmware: ArrayBuffer | null = null;
   _usbFirmwareName = "";
-  // The platform flasher a hand-off is for (its artifact and engine); null
-  // for the ESP factory image.
-  _usbHandoff: AnyBrowserInstall | null = null;
 
   // Teardown for an in-flight external-flasher hand-off (set by
   // handOffToFlasher). Called from _detachStream so closing / reusing the
@@ -241,12 +238,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   // "Flash via USB": compile + download the image here (logs/errors visible),
   // then land on the ready step. The flasher tab is opened only when the user
-  // clicks Open USB flasher — never before a working image exists. ESP by
-  // default; a platform descriptor with ``handoff`` sends its own artifact to
-  // its own engine on web.esphome.io.
-  installUsbFlash(device: ConfiguredDevice, handoff?: AnyBrowserInstall) {
+  // clicks Open USB flasher — never before a working image exists. The
+  // device's platform decides the image and the flasher (see handoffFor).
+  installUsbFlash(device: ConfiguredDevice) {
     this._begin(device, "web-flash");
-    this._usbHandoff = handoff ?? null;
     void startUsbFlash(this);
   }
 
@@ -317,7 +312,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._timer.reset();
     this._usbFirmware = null;
     this._usbFirmwareName = "";
-    this._usbHandoff = null;
     // _detachStream already cleared _jobId / _streamId / _compileReject.
     this._detected = null;
     this._flasher = null;
@@ -495,10 +489,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       );
       if (!settled) return;
     }
-    // The same hand-off again: an RTL8720C retry must not fall to the ESP image.
-    if (this._installer === "web-flash") {
-      this.installUsbFlash(device, this._usbHandoff ?? undefined);
-    } else if (this._flasher) this._retryFlasher(this._flasher, device);
+    if (this._installer === "web-flash") this.installUsbFlash(device);
+    else if (this._flasher) this._retryFlasher(this._flasher, device);
     else this.installWebSerial(device);
   };
 

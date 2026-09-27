@@ -12,15 +12,16 @@ import {
   downloadBuildArtifact,
   installLog,
   pickSerialPortOrFail,
+  pickUf2,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
-import { getErrorMessage } from "../../util/error-message.js";
+import type { HandoffSpec } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
-import { loadAmbz2Engine, loadAmbz2Image } from "./index.js";
+import { loadAmbz2Image, runAmbz2 } from "./index.js";
 import type { LibreTinyImage } from "./libretiny-uf2.js";
 
 declare module "../platform-support.js" {
@@ -41,8 +42,8 @@ export async function startRtlAmbz2Install(
   const artifact = await downloadBuildArtifact(
     host,
     device,
-    (b) => b.type === "uf2",
-    "firmware.no_uf2"
+    pickUf2,
+    RTL_AMBZ2_HANDOFF.noArtifactKey
   );
   if (!artifact) return;
   const parsed = await loadAmbz2Image(artifact.bytes);
@@ -80,35 +81,30 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   host._flashPercent = 0;
   const abort = new AbortController();
   host._flashAbort = abort;
-  let rebooted: boolean;
-  try {
-    const { flashAmbz2 } = await loadAmbz2Engine();
-    rebooted = await flashAmbz2(port, image, {
-      signal: abort.signal,
-      onLog: installLog(host, stillCurrent),
-      onWaitingForStrap: () => {
-        if (!stillCurrent()) return;
-        host._step = "rtl-wait";
-        host._statusMessage = host._localize("firmware.rtl_wait_title");
-      },
-      onLinked: () => {
-        if (!stillCurrent()) return;
-        host._step = "flashing";
-        host._statusMessage = host._localize("firmware.status_flashing");
-      },
-      onProgress: (percent) => {
-        if (stillCurrent()) host._flashPercent = percent;
-      },
-    });
-  } catch (err) {
-    if (stillCurrent()) {
-      host._fail(host._localize("firmware.rtl_flash_failed"), getErrorMessage(err));
-    }
-    return;
-  } finally {
-    if (host._flashAbort === abort) host._flashAbort = null;
-  }
+  const result = await runAmbz2(port, image, {
+    signal: abort.signal,
+    onLog: installLog(host, stillCurrent),
+    onWaitingForStrap: () => {
+      if (!stillCurrent()) return;
+      host._step = "rtl-wait";
+      host._statusMessage = host._localize("firmware.rtl_wait_title");
+    },
+    onLinked: () => {
+      if (!stillCurrent()) return;
+      host._step = "flashing";
+      host._statusMessage = host._localize("firmware.status_flashing");
+    },
+    onProgress: (percent) => {
+      if (stillCurrent()) host._flashPercent = percent;
+    },
+  });
+  if (host._flashAbort === abort) host._flashAbort = null;
   if (!stillCurrent()) return;
+  if ("detail" in result) {
+    host._fail(host._localize("firmware.rtl_flash_failed"), result.detail);
+    return;
+  }
+  const { rebooted } = result;
   // Without control lines the board is still sitting in the ROM downloader.
   host._statusMessage = host._localize(
     rebooted ? "firmware.status_done" : "firmware.rtl_done_manual_reset"
@@ -118,6 +114,16 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   finishWithLogsPort(host, port, rebooted);
 }
 
+// The same UF2 the in-app flow parses, handed whole to web.esphome.io's
+// rtl-ambz2 engine when this origin cannot flash. The ROM downloader has no
+// erase.
+const RTL_AMBZ2_HANDOFF: HandoffSpec = {
+  flasher: "rtl-ambz2",
+  erase: false,
+  pick: pickUf2,
+  noArtifactKey: "firmware.no_uf2",
+};
+
 export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {
   id: "rtl-ambz2",
   methodKey: "rtl_ambz2",
@@ -126,13 +132,7 @@ export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {
   image: rtlImage,
   start: startRtlAmbz2Install,
   showFirstStep: showReadyStep,
-  // The same UF2 the in-app flow parses, handed whole to web.esphome.io's
-  // rtl-ambz2 engine when this origin cannot flash.
-  handoff: {
-    flasher: "rtl-ambz2",
-    artifact: (b) => b.type === "uf2",
-    noArtifactKey: "firmware.no_uf2",
-  },
+  handoff: RTL_AMBZ2_HANDOFF,
   steps: {
     // One click: the engine resets the board itself, or shows the strap guide.
     "rtl-ready": {
