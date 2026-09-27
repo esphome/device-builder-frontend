@@ -13,6 +13,13 @@ const state = vi.hoisted(() => ({
 }));
 const loaderOptions = vi.hoisted(() => ({ last: undefined as unknown }));
 
+// The session guard has its own tests; these ports are bare fakes.
+const guard = vi.hoisted(() => ({
+  guardTransport: vi.fn(),
+  releaseTransportGuard: vi.fn(),
+}));
+vi.mock("../../../src/platforms/esp/transport-guard.js", () => guard);
+
 vi.mock("esptool-js", () => {
   class Transport {
     constructor(
@@ -111,7 +118,10 @@ describe("connectToPort deadline", () => {
 
   it("leaves a handshake that answers in time alone", async () => {
     state.main = async () => "ESP32";
-    await expect(connectToPort(port)).resolves.toMatchObject({ chipName: "ESP32" });
+    const detected = await connectToPort(port);
+    expect(detected).toMatchObject({ chipName: "ESP32" });
+    // The session is the caller's from here, so it is guarded from here.
+    expect(guard.guardTransport).toHaveBeenCalledExactlyOnceWith(detected.transport);
   });
 });
 

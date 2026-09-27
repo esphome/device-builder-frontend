@@ -16,13 +16,13 @@ import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
 import type { LogCallback } from "../../util/web-serial.js";
 import { settledWithin, withDeadline } from "../../util/with-deadline.js";
-import { whileDevicePresent, WRITE_STALL_MS } from "./device-present.js";
 import {
   type DeviceManifest,
   type FlashProgress,
   isEspressifUsbJtagPort,
   UnsupportedChipError,
 } from "./esp-usb.js";
+import { guardTransport, releaseTransportGuard } from "./transport-guard.js";
 
 export interface DetectedChip {
   chipName: string;
@@ -180,6 +180,9 @@ export async function connectToPort(
       CONNECT_DEADLINE_MS,
       () => new SerialConnectTimeoutError(CONNECT_DEADLINE_MS)
     );
+    // From here on the session is the caller's: through a compile, a flash
+    // or an erase, with nothing else to end a write the device never takes.
+    guardTransport(transport);
     return { chipName, port, transport, loader };
   } catch (error) {
     if (onLog) {
@@ -209,6 +212,7 @@ export async function connectToPort(
  * the one to show.
  */
 async function releasePort(transport: Transport): Promise<void> {
+  releaseTransportGuard(transport);
   // Once this attempt has given up, the port may belong to a later one; a
   // disconnect that finally fails then must not close it out from under it.
   let abandoned = false;
@@ -281,7 +285,8 @@ export async function readDeviceManifest(
  * Flash firmware binary data to a connected ESP device.
  * Assumes connectToPort() was already called and the loader is connected.
  * Throws ``SerialDeviceLostError`` when the device goes away during the
- * write and ``SerialWriteStalledError`` when it stops answering.
+ * write and ``SerialWriteStalledError`` when it stops taking data (see
+ * ``guardTransport``).
  */
 export async function flashFirmware(
   loader: ESPLoader,
@@ -290,44 +295,26 @@ export async function flashFirmware(
   onProgress?: (progress: FlashProgress) => void
 ): Promise<void> {
   markSerialActivity();
-  await whileDevicePresent(
-    loader.transport.device,
-    ({ progressed, live }) =>
-      loader.writeFlash({
-        fileArray: [{ data, address }],
-        flashSize: "keep",
-        flashMode: "keep",
-        flashFreq: "keep",
-        eraseAll: false,
-        compress: true,
-        reportProgress: (fileIndex, written, total) => {
-          // A write given up on must not move the bar under its failure.
-          if (!live()) return;
-          progressed();
-          // Keep the suppression window alive throughout long flashes —
-          // a 60-second write would otherwise let the post-flash reset
-          // toast leak through despite the operation still being active.
-          markSerialActivity();
-          onProgress?.({
-            fileIndex,
-            written,
-            total,
-            percent: Math.round((written / total) * 100),
-          });
-        },
-      }),
-    WRITE_STALL_MS
-  );
-}
-
-/**
- * Erase the whole flash. Throws ``SerialDeviceLostError`` when the device
- * goes away meanwhile. An erase reports no progress and takes its time, so
- * it gets no stall window.
- */
-export async function eraseFlash(loader: ESPLoader): Promise<void> {
-  markSerialActivity();
-  await whileDevicePresent(loader.transport.device, () => loader.eraseFlash());
+  await loader.writeFlash({
+    fileArray: [{ data, address }],
+    flashSize: "keep",
+    flashMode: "keep",
+    flashFreq: "keep",
+    eraseAll: false,
+    compress: true,
+    reportProgress: (fileIndex, written, total) => {
+      // Keep the suppression window alive throughout long flashes —
+      // a 60-second write would otherwise let the post-flash reset
+      // toast leak through despite the operation still being active.
+      markSerialActivity();
+      onProgress?.({
+        fileIndex,
+        written,
+        total,
+        percent: Math.round((written / total) * 100),
+      });
+    },
+  });
 }
 
 /**
@@ -519,6 +506,9 @@ export async function resetAndDisconnect(
   port: SerialPort
 ): Promise<void> {
   markSerialActivity();
+  // A chip on its own USB drops off the bus as it resets, which is the
+  // reset working; the reset keeps its own best effort handling.
+  releaseTransportGuard(transport);
   try {
     await hardResetChip(loader, transport, port);
   } finally {

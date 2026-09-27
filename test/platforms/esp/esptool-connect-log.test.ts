@@ -24,6 +24,13 @@ const state: {
   main: () => Promise.reject(new Error("unset")),
 };
 
+// The session guard has its own tests; these ports are bare fakes.
+const guard = vi.hoisted(() => ({
+  guardTransport: vi.fn(),
+  releaseTransportGuard: vi.fn(),
+}));
+vi.mock("../../../src/platforms/esp/transport-guard.js", () => guard);
+
 vi.mock("esptool-js", () => {
   class Transport {
     constructor(

@@ -75,7 +75,7 @@ export class SerialOpenTimeoutError extends Error {
   }
 }
 
-/** The device went away (unplugged, or it dropped off the bus) during a write or an erase. */
+/** The device went away (unplugged, or it dropped off the bus) while it was in use. */
 export class SerialDeviceLostError extends Error {
   constructor() {
     super("The device disconnected during the operation");
@@ -83,13 +83,13 @@ export class SerialDeviceLostError extends Error {
   }
 }
 
-/** A write made no progress for a window; the device is there but not answering. */
+/** A write did not return by its deadline; the device is there but not taking data. */
 export class SerialWriteStalledError extends Error {
   readonly seconds: number;
 
-  constructor(windowMs: number) {
-    const seconds = Math.round(windowMs / 1000);
-    super(`No progress from the device in ${seconds} s`);
+  constructor(deadlineMs: number) {
+    const seconds = Math.round(deadlineMs / 1000);
+    super(`The device took no data in ${seconds} s`);
     this.name = "SerialWriteStalledError";
     this.seconds = seconds;
   }

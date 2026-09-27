@@ -198,13 +198,15 @@ export async function startWebSerialInstall(
     });
   } catch (err) {
     console.error("[Web Serial] Flash error:", err);
-    // 100% reached: treat as success — device may have reset during verification.
-    if (host._flashPercent < 100) {
+    const named = namedConnectFailure(err, host._localize);
+    // 100% reached: treat as success — device may have reset during
+    // verification. Not a device that went away or stopped taking data: the
+    // last blocks may not be written.
+    if (named !== undefined || host._flashPercent < 100) {
+      // The failure first: the release can take its whole deadline when the
+      // write that hung still holds the port.
+      host._fail(named ?? formatApiError(err, host._localize, "firmware.flash_failed"));
       await releaseSerial(esptool, detected);
-      host._fail(
-        namedConnectFailure(err, host._localize) ??
-          formatApiError(err, host._localize, "firmware.flash_failed")
-      );
       return;
     }
   }

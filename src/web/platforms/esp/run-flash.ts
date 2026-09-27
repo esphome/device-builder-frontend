@@ -31,8 +31,9 @@ export interface FlashMessages {
    * "hold the BOOT button" hint (a bare S2/S3/C3 module needs it).
    */
   connectFailed?: string;
-  /** Copy for a connect failure that can be named: the port held elsewhere, a
-   *  device that never answered (see ``namedConnectFailure``). */
+  /** Copy for a failure that can be named: the port held elsewhere, a device
+   *  that never answered, or one lost or gone quiet during a write (see
+   *  ``namedConnectFailure``). */
   namedFailure?: (err: unknown) => string | undefined;
   /** Shown when the plan yields no parts to write. */
   noFirmware?: string;
@@ -124,7 +125,7 @@ export async function runFlash(
   try {
     if (plan.erase) {
       hooks.onStep("erasing");
-      await esptool.eraseFlash(detected.loader);
+      await detected.loader.eraseFlash();
     }
     hooks.onStep("flashing");
     const total = parts.reduce((sum, p) => sum + p.data.length, 0);

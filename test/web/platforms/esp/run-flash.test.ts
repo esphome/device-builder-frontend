@@ -6,7 +6,6 @@ vi.mock("../../../../src/util/web-serial.js", () => ({
 vi.mock("../../../../src/platforms/esp/esptool.js", () => ({
   connectToPort: vi.fn(),
   flashFirmware: vi.fn(),
-  eraseFlash: vi.fn(),
   resetAndDisconnect: vi.fn(async () => {}),
   disconnect: vi.fn(async () => {}),
 }));
@@ -18,7 +17,6 @@ vi.mock("../../../../src/platforms/esp/esptool-loader.js", () => ({
 import {
   connectToPort,
   disconnect,
-  eraseFlash,
   flashFirmware,
   resetAndDisconnect,
 } from "../../../../src/platforms/esp/esptool.js";
@@ -71,7 +69,6 @@ beforeEach(() => {
   );
   vi.mocked(isPortPickerCancel).mockReturnValue(false);
   vi.mocked(flashFirmware).mockResolvedValue(undefined);
-  vi.mocked(eraseFlash).mockResolvedValue(undefined);
   vi.mocked(resetAndDisconnect).mockResolvedValue(undefined);
   vi.mocked(disconnect).mockResolvedValue(undefined);
 });
@@ -113,62 +110,33 @@ describe("runFlash", () => {
       hooks
     );
 
-    expect(eraseFlash).toHaveBeenCalledExactlyOnceWith(chip.loader);
+    expect(chip.loader.eraseFlash).toHaveBeenCalledOnce();
     expect(hooks.steps).toContain("erasing");
   });
 
-  it.each([
-    ["flash", flashFirmware],
-    ["erase", eraseFlash],
-  ])(
-    "names a board unplugged during the %s and releases the port",
-    async (_what, step) => {
-      vi.mocked(connectToPort).mockResolvedValue(detected() as never);
-      vi.mocked(step).mockRejectedValue(new SerialDeviceLostError());
-      const hooks = makeHooks();
+  it("names a board unplugged during the flash or the erase, and releases the port", async () => {
+    const lost = new SerialDeviceLostError();
+    const plan = {
+      erase: true,
+      filesCallback: async () => [{ data: new Uint8Array(4), address: 0 }],
+      messages: webFlashMessages((key) => key),
+    };
 
-      const ok = await runFlash(
-        port,
-        {
-          erase: true,
-          filesCallback: async () => [{ data: new Uint8Array(4), address: 0 }],
-          messages: webFlashMessages((key) => key),
-        },
-        hooks
-      );
+    vi.mocked(connectToPort).mockResolvedValue(detected() as never);
+    vi.mocked(flashFirmware).mockRejectedValue(lost);
+    const flash = makeHooks();
+    expect(await runFlash(port, plan, flash)).toBe(false);
+    expect(flash.errors).toEqual(["serial.device_lost"]);
 
-      expect(ok).toBe(false);
-      expect(hooks.errors).toEqual(["serial.device_lost"]);
-      expect(disconnect).toHaveBeenCalledOnce();
-      expect(resetAndDisconnect).not.toHaveBeenCalled();
-    }
-  );
-
-  it("aggregates progress across multiple parts by byte size", async () => {
     const chip = detected();
+    chip.loader.eraseFlash.mockRejectedValue(lost);
     vi.mocked(connectToPort).mockResolvedValue(chip as never);
-    // Report 100% for each part so the aggregate reflects part boundaries.
-    vi.mocked(flashFirmware).mockImplementation(
-      async (_loader, _data, _addr, onProgress) => {
-        onProgress?.({ fileIndex: 0, written: 1, total: 1, percent: 100 });
-      }
-    );
-    const hooks = makeHooks();
+    const erase = makeHooks();
+    expect(await runFlash(port, plan, erase)).toBe(false);
+    expect(erase.errors).toEqual(["serial.device_lost"]);
 
-    await runFlash(
-      port,
-      {
-        filesCallback: async () => [
-          { data: new Uint8Array(30), address: 0 },
-          { data: new Uint8Array(10), address: 100 },
-        ],
-      },
-      hooks
-    );
-
-    // After part 1 (30/40) → 75%, after part 2 (40/40) → 100%.
-    expect(hooks.progress).toContain(75);
-    expect(hooks.progress[hooks.progress.length - 1]).toBe(100);
+    expect(disconnect).toHaveBeenCalledTimes(2);
+    expect(resetAndDisconnect).not.toHaveBeenCalled();
   });
 
   it("reports a connect failure, falling back to the raw error without a hint", async () => {

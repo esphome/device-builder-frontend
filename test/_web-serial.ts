@@ -1,17 +1,25 @@
 import { PickerActivationError } from "../src/util/picker-activation.js";
 
+/** The disconnect event of a fake port, to spread into one a test builds itself. */
+export function disconnectEvents() {
+  const listeners = new Set<EventListener>();
+  return {
+    addEventListener: (_t: string, l: EventListener) => void listeners.add(l),
+    removeEventListener: (_t: string, l: EventListener) => void listeners.delete(l),
+    fire: () => [...listeners].forEach((l) => l(new Event("disconnect"))),
+    listenerCount: () => listeners.size,
+  };
+}
+
 /** Fake SerialPort whose disconnect listeners tests can fire directly. */
 export function makeDisconnectPort(): SerialPort & {
   fire: () => void;
   listenerCount: () => number;
 } {
-  const listeners = new Set<EventListener>();
-  return {
-    addEventListener: (_t: string, l: EventListener) => listeners.add(l),
-    removeEventListener: (_t: string, l: EventListener) => listeners.delete(l),
-    fire: () => [...listeners].forEach((l) => l(new Event("disconnect"))),
-    listenerCount: () => listeners.size,
-  } as unknown as SerialPort & { fire: () => void; listenerCount: () => number };
+  return disconnectEvents() as unknown as SerialPort & {
+    fire: () => void;
+    listenerCount: () => number;
+  };
 }
 
 /** Install (or remove, with null) a `navigator.bluetooth` stub; returns a restore function. */

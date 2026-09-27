@@ -324,34 +324,45 @@ describe("Web Serial install — HTTP byte download", () => {
 });
 
 describe("Web Serial install when the board is unplugged during the flash (#1896)", () => {
-  it("fails with the device lost line, releases the port and leaves Retry", async () => {
+  function lostAt(percent: number, err: Error = new SerialDeviceLostError()) {
     const { host } = makeHost();
     esptool.connectToPort.mockResolvedValue(CHIP);
-    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
     esptool.flashFirmware.mockImplementation(async (_l, _d, _a, onProgress) => {
-      onProgress({ percent: 60 });
-      throw new SerialDeviceLostError();
+      onProgress({ percent });
+      throw err;
     });
+    // The release takes its whole deadline when the hung write holds the port.
+    const shown: string[] = [];
+    esptool.disconnect.mockImplementation(async () => {
+      shown.push(host._statusMessage);
+    });
+    const run = startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+    return { host, shown, run };
+  }
 
-    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+  it("fails with the device lost line before it releases the port, and leaves Retry", async () => {
+    const { host, shown, run } = lostAt(60);
+    await run;
 
     expect(host._fail).toHaveBeenCalledWith("serial.device_lost");
-    expect(esptool.disconnect).toHaveBeenCalled();
+    expect(shown).toEqual(["serial.device_lost"]);
     expect(esptool.resetAndDisconnect).not.toHaveBeenCalled();
     // Retry is only offered for a failure with no kind of its own.
     expect(host._failureKind).toBeNull();
   });
 
-  it("still counts a write that reached the end as done", async () => {
-    const { host } = makeHost();
-    esptool.connectToPort.mockResolvedValue(CHIP);
-    esptool.resetAndDisconnect.mockResolvedValue(undefined);
-    esptool.flashFirmware.mockImplementation(async (_l, _d, _a, onProgress) => {
-      onProgress({ percent: 100 });
-      throw new SerialDeviceLostError();
-    });
+  it("does not call a board that went away at the end done: the tail may be unwritten", async () => {
+    const { host, run } = lostAt(100);
+    await run;
 
-    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+    expect(host._fail).toHaveBeenCalledWith("serial.device_lost");
+    expect(esptool.resetAndDisconnect).not.toHaveBeenCalled();
+  });
+
+  it("still counts any other failure at the end as done", async () => {
+    const { host, run } = lostAt(100, new Error("Invalid head of packet"));
+    await run;
 
     expect(host._fail).not.toHaveBeenCalled();
     expect(host._step).toBe("done");

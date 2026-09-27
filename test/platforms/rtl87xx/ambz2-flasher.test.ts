@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
+import { disconnectEvents } from "../../_web-serial.js";
 
 import {
   Ambz2ConsoleError,
@@ -103,6 +104,7 @@ function fakeRom(opts: RomOptions = {}) {
 
   // Like a freshly picked port: no streams until open().
   const port = {
+    ...disconnectEvents(),
     readable: null as ReadableStream<Uint8Array> | null,
     writable: null as WritableStream<Uint8Array> | null,
     open: vi.fn(async () => {
