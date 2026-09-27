@@ -362,7 +362,6 @@ export function compileAndWait(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<void> {
-  const run = host._installRun;
   return new Promise((resolve, reject) => {
     // Capture reject on the dialog so a mid-flight detach (header-X / Escape /
     // reopen) can settle this promise. followJob callbacks clear the hook to
@@ -426,10 +425,11 @@ export function compileAndWait(
     // where the constructor expects a void-returning one.
     const start = async () => {
       const job = await host._api.firmwareCompile(configuration);
-      // A reopen while the submit was out started the next run, whose _init
-      // settled this promise; the job is not that run's to follow. A plain
-      // dismissal still records it, so the after-hide can say it goes on.
-      if (host._installRun !== run) return;
+      // A teardown while the submit was out (the after-hide of a dismissal,
+      // or the _init of a reopen) settled this promise and took the hook: the
+      // job is not this dialog's to follow. A dismissal whose after-hide is
+      // still to come records it, so that after-hide can say it goes on.
+      if (host._compileReject !== reject) return;
       host._jobId = job.job_id;
       // Capture so a compile failure can pick the right hint variant:
       // local jobs get the link-to-reset, remote jobs get the plain-text
@@ -440,8 +440,8 @@ export function compileAndWait(
       follow(job.job_id);
     };
     start().catch((err: unknown) => {
-      // After a reopen the hook on the dialog is the next run's.
-      if (host._installRun === run) host._compileReject = null;
+      // After a teardown the hook on the dialog is gone, or the next run's.
+      if (host._compileReject === reject) host._compileReject = null;
       // Raw rejection: compileFailureDetail normalizes downstream.
       reject(err);
     });

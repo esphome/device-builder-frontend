@@ -659,8 +659,10 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
     const { host, api } = ready();
     api.firmwareCompile.mockImplementationOnce(async () => {
       dismiss(host);
-      reopen(host);
+      // The reopen's _init settles the compile and drops its hook.
       host._compileReject?.(new Error("Install dialog dismissed"));
+      host._compileReject = null;
+      reopen(host);
       return { job_id: "j-old", source: JobSource.LOCAL, source_label: "" };
     });
 
@@ -720,6 +722,24 @@ describe("Web Serial install dismissed before the flash (#1900)", () => {
 
     expect(host._compileReject).toBe(nextHook);
     expect(nextHook).not.toHaveBeenCalled();
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("does not follow a compile whose dialog was torn down while the submit was out", async () => {
+    const { host, api } = ready();
+    api.firmwareCompile.mockImplementationOnce(async () => {
+      // The after-hide came before the submit returned: its teardown settled
+      // the compile and dropped the hook.
+      dismiss(host);
+      host._compileReject?.(new Error("Install dialog dismissed"));
+      host._compileReject = null;
+      return { job_id: "j-old", source: JobSource.LOCAL, source_label: "" };
+    });
+
+    await run(host);
+
+    expect(api.firmwareFollowJob).not.toHaveBeenCalled();
+    expect(host._jobId).toBe("");
     expect(host._fail).not.toHaveBeenCalled();
   });
 
