@@ -43,6 +43,9 @@ jobs:
       - name: ESLint
         run: pnpm run lint:eslint
 
+      - name: Import cycles
+        run: pnpm run lint:cycles
+
   typecheck:
     name: Type check
     runs-on: ubuntu-latest
