@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { disconnectEvents } from "../../_web-serial.js";
 import {
   buildSmpFrame,
   parseMcubootImage,
@@ -141,6 +142,7 @@ function makePort({
   });
   let open = false;
   const port = {
+    ...disconnectEvents(),
     get readable() {
       return open ? readable : null;
     },
