@@ -49,7 +49,13 @@ export type LogsSession =
        *  session without it, so a user stop never auto-resumes. */
       readonly interrupted?: boolean;
     }
-  | { readonly kind: "reconnecting"; readonly paused: boolean }
+  | {
+      readonly kind: "reconnecting";
+      readonly paused: boolean;
+      /** A live link dropped and is being restored, as opposed to the first
+       *  attach, which shares this phase. */
+      readonly resume?: boolean;
+    }
   | {
       readonly kind: "serial";
       readonly port: SerialPort;

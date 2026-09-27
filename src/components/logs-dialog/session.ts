@@ -60,6 +60,10 @@ export function openPassive(
   host._session = { kind: "reconnecting", paused: false };
   host._open = true;
   host._resetAnsiLogScroll();
+  // The BLE connect can take seconds with nothing to show yet.
+  if (host._passiveSource === "ble") {
+    host._log.append([host._localize("dashboard.logs_ble_nus_connecting")]);
+  }
   // For that attach: it may still be settling when this session is gone.
   return sessionMovedOn(host);
 }
@@ -107,13 +111,11 @@ export function setSerialStream(
 
 /** Register a streaming Bluetooth logs link (its cancel). */
 export function setBleStream(host: ESPHomeLogsDialog, cancel: () => Promise<void>): void {
-  const wasReconnecting = host._session.kind === "reconnecting";
   const pending = pendingPassiveAttach(host, cancel);
-  if (pending) {
-    host._session = { kind: "ble", cancel, paused: pending.paused };
-    if (wasReconnecting) {
-      host._log.append([host._localize("dashboard.logs_ble_nus_reconnected"), ""]);
-    }
+  if (!pending) return;
+  host._session = { kind: "ble", cancel, paused: pending.paused };
+  if (pending.resume) {
+    host._log.append([host._localize("dashboard.logs_ble_nus_reconnected"), ""]);
   }
 }
 
@@ -134,7 +136,7 @@ export function triggerBleReconnect(
     disconnectMessage,
     host._localize("dashboard.logs_ble_nus_reconnecting"),
   ]);
-  reconnectSerial(host);
+  reconnectSerial(host, true);
 }
 
 // An attach is async (a reopen retries for seconds). If the dialog closed or
@@ -144,12 +146,14 @@ export function triggerBleReconnect(
 function pendingPassiveAttach(
   host: ESPHomeLogsDialog,
   cancel: () => Promise<void>
-): { paused: boolean } | null {
+): { paused: boolean; resume: boolean } | null {
   if (!host._open || !isPassive(host._session)) {
     void cancel();
     return null;
   }
-  return { paused: host._session.kind === "reconnecting" && host._session.paused };
+  const s = host._session;
+  if (s.kind !== "reconnecting") return { paused: false, resume: false };
+  return { paused: s.paused, resume: s.resume === true };
 }
 
 /**
@@ -433,10 +437,11 @@ export async function resetSerialDevice(host: ESPHomeLogsDialog): Promise<void> 
 async function runReconnecting(
   host: ESPHomeLogsDialog,
   task: (cancelled: () => boolean) => Promise<void>,
-  failKey: string
+  failKey: string,
+  resume = false
 ): Promise<void> {
   const cancelled = sessionMovedOn(host);
-  host._session = { kind: "reconnecting", paused: false };
+  host._session = { kind: "reconnecting", paused: false, ...(resume && { resume }) };
   let failure: unknown;
   try {
     await task(cancelled);
@@ -452,7 +457,7 @@ async function runReconnecting(
   notifyError(host._localize(failKey));
 }
 
-function reconnectSerial(host: ESPHomeLogsDialog): void {
+function reconnectSerial(host: ESPHomeLogsDialog, resume = false): void {
   const reconnect = host._reconnect;
   if (!reconnect) return;
   void runReconnecting(
@@ -460,7 +465,8 @@ function reconnectSerial(host: ESPHomeLogsDialog): void {
     reconnect,
     host._passiveSource === "ble"
       ? "dashboard.logs_ble_nus_open_failed"
-      : "dashboard.logs_web_serial_open_failed"
+      : "dashboard.logs_web_serial_open_failed",
+    resume
   );
 }
 
