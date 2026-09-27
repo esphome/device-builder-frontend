@@ -2079,7 +2079,7 @@
     },
     "nrf": {
       "title": "nRF52 Device",
-      "connect_hint": "Update firmware on your nRF52 device using the Nordic DFU protocol, or read its logs over USB or Bluetooth. No drivers required.",
+      "connect_hint": "Update firmware on your nRF52 device using the Nordic DFU protocol or, where it runs MCUboot, over mcumgr; or read its logs over USB or Bluetooth. No drivers required.",
       "logs_usb": "Serial logs",
       "logs_ble": "Bluetooth logs",
       "install_title": "Update nRF52 firmware",
@@ -2091,7 +2091,14 @@
       "install_waiting_hint": "Your device has been reset and is entering DFU mode. Click Continue when ready. If no new port appears, the firmware on the board did not act on the reset: double-press the board's reset button to enter the bootloader by hand, then click Continue.",
       "install_flashing": "Installing firmware…",
       "install_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
-      "install_error_flash": "Firmware update failed: {error}"
+      "install_error_flash": "Firmware update failed: {error}",
+      "update": "MCUboot update",
+      "update_title": "Update nRF52 firmware over mcumgr",
+      "update_hint": "Sends an MCUboot update image to a device that is running ESPHome with the mcumgr OTA platform. A device with other firmware needs the DFU install first.",
+      "update_file_label": "MCUboot update image (app_update.bin)",
+      "update_ble": "Update over Bluetooth",
+      "update_serial": "Update over serial",
+      "update_no_reply": "The device did not answer. Make sure its firmware has the mcumgr transport you picked and, over serial, that you chose the port of that transport."
     }
   },
   "remote_build_dashboard": {

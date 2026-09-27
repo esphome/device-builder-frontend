@@ -4,7 +4,8 @@ The standalone, backend-free Web Serial tool published to
 [web.esphome.io](https://web.esphome.io). Everything runs in the
 browser: connect an ESP or Raspberry Pi Pico W over USB to install
 firmware, stream logs, and provision Wi-Fi via Improv; an nRF52 gets DFU
-installs and logs over USB or Bluetooth; an RTL8720C gets a LibreTiny UF2
+installs, MCUboot updates over mcumgr, and logs, the last two over USB or
+Bluetooth; an RTL8720C gets a LibreTiny UF2
 flashed through its ROM downloader and logs over its serial adapter. It shares the
 repo's `src/` tree (design system, the esptool-js flash engine in
 `src/platforms/esp/esptool.ts`, localization) and adds only this app.
@@ -52,17 +53,17 @@ hardware classes behave differently:
 
 ## Where things live
 
-| Path                                   | What                                                                                            |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                                                       |
-| `web-mode.ts`, `header/`               | The mode switch (ESP, `?pico`, `?nrf`, `?rtl`) and the header, both read from the registry      |
-| `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                           |
-| `platforms/<name>/`                    | Each family's `mode.ts`, cards and install dialogs; `platforms/registry.ts` lists them          |
-| `install/`                             | Pieces the install dialogs share: the progress card and the file picker                         |
-| `logs/`                                | Log viewer dialog and its sources (Web Serial, Bluetooth for nRF52)                             |
-| `improv/`                              | Wi-Fi provisioning dialog                                                                       |
-| `flash-receiver/`                      | Flashes firmware a Device Builder hands over when it can't flash itself                         |
-| `util/`                                | Web-only helpers (firmware fetch, port pickers and release, disconnect watcher)                 |
+| Path                                   | What                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                                                  |
+| `web-mode.ts`, `header/`               | The mode switch (ESP, `?pico`, `?nrf`, `?rtl`) and the header, both read from the registry |
+| `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                      |
+| `platforms/<name>/`                    | Each family's `mode.ts`, cards and install dialogs; `platforms/registry.ts` lists them     |
+| `install/`                             | Pieces the install dialogs share: the progress card and the file picker                    |
+| `logs/`                                | Log viewer dialog and its sources (Web Serial, Bluetooth for nRF52)                        |
+| `improv/`                              | Wi-Fi provisioning dialog                                                                  |
+| `flash-receiver/`                      | Flashes firmware a Device Builder hands over when it can't flash itself                    |
+| `util/`                                | Web-only helpers (firmware fetch, port pickers and release, disconnect watcher)            |
 
 ### Adding a device family
 

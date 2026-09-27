@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiBluetooth, mdiTextBoxOutline, mdiUpload } from "@mdi/js";
+import { mdiBluetooth, mdiTextBoxOutline, mdiUpdate, mdiUpload } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
@@ -8,6 +8,7 @@ import { localizeContext } from "../../../context/index.js";
 import { actionBtnStyles } from "../../../styles/action-buttons.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import "./esphome-web-install-nrf-dialog.js";
+import "./esphome-web-update-nrf-dialog.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
 import "../../logs/esphome-web-logs-dialog.js";
@@ -22,6 +23,7 @@ registerMdiIcons({
   upload: mdiUpload,
   "text-box-outline": mdiTextBoxOutline,
   bluetooth: mdiBluetooth,
+  update: mdiUpdate,
 });
 
 /** What the open logs dialog streams from; one or the other, never both. */
@@ -29,7 +31,8 @@ type LogsSource = { port: SerialPort } | { ble: BluetoothDevice };
 
 /**
  * nRF52 card: no connected state; each install is a self-contained reset +
- * flash, and each logs session picks its own port or Bluetooth device.
+ * flash, each update picks the device it goes to, and each logs session picks
+ * its own port or Bluetooth device.
  */
 @customElement("esphome-web-nrf-card")
 export class ESPHomeWebNrfCard extends LitElement {
@@ -38,6 +41,7 @@ export class ESPHomeWebNrfCard extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _installOpen = false;
+  @state() private _updateOpen = false;
   @state() private _logs?: LogsSource;
   // A chooser is up; a second click must not open another beside it. A
   // session still set (the dialog open, or hiding with its after-hide yet to
@@ -92,6 +96,15 @@ export class ESPHomeWebNrfCard extends LitElement {
             ${this._localize("dashboard.install")}
           </button>
           <button
+            id="btn-update"
+            class="action-btn action-btn--ghost action-btn--tile"
+            aria-label=${this._localize("web.nrf.update")}
+            @click=${() => (this._updateOpen = true)}
+          >
+            <wa-icon library="mdi" name="update"></wa-icon>
+          </button>
+          <wa-tooltip for="btn-update">${this._localize("web.nrf.update")}</wa-tooltip>
+          <button
             id="btn-logs-usb"
             class="action-btn action-btn--ghost action-btn--tile"
             aria-label=${this._localize("web.nrf.logs_usb")}
@@ -119,6 +132,10 @@ export class ESPHomeWebNrfCard extends LitElement {
         ?open=${this._installOpen}
         @after-hide=${() => (this._installOpen = false)}
       ></esphome-web-install-nrf-dialog>
+      <esphome-web-update-nrf-dialog
+        ?open=${this._updateOpen}
+        @after-hide=${() => (this._updateOpen = false)}
+      ></esphome-web-update-nrf-dialog>
       <esphome-web-logs-dialog
         .port=${logs && "port" in logs ? logs.port : undefined}
         .bleDevice=${logs && "ble" in logs ? logs.ble : undefined}

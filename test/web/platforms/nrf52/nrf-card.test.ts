@@ -21,6 +21,10 @@ vi.mock(
   "../../../../src/web/platforms/nrf52/esphome-web-install-nrf-dialog.js",
   () => ({})
 );
+vi.mock(
+  "../../../../src/web/platforms/nrf52/esphome-web-update-nrf-dialog.js",
+  () => ({})
+);
 vi.mock("../../../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: mocks.toastError } }));
@@ -52,7 +56,22 @@ afterEach(() => {
 
 describe("esphome-web-nrf-card", () => {
   it("anchors every action tooltip to a real button id", async () => {
-    expectTooltipsAnchored(await mount(), 2);
+    expectTooltipsAnchored(await mount(), 3);
+  });
+
+  it("opens the MCUboot update dialog from its own action", async () => {
+    const el = await mount();
+    const dialog = () =>
+      el.shadowRoot!.querySelector("esphome-web-update-nrf-dialog") as HTMLElement;
+    expect(dialog().hasAttribute("open")).toBe(false);
+
+    el.shadowRoot!.querySelector<HTMLElement>("#btn-update")!.click();
+    await el.updateComplete;
+    expect(dialog().hasAttribute("open")).toBe(true);
+
+    dialog().dispatchEvent(new CustomEvent("after-hide"));
+    await el.updateComplete;
+    expect(dialog().hasAttribute("open")).toBe(false);
   });
 
   it("opens the logs dialog on the picked, opened CDC port", async () => {
