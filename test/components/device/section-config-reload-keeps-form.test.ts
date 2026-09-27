@@ -197,4 +197,34 @@ describe("section reload keeps the form mounted", () => {
     expect(form(c)).toBeNull();
     expect(c.shadowRoot!.querySelector(".error")).not.toBeNull();
   });
+
+  describe("a YAML edited outside the form (#1906)", () => {
+    const EDITED = YAML.replace("sensor:", "sensor: # by hand");
+
+    async function reloadWith(c: ESPHomeDeviceSectionConfig, yaml: string) {
+      c.yaml = yaml;
+      c.reload();
+      await flush();
+      await c.updateComplete;
+    }
+
+    it("tells the form the values were read again", async () => {
+      const { c } = await firstLoad();
+      const before = form(c).valuesRead;
+
+      await reloadWith(c, EDITED);
+
+      expect(form(c).valuesRead).toBeGreaterThan(before);
+    });
+
+    it("does not for the YAML the section wrote itself", async () => {
+      const { c, inner } = await firstLoad();
+      const before = form(c).valuesRead;
+
+      inner._lastSelfWrittenYaml = EDITED;
+      await reloadWith(c, EDITED);
+
+      expect(form(c).valuesRead).toBe(before);
+    });
+  });
 });
