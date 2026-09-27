@@ -135,6 +135,13 @@ function offlineLabel(card: ESPHomeDeviceCard): string {
   });
 }
 
+/** True while a busy or finished-job badge stands in for the status pill. */
+export function jobBadgeShown(card: ESPHomeDeviceCard): boolean {
+  return (
+    card.busy || (card.recentJob !== null && !!RECENT_JOB_ICON[card.recentJob.status])
+  );
+}
+
 export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
   if (card.busy) {
     const labelKey =

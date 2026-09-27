@@ -37,6 +37,7 @@ import { busyActionLabel, updateActionTitle } from "../util/update-tooltip.js";
 import { renderVisitWebUiLink } from "../util/visit-web-ui-link.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
+  jobBadgeShown,
   renderEncryptionIcon,
   renderLabels,
   renderMigrationDot,
@@ -83,9 +84,9 @@ export class ESPHomeDeviceCard extends LitElement {
     return offlineSeconds(this.state, this.nameAddMacSuffix, this.offlineSince);
   }
 
-  // The busy badge covers the status pill, so there is nothing to repaint.
+  // A job badge covers the status pill, so there is nothing to repaint.
   protected readonly _offlineClock = new OfflineClockController(this, () =>
-    this.busy ? null : this._offlineSeconds
+    jobBadgeShown(this) ? null : this._offlineSeconds
   );
 
   // Resolved against the catalog at render time so a recolor / rename in

@@ -8,6 +8,7 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
 import { DeviceState } from "../../src/api/types/devices.js";
+import { type FirmwareJob, JobStatus } from "../../src/api/types/firmware-jobs.js";
 import { mountDeviceCard as mount } from "./_device-card.js";
 
 function badgeText(el: HTMLElement): string {
@@ -78,6 +79,21 @@ describe("device-card offline duration", () => {
     expect(vi.getTimerCount()).toBe(0);
 
     el.busy = false;
+    await el.updateComplete;
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it("stops repainting while a finished-job badge covers the pill", async () => {
+    vi.useFakeTimers();
+    const el = await mount({
+      _localize: localize,
+      state: DeviceState.OFFLINE,
+      offlineSince: nowSeconds() - 30,
+      recentJob: { status: JobStatus.FAILED } as FirmwareJob,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+
+    el.recentJob = null;
     await el.updateComplete;
     expect(vi.getTimerCount()).toBe(1);
   });
