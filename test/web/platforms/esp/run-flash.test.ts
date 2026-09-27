@@ -6,6 +6,7 @@ vi.mock("../../../../src/util/web-serial.js", () => ({
 vi.mock("../../../../src/platforms/esp/esptool.js", () => ({
   connectToPort: vi.fn(),
   flashFirmware: vi.fn(),
+  eraseFlash: vi.fn(),
   resetAndDisconnect: vi.fn(async () => {}),
   disconnect: vi.fn(async () => {}),
 }));
@@ -17,12 +18,14 @@ vi.mock("../../../../src/platforms/esp/esptool-loader.js", () => ({
 import {
   connectToPort,
   disconnect,
+  eraseFlash,
   flashFirmware,
   resetAndDisconnect,
 } from "../../../../src/platforms/esp/esptool.js";
 import {
   markOpenFailure,
   SerialConnectTimeoutError,
+  SerialDeviceLostError,
 } from "../../../../src/util/serial-open-error.js";
 import { isPortPickerCancel } from "../../../../src/util/web-serial.js";
 import {
@@ -68,6 +71,7 @@ beforeEach(() => {
   );
   vi.mocked(isPortPickerCancel).mockReturnValue(false);
   vi.mocked(flashFirmware).mockResolvedValue(undefined);
+  vi.mocked(eraseFlash).mockResolvedValue(undefined);
   vi.mocked(resetAndDisconnect).mockResolvedValue(undefined);
   vi.mocked(disconnect).mockResolvedValue(undefined);
 });
@@ -109,9 +113,36 @@ describe("runFlash", () => {
       hooks
     );
 
-    expect(chip.loader.eraseFlash).toHaveBeenCalledOnce();
+    expect(eraseFlash).toHaveBeenCalledExactlyOnceWith(chip.loader);
     expect(hooks.steps).toContain("erasing");
   });
+
+  it.each([
+    ["flash", flashFirmware],
+    ["erase", eraseFlash],
+  ])(
+    "names a board unplugged during the %s and releases the port",
+    async (_what, step) => {
+      vi.mocked(connectToPort).mockResolvedValue(detected() as never);
+      vi.mocked(step).mockRejectedValue(new SerialDeviceLostError());
+      const hooks = makeHooks();
+
+      const ok = await runFlash(
+        port,
+        {
+          erase: true,
+          filesCallback: async () => [{ data: new Uint8Array(4), address: 0 }],
+          messages: webFlashMessages((key) => key),
+        },
+        hooks
+      );
+
+      expect(ok).toBe(false);
+      expect(hooks.errors).toEqual(["serial.device_lost"]);
+      expect(disconnect).toHaveBeenCalledOnce();
+      expect(resetAndDisconnect).not.toHaveBeenCalled();
+    }
+  );
 
   it("aggregates progress across multiple parts by byte size", async () => {
     const chip = detected();

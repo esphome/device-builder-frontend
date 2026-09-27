@@ -75,6 +75,26 @@ export class SerialOpenTimeoutError extends Error {
   }
 }
 
+/** The device went away (unplugged, or it dropped off the bus) during a write or an erase. */
+export class SerialDeviceLostError extends Error {
+  constructor() {
+    super("The device disconnected during the operation");
+    this.name = "SerialDeviceLostError";
+  }
+}
+
+/** A write made no progress for a window; the device is there but not answering. */
+export class SerialWriteStalledError extends Error {
+  readonly seconds: number;
+
+  constructor(windowMs: number) {
+    const seconds = Math.round(windowMs / 1000);
+    super(`No progress from the device in ${seconds} s`);
+    this.name = "SerialWriteStalledError";
+    this.seconds = seconds;
+  }
+}
+
 /** The port could not be closed or released; it stays held until the board is replugged. */
 export class SerialPortHeldError extends Error {
   constructor() {
@@ -86,8 +106,8 @@ export class SerialPortHeldError extends Error {
 /**
  * The copy for a failed pick or connect that can be named: a picker refused
  * for a click that ran out, the port held elsewhere, the device never
- * answering, the port never opening, or the port not releasing; undefined
- * for anything else.
+ * answering, the port never opening, the port not releasing, or the device
+ * lost or gone quiet during a write; undefined for anything else.
  */
 export function namedConnectFailure(
   err: unknown,
@@ -101,6 +121,10 @@ export function namedConnectFailure(
     return localize("serial.open_timed_out", { seconds: err.seconds });
   }
   if (err instanceof SerialPortHeldError) return localize("serial.port_held");
+  if (err instanceof SerialDeviceLostError) return localize("serial.device_lost");
+  if (err instanceof SerialWriteStalledError) {
+    return localize("serial.write_stalled", { seconds: err.seconds });
+  }
   return portInUseMessage(err, localize);
 }
 

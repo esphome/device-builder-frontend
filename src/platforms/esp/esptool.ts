@@ -16,6 +16,7 @@ import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
 import type { LogCallback } from "../../util/web-serial.js";
 import { settledWithin, withDeadline } from "../../util/with-deadline.js";
+import { whileDevicePresent, WRITE_STALL_MS } from "./device-present.js";
 import {
   type DeviceManifest,
   type FlashProgress,
@@ -279,6 +280,8 @@ export async function readDeviceManifest(
 /**
  * Flash firmware binary data to a connected ESP device.
  * Assumes connectToPort() was already called and the loader is connected.
+ * Throws ``SerialDeviceLostError`` when the device goes away during the
+ * write and ``SerialWriteStalledError`` when it stops answering.
  */
 export async function flashFirmware(
   loader: ESPLoader,
@@ -287,26 +290,44 @@ export async function flashFirmware(
   onProgress?: (progress: FlashProgress) => void
 ): Promise<void> {
   markSerialActivity();
-  await loader.writeFlash({
-    fileArray: [{ data, address }],
-    flashSize: "keep",
-    flashMode: "keep",
-    flashFreq: "keep",
-    eraseAll: false,
-    compress: true,
-    reportProgress: (fileIndex, written, total) => {
-      // Keep the suppression window alive throughout long flashes —
-      // a 60-second write would otherwise let the post-flash reset
-      // toast leak through despite the operation still being active.
-      markSerialActivity();
-      onProgress?.({
-        fileIndex,
-        written,
-        total,
-        percent: Math.round((written / total) * 100),
-      });
-    },
-  });
+  await whileDevicePresent(
+    loader.transport.device,
+    ({ progressed, live }) =>
+      loader.writeFlash({
+        fileArray: [{ data, address }],
+        flashSize: "keep",
+        flashMode: "keep",
+        flashFreq: "keep",
+        eraseAll: false,
+        compress: true,
+        reportProgress: (fileIndex, written, total) => {
+          // A write given up on must not move the bar under its failure.
+          if (!live()) return;
+          progressed();
+          // Keep the suppression window alive throughout long flashes —
+          // a 60-second write would otherwise let the post-flash reset
+          // toast leak through despite the operation still being active.
+          markSerialActivity();
+          onProgress?.({
+            fileIndex,
+            written,
+            total,
+            percent: Math.round((written / total) * 100),
+          });
+        },
+      }),
+    WRITE_STALL_MS
+  );
+}
+
+/**
+ * Erase the whole flash. Throws ``SerialDeviceLostError`` when the device
+ * goes away meanwhile. An erase reports no progress and takes its time, so
+ * it gets no stall window.
+ */
+export async function eraseFlash(loader: ESPLoader): Promise<void> {
+  markSerialActivity();
+  await whileDevicePresent(loader.transport.device, () => loader.eraseFlash());
 }
 
 /**

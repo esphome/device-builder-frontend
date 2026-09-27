@@ -124,7 +124,7 @@ export async function runFlash(
   try {
     if (plan.erase) {
       hooks.onStep("erasing");
-      await detected.loader.eraseFlash();
+      await esptool.eraseFlash(detected.loader);
     }
     hooks.onStep("flashing");
     const total = parts.reduce((sum, p) => sum + p.data.length, 0);
@@ -140,7 +140,7 @@ export async function runFlash(
     hooks.onStep("done");
   } catch (err) {
     hooks.onStep("error");
-    hooks.onError(err instanceof Error ? err.message : String(err));
+    hooks.onError(plan.messages?.namedFailure?.(err) ?? getErrorMessage(err));
     await releaseSerial(esptool, detected);
     return false;
   }

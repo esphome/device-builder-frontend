@@ -37,7 +37,10 @@ import { JobSource, JobStatus } from "../../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
 import { startWebSerialInstall } from "../../../src/platforms/esp/web-serial-install.js";
 import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
-import { markOpenFailure } from "../../../src/util/serial-open-error.js";
+import {
+  markOpenFailure,
+  SerialDeviceLostError,
+} from "../../../src/util/serial-open-error.js";
 
 function makeHost() {
   const api = {
@@ -317,5 +320,40 @@ describe("Web Serial install — HTTP byte download", () => {
     await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
 
     expect(host._failureKind).toBe(null);
+  });
+});
+
+describe("Web Serial install when the board is unplugged during the flash (#1896)", () => {
+  it("fails with the device lost line, releases the port and leaves Retry", async () => {
+    const { host } = makeHost();
+    esptool.connectToPort.mockResolvedValue(CHIP);
+    esptool.disconnect.mockResolvedValue(undefined);
+    esptool.flashFirmware.mockImplementation(async (_l, _d, _a, onProgress) => {
+      onProgress({ percent: 60 });
+      throw new SerialDeviceLostError();
+    });
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._fail).toHaveBeenCalledWith("serial.device_lost");
+    expect(esptool.disconnect).toHaveBeenCalled();
+    expect(esptool.resetAndDisconnect).not.toHaveBeenCalled();
+    // Retry is only offered for a failure with no kind of its own.
+    expect(host._failureKind).toBeNull();
+  });
+
+  it("still counts a write that reached the end as done", async () => {
+    const { host } = makeHost();
+    esptool.connectToPort.mockResolvedValue(CHIP);
+    esptool.resetAndDisconnect.mockResolvedValue(undefined);
+    esptool.flashFirmware.mockImplementation(async (_l, _d, _a, onProgress) => {
+      onProgress({ percent: 100 });
+      throw new SerialDeviceLostError();
+    });
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    expect(host._fail).not.toHaveBeenCalled();
+    expect(host._step).toBe("done");
   });
 });

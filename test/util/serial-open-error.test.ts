@@ -9,8 +9,10 @@ import {
   openSerialPort,
   portInUseMessage,
   SerialConnectTimeoutError,
+  SerialDeviceLostError,
   SerialOpenTimeoutError,
   SerialPortHeldError,
+  SerialWriteStalledError,
 } from "../../src/util/serial-open-error.js";
 
 const localize = (k: string, v?: Record<string, string | number>) =>
@@ -83,6 +85,15 @@ describe("serial-open-error", () => {
     );
     expect(connectFailureDetail(refused, localize, () => "hinted")).toBe(
       "serial.picker_needs_click"
+    );
+  });
+
+  it("names a device lost or gone quiet during a write", () => {
+    expect(namedConnectFailure(new SerialDeviceLostError(), localize)).toBe(
+      "serial.device_lost"
+    );
+    expect(namedConnectFailure(new SerialWriteStalledError(60_000), localize)).toBe(
+      'serial.write_stalled {"seconds":60}'
     );
   });
 });
