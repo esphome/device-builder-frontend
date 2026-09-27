@@ -97,6 +97,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     super.connectedCallback();
     // The page exists to flash: warm the esptool chunk while the hand-off arrives.
     preloadEsptool();
+    // And its receiver engine, so the manual file path's click reaches the
+    // port picker without a chunk fetch; a miss is reported by _prepare.
+    void RECEIVER_ENGINES.esp().catch(() => {});
     const params = parseFlasherParams(window.location.hash);
     this._hasOpener = window.opener != null;
     if (params && window.opener) {
@@ -240,7 +243,16 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       }
       // Held from here: the read and the check must not let a second click in.
       this._busy = true;
-      const data = new Uint8Array(await file.arrayBuffer());
+      let data: Uint8Array;
+      try {
+        data = new Uint8Array(await file.arrayBuffer());
+      } catch (err) {
+        // The file changed or went away after it was picked.
+        console.error("[flash receiver] Could not read the picked file:", err);
+        this._busy = false;
+        this._setState("error", this._localize("web.flash.choose_file"));
+        return;
+      }
       this._prepared = this._prepare(
         [{ data, address: 0 }],
         true,

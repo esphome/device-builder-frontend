@@ -152,6 +152,24 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(engines.esp.run).toHaveBeenCalledOnce();
   });
 
+  it("frees the button when the picked file cannot be read", async () => {
+    Object.defineProperty(window, "opener", { value: null, configurable: true });
+    window.location.hash = "";
+    const el = new ESPHomeWebFlashReceiver();
+    (el as any)._localize = (k: string) => k;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    Object.defineProperty(el, "_fileInput", {
+      value: {
+        files: [{ arrayBuffer: () => Promise.reject(new Error("NotReadableError")) }],
+      },
+    });
+    await (el as any)._onPrimary();
+    expect((el as any)._busy).toBe(false);
+    expect((el as any)._state).toBe("error");
+    expect(engines.esp.run).not.toHaveBeenCalled();
+  });
+
   it("sends the manual reset as the done note and parks the port for Logs", async () => {
     engines.rtl.run.mockImplementationOnce(async (_port, hooks) => {
       hooks.onState("installing", "writing");

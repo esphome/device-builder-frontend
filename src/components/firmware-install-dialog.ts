@@ -495,8 +495,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       );
       if (!settled) return;
     }
-    if (this._installer === "web-flash") this.installUsbFlash(device);
-    else if (this._flasher) this._retryFlasher(this._flasher, device);
+    // The same hand-off again: an RTL8720C retry must not fall to the ESP image.
+    if (this._installer === "web-flash") {
+      this.installUsbFlash(device, this._usbHandoff ?? undefined);
+    } else if (this._flasher) this._retryFlasher(this._flasher, device);
     else this.installWebSerial(device);
   };
 
