@@ -69,14 +69,12 @@ import {
   parseFieldKey,
   renderYamlOnlyField,
 } from "./config-entry-renderers-shared.js";
-import {
-  closePinAdvanced,
-  rowMemoryCtx,
-} from "./config-entry-renderers/row-memory-ctx.js";
+import { rowMemoryCtx } from "./config-entry-renderers/row-memory-ctx.js";
 import { ValueMemory } from "./config-entry-renderers/value-memory.js";
 import { ConstraintClusterController } from "./constraint-cluster-controller.js";
 import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";
+import { closePinAdvanced } from "./pin/advanced-key.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

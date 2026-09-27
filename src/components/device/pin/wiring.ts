@@ -40,12 +40,10 @@ import {
   type LockedReasonCarrier,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
+import { PIN_ADVANCED_SUFFIX } from "./advanced-key.js";
 import { renderCustomEditor, renderLongFormChild, wiringDiagram } from "./mode-editor.js";
 
 registerMdiIcons({ tune: mdiTune });
-
-/** Ends the key of a pin's Advanced disclosure in the form's open groups. */
-export const PIN_ADVANCED_SUFFIX = ":pin-advanced";
 
 export interface PinWiringOptions {
   entry: ConfigEntry;
