@@ -32,7 +32,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import { floatRequiredFirst } from "../../util/config-entry-ordering.js";
-import { sameEntryShape } from "../../util/config-entry-shape.js";
+import { sameEntryTarget } from "../../util/config-entry-target.js";
 import { anyAdvancedEntry, pathIsAdvanced } from "../../util/config-entry-tree.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
@@ -648,8 +648,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const previous = changed.get("entries") as ConfigEntry[] | undefined;
     if (changed.has("entries") && previous !== undefined) {
       // A stash holds what the user typed on the side they left, so it is
-      // dropped only for other fields, not for the same ones rebuilt.
-      if (!sameEntryShape(previous, this.entries)) {
+      // dropped only for another target, not for the same one rebuilt.
+      if (!sameEntryTarget(previous, this.entries)) {
         clearTemplatableStash(this);
         clearEnableStash(this);
       }

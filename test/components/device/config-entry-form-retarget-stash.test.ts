@@ -66,15 +66,16 @@ describe("config-entry-form literal / lambda stash", () => {
     });
   });
 
-  it("keeps the stash when the host rebuilds the same entries", async () => {
+  it("keeps the stash when the host rebuilds its list of the same entries", async () => {
     // A host that filters the catalog's entries on every render hands over
-    // a new array each time; that is the same form, not a re-target.
-    const { form, changes, toggle } = await mountForm(valueEntry("Delay"), {
+    // a new array of the same objects; that is the same form, not a re-target.
+    const entries = valueEntry("Delay");
+    const { form, changes, toggle } = await mountForm(entries, {
       id: { _lambda: "return 1000;", _tag: "!lambda" },
     });
     await toggle("literal");
 
-    form.entries = valueEntry("Delay");
+    form.entries = entries.filter(Boolean);
     await form.updateComplete;
     await toggle("lambda");
 
@@ -84,20 +85,14 @@ describe("config-entry-form literal / lambda stash", () => {
     });
   });
 
-  it("forgets the stash once the form is re-targeted to other entries", async () => {
+  it("forgets the stash once the form is re-targeted, even to like-named fields", async () => {
     const { form, changes, toggle } = await mountForm(valueEntry("Delay"), {
       id: { _lambda: "return 1000;", _tag: "!lambda" },
     });
     await toggle("literal");
 
-    form.entries = [
-      makeConfigEntry({
-        key: "id",
-        type: ConfigEntryType.FLOAT,
-        label: "Other action",
-        templatable: true,
-      }),
-    ];
+    // Another definition whose one field has the same key and type.
+    form.entries = valueEntry("Other action");
     form.values = {};
     await form.updateComplete;
     await toggle("lambda");
