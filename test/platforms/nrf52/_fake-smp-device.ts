@@ -7,6 +7,7 @@ import {
   OS_MGMT_MCUMGR_PARAMS,
   OS_MGMT_RESET,
   parseSmpFrame,
+  SmpNoReplyError,
   type SmpTransport,
 } from "../../../src/platforms/nrf52/smp-protocol.js";
 
@@ -29,6 +30,7 @@ export class FakeSmpDevice implements SmpTransport {
   /** The hash the device gives an uploaded image. */
   uploadedHash = new Uint8Array(32).fill(0xab);
   resetDropsLink = false;
+  resetWriteFails = false;
   resetReply: object = {};
   /** What the device answers a parameters query with; an error when unset. */
   params?: { buf_size: number; buf_count: number };
@@ -43,7 +45,8 @@ export class FakeSmpDevice implements SmpTransport {
       return reply(this.params ?? { rc: 8 });
     }
     if (req.group === MGMT_GROUP_OS && req.id === OS_MGMT_RESET) {
-      if (this.resetDropsLink) throw new Error("link dropped");
+      if (this.resetDropsLink) throw new SmpNoReplyError("link dropped");
+      if (this.resetWriteFails) throw new Error("write failed");
       return reply(this.resetReply);
     }
     if (req.group === MGMT_GROUP_IMAGE && req.id === IMG_MGMT_STATE) {

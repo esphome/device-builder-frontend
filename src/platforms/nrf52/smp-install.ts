@@ -103,9 +103,10 @@ async function runSmpFlash<Target>(
   host._flashPercent = 0;
   const abort = new AbortController();
   host._flashAbort = abort;
-  // A cache hit: the engine loaded when the image was parsed.
-  const engine = await loadSmpEngine();
+  let engine: SmpEngine | undefined;
   try {
+    // A cache hit: the engine loaded when the image was parsed.
+    engine = await loadSmpEngine();
     await flash(engine, target, image, {
       signal: abort.signal,
       onProgress: (percent) => {
@@ -115,8 +116,9 @@ async function runSmpFlash<Target>(
     });
   } catch (err) {
     if (stillCurrent()) {
-      const key =
-        err instanceof engine.SmpBleServiceNotFoundError
+      const key = !engine
+        ? "firmware.engine_load_failed"
+        : err instanceof engine.SmpBleServiceNotFoundError
           ? "firmware.nrf_smp_ble_service_not_found"
           : flow.failedKey;
       host._fail(host._localize(key), getErrorMessage(err));

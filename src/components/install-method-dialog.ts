@@ -464,8 +464,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * list. Holds the OTA address-override card (target a specific
    * IP / hostname — useful when the device hasn't been resolved
    * yet, or when overriding the dashboard's auto-detected
-   * address) and, in install mode, the manual binary-download
-   * option (compile here, flash with an external tool).
+   * address), the platform flashers marked advanced and, in install
+   * mode, the manual binary-download option (compile here, flash with
+   * an external tool).
    */
   private _renderAdvancedSection(ctx: MethodRowContext) {
     return renderDisclosure({

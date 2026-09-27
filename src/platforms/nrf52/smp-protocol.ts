@@ -3,7 +3,9 @@
  * the Bluetooth and serial transports: frames, image validation, and the
  * upload sequence (chunks, mark for test, reset).
  */
+import { getErrorMessage } from "../../util/error-message.js";
 import { sleep } from "../../util/sleep.js";
+import { withDeadline } from "../../util/with-deadline.js";
 import { cborDecode, cborEncode } from "./smp-cbor.js";
 
 export const MGMT_OP_READ = 0;
@@ -43,6 +45,14 @@ export class SmpError extends Error {
   }
 }
 
+/** The request went out and no reply came back: the link dropped, or timed out. */
+export class SmpNoReplyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SmpNoReplyError";
+  }
+}
+
 export interface SmpDeviceParams {
   /** Maximum SMP frame the device can receive, including the 8-byte header. */
   bufSize: number;
@@ -73,8 +83,9 @@ export async function smpQueryDeviceParams(
       return { bufSize, bufCount };
     }
   } catch (err) {
-    if (signal?.aborted) throw err;
-    // Older firmware has no such command; the caller falls back.
+    // Older firmware has no such command: it refuses it or stays silent,
+    // and the caller falls back. Anything else is a real failure.
+    if (!(err instanceof SmpError || err instanceof SmpNoReplyError)) throw err;
   }
   return null;
 }
@@ -91,7 +102,9 @@ export function chunkSizeFromParams(params: SmpDeviceParams): number {
 
 /**
  * Sends an SMP frame and returns the response to it. One exchange completes
- * before the next begins: mcumgr handles a single request at a time.
+ * before the next begins: mcumgr handles a single request at a time. Throws
+ * ``SmpNoReplyError`` when the frame went out and nothing came back, and the
+ * abort reason on a cancel.
  */
 export interface SmpTransport {
   exchange(frame: Uint8Array, signal?: AbortSignal): Promise<Uint8Array>;
@@ -193,6 +206,27 @@ function findImageHashTlv(
     p = valueStart + len;
   }
   return undefined;
+}
+
+/**
+ * The reply to a frame that has gone out, for a transport. A cancel passes
+ * through; any other failure to get one is ``SmpNoReplyError``.
+ */
+export async function awaitReply(
+  reply: Promise<Uint8Array>,
+  timeoutMs: number,
+  signal?: AbortSignal
+): Promise<Uint8Array> {
+  try {
+    return await withDeadline(
+      reply,
+      timeoutMs,
+      () => new Error("SMP: no response from the device")
+    );
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    throw new SmpNoReplyError(getErrorMessage(err));
+  }
 }
 
 /** A validated MCUboot image, ready to upload. */
@@ -383,7 +417,7 @@ async function sendChunks(
 async function testAndReset(
   client: SmpClient,
   hash: Uint8Array,
-  { onProgress, onLog, signal }: SmpUploadHooks
+  { onProgress, onLog }: SmpUploadHooks
 ): Promise<void> {
   onProgress(96);
   onLog?.("Marking uploaded image for test boot");
@@ -395,9 +429,9 @@ async function testAndReset(
   await client
     .request(MGMT_OP_WRITE, MGMT_GROUP_OS, OS_MGMT_RESET, {}, "resetting")
     .catch((err: unknown) => {
-      // The device resets before its reply arrives, so a dead link is the
-      // expected outcome; a refusal or a cancel is not.
-      if (err instanceof SmpError || signal?.aborted) throw err;
+      // The device resets before its reply arrives, so no reply is the
+      // expected outcome; a request that never went out is not.
+      if (!(err instanceof SmpNoReplyError)) throw err;
     });
   onLog?.("Done; the device is rebooting into the new firmware");
   onProgress(100);

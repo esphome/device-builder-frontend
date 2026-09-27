@@ -11,6 +11,7 @@ import {
   OS_MGMT_RESET,
   parseMcubootImage,
   parseSmpFrame,
+  SmpNoReplyError,
   smpQueryDeviceParams,
   type SmpTransport,
   smpUploadImage,
@@ -120,10 +121,15 @@ describe("device parameters", () => {
   });
 
   it.each([
-    ["rejects", () => Promise.reject(new Error("timeout"))],
+    ["stays silent", () => Promise.reject(new SmpNoReplyError("timeout"))],
     ["answers without them", () => Promise.resolve(buildSmpFrame(1, 0, 6, 0, { rc: 8 }))],
   ])("is null when the device %s", async (_name, exchange) => {
     expect(await smpQueryDeviceParams({ exchange })).toBeNull();
+  });
+
+  it("passes a failed write on instead of falling back", async () => {
+    const exchange = () => Promise.reject(new Error("write failed"));
+    await expect(smpQueryDeviceParams({ exchange })).rejects.toThrow("write failed");
   });
 
   it("passes a cancel on instead of falling back", async () => {
@@ -185,6 +191,17 @@ describe("smpUploadImage", () => {
 
     await expect(done).resolves.toBeUndefined();
     expect(progress[progress.length - 1]).toBe(100);
+  });
+
+  it("fails when the reset request never went out", async () => {
+    const image = await parseMcubootImage(makeMcubootImage());
+    const device = new FakeSmpDevice();
+    device.resetWriteFails = true;
+
+    const { done, progress } = await upload(device, image);
+
+    await expect(done).rejects.toThrow("write failed");
+    expect(progress).not.toContain(100);
   });
 
   it("fails when the device refuses the reset", async () => {

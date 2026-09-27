@@ -4,9 +4,9 @@
  */
 import { concat } from "../../util/bytes.js";
 import { sleep } from "../../util/sleep.js";
-import { withDeadline } from "../../util/with-deadline.js";
 import { SMP_BLE_CHARACTERISTIC_UUID, SMP_BLE_SERVICE_UUID } from "./smp-ble-service.js";
 import {
+  awaitReply,
   chunkSizeFromParams,
   type McubootImage,
   SMP_CHUNK_SIZE_DEFAULT,
@@ -86,11 +86,7 @@ class SmpBleTransport implements SmpTransport {
       for (let start = 0; start < frame.length; start += BLE_WRITE_FRAGMENT) {
         await this.writeFragment(frame.slice(start, start + BLE_WRITE_FRAGMENT));
       }
-      return await withDeadline(
-        response,
-        BLE_EXCHANGE_TIMEOUT_MS,
-        () => new Error("SMP: no response from the device")
-      );
+      return await awaitReply(response, BLE_EXCHANGE_TIMEOUT_MS, signal);
     } finally {
       this.pending = null;
       signal?.removeEventListener("abort", onAbort);

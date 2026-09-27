@@ -11,9 +11,9 @@
 import { arrayBufferToBase64 } from "../../util/base64.js";
 import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { SerialStreamSession } from "../../util/serial-stream-session.js";
-import { withDeadline } from "../../util/with-deadline.js";
 import { crc16Xmodem } from "../../util/xmodem.js";
 import {
+  awaitReply,
   type McubootImage,
   SMP_CHUNK_SIZE_DEFAULT,
   type SmpTransport,
@@ -131,39 +131,45 @@ export class SmpSerialDecoder {
 }
 
 class SmpSerialSession extends SerialStreamSession implements SmpTransport {
-  private readonly decoder = new SmpSerialDecoder((frame) => this.resolve?.(frame));
-  private resolve: ((frame: Uint8Array) => void) | null = null;
-  private reject: ((err: Error) => void) | null = null;
+  // One exchange at a time, so one reply is ever awaited.
+  private pending: { seq: number; settle(frame: Uint8Array | Error): void } | null = null;
+  private readonly decoder = new SmpSerialDecoder((frame) => {
+    // A late reply to a request that timed out is not this one's.
+    if (this.pending?.seq === frame[6]) this.pending.settle(frame);
+  });
 
   protected onBytes(bytes: Uint8Array): void {
     this.decoder.push(bytes);
   }
 
   protected onEnded(err: Error): void {
-    this.reject?.(err);
+    this.pending?.settle(err);
   }
 
   async exchange(frame: Uint8Array): Promise<Uint8Array> {
     if (this.readEnded) throw this.readEnded;
     const response = new Promise<Uint8Array>((resolve, reject) => {
-      this.resolve = resolve;
-      this.reject = reject;
-    }).finally(() => {
-      this.resolve = null;
-      this.reject = null;
+      this.pending = {
+        seq: frame[6],
+        settle: (result) => {
+          this.pending = null;
+          if (result instanceof Uint8Array) resolve(result);
+          else reject(result);
+        },
+      };
     });
     // A write that fails after the read loop ended leaves this unawaited.
     response.catch(() => {});
-    await this.writeBytes(encodeSerialFrame(frame));
-    // A frame that fails its CRC is dropped, so a garbled reply would
-    // otherwise wait forever.
-    return this.race(
-      withDeadline(
-        response,
-        SERIAL_EXCHANGE_TIMEOUT_MS,
-        () => new Error("SMP: no response from the device")
-      )
-    );
+    try {
+      await this.writeBytes(encodeSerialFrame(frame));
+      // A frame that fails its CRC is dropped, so a garbled reply would
+      // otherwise wait forever.
+      return await this.race(
+        awaitReply(response, SERIAL_EXCHANGE_TIMEOUT_MS, this.signal)
+      );
+    } finally {
+      this.pending = null;
+    }
   }
 }
 

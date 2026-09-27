@@ -1,9 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { buildSmpFrame } from "../../../src/platforms/nrf52/smp-protocol.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  buildSmpFrame,
+  parseMcubootImage,
+} from "../../../src/platforms/nrf52/smp-protocol.js";
 import {
   encodeSerialFrame,
+  flashMcubootOverSerial,
   SmpSerialDecoder,
 } from "../../../src/platforms/nrf52/smp-serial.js";
+import { FakeSmpDevice } from "./_fake-smp-device.js";
+import { makeMcubootImage } from "./_mcuboot-image.js";
 
 const lines = (encoded: Uint8Array): Uint8Array[] => {
   const out: Uint8Array[] = [];
@@ -111,5 +117,89 @@ describe("SmpSerialDecoder", () => {
     expect(decode(new Uint8Array([...first, 0x0a]), encodeSerialFrame(frame))).toEqual([
       frame,
     ]);
+  });
+});
+
+/** A serial port in front of a ``FakeSmpDevice``, speaking the mcumgr framing. */
+function makePort({
+  smp = new FakeSmpDevice(),
+  silent = false,
+  strayReply = false,
+}: { smp?: FakeSmpDevice; silent?: boolean; strayReply?: boolean } = {}) {
+  let rx!: ReadableStreamDefaultController<Uint8Array>;
+  const decoder = new SmpSerialDecoder((frame) => {
+    if (silent) return;
+    void smp.exchange(frame).then((reply) => {
+      if (strayReply) {
+        // A late answer to an earlier request, numbered differently.
+        const stray = reply.slice();
+        stray[6] = (reply[6] + 100) & 0xff;
+        rx.enqueue(encodeSerialFrame(stray));
+      }
+      rx.enqueue(encodeSerialFrame(reply));
+    });
+  });
+  let open = false;
+  const port = {
+    get readable() {
+      return open ? readable : null;
+    },
+    get writable() {
+      return open ? writable : null;
+    },
+    open: vi.fn(async () => {
+      open = true;
+    }),
+    close: vi.fn(async () => {
+      open = false;
+    }),
+  };
+  const readable = new ReadableStream<Uint8Array>({ start: (c) => (rx = c) });
+  const writable = new WritableStream<Uint8Array>({
+    write: (bytes) => decoder.push(bytes),
+  });
+  return { port: port as unknown as SerialPort, mock: port, smp };
+}
+
+async function flashOverSerial(fake: ReturnType<typeof makePort>, bodySize = 300) {
+  const image = await parseMcubootImage(makeMcubootImage({ bodySize }));
+  const done = flashMcubootOverSerial(fake.port, image, { onProgress: () => {} });
+  done.catch(() => {});
+  await vi.runAllTimersAsync();
+  return { done, image };
+}
+
+describe("flashMcubootOverSerial", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("uploads the image at 115200 baud and closes the port", async () => {
+    const fake = makePort();
+    const { done, image } = await flashOverSerial(fake);
+    await done;
+
+    expect(fake.mock.open).toHaveBeenCalledWith({ baudRate: 115200 });
+    expect(fake.smp.received).toEqual(image.bytes);
+    expect(fake.mock.close).toHaveBeenCalled();
+  });
+
+  it("takes only the reply numbered for the request it sent", async () => {
+    const fake = makePort({ strayReply: true });
+    const { done, image } = await flashOverSerial(fake);
+    await done;
+
+    expect(fake.smp.received).toEqual(image.bytes);
+  });
+
+  it("fails when the device never answers, and closes the port", async () => {
+    const fake = makePort({ silent: true });
+    const { done } = await flashOverSerial(fake);
+
+    await expect(done).rejects.toThrow("no response from the device");
+    expect(fake.mock.close).toHaveBeenCalled();
   });
 });

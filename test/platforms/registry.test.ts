@@ -70,7 +70,6 @@ describe("PLATFORMS", () => {
   });
 
   it.each(byId)("%s offers its install by chip", (id, platform) => {
-    const sample = SAMPLE_PLATFORM[id];
     const [install] = platform.installs ?? [];
     const chips = CHIPS[id];
     // Every flasher of a platform that is more than one chip names its chips.
@@ -86,7 +85,6 @@ describe("PLATFORMS", () => {
     expect(installOf(platform, chips.refuses)).toBeUndefined();
     // Unknown is not offered: the chip has to be one a flasher writes.
     expect(installOf(platform, null)).toBeUndefined();
-    expect(sample).toBeTruthy();
   });
 
   it("picks the flasher that writes the chip where a platform has several", () => {
