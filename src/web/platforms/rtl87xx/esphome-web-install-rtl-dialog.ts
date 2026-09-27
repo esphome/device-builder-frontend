@@ -8,6 +8,7 @@ import "../../../components/base-dialog.js";
 import { localizeContext } from "../../../context/index.js";
 import {
   type LibreTinyImage,
+  loadAmbz2Engine,
   loadAmbz2Image,
   runAmbz2,
 } from "../../../platforms/rtl87xx/index.js";
@@ -16,6 +17,10 @@ import { getErrorMessage } from "../../../util/error-message.js";
 import { requestSerialPort } from "../../../util/web-serial.js";
 
 import { filePickerStyles, renderFilePicker } from "../../install/file-picker.js";
+import {
+  FilePreparation,
+  type PreparationFailure,
+} from "../../install/file-preparation.js";
 import {
   installActionsStyles,
   installTerminalState,
@@ -44,18 +49,47 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _state: InstallState = "idle";
-  @state() private _file: File | null = null;
   @state() private _progress = 0;
   @state() private _errorTitle = "";
   @state() private _errorMessage = "";
   @state() private _logLines: string[] = [];
   // The adapter had no control lines: the user resets the board by hand.
   @state() private _manualReset = false;
-  // Blocks a second click while the file read, the engine load or the port
-  // picker is in flight.
+  // Blocks a second click while the port picker is open.
   @state() private _pending = false;
 
   private _abort: AbortController | null = null;
+
+  // The UF2 is read and parsed when it is picked, so the click that installs
+  // it goes straight to the port picker.
+  private _image = new FilePreparation<LibreTinyImage>(
+    this,
+    (file) => this._parse(file),
+    (failure) => this._fail(failure.title, failure.detail)
+  );
+
+  private async _parse(
+    file: File
+  ): Promise<{ value: LibreTinyImage } | PreparationFailure> {
+    // The engine is a chunk of its own; fetch it while the file is checked.
+    void loadAmbz2Engine().catch(() => {});
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(await file.arrayBuffer());
+    } catch (err) {
+      return {
+        title: this._localize("firmware.rtl_bad_uf2"),
+        detail: getErrorMessage(err),
+      };
+    }
+    const parsed = await loadAmbz2Image(bytes);
+    if ("image" in parsed) return { value: parsed.image };
+    return {
+      title: this._localize(parsed.key),
+      detail: parsed.detail,
+      retryable: parsed.key === "firmware.engine_load_failed",
+    };
+  }
 
   private _log = (line: string) => {
     this._logLines = [...this._logLines, line];
@@ -76,7 +110,7 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
     this._abort?.abort();
     this._abort = null;
     this._state = "idle";
-    this._file = null;
+    this._image.clear();
     this._progress = 0;
     this._errorTitle = "";
     this._errorMessage = "";
@@ -92,30 +126,24 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
   }
 
   private _onFileChange = (e: Event): void => {
-    this._file = (e.target as HTMLInputElement).files?.[0] ?? null;
+    this._image.start((e.target as HTMLInputElement).files?.[0] ?? null);
+  };
+
+  // Back to the setup step, with the file checked again or another to pick.
+  private _retry = (): void => {
+    this._state = "idle";
+    this._image.recover();
   };
 
   private async _flash(): Promise<void> {
-    const file = this._file;
-    if (!file || this._pending) return;
+    const prepared = this._image.state;
+    if (prepared.kind !== "ready" || this._pending) return;
+    const image = prepared.value;
     this._pending = true;
     this._logLines = [];
-    let image: LibreTinyImage;
     let port: SerialPort | null;
     try {
-      let bytes: Uint8Array;
-      try {
-        bytes = new Uint8Array(await file.arrayBuffer());
-      } catch (err) {
-        this._fail(this._localize("firmware.rtl_bad_uf2"), getErrorMessage(err));
-        return;
-      }
-      const parsed = await loadAmbz2Image(bytes);
-      if ("key" in parsed) {
-        this._fail(this._localize(parsed.key), parsed.detail);
-        return;
-      }
-      image = parsed.image;
+      // Nothing is awaited before the picker: it needs the click's activation.
       try {
         port = await requestSerialPort();
       } catch (err) {
@@ -199,10 +227,11 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
       ${renderFilePicker({
         label: this._localize("web.rtl.install_file_label"),
         accept: ".uf2",
-        file: this._file,
+        file: this._image.file,
         placeholder: this._localize("web.rtl.install_file_placeholder"),
         onChange: this._onFileChange,
       })}
+      ${this._renderPreparing()}
       <p>${this._localize("web.rtl.install_howto_title")}</p>
       <ol>
         <li>${this._localize("web.install.upload_howto_1")}</li>
@@ -210,6 +239,14 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
         <li>${this._localize("web.rtl.install_howto_3")}</li>
       </ol>
     `;
+  }
+
+  private _renderPreparing() {
+    return this._image.state.kind === "pending"
+      ? html`<p class="preparing" role="status">
+          ${this._localize("web.install.preparing")}
+        </p>`
+      : nothing;
   }
 
   private _renderProgress() {
@@ -245,14 +282,14 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
         return html`
           <wa-button
             variant="brand"
-            ?disabled=${!this._file || this._pending}
+            ?disabled=${this._image.state.kind !== "ready" || this._pending}
             @click=${this._flash}
           >
             ${this._localize("firmware.browser_flash_action")}
           </wa-button>
         `;
       case "error":
-        return renderRetryButton(this._localize, () => (this._state = "idle"));
+        return renderRetryButton(this._localize, this._retry);
       case "success":
         return renderCloseButton(this._localize, this._onAfterHide);
       default:
@@ -285,6 +322,11 @@ export class ESPHomeWebInstallRtlDialog extends LitElement {
       }
       .guide {
         margin: var(--wa-space-s) 0 0;
+        font-size: var(--wa-font-size-s);
+      }
+      .preparing {
+        margin: var(--wa-space-s) 0 0;
+        color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-s);
       }
     `,
