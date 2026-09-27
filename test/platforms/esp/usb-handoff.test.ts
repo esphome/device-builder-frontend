@@ -1,8 +1,13 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { openFlasher } = vi.hoisted(() => ({ openFlasher: vi.fn() }));
 vi.mock("../../../src/platforms/esp/usb-flasher.js", () => ({ openFlasher }));
+const rtl = vi.hoisted(() => ({ loadAmbz2Image: vi.fn() }));
+vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  loadAmbz2Image: rtl.loadAmbz2Image,
+}));
 const steps = vi.hoisted(() => ({
   downloadBuildArtifact: vi.fn(),
   pickUf2: (binaries: Array<{ type?: string }>) => binaries.find((b) => b.type === "uf2"),
@@ -47,6 +52,9 @@ function makeHost() {
 const asHost = (h: ReturnType<typeof makeHost>) =>
   h as unknown as ESPHomeFirmwareInstallDialog;
 
+beforeEach(() => {
+  rtl.loadAmbz2Image.mockResolvedValue({ image: { runs: [], totalBytes: 0 } });
+});
 afterEach(() => vi.clearAllMocks());
 
 // The callbacks the dialog gave the (mocked) flasher session.
@@ -181,6 +189,20 @@ describe("startUsbFlash artifact", () => {
     expect(host._usbFirmware).toBe(artifact.bytes.buffer);
     expect(host._usbFirmwareName).toBe("firmware.uf2");
     expect(host._step).toBe("download-ready");
+  });
+
+  it("refuses an RTL8710B image in the dashboard, before any flasher tab is offered", async () => {
+    const host = flowHost("rtl87xx");
+    steps.downloadBuildArtifact.mockResolvedValue(downloaded("firmware.uf2"));
+    rtl.loadAmbz2Image.mockResolvedValueOnce({
+      key: "firmware.rtl_wrong_family",
+      detail: "family 0x22e0d6fc",
+    });
+    await startUsbFlash(asHost(host));
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.rtl_wrong_family");
+    expect(host._errorMessage).toBe("family 0x22e0d6fc");
+    expect(host._usbFirmware).toBeNull();
   });
 
   it("sends the factory image for an ESP through the same download", async () => {

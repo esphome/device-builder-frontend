@@ -116,12 +116,17 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
 
 // The same UF2 the in-app flow parses, handed whole to web.esphome.io's
 // rtl-ambz2 engine when this origin cannot flash. The ROM downloader has no
-// erase.
+// erase. The platform is also the RTL8710B, whose image this flasher cannot
+// write, so the UF2 is parsed here first, as the in-app flow does.
 const RTL_AMBZ2_HANDOFF: HandoffSpec = {
   flasher: "rtl-ambz2",
   erase: false,
   pick: pickUf2,
   noArtifactKey: "firmware.no_uf2",
+  check: async (bytes) => {
+    const parsed = await loadAmbz2Image(bytes);
+    return "key" in parsed ? parsed : null;
+  },
 };
 
 export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {

@@ -68,6 +68,13 @@ export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise
     handoff.noArtifactKey
   );
   if (!artifact) return;
+  const wrong = await handoff.check?.(artifact.bytes);
+  // Not for a dialog that moved to another device meanwhile.
+  if (host._device !== device) return;
+  if (wrong) {
+    host._fail(host._localize(wrong.key), wrong.detail);
+    return;
+  }
   host._usbFirmware = artifact.bytes.buffer;
   host._usbFirmwareName = artifact.binary.file;
   host._step = "download-ready";

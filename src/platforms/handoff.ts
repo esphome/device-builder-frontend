@@ -45,7 +45,7 @@ export function isHandoffFlasher(value: unknown): value is HandoffFlasher {
  * How the dashboard hands a platform's firmware over when it cannot flash
  * itself (an insecure origin): the flasher that takes it, whether that
  * flasher erases first, which built artifact to send (as one part at address
- * 0) and the copy for a build without one.
+ * 0), the copy for a build without one, and a check of the artifact.
  */
 export interface HandoffSpec {
   flasher: HandoffFlasher;
@@ -55,6 +55,12 @@ export interface HandoffSpec {
     targetPlatform: string
   ) => FirmwareBinary | undefined;
   noArtifactKey: string;
+  /**
+   * Why the downloaded artifact is not this flasher's image, when a platform
+   * covers chips its flasher cannot write (``rtl87xx`` is also the RTL8710B);
+   * null when it is. Checked before the flasher tab is offered.
+   */
+  check?: (bytes: Uint8Array) => Promise<{ key: string; detail: string } | null>;
 }
 
 /**
