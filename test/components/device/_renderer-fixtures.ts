@@ -72,17 +72,6 @@ export function makeTestBoard(
  *  defaults to a generic ESP32 stub (override via *board*).
  *  Other ctx fields fall through to safe defaults; pass
  *  *overrides* to swap any specific field. */
-/** Where the one ``rowsMoved`` call on *ctx* sends rows 0..*rows*-1. */
-export function reportedRowMoves(
-  ctx: RenderCtx,
-  rows: number
-): [string[], (number | null)[]] {
-  const calls = vi.mocked(ctx.rowsMoved).mock.calls;
-  expect(calls).toHaveLength(1);
-  const [path, move] = calls[0];
-  return [path, Array.from({ length: rows }, (_, row) => move(row))];
-}
-
 export function makeRenderCtx(
   values: unknown,
   options: {
@@ -216,4 +205,15 @@ export function makeEmitCtx(
     overrides: { emitChange, ...overrides },
   });
   return { ctx, emitChange };
+}
+
+/** Where the one ``rowsMoved`` call on *ctx* sends rows 0..*rows*-1. */
+export function reportedRowMoves(
+  ctx: RenderCtx,
+  rows: number
+): [string[], (number | null)[]] {
+  const calls = vi.mocked(ctx.rowsMoved).mock.calls;
+  expect(calls).toHaveLength(1);
+  const [path, move] = calls[0];
+  return [path, Array.from({ length: rows }, (_, row) => move(row))];
 }

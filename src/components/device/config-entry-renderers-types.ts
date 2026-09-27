@@ -11,10 +11,7 @@ import type { ConfigEntry, RequiredGroup } from "../../api/types/config-entries.
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ComponentProvider } from "../../util/config-entry-yaml-scan.js";
 import type { ValidationError } from "../../util/config-validation.js";
-
-/** Where a list row goes, by its index: its new index, or ``null`` when
- *  what was remembered for it is dropped. */
-export type RowMove = (row: number) => number | null;
+import type { RowMove } from "./config-entry-renderers/row-memory.js";
 
 export interface RenderCtx {
   localize: LocalizeFunc;

@@ -1049,7 +1049,8 @@ describe("renderRegistryListField — foreign-entry preservation", () => {
     ).toBe("0");
   });
 
-  it("Remove reports where the rows go, past the entry that stays", async () => {
+  it("Remove takes the row out where it is and keeps the order around it", async () => {
+    // Filters run in order, so a row must not jump over the entry that stays.
     const { el, emit } = mount({
       effects: [{ pulse: null }, FOREIGN, { addressable_rainbow: null }],
     });
@@ -1061,9 +1062,9 @@ describe("renderRegistryListField — foreign-entry preservation", () => {
     ).click();
     expect(emit).toHaveBeenCalledWith(
       ["effects"],
-      [{ addressable_rainbow: null }, FOREIGN]
+      [FOREIGN, { addressable_rainbow: null }]
     );
-    expect(reportedRowMoves(el.ctx, 3)).toEqual([["effects"], [null, 1, 0]]);
+    expect(reportedRowMoves(el.ctx, 3)).toEqual([["effects"], [null, 0, 1]]);
   });
 
   it("a kind change forgets the row at its place in the whole list", async () => {
@@ -1095,6 +1096,7 @@ describe("renderRegistryListField — foreign-entry preservation", () => {
       ["effects"],
       [foreign, { addressable_rainbow: null }]
     );
+    expect(reportedRowMoves(el.ctx, 3)).toEqual([["effects"], [0, null, 1]]);
   });
 
   it("Add preserves trailing foreign entries", async () => {

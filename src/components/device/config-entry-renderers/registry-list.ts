@@ -41,14 +41,13 @@ import {
 import {
   asList,
   editableEntries,
-  editableRowMove,
   formatRegistryId,
   itemId,
   REGISTRY_OPS,
   type RegistryOps,
   spliceEditable,
 } from "./registry-list-helpers.js";
-import { rowForgotten } from "./row-memory.js";
+import { rowForgotten, rowRemoved } from "./row-memory.js";
 import { makeScalarValueEntry, scalarValueType } from "./scalar-value-entry.js";
 
 @customElement("esphome-registry-list")
@@ -425,19 +424,12 @@ export class ESPHomeRegistryList extends LitElement {
     `;
   }
 
-  /** Shared mutator: read the on-disk list, run *transform* against
-   *  the editable slice, splice the result back over the original
-   *  list (preserving foreign / multi-key entries verbatim), and
-   *  emit. Centralises the "asList → editableEntries → emit via
-   *  spliceEditable" chain so Add / Remove / Rename can't drift on
-   *  the foreign-entry preservation contract. */
-  private _mutateEditable(
-    transform: (editable: Record<string, unknown>[]) => Record<string, unknown>[]
-  ): void {
+  /** The on-disk list with its editable rows and their places in it.
+   *  Foreign (non-object / multi-key) entries have no row and are kept
+   *  verbatim by every edit. */
+  private _editable() {
     const list = asList(this.ctx.getAt(this.path));
-    const { items, positions } = editableEntries(list);
-    const next = transform(items);
-    this.ctx.emitChange(this.path, spliceEditable(list, positions, next));
+    return { list, ...editableEntries(list) };
   }
 
   /** Decide which scalar input type to dispatch to, if any.
@@ -499,20 +491,28 @@ export class ESPHomeRegistryList extends LitElement {
     // so the backend rejects it on save. The picker shows a
     // placeholder until the user chooses; bare-dash placeholders
     // round-trip cleanly through ``serializeListItem``.
-    this._mutateEditable((items) => [...items, {}]);
+    const { list, items, positions } = this._editable();
+    this.ctx.emitChange(this.path, spliceEditable(list, positions, [...items, {}]));
   }
 
+  /** Remove the row by its place in the whole list, so the entries
+   *  around it, foreign ones included, keep their order. */
   private _removeAt(index: number) {
-    const { positions } = editableEntries(asList(this.ctx.getAt(this.path)));
-    this.ctx.rowsMoved(this.path, editableRowMove(positions, index));
-    this._mutateEditable((items) => items.filter((_, i) => i !== index));
+    const { list, positions } = this._editable();
+    const position = positions[index];
+    if (position === undefined) return;
+    this.ctx.rowsMoved(this.path, rowRemoved(position));
+    this.ctx.emitChange(
+      this.path,
+      list.filter((_, i) => i !== position)
+    );
   }
 
   private _renameRow(index: number, nextId: string) {
     // Reject empty: an empty id would synthesize ``{ "": null }``
     // and collide with itemId()'s unselected-placeholder sentinel.
     if (!nextId) return;
-    const { items, positions } = editableEntries(asList(this.ctx.getAt(this.path)));
+    const { list, items, positions } = this._editable();
     const target = items[index];
     if (!target || itemId(target) === nextId) return;
     // Discard non-null params on type change: each entry type has
@@ -521,9 +521,8 @@ export class ESPHomeRegistryList extends LitElement {
     // time string. V1 has no sub-form to surface the mismatch, so
     // emit ``{nextId: null}`` and let the user reconfigure.
     this.ctx.rowsMoved(this.path, rowForgotten(positions[index]));
-    this._mutateEditable((items) =>
-      items.map((it, i) => (i === index ? { [nextId]: null } : it))
-    );
+    const next = items.map((it, i) => (i === index ? { [nextId]: null } : it));
+    this.ctx.emitChange(this.path, spliceEditable(list, positions, next));
   }
 }
 

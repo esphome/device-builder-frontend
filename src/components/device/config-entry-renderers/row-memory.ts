@@ -7,10 +7,13 @@
  */
 import { isIndexSegment } from "../../../util/nested-values.js";
 import { fieldKeyAttr, parseFieldKey } from "../config-entry-renderers-shared.js";
-import type { RowMove } from "../config-entry-renderers-types.js";
 
 /** New key for a remembered entry; ``null`` drops the entry. */
 export type Rekey = (key: string) => string | null;
+
+/** Where a list row goes, by its index: its new index, or ``null`` when
+ *  what was remembered for it is dropped. */
+export type RowMove = (row: number) => number | null;
 
 /** Row *index* leaves a list: the rows below it move up one. */
 export const rowRemoved =

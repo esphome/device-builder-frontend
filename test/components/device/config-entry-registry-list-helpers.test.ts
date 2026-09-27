@@ -11,7 +11,6 @@ import { describe, expect, it } from "vitest";
 import {
   asList,
   editableEntries,
-  editableRowMove,
   formatRegistryId,
   isEditableItem,
   itemId,
@@ -106,11 +105,6 @@ describe("spliceEditable", () => {
     ]);
   });
 
-  it("removes a trailing editable slot while preserving foreign entries (remove)", () => {
-    const list = [{ a: 1 }, "foreign", { b: 2 }];
-    expect(spliceEditable(list, [0, 2], [{ a: 1 }])).toEqual([{ a: 1 }, "foreign"]);
-  });
-
   it("inserts a new entry after the last editable slot, before trailing foreign entries (add)", () => {
     const list = [{ a: 1 }, "foreign"];
     expect(spliceEditable(list, [0], [{ a: 1 }, { c: 3 }])).toEqual([
@@ -156,36 +150,5 @@ describe("registry tables", () => {
     const ops = REGISTRY_OPS.filter;
     expect(ops.parentToken("sensor.temperature")).toBe("sensor");
     expect(ops.dedupByTypeId).toBe(false);
-  });
-});
-
-describe("editableRowMove", () => {
-  const moves = (list: unknown[], removed: number) => {
-    const move = editableRowMove(editableEntries(list).positions, removed);
-    return list.map((_, row) => move(row));
-  };
-  const A = { a: null };
-  const B = { b: null };
-  const C = { c: null };
-  const FOREIGN = "!secret legacy";
-
-  it.each([
-    ["no foreign entries", [A, B, C], 0, [null, 0, 1]],
-    ["a foreign entry ahead", [FOREIGN, A, B], 0, [0, null, 1]],
-    ["a foreign entry between", [A, FOREIGN, B], 0, [null, 1, 0]],
-    ["two foreign entries between", [A, FOREIGN, FOREIGN, B, C], 0, [null, 1, 2, 0, 3]],
-    ["a foreign entry after", [A, B, FOREIGN], 0, [null, 0, 2]],
-    ["the last row", [A, FOREIGN, B], 1, [0, 1, null]],
-  ])("follows the rows with %s", (_name, list, removed, expected) => {
-    expect(moves(list, removed)).toEqual(expected);
-  });
-
-  it("sends each row where spliceEditable puts it", () => {
-    const list = [A, FOREIGN, B, FOREIGN, C];
-    const { items, positions } = editableEntries(list);
-    const move = editableRowMove(positions, 0);
-    const next = spliceEditable(list, positions, items.slice(1));
-    expect(next[move(2)!]).toBe(B);
-    expect(next[move(4)!]).toBe(C);
   });
 });

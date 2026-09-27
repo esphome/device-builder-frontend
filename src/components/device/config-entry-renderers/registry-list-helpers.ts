@@ -19,7 +19,6 @@ import {
   getCachedFilters,
   getCachedLightEffects,
 } from "../../../util/automation-catalog-cache.js";
-import type { RowMove } from "../config-entry-renderers-types.js";
 
 /** Extract the single key from a polymorphic-list item. Items
  *  arriving from a freshly-pressed Add button can be ``{}`` until
@@ -140,43 +139,24 @@ export function editableEntries(list: unknown[]): {
   return { items, positions };
 }
 
-/** Where ``spliceEditable`` puts each row when editable row *removed*
- *  leaves: the editable rows after it each take the slot of the one before,
- *  passing over the foreign entries, which stay where they are. */
-export function editableRowMove(positions: number[], removed: number): RowMove {
-  const moves = new Map<number, number | null>([[positions[removed], null]]);
-  for (let i = removed + 1; i < positions.length; i++) {
-    moves.set(positions[i], positions[i - 1]);
-  }
-  return (row) => (moves.has(row) ? moves.get(row)! : row);
-}
-
-/** Re-emit *list* with the editable slice replaced by *next*. Foreign
- *  entries keep their original positions; new entries from Add land
- *  at the end of the editable slice (just before any trailing
- *  foreign entries). */
+/** Re-emit *list* with the editable slice replaced by *next*, which holds
+ *  the same rows or those and new ones. Foreign entries keep their
+ *  positions; new entries from Add land at the end of the editable slice
+ *  (just before any trailing foreign entries). A row is removed by its
+ *  place in the whole list, not through here. */
 export function spliceEditable(
   list: unknown[],
   positions: number[],
   next: Record<string, unknown>[]
 ): unknown[] {
   const out: unknown[] = [...list];
-  // Replace each tracked editable slot, drop the trailing tail when
-  // ``next`` is shorter (Remove), append when longer (Add).
   positions.forEach((pos, i) => {
-    if (i < next.length) out[pos] = next[i];
+    out[pos] = next[i];
   });
-  if (next.length < positions.length) {
-    // Remove the surplus tracked slots in descending order so earlier
-    // indices stay valid as we splice.
-    const removeAt = positions.slice(next.length).reverse();
-    for (const pos of removeAt) out.splice(pos, 1);
-  } else if (next.length > positions.length) {
-    // Add: insert new entries immediately after the last editable
-    // slot, preserving any foreign entries that came after.
-    const insertAt =
-      positions.length > 0 ? positions[positions.length - 1] + 1 : out.length;
-    out.splice(insertAt, 0, ...next.slice(positions.length));
-  }
+  // Add: insert new entries immediately after the last editable
+  // slot, preserving any foreign entries that came after.
+  const insertAt =
+    positions.length > 0 ? positions[positions.length - 1] + 1 : out.length;
+  out.splice(insertAt, 0, ...next.slice(positions.length));
   return out;
 }
