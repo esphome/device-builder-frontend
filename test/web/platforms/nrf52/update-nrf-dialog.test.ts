@@ -154,7 +154,7 @@ describe.each(TRANSPORTS)(
       expect(el._state).toBe("idle");
     });
 
-    it("names a device that never answers as one without that transport", async () => {
+    it("names a device that never answers as one without the serial transport", async () => {
       const el = await mountDialog();
       flash.mockRejectedValue(
         new SmpSilentDeviceError("SMP: no response from the device")
@@ -163,7 +163,12 @@ describe.each(TRANSPORTS)(
       await el[run]();
 
       expect(el._state).toBe("error");
-      expect(el._errorMessage).toBe("web.nrf.update_no_reply");
+      // Over Bluetooth the service found says the transport is there.
+      expect(el._errorMessage).toBe(
+        run === "_updateOverSerial"
+          ? "web.nrf.update_serial_no_reply"
+          : "web.nrf.install_error_flash"
+      );
     });
 
     it("asks for a restart when the reset could not be sent", async () => {

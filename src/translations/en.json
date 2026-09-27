@@ -2102,7 +2102,7 @@
       "update_file_label": "MCUboot update image (app_update.bin)",
       "update_ble": "Update over Bluetooth",
       "update_serial": "Update over serial",
-      "update_no_reply": "The device did not answer. Make sure its firmware has the mcumgr transport you picked and, over serial, that you chose the port of that transport."
+      "update_serial_no_reply": "The device did not answer. Make sure its firmware has the mcumgr serial transport and that you chose the port of that transport."
     }
   },
   "remote_build_dashboard": {

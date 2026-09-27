@@ -163,12 +163,15 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
           return null;
         }
       },
-      (engine, port, image, hooks) => engine.flashMcubootOverSerial(port, image, hooks)
+      (engine, port, image, hooks) => engine.flashMcubootOverSerial(port, image, hooks),
+      // Not over Bluetooth, where the service found says the transport is there.
+      "web.nrf.update_serial_no_reply"
     );
 
   /**
    * ``pick`` opens the chooser (null when there is nothing to update),
-   * ``flash`` runs the engine over what it picked.
+   * ``flash`` runs the engine over what it picked, ``silentKey`` is the line
+   * for a device that never answered.
    */
   private async _update<Target>(
     pick: () => Promise<Target | null>,
@@ -177,7 +180,8 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
       target: Target,
       image: McubootImage,
       hooks: SmpUploadHooks
-    ) => Promise<void>
+    ) => Promise<void>,
+    silentKey?: string
   ): Promise<void> {
     const prepared = this._image.state;
     if (prepared.kind !== "ready" || this._state !== "idle" || this._pending) return;
@@ -214,7 +218,7 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
     } catch (err) {
       if (abort.signal.aborted) return;
       console.error("[nrf52] The MCUboot update failed:", err);
-      this._fail(this._failureOf(engine, err));
+      this._fail(this._failureOf(engine, err, silentKey));
     } finally {
       if (this._abort === abort) this._abort = null;
     }
@@ -222,7 +226,11 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
 
   // The site cannot know what the device runs, so a device without the
   // mcumgr service is named as such.
-  private _failureOf(engine: SmpEngine | undefined, err: unknown): string {
+  private _failureOf(
+    engine: SmpEngine | undefined,
+    err: unknown,
+    silentKey?: string
+  ): string {
     if (!engine) return this._localize("web.install.tools_load_failed");
     if (err instanceof engine.SmpBleServiceNotFoundError) {
       return this._localize("firmware.nrf_smp_ble_service_not_found");
@@ -233,8 +241,8 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
     if (engine.isSerialDeviceLost(err)) return this._localize("serial.device_lost");
     // Only a device that never answered: one that stopped part way has the
     // transport.
-    if (err instanceof engine.SmpSilentDeviceError) {
-      return this._localize("web.nrf.update_no_reply");
+    if (silentKey && err instanceof engine.SmpSilentDeviceError) {
+      return this._localize(silentKey);
     }
     return this._localize("web.nrf.install_error_flash", {
       error: getErrorMessage(err),
