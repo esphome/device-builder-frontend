@@ -162,6 +162,38 @@ describe("base editor relocation hydrate", () => {
     expect(actionList(editor)).not.toBe(before);
   });
 
+  it("collapses Show advanced settings once the other automation has landed", async () => {
+    const d = deferred<ParsedAutomation[]>();
+    const { editor } = await mountAt("a", vi.fn().mockReturnValue(d.promise));
+    (editor as any)._onAdvancedToggle(
+      new CustomEvent("advanced-toggle", { detail: { show: true } })
+    );
+
+    (editor as any).location = { kind: "script", id: "b" };
+    await editor.updateComplete;
+    await flushMicrotasks(3);
+    expect((editor as any)._showAdvanced).toBe(true);
+
+    d.resolve([parsedScript("b")]);
+    await flushMicrotasks(5);
+    await editor.updateComplete;
+    expect((editor as any)._showAdvanced).toBe(false);
+  });
+
+  it("keeps Show advanced settings through a re-parse of the same automation", async () => {
+    const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
+    const { editor } = await mountAt("a", parse);
+    (editor as any)._showAdvanced = true;
+
+    (editor as any).yaml = "script:\n  - id: a\n";
+    editor.reload();
+    await flushMicrotasks(5);
+    await editor.updateComplete;
+
+    expect(parse).toHaveBeenCalled();
+    expect((editor as any)._showAdvanced).toBe(true);
+  });
+
   it("keeps its body through a re-parse of the same automation", async () => {
     const parse = vi.fn().mockResolvedValue([parsedScript("a")]);
     const { editor } = await mountAt("a", parse);
