@@ -45,7 +45,10 @@ export class SmpError extends Error {
   }
 }
 
-/** The request went out and no reply came back: the link dropped, or timed out. */
+/**
+ * No reply came back to a request that went out, or may have: the link
+ * dropped, or timed out. ``cause`` is what ended the wait.
+ */
 export class SmpNoReplyError extends Error {
   constructor(
     message: string,
@@ -107,8 +110,8 @@ export function chunkSizeFromParams(params: SmpDeviceParams): number {
 /**
  * Sends an SMP frame and returns the response to it. One exchange completes
  * before the next begins: mcumgr handles a single request at a time. Throws
- * ``SmpNoReplyError`` when the frame went out and nothing came back, and the
- * abort reason on a cancel.
+ * ``SmpNoReplyError`` when the frame went out, or may have, and nothing came
+ * back, and the abort reason on a cancel.
  */
 export interface SmpTransport {
   exchange(frame: Uint8Array, signal?: AbortSignal): Promise<Uint8Array>;
@@ -434,7 +437,9 @@ async function testAndReset(
     .request(MGMT_OP_WRITE, MGMT_GROUP_OS, OS_MGMT_RESET, {}, "resetting")
     .catch((err: unknown) => {
       // The device resets before its reply arrives, so no reply is the
-      // expected outcome; a request that never went out is not.
+      // expected outcome; a request that never went out is not. A device
+      // that left under the request counts too: the test flag is stored, so
+      // its next boot is the new image either way.
       if (!(err instanceof SmpNoReplyError)) throw err;
     });
   onLog?.("Done; the device is rebooting into the new firmware");
