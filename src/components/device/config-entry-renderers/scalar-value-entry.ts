@@ -21,16 +21,6 @@ type ScalarValued = Pick<
   "value_type" | "templatable" | "duration_min_unit"
 >;
 
-/** UI-only marker on a scalar-value entry: the value is a whole body, so a
- *  time period may arrive in its mapping form (`{seconds: 2}`). A regular
- *  field never carries it and keeps the YAML-only notice for a mapping. */
-interface DurationMappingCarrier {
-  accepts_duration_mapping?: boolean;
-}
-
-export const acceptsDurationMapping = (entry: ConfigEntry): boolean =>
-  (entry as ConfigEntry & DurationMappingCarrier).accepts_duration_mapping === true;
-
 /** The widget type a catalog entry's ``value_type`` maps to, or null when
  *  it has none (or one this build doesn't know). */
 export function scalarValueType(
@@ -50,7 +40,7 @@ export function makeScalarValueEntry(
   source: ScalarValued | undefined,
   overrides: Partial<ConfigEntry> = {}
 ): ConfigEntry {
-  const entry: ConfigEntry & DurationMappingCarrier = makeConfigEntry({
+  const entry = makeConfigEntry({
     type,
     templatable: source?.templatable ?? false,
     ...overrides,

@@ -347,13 +347,13 @@ export class ESPHomeRegistryList extends LitElement {
     // (``delayed_on_off: 50ms`` shorthand for the mapping form) the
     // catalog doesn't classify. Suppressed when params is already a
     // mapping so a hypothetical catalog miscategorisation can't
-    // clobber an existing nested config; an entry with no fields has no
-    // nested config, so its mapping is the value's own dict form
-    // (``throttle: {seconds: 5}``).
-    // ``config_entries`` is absent on a row whose body hasn't hydrated yet.
-    const hasFields = (catalogEntry?.config_entries?.length ?? 0) > 0;
+    // clobber an existing nested config. An entry known to have no fields
+    // has no nested config, so its mapping is the value's own dict form
+    // (``throttle: {seconds: 5}``); ``config_entries`` is absent until the
+    // row's body hydrates, and only then is that known.
+    const fieldless = catalogEntry?.config_entries?.length === 0;
     const scalarConfigType =
-      paramsIsMapping && hasFields
+      paramsIsMapping && !fieldless
         ? null
         : this._scalarDispatchType(catalogEntry, params);
     // Render every child unconditionally — the user opted into this

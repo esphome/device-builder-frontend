@@ -141,6 +141,13 @@ export interface ConfigEntry {
    * unit is valid.
    */
   duration_min_unit?: string | null;
+  /**
+   * UI-only, never on the wire: set on the synthetic entry for a whole-body
+   * duration (`delay: 2s`, `throttle: 10s`), whose value may arrive in its
+   * mapping form (`{seconds: 2}`). A regular field keeps the YAML-only
+   * notice for a mapping.
+   */
+  accepts_duration_mapping?: boolean;
   /** When True the field accepts a list of values. */
   multi_value?: boolean;
   /**

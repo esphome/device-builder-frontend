@@ -651,6 +651,21 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     ]);
   });
 
+  it("waits for the body before reading a mapping as a scalar-or-mapping row's value", async () => {
+    // ``heartbeat`` takes ``60s`` or ``{period: 60s}``; until its fields
+    // arrive the mapping can't be told from the value's own dict form.
+    const renderEntry = vi.fn();
+    const catalog = [
+      { id: "heartbeat", name: "Heartbeat", value_type: "time_period" },
+    ] as unknown as LightEffect[];
+    const { el } = mount(
+      { filters: [{ heartbeat: { period: "60s" } }] },
+      { key: "filters", registry: "filter", catalog, renderEntry }
+    );
+    await el.updateComplete;
+    expect(renderEntry).not.toHaveBeenCalled();
+  });
+
   it("renders the value entry for a mapping on a filter that has no fields", async () => {
     // ``throttle: {seconds: 5}`` is the duration's own mapping form; with no
     // catalog fields there is no sub-form it could be mistaken for.

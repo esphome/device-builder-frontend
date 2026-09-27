@@ -34,7 +34,6 @@ import {
   renderUnparseableScalarField,
   renderYamlOnlyFallbackIfNonPrimitive,
 } from "../config-entry-renderers-shared.js";
-import { acceptsDurationMapping } from "./scalar-value-entry.js";
 
 export function renderNumberField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   // A featured-entry preset can pin the choice to a short list — defer to
@@ -195,7 +194,7 @@ export function renderTimePeriodField(
   // A single unit reads as the scalar it is equivalent to, and an edit
   // writes that scalar; a multi-unit mapping falls to the bail below.
   const raw =
-    (acceptsDurationMapping(entry) ? durationMappingAsScalar(stored) : null) ?? stored;
+    (entry.accepts_duration_mapping ? durationMappingAsScalar(stored) : null) ?? stored;
   // Bail above parseTimePeriodScalar — its ``String(raw).trim()`` would
   // turn a single-element list ``["5s"]`` into the parseable string
   // ``"5s"`` and a save would clobber the original list.
