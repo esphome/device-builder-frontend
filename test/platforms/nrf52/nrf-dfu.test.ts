@@ -2,6 +2,7 @@ import { strToU8, zipSync } from "fflate";
 import { describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
 import { disconnectEvents } from "../../_web-serial.js";
+import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 import { makeWebSerialPort } from "../../web/_make-web-serial-port.js";
 
 import {
@@ -204,7 +205,7 @@ describe("flashDfuPackage", () => {
     };
 
     await expect(flashDfuPackage(port, pkg, { onProgress: () => {} })).rejects.toThrow(
-      /Serial port closed/
+      SerialDeviceLostError
     );
     expect(port.close).toHaveBeenCalled();
   });
@@ -334,7 +335,7 @@ describe("flashDfuPackageWithReconnect", () => {
           onReconnecting,
           onLog: (l) => log.push(l),
         })
-      ).rejects.toThrow(/Serial port closed/);
+      ).rejects.toThrow(SerialDeviceLostError);
       expect(onReconnecting).toHaveBeenCalledTimes(1);
       expect(log).toContain(
         "The device dropped off the bus mid-flash; waiting for it to re-enumerate"
@@ -359,7 +360,7 @@ describe("flashDfuPackageWithReconnect", () => {
         onProgress: () => {},
         onLog: (l) => log.push(l),
       })
-    ).rejects.toThrow(/Serial port closed/);
+    ).rejects.toThrow(SerialDeviceLostError);
     expect(log[log.length - 1]).toBe("The device did not come back");
     expect(port.close).toHaveBeenCalledTimes(1);
   });

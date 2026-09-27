@@ -86,6 +86,20 @@ describe("SerialStreamSession", () => {
     expect(session.ended).toBeInstanceOf(SerialDeviceLostError);
   });
 
+  it("takes a stream that ends under it for the device going away", async () => {
+    let endRead = (): void => {};
+    const port = Object.assign(makeDisconnectPort(), {
+      readable: new ReadableStream<Uint8Array>({
+        start: (controller) => (endRead = () => controller.close()),
+      }),
+      writable: new WritableStream<Uint8Array>({ write: () => new Promise(() => {}) }),
+    });
+    const session = new Session(port);
+    const write = session.write(new Uint8Array([1]));
+    endRead();
+    await expect(write).rejects.toBeInstanceOf(SerialDeviceLostError);
+  });
+
   it("keeps a read that ended for another reason as it is", async () => {
     const { port, failRead } = stuckPort();
     const session = new Session(port);

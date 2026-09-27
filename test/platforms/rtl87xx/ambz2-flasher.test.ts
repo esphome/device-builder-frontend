@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
 import { disconnectEvents } from "../../_web-serial.js";
+import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 
 import {
   Ambz2ConsoleError,
@@ -295,7 +296,7 @@ describe("flashAmbz2", () => {
     p.catch(() => {});
     await vi.advanceTimersByTimeAsync(1000);
     rom.dropLink();
-    await expect(driveFakeTimers(p)).rejects.toThrow(/Serial port closed/);
+    await expect(driveFakeTimers(p)).rejects.toThrow(SerialDeviceLostError);
     expect(rom.raw.close).toHaveBeenCalledOnce();
   });
 
@@ -308,6 +309,6 @@ describe("flashAmbz2", () => {
     rom.raw.setSignals.mockReturnValue(new Promise(() => {}));
     rom.raw.close.mockReturnValue(new Promise(() => {}));
     rom.dropLink();
-    await expect(driveFakeTimers(p)).rejects.toThrow(/Serial port closed/);
+    await expect(driveFakeTimers(p)).rejects.toThrow(SerialDeviceLostError);
   });
 });

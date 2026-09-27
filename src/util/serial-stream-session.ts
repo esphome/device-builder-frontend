@@ -9,7 +9,7 @@
  * that was unplugged it can stay pending, and the engine would wait on it
  * without end (#1896).
  */
-import { deviceLostFrom } from "./serial-open-error.js";
+import { deviceLostFrom, SerialDeviceLostError } from "./serial-open-error.js";
 import { type PortLost, watchPortLost } from "./serial-port-lost.js";
 import { sleep } from "./sleep.js";
 
@@ -86,7 +86,10 @@ export abstract class SerialStreamSession {
         return;
       }
       if (result.done || !result.value) {
-        this.end(new Error("Serial port closed"));
+        // A stream that ends under a session in use is the device going away
+        // as well; one that ends with the session is its own close.
+        const closed = new Error("Serial port closed");
+        this.end(this.active ? new SerialDeviceLostError(closed) : closed);
         return;
       }
       this.onBytes(result.value);
