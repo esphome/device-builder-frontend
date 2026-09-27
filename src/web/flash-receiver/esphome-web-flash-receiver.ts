@@ -21,7 +21,11 @@ import {
   type FlashState,
   HANDOFF_FLASHERS,
 } from "./protocol.js";
-import type { ReceiverNote, ReceiverRun } from "./receiver-engine.js";
+import {
+  RECEIVER_ENGINES,
+  type ReceiverNote,
+  type ReceiverRun,
+} from "./receiver-engine.js";
 import { ReceiverPreparation } from "./receiver-preparation.js";
 
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -91,6 +95,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     super.connectedCallback();
     // The page exists to flash: warm the esptool chunk while the hand-off arrives.
     preloadEsptool();
+    // And its receiver engine, a chunk of its own, so an ESP hand-off is
+    // ready as soon as it arrives; a miss is named by the preparation.
+    void RECEIVER_ENGINES.esp().catch(() => {});
     const params = parseFlasherParams(window.location.hash);
     this._hasOpener = window.opener != null;
     if (params && window.opener) {
@@ -158,7 +165,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         name: msg.deviceName,
       });
     }
-    this._setState("connecting", this._localize("web.flash.preparing"));
+    this._setState("connecting", this._localize("web.install.preparing"));
     this._preparation.start({
       parts,
       erase: msg.erase !== false,
@@ -246,7 +253,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     }
     // A newer pick overtook this read.
     if (this._fileInput?.files?.[0] !== file) return;
-    this._setState("connecting", this._localize("web.flash.preparing"));
+    this._setState("connecting", this._localize("web.install.preparing"));
     this._preparation.start({
       parts: [{ data, address: 0 }],
       erase: true,
@@ -259,20 +266,16 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       window.close();
       return;
     }
-    if (this._busy || this._preparation.pending) return;
-    const run = this._preparation.run;
-    if (run) {
-      await this._runInstall(run);
+    if (this._working) return;
+    const preparation = this._preparation.state;
+    if (preparation.kind === "ready") {
+      await this._runInstall(preparation.run);
       return;
     }
-    // The earlier preparation failed; run it again. The install is offered
-    // once it is ready, on a click of its own.
-    if (this._preparation.canRetry) {
-      this._setState("connecting", this._localize("web.flash.preparing"));
-      this._preparation.retry();
-    } else {
-      this._setState("error", this._localize("web.flash.choose_file"));
-    }
+    // The engine did not load earlier; load it again. The install is offered
+    // once that is done, on a click of its own.
+    this._setState("connecting", this._localize("web.install.preparing"));
+    this._preparation.retry();
   }
 
   // Nothing is awaited before the port picker: it needs the click's activation.
@@ -377,9 +380,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   private _resetForRetry(): void {
     this._waiting = null;
     this._state = this._firmware ? "connecting" : "idle";
-    this._statusMessage = this._firmware
-      ? this._localize("web.flash.firmware_ready")
-      : "";
+    this._statusMessage = this._firmware ? this._readyMessage() : "";
     this._progress = null;
   }
 
@@ -392,10 +393,14 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     return this._localize("web.flash.connect_install");
   }
 
+  // Flashing, or getting the firmware ready to.
+  private get _working(): boolean {
+    return this._busy || this._preparation.state.kind === "pending";
+  }
+
   private get _primaryDisabled(): boolean {
     if (this._flashDone) return !this._hasOpener;
-    if (this._busy || this._preparation.pending) return true;
-    return !this._preparation.run && !this._preparation.canRetry;
+    return this._working || this._preparation.state.kind === "idle";
   }
 
   private get _hint(): string {
@@ -420,11 +425,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
           ${
             this._state !== "idle"
               ? html`<div class="status status--${this._state}">
-                  ${
-                    this._busy || this._preparation.pending
-                      ? html`<wa-spinner></wa-spinner>`
-                      : nothing
-                  }
+                  ${this._working ? html`<wa-spinner></wa-spinner>` : nothing}
                   <span>${this._statusMessage}</span>
                 </div>`
               : nothing
