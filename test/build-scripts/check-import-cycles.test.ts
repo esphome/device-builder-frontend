@@ -17,6 +17,9 @@ describe("runtimeImports", () => {
           'import b, { type B } from "./b.js";',
           'import "./side-effect.js";',
           'export * from "./re-export.js";',
+          'export * as ns from "./namespace.js";',
+          'export { g, type G } from "./named.js";',
+          'import type from "./default-called-type.js";',
           "import {\n  c,\n  type C,\n} from './multi-line.js';",
         ].join("\n")
       )
@@ -25,6 +28,9 @@ describe("runtimeImports", () => {
       "./b.js",
       "./side-effect.js",
       "./re-export.js",
+      "./namespace.js",
+      "./named.js",
+      "./default-called-type.js",
       "./multi-line.js",
     ]);
   });
@@ -38,6 +44,7 @@ describe("runtimeImports", () => {
           'export type { B } from "./types.js";',
           'export type * from "./types.js";',
           'import { type C, type D } from "./types.js";',
+          'export { type E, type F } from "./types.js";',
           'import { html } from "lit";',
           'const lazy = () => import("./lazy.js");',
           '// import { e } from "./commented.js";',
@@ -55,9 +62,12 @@ describe("runtimeImports", () => {
           '  import "./indented.js";',
           '  const lazy = import("./lazy.js");',
           '  import("./bare-lazy.js");',
+          "  const meta = import.meta.url;",
+          '  const re = /[`"#]/; const text = `import { t } from "./template.js"`;',
+          '  import { after } from "./after.js";',
         ].join("\n")
       )
-    ).toEqual(["./value.js", "./indented.js"]);
+    ).toEqual(["./value.js", "./indented.js", "./after.js"]);
   });
 
   it("reads a specifier list with a comment after a name", async () => {

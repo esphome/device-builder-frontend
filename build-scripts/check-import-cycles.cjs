@@ -16,52 +16,50 @@
 const fs = require("fs");
 const path = require("path");
 
+// The parser ESLint already uses on this tree, so comments, strings,
+// templates and regular expressions are read as the compiler reads them
+// rather than guessed at with patterns.
+const { parser } = require("typescript-eslint");
+
 const SRC_DIR = path.join(__dirname, "..", "src");
+const PARSE_OPTIONS = { sourceType: "module", range: false, loc: false };
 
-// A static import or re-export with a relative source, or a side-effect
-// import. Indentation is allowed: a statement keeps the blank a stripped
-// comment leaves in front of it. Group 1: the `type` keyword; 2: what is imported; 3 and 4: the
-// source.
-const STATEMENT =
-  /^[ \t]*(?:import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*["'](\.[^"']+)["']|^[ \t]*import\s+["'](\.[^"']+)["']/gm;
-// Comments that start a line, which is where a commented-out import sits.
-// Anchored so a `/*` inside a string ("image/*", a glob) cannot swallow the
-// imports after it.
-const COMMENTS = /^\s*\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm;
-// A comment trailing one name of a multi-line specifier list. Left in, it
-// would glue itself to the next name (a `type` list read as a runtime one)
-// or, with a quote in it, stop the statement from matching at all.
-const SPECIFIER_COMMENT = /^(\s*(?:type\s+)?[\w$]+(?:\s+as\s+[\w$]+)?\s*,?)\s*\/\/.*$/gm;
-// The same on the line that opens the list: `import { type A, // why`.
-const OPENING_COMMENT = /^([ \t]*(?:import|export)\b[^'"\n]*?[{,])\s*\/\/.*$/gm;
-
-/** Whether `{ type A, type B }` names types only. */
-function isTypeOnlyList(specifiers) {
-  if (!specifiers.startsWith("{")) return false;
-  const names = specifiers
-    .replace(/^\{|\}$/g, "")
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
-  return names.length > 0 && names.every((name) => name.startsWith("type "));
+/** Whether every name in a `{ ... }` list is a `type` one, which the compiler erases. */
+function isTypeOnlyList(specifiers, kindOf) {
+  return specifiers.length > 0 && specifiers.every((s) => kindOf(s) === "type");
 }
 
-function stripComments(source) {
-  return source
-    .replace(COMMENTS, "")
-    .replace(SPECIFIER_COMMENT, "$1")
-    .replace(OPENING_COMMENT, "$1");
-}
-
-/** The relative sources a module imports at runtime. */
-function runtimeImports(source) {
-  const specs = [];
-  for (const match of stripComments(source).matchAll(STATEMENT)) {
-    const [, typeKeyword, specifiers, from, sideEffect] = match;
-    if (sideEffect) specs.push(sideEffect);
-    else if (!typeKeyword && !isTypeOnlyList(specifiers)) specs.push(from);
+/** The source of a top-level statement, when it imports it at runtime. */
+function runtimeSource(node) {
+  if (!node.source) return undefined;
+  if (node.type === "ImportDeclaration") {
+    const erased =
+      node.importKind === "type" ||
+      isTypeOnlyList(node.specifiers, (s) =>
+        s.type === "ImportSpecifier" ? s.importKind : "value"
+      );
+    return erased ? undefined : node.source.value;
   }
-  return specs;
+  if (node.type === "ExportAllDeclaration") {
+    return node.exportKind === "type" ? undefined : node.source.value;
+  }
+  if (node.type === "ExportNamedDeclaration") {
+    const erased =
+      node.exportKind === "type" || isTypeOnlyList(node.specifiers, (s) => s.exportKind);
+    return erased ? undefined : node.source.value;
+  }
+  return undefined;
+}
+
+/**
+ * The relative sources a module imports at runtime. Static imports and
+ * re-exports are top-level statements, so a lazy `import()` is never seen.
+ */
+function runtimeImports(source) {
+  const { ast } = parser.parseForESLint(source, PARSE_OPTIONS);
+  return ast.body
+    .map(runtimeSource)
+    .filter((spec) => typeof spec === "string" && spec.startsWith("."));
 }
 
 /** The module an import names: `./a.js` is `a.ts`, a directory its index. */
