@@ -148,7 +148,8 @@ export class ESPHomeWebUpdateNrfDialog extends LitElement {
   private _updateOverBle = (): Promise<void> =>
     this._update(
       // The failures of the chooser are toasted by the picker itself.
-      () => pickBleDevice(this._localize, [], SMP_BLE_SERVICE_UUID),
+      () =>
+        pickBleDevice(this._localize, [], SMP_BLE_SERVICE_UUID, [SMP_BLE_SERVICE_UUID]),
       (engine, device, image, hooks) => engine.flashMcubootOverBle(device, image, hooks)
     );
 

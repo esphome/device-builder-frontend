@@ -181,13 +181,14 @@ describe.each(TRANSPORTS)(
 );
 
 describe("esphome-web-update-nrf-dialog", () => {
-  it("asks the chooser for any device with the SMP service", async () => {
+  it("asks the chooser for the devices that advertise the SMP service", async () => {
     const el = await mountDialog();
     await el._updateOverBle();
     expect(mocks.pickBleDevice).toHaveBeenCalledWith(
       identityLocalize,
       [],
-      SMP_BLE_SERVICE_UUID
+      SMP_BLE_SERVICE_UUID,
+      [SMP_BLE_SERVICE_UUID]
     );
   });
 
