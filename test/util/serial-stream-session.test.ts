@@ -21,6 +21,10 @@ class Session extends SerialStreamSession {
   write(bytes: Uint8Array): Promise<void> {
     return this.writeBytes(bytes);
   }
+
+  wait<T>(p: Promise<T>): Promise<T> {
+    return this.race(p);
+  }
 }
 
 /** A port whose write never returns, and whose read waits or fails on demand. */
@@ -130,6 +134,28 @@ describe("SerialStreamSession", () => {
 
     await expect(first).rejects.toMatchObject({ name: "AbortError" });
     await expect(second).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("ends a wait with the abort when its result and the abort are both in already", async () => {
+    const abort = new AbortController();
+    const session = new Session(stuckPort().port, abort.signal);
+    const waits = session as unknown as { onAbort: Set<unknown> };
+    const stop = new DOMException("stop", "AbortError");
+
+    // The result is in, and the abort comes before anything reads it.
+    const late = session.wait(Promise.resolve(1));
+    abort.abort(stop);
+    await expect(late).rejects.toBe(stop);
+
+    // Both are in before the wait starts.
+    await expect(session.wait(Promise.resolve(2))).rejects.toBe(stop);
+    expect(waits.onAbort.size).toBe(0);
+  });
+
+  it("hands out a result that is in when no abort came", async () => {
+    const session = new Session(stuckPort().port, new AbortController().signal);
+
+    await expect(session.wait(Promise.resolve(1))).resolves.toBe(1);
   });
 
   it("keeps nothing of a stuck write that the abort ended", async () => {
