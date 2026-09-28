@@ -120,6 +120,18 @@ describe("SerialStreamSession", () => {
     );
   });
 
+  it("tells every write that is under way of the abort", async () => {
+    const abort = new AbortController();
+    const session = new Session(stuckPort().port, abort.signal);
+    const first = session.write(new Uint8Array([1]));
+    const second = session.write(new Uint8Array([2]));
+
+    abort.abort(new DOMException("stop", "AbortError"));
+
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await expect(second).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("keeps nothing of a write that is over, however many there were", async () => {
     const port = Object.assign(makeDisconnectPort(), {
       readable: new ReadableStream<Uint8Array>(),

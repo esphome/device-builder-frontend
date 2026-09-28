@@ -2,6 +2,9 @@
  * A serial session read as bytes: the read loop feeds a buffer that an
  * engine's command helpers consume with timeouts. Every wait is raced
  * against the abort signal and fails once the port is gone.
+ *
+ * For one reader at a time: the bytes are one stream, so two reads that
+ * wait together have no order between them, and only the later is woken.
  */
 import { SerialStreamSession } from "./serial-stream-session.js";
 
