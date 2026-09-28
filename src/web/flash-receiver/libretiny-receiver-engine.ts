@@ -50,8 +50,11 @@ export function libretinyReceiverEngine(
             );
             return null;
           }
-          // Without control lines the board is still sitting in its downloader.
-          const byHand = !result.rebooted && copy.doneByHand;
+          // Without control lines the board is still sitting in its downloader,
+          // which is said as the dialog says it.
+          const byHand = result.rebooted
+            ? undefined
+            : (copy.doneByHand ?? "web.install.done_reset_by_hand");
           return {
             rebooted: result.rebooted,
             note: byHand ? { message: localize(byHand) } : undefined,

@@ -169,7 +169,7 @@ describe("libretinyReceiverEngine", () => {
 
     expect("run" in plan && (await plan.run(hooks()))).toEqual({
       rebooted: false,
-      note: undefined,
+      note: { message: "web.install.done_reset_by_hand" },
     });
   });
 });
