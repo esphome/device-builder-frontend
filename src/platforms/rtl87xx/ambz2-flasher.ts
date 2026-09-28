@@ -6,7 +6,7 @@
  * on demand by the install flow; nothing here touches the DOM.
  */
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
-import { SerialStreamSession } from "../../util/serial-stream-session.js";
+import { SerialByteSession } from "../../util/serial-byte-session.js";
 import { sleep } from "../../util/sleep.js";
 import { settledWithin } from "../../util/with-deadline.js";
 import { type XmodemIo, xmodemSend } from "../../util/xmodem.js";
@@ -70,73 +70,11 @@ export class Ambz2VerifyError extends Error {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-/**
- * Byte-level access to the port: the read loop feeds a buffer that the
- * command helpers consume with timeouts.
- */
-class RomLink extends SerialStreamSession implements XmodemIo {
-  private buf: number[] = [];
-  private wake: (() => void) | null = null;
-
-  protected onBytes(bytes: Uint8Array): void {
-    for (const b of bytes) this.buf.push(b);
-    this.wake?.();
-  }
-
-  protected onEnded(): void {
-    this.wake?.();
-  }
-
-  /** Resolves true when bytes arrived, false on timeout; throws once the port is gone. */
-  private waitForData(timeoutMs: number): Promise<boolean> {
-    if (this.readEnded) return Promise.reject(this.readEnded);
-    let timer: ReturnType<typeof setTimeout>;
-    const arrived = new Promise<boolean>((resolve) => {
-      timer = setTimeout(() => resolve(false), timeoutMs);
-      this.wake = () => {
-        clearTimeout(timer);
-        this.wake = null;
-        resolve(true);
-      };
-    });
-    return this.race(arrived).then((got) => {
-      if (got && this.readEnded && this.buf.length === 0) throw this.readEnded;
-      return got;
-    });
-  }
-
+/** The ROM's console: lines out, lines and XModem bytes back. */
+class RomLink extends SerialByteSession implements XmodemIo {
   async write(data: Uint8Array | string): Promise<void> {
     const bytes = typeof data === "string" ? encoder.encode(data) : data;
     await this.writeBytes(bytes);
-  }
-
-  drain(): void {
-    this.buf = [];
-  }
-
-  async readByte(timeoutMs: number): Promise<number | null> {
-    if (this.buf.length === 0 && !(await this.waitForData(timeoutMs))) return null;
-    return this.buf.shift() ?? null;
-  }
-
-  /** Exactly ``count`` bytes; the timeout restarts with every arrival. */
-  async readBytes(count: number, timeoutMs: number): Promise<Uint8Array> {
-    while (this.buf.length < count) {
-      if (!(await this.waitForData(timeoutMs))) {
-        throw new Error(`Timed out waiting for ${count} bytes (got ${this.buf.length})`);
-      }
-    }
-    return new Uint8Array(this.buf.splice(0, count));
-  }
-
-  /** Everything received until ``quietMs`` of silence, at most ``windowMs``. */
-  async readQuiet(quietMs: number, windowMs: number): Promise<Uint8Array> {
-    const deadline = Date.now() + windowMs;
-    while (Date.now() < deadline) {
-      const wait = Math.min(quietMs, deadline - Date.now());
-      if (!(await this.waitForData(wait)) && this.buf.length > 0) break;
-    }
-    return new Uint8Array(this.buf.splice(0));
   }
 
   /** The next non-empty line, CR/LF stripped. */

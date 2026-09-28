@@ -108,6 +108,36 @@ describe("SerialStreamSession", () => {
     await expect(session.write(new Uint8Array([1]))).rejects.toBe(framing);
   });
 
+  it("fails a write at once on a session that has ended", async () => {
+    const { port } = stuckPort();
+    const session = new Session(port);
+    port.fire();
+    await Promise.resolve();
+    expect(session.ended).toBeInstanceOf(SerialDeviceLostError);
+
+    await expect(session.write(new Uint8Array([1]))).rejects.toBeInstanceOf(
+      SerialDeviceLostError
+    );
+  });
+
+  it("keeps nothing of a write that is over, however many there were", async () => {
+    const port = Object.assign(makeDisconnectPort(), {
+      readable: new ReadableStream<Uint8Array>(),
+      writable: new WritableStream<Uint8Array>(),
+    });
+    const session = new Session(port, new AbortController().signal);
+    const waits = session as unknown as { onAbort: Set<unknown>; onGone: Set<unknown> };
+
+    const pending = session.write(new Uint8Array([1]));
+    expect(waits.onAbort.size).toBe(1);
+    expect(waits.onGone.size).toBe(1);
+    await pending;
+    for (let i = 0; i < 50; i++) await session.write(new Uint8Array([i]));
+
+    expect(waits.onAbort.size).toBe(0);
+    expect(waits.onGone.size).toBe(0);
+  });
+
   it("stops listening to the port when it is closed", async () => {
     const { port } = stuckPort();
     const session = new Session(port);
