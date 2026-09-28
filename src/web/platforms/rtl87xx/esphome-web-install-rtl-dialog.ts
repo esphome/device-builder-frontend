@@ -1,6 +1,6 @@
 import { customElement } from "lit/decorators.js";
 
-import { UartInstallDialog } from "../../install/uart-install-dialog.js";
+import { LibreTinyInstallDialog } from "../../install/libretiny-install-dialog.js";
 import { RTL_INSTALL } from "./install.js";
 
 /**
@@ -10,7 +10,7 @@ import { RTL_INSTALL } from "./install.js";
  * ROM.
  */
 @customElement("esphome-web-install-rtl-dialog")
-export class ESPHomeWebInstallRtlDialog extends UartInstallDialog {
+export class ESPHomeWebInstallRtlDialog extends LibreTinyInstallDialog {
   protected readonly install = RTL_INSTALL;
 }
 

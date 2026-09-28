@@ -79,8 +79,8 @@ and which lines an open or a reopen leaves up) to both the port open and the
 logs dialog's `policy`; the dialog's default is no reset.
 
 A family that is flashed from a LibreTiny UF2 over a USB serial adapter extends
-`UartCardElement` (`dashboard/uart-card-element.ts`) and `UartInstallDialog`
-(`install/uart-install-dialog.ts`) with its copy, its `SerialLogsPolicy` and how
+`LibreTinyCardElement` (`dashboard/libretiny-card-element.ts`) and `LibreTinyInstallDialog`
+(`install/libretiny-install-dialog.ts`) with its copy, its `SerialLogsPolicy` and how
 its file is parsed and written (see `platforms/rtl87xx/install.ts`).
 
 New copy goes in `src/translations/en.json` under the `web.*`

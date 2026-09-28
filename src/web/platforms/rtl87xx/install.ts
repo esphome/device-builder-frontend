@@ -1,9 +1,9 @@
 /** The RTL8720C (AmebaZ2) as web.esphome.io installs it: through the ROM downloader. */
 import { LIBRETINY_AMBZ2_GUIDE_URL } from "../../../common/docs.js";
 import { loadAmbz2Image, runAmbz2 } from "../../../platforms/rtl87xx/index.js";
-import type { UartInstall } from "../../install/uart-install-dialog.js";
+import type { LibreTinyInstall } from "../../install/libretiny-install-dialog.js";
 
-export const RTL_INSTALL: UartInstall = {
+export const RTL_INSTALL: LibreTinyInstall = {
   copy: {
     title: "web.rtl.install_title",
     intro: "web.rtl.install_intro",

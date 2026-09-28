@@ -31,8 +31,8 @@ import { parseFailureCopy, Preparation, type Prepared } from "./preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
-/** What a UART flash reports while it runs. */
-export interface UartFlashHooks {
+/** What a flash over the serial adapter reports while it runs. */
+export interface LibreTinyFlashHooks {
   signal: AbortSignal;
   onLog: (line: string) => void;
   /** The chip did not answer by itself; the user has to get it into its downloader. */
@@ -45,7 +45,7 @@ export interface UartFlashHooks {
  * A chip family whose LibreTiny UF2 is flashed over its serial adapter: how
  * its file is parsed and written, and the copy of each step.
  */
-export interface UartInstall {
+export interface LibreTinyInstall {
   readonly copy: {
     readonly title: string;
     readonly intro: string;
@@ -74,7 +74,7 @@ export interface UartInstall {
   run(
     port: SerialPort,
     image: LibreTinyImage,
-    hooks: UartFlashHooks
+    hooks: LibreTinyFlashHooks
   ): Promise<{ rebooted: boolean } | { detail: string; error: unknown }>;
 }
 
@@ -87,10 +87,10 @@ type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" |
  * into it where it can; else the dialog shows the guide while the engine
  * keeps polling. A family's element extends this with its ``install``.
  */
-export abstract class UartInstallDialog extends LitElement {
+export abstract class LibreTinyInstallDialog extends LitElement {
   @property({ type: Boolean }) open = false;
 
-  protected abstract readonly install: UartInstall;
+  protected abstract readonly install: LibreTinyInstall;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()

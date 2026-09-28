@@ -20,7 +20,7 @@ import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 registerMdiIcons({ upload: mdiUpload, "text-box-outline": mdiTextBoxOutline });
 
 /** A family's card: its copy and its logs. */
-export interface UartCard {
+export interface LibreTinyCard {
   readonly copy: {
     readonly title: string;
     readonly hint: string;
@@ -35,8 +35,8 @@ export interface UartCard {
  * and each logs session picks its own port. A family's element extends this
  * with its ``card`` and its install dialog.
  */
-export abstract class UartCardElement extends LitElement {
-  protected abstract readonly card: UartCard;
+export abstract class LibreTinyCardElement extends LitElement {
+  protected abstract readonly card: LibreTinyCard;
 
   protected abstract renderInstall(open: boolean, onHide: () => void): TemplateResult;
 
