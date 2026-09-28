@@ -152,6 +152,18 @@ describe("SerialStreamSession", () => {
     expect(waits.onAbort.size).toBe(0);
   });
 
+  it("has forgotten a wait by the time whoever waited on it goes on", async () => {
+    const session = new Session(stuckPort().port, new AbortController().signal);
+    const waits = session as unknown as { onAbort: Set<unknown> };
+
+    await session.wait(Promise.resolve(1));
+    expect(waits.onAbort.size).toBe(0);
+
+    const failed = new Error("no");
+    await expect(session.wait(Promise.reject(failed))).rejects.toBe(failed);
+    expect(waits.onAbort.size).toBe(0);
+  });
+
   it("hands out a result that is in when no abort came", async () => {
     const session = new Session(stuckPort().port, new AbortController().signal);
 

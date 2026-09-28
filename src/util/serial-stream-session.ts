@@ -149,7 +149,18 @@ function until<T>(
       reject(reason);
     };
     waiting.forEach((set) => set.add(told));
-    p.then(resolve, reject).finally(forget);
+    // Forgotten as it ends, not after: whoever waited on it runs next, and
+    // finds nothing of it left.
+    p.then(
+      (value) => {
+        forget();
+        resolve(value);
+      },
+      (err: unknown) => {
+        forget();
+        reject(err);
+      }
+    );
   });
 }
 
