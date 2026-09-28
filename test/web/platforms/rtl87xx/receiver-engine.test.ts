@@ -18,7 +18,9 @@ vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => 
 
 import { recordingHooks as hooks } from "../../_receiver-hooks.js";
 import { RTL87XX_SERIAL_LOGS } from "../../../../src/platforms/rtl87xx/serial-logs.js";
+import { libretinyReceiverEngine } from "../../../../src/web/flash-receiver/libretiny-receiver-engine.js";
 import type { ReceiverRun } from "../../../../src/web/flash-receiver/receiver-engine.js";
+import { RTL_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
 import { rtlAmbz2ReceiverEngine } from "../../../../src/web/platforms/rtl87xx/receiver-engine.js";
 
 const localize = (k: string) => k;
@@ -107,5 +109,37 @@ describe("rtlAmbz2ReceiverEngine", () => {
     expect(await run(h)).toBeNull();
     expect(h.states[h.states.length - 1]).toBe("error:firmware.rtl_flash_failed: no ROM");
     expect(rtlAmbz2ReceiverEngine.logs).toBe(RTL87XX_SERIAL_LOGS);
+  });
+
+  it("fetches the engine with the parse, and leaves a fetch that fails to the run", async () => {
+    const loadEngine = vi.spyOn(RTL_INSTALL, "loadEngine");
+    loadEngine.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await prepared();
+
+    expect(loadEngine).toHaveBeenCalledOnce();
+    loadEngine.mockRestore();
+  });
+});
+
+describe("libretinyReceiverEngine", () => {
+  // A family whose board can be left in its downloader and has no line for it.
+  const bare = libretinyReceiverEngine(
+    {
+      ...RTL_INSTALL,
+      copy: { ...RTL_INSTALL.copy, doneByHand: undefined },
+      load: async () => ({ image }),
+      run: async () => ({ rebooted: false }),
+    },
+    RTL87XX_SERIAL_LOGS
+  );
+
+  it("says the board did not reboot, with or without a line for it", async () => {
+    const plan = await bare.prepare(uf2, false, localize);
+
+    expect("run" in plan && (await plan.run(hooks()))).toEqual({
+      rebooted: false,
+      note: undefined,
+    });
   });
 });

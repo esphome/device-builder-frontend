@@ -1,6 +1,10 @@
 /** The RTL8720C (AmebaZ2) as web.esphome.io installs it: through the ROM downloader. */
 import { LIBRETINY_AMBZ2_GUIDE_URL } from "../../../common/docs.js";
-import { loadAmbz2Image, runAmbz2 } from "../../../platforms/rtl87xx/index.js";
+import {
+  loadAmbz2Engine,
+  loadAmbz2Image,
+  runAmbz2,
+} from "../../../platforms/rtl87xx/index.js";
 import type { LibreTinyInstall } from "../../install/libretiny-install-dialog.js";
 
 export const RTL_INSTALL: LibreTinyInstall = {
@@ -18,6 +22,7 @@ export const RTL_INSTALL: LibreTinyInstall = {
     badFile: "firmware.rtl_bad_uf2",
   },
   guideUrl: LIBRETINY_AMBZ2_GUIDE_URL,
+  loadEngine: loadAmbz2Engine,
   load: loadAmbz2Image,
   run: (port, image, { onWaiting, ...hooks }) =>
     runAmbz2(port, image, { ...hooks, onWaitingForStrap: onWaiting }),

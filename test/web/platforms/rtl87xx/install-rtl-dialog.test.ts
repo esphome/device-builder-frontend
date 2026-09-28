@@ -38,7 +38,9 @@ import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file
 import { identityLocalize, mount } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
 import { Ambz2ImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
+import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
 import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
+import { RTL_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -109,6 +111,27 @@ describe("esphome-web-install-rtl-dialog", () => {
     await el._flash();
     await el.updateComplete;
     expect(card(el).statusMessage).toBe("firmware.rtl_done_manual_reset");
+  });
+
+  it("has a line of its own for a family that has none for a reset by hand", async () => {
+    class BareDialog extends LibreTinyInstallDialog {
+      protected readonly install = {
+        ...RTL_INSTALL,
+        copy: { ...RTL_INSTALL.copy, doneByHand: undefined },
+      };
+    }
+    customElements.define("test-bare-install-dialog", BareDialog);
+    mocks.flashAmbz2.mockResolvedValue(false);
+    const el = (await mount(new BareDialog(), {
+      _localize: identityLocalize,
+      open: true,
+    } as Partial<BareDialog>)) as any;
+    await pickFile(el, "_image", uf2());
+
+    await el._flash();
+    await el.updateComplete;
+
+    expect(card(el).statusMessage).toBe("web.install.done_reset_by_hand");
   });
 
   it("shows the strap guide while the engine waits for download mode", async () => {

@@ -12,9 +12,7 @@ import { serialRun } from "./serial-run.js";
 
 export function libretinyReceiverEngine(
   install: LibreTinyInstall,
-  logs: SerialLogsPolicy,
-  /** Fetches the engine's chunk; started with the parse so a failed fetch costs nothing later. */
-  loadEngine: () => Promise<unknown>
+  logs: SerialLogsPolicy
 ): ReceiverEngine {
   const { copy } = install;
   return {
@@ -30,8 +28,9 @@ export function libretinyReceiverEngine(
         return { error: `${localize(key)} (${parsed.detail})`, retryable };
       }
       const { image } = parsed;
-      // ``run`` names a fetch that failed.
-      void loadEngine().catch(() => {});
+      // Started with the parse so a fetch costs nothing later; ``run`` fetches
+      // the same chunk and names a fetch that failed.
+      void install.loadEngine().catch(() => {});
       const guide = { url: install.guideUrl, label: localize(copy.guideLink) };
       return {
         run: serialRun(localize, async (port, hooks) => {
@@ -52,9 +51,11 @@ export function libretinyReceiverEngine(
             return null;
           }
           // Without control lines the board is still sitting in its downloader.
-          return result.rebooted || !copy.doneByHand
-            ? { rebooted: true }
-            : { rebooted: false, note: { message: localize(copy.doneByHand) } };
+          const byHand = !result.rebooted && copy.doneByHand;
+          return {
+            rebooted: result.rebooted,
+            note: byHand ? { message: localize(byHand) } : undefined,
+          };
         }),
       };
     },

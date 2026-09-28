@@ -2064,6 +2064,7 @@
       "uf2_file_placeholder": "No file selected",
       "uf2_howto_title": "To get the UF2 of your ESPHome project:",
       "uf2_howto_3": "Choose the UF2 format and save the .uf2 file.",
+      "done_reset_by_hand": "Installation complete. Reset the board to start the firmware.",
       "adoptable_title": "Prepare your device for first use",
       "adoptable_intro": "This installs a basic version of ESPHome on your device and helps you connect it to your network.",
       "adoptable_detail": "Once installed, your ESPHome Device Builder shows the device and lets you take control, creating a local configuration you can manage over the network.",

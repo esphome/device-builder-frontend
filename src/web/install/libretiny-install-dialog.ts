@@ -55,13 +55,15 @@ export interface LibreTinyInstall {
     readonly waitDetail: string;
     readonly guideLink: string;
     readonly done: string;
-    /** The flash went through and the board has to be reset by hand, where that can be. */
+    /** The flash went through and the board has to be reset by hand; the dialog has a line for a family without its own. */
     readonly doneByHand?: string;
     readonly failed: string;
     readonly badFile: string;
   };
   /** Where to read on when the chip does not get into its downloader. */
   readonly guideUrl: string;
+  /** Fetches the chunk ``run`` writes with, for one who wants it ahead of the run. */
+  loadEngine(): Promise<unknown>;
   /** Never throws: a failure names its copy. */
   load(
     bytes: Uint8Array
@@ -260,7 +262,11 @@ export abstract class LibreTinyInstallDialog extends LitElement {
       case "flashing":
         return this._localize("firmware.status_flashing");
       case "success":
-        return this._localize((this._manualReset && copy.doneByHand) || copy.done);
+        return this._localize(
+          this._manualReset
+            ? (copy.doneByHand ?? "web.install.done_reset_by_hand")
+            : copy.done
+        );
       default:
         return this._errorTitle;
     }
