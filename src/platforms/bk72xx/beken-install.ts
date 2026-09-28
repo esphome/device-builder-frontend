@@ -112,8 +112,7 @@ export const bekenInstall: BrowserInstall<"bk-uart"> = {
   methodKey: "bk_uart",
   chips: ["bk7231", "bk7238", "bk7251"],
   // The flash goes over UART1 and the logs come from UART2, unless the
-  // config moves them: the port used is not the one the logs are on, and
-  // the logs stay with the server's serial port.
+  // config moves them: the port used is not the one the logs are on.
   holdsPort: false,
   image: bekenImage,
   start: startBekenInstall,

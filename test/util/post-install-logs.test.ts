@@ -158,28 +158,31 @@ describe("formatSerialPortLabel", () => {
 });
 
 describe("reconnectWebSerialLogs", () => {
-  it("releases both lines after reopening an RTL8720C board's port", async () => {
-    const port = openPort();
-    const restore = withRequestPort(async () => port);
-    const dialog = stubDialog();
-    try {
-      await reconnectWebSerialLogs(
-        dialog as never,
-        defaultLocalize,
-        115200,
-        null,
-        () => false,
-        "rtl87xx"
-      );
-      expect(port.setSignals).toHaveBeenCalledWith({
-        dataTerminalReady: false,
-        requestToSend: false,
-      });
-      expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
-    } finally {
-      restore();
+  it.each(["rtl87xx", "bk72xx"])(
+    "releases both lines after reopening the port of a %s",
+    async (platform) => {
+      const port = openPort();
+      const restore = withRequestPort(async () => port);
+      const dialog = stubDialog();
+      try {
+        await reconnectWebSerialLogs(
+          dialog as never,
+          defaultLocalize,
+          115200,
+          null,
+          () => false,
+          platform
+        );
+        expect(port.setSignals).toHaveBeenCalledWith({
+          dataTerminalReady: false,
+          requestToSend: false,
+        });
+        expect(dialog.setSerialStream).toHaveBeenCalledTimes(1);
+      } finally {
+        restore();
+      }
     }
-  });
+  );
 
   it("says the port may be in use when the reopen's open fails with NetworkError", async () => {
     const port = openPort();
@@ -567,6 +570,12 @@ describe("attachSerialLogStream reopen", () => {
       "an RTL8720C kit on an unlisted bridge",
       { usbVendorId: 0x1234, usbProductId: 1 },
       "rtl87xx",
+      true,
+    ],
+    [
+      "a BK72xx on an unlisted adapter",
+      { usbVendorId: 0x1234, usbProductId: 1 },
+      "bk72xx",
       true,
     ],
   ])(

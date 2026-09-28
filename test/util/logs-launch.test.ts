@@ -252,10 +252,11 @@ describe("launchLogsWithMethod web-serial", () => {
     }
   });
 
-  // Chromium asserts DTR and RTS on open; an RTL8720C kit needs them released
+  // Chromium asserts DTR and RTS on open; an RTL8720C kit and a BK72xx need them released
   // (see releaseLinesAfterOpen), an ESP board must keep the open's state.
   it.each([
     ["rtl87xx", true],
+    ["bk72xx", true],
     ["esp32", false],
   ])("releases the lines after opening a %s port: %s", async (platform, released) => {
     const restore = withWebSerial(true);

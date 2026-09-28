@@ -234,7 +234,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const isEsptool = this._isEsptoolPlatform;
     const isLogs = this.mode === "logs";
     // Web Serial logs also cover every platform whose logs policy offers them
-    // (Pico, nRF52, RTL8720C); flashing stays esptool-only.
+    // (Pico, nRF52, RTL8720C, BK72xx); flashing stays esptool-only.
     const webSerialPlatform =
       isEsptool ||
       (isLogs && platformFor(this.deviceTargetPlatform)?.logs?.serial !== undefined);
