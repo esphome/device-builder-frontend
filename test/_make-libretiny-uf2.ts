@@ -3,8 +3,8 @@ import {
   LT_TAG,
   PARTITION_ENTRY_SIZE,
   PARTITION_MAGIC,
-  UF2_FAMILY_AMBZ2,
-} from "../src/platforms/rtl87xx/libretiny-uf2.js";
+} from "../src/platforms/libretiny-uf2.js";
+import { UF2_FAMILY_AMBZ2 } from "../src/platforms/rtl87xx/ambz2-image.js";
 import { concat } from "../src/util/bytes.js";
 import { UF2_FLAG_NOT_MAIN_FLASH } from "../src/util/uf2.js";
 import { makeUf2Block, type Uf2Tag } from "./_make-uf2-block.js";
@@ -44,6 +44,11 @@ export function ltPartitionTable(parts: LtPartitionSpec[]): Uint8Array {
   return table;
 }
 
+/** The OTA_PART_INFO tag that opens a group of blocks. */
+export const ltPartInfoTags = (indexes: number[], names: string[]): Uf2Tag[] => [
+  ltTag(LT_TAG.OTA_PART_INFO, ltPartInfo(indexes, names)),
+];
+
 /** OTA_PART_INFO: one partition index (1-based, 0 = none) per scheme, then the names. */
 export function ltPartInfo(indexes: number[], names: string[]): Uint8Array {
   const digits = indexes.map((i) => i.toString(16)).join("");
@@ -67,7 +72,7 @@ export interface LtUf2Spec {
 
 /** The usual header tags, overridable per key. */
 export function ltHeaderTags(
-  over: Partial<Record<keyof typeof LT_TAG, string | null>> = {}
+  over: Partial<Record<keyof typeof LT_TAG, Uint8Array | string | null>> = {}
 ) {
   const tags: Uf2Tag[] = [];
   const add = (key: keyof typeof LT_TAG, fallback: Uint8Array | string) => {

@@ -15,7 +15,7 @@ vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
 }));
-vi.mock("../../../../src/platforms/rtl87xx/libretiny-uf2.js", async (importOriginal) => ({
+vi.mock("../../../../src/platforms/rtl87xx/ambz2-image.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   parseAmbz2Image: mocks.parseAmbz2Image,
 }));
@@ -37,7 +37,7 @@ vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => 
 import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
-import { Ambz2ImageError } from "../../../../src/platforms/rtl87xx/libretiny-uf2.js";
+import { Ambz2ImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
 import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

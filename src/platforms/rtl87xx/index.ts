@@ -4,16 +4,17 @@
  * only, and the loaders fetch them on demand.
  */
 export type * from "./ambz2-flasher.js";
-export type * from "./libretiny-uf2.js";
+export type * from "../libretiny-uf2.js";
+export type * from "./ambz2-image.js";
 export * from "./rtl87xx-platform.js";
 export * from "./serial-logs.js";
 
 import { getErrorMessage } from "../../util/error-message.js";
+import type { LibreTinyImage } from "../libretiny-uf2.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
-import type { LibreTinyImage } from "./libretiny-uf2.js";
 
 export const loadAmbz2Engine = () => import("./ambz2-flasher.js");
-export const loadLibreTinyParser = () => import("./libretiny-uf2.js");
+export const loadLibreTinyParser = () => import("./ambz2-image.js");
 
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */
 export interface Ambz2ImageFailure {

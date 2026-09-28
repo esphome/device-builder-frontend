@@ -10,7 +10,7 @@ import { SerialStreamSession } from "../../util/serial-stream-session.js";
 import { sleep } from "../../util/sleep.js";
 import { settledWithin } from "../../util/with-deadline.js";
 import { type XmodemIo, xmodemSend } from "../../util/xmodem.js";
-import type { LibreTinyImage } from "./libretiny-uf2.js";
+import type { LibreTinyImage } from "../libretiny-uf2.js";
 
 const AMBZ2_BAUD_RATE = 115200;
 /** How long the automatic DTR/RTS reset gets to produce a linked ROM. */

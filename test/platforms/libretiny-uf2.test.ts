@@ -7,17 +7,20 @@ import {
   ltPartitionTable,
   ltTag,
   makeLibreTinyUf2,
-} from "../../_make-libretiny-uf2.js";
-import { makeUf2Block } from "../../_make-uf2-block.js";
+} from "../_make-libretiny-uf2.js";
+import { makeUf2Block } from "../_make-uf2-block.js";
 import {
   LT_TAG,
   parseLibreTinyBlocks,
   parseLibreTinyImage,
   parsePartitionTable,
+} from "../../src/platforms/libretiny-uf2.js";
+import {
+  AMBZ2_PARSE,
   UF2_FAMILY_AMBZ,
   UF2_FAMILY_AMBZ2,
-} from "../../../src/platforms/rtl87xx/libretiny-uf2.js";
-import { Uf2FamilyError } from "../../../src/util/uf2.js";
+} from "../../src/platforms/rtl87xx/ambz2-image.js";
+import { Uf2FamilyError } from "../../src/util/uf2.js";
 
 // Scheme slots: device single, device OTA1, device OTA2, flasher single,
 // flasher OTA1, flasher OTA2.
@@ -26,12 +29,9 @@ const BOOT_INFO = ltPartInfo([0, 0, 0, 0, 1, 1], ["boot"]);
 const OTA2_WIPE_INFO = ltPartInfo([0, 0, 0, 0, 2, 1], ["ota1", "ota2"]);
 const info = (bytes: Uint8Array) => [ltTag(LT_TAG.OTA_PART_INFO, bytes)];
 
+// As the RTL8720C flasher parses: the first OTA slot, blocks from the run.
 const parse = (bytes: Uint8Array) =>
-  parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2], {
-    scheme: "flasher-ota1",
-    blockSize: 1024,
-    blocksFrom: "run",
-  });
+  parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2], AMBZ2_PARSE);
 
 describe("parseLibreTinyImage", () => {
   it("resolves the flasher's OTA1 runs through the file's partition table", () => {

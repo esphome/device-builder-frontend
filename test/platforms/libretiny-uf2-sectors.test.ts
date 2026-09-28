@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  ltPartInfo,
+  ltPartInfoTags as info,
+  ltHeaderTags,
+  type LtPartitionSpec,
   ltPartitionTable,
-  ltTag,
   makeLibreTinyUf2,
-} from "../../_make-libretiny-uf2.js";
+} from "../_make-libretiny-uf2.js";
 import {
   type LibreTinyParseOptions,
-  LT_TAG,
   parseLibreTinyImage,
-} from "../../../src/platforms/libretiny/uf2.js";
+} from "../../src/platforms/libretiny-uf2.js";
 
 const FAMILY = 0x7b3ef230;
 
@@ -19,14 +19,8 @@ const PARTITIONS = [
   { name: "download", offset: 0x12a000, length: 0xa6000 },
 ];
 
-const header = () => [
-  ltTag(LT_TAG.BOARD, "cb3s"),
-  ltTag(LT_TAG.OTA_FORMAT_2, new Uint8Array([2])),
-  ltTag(LT_TAG.FAL_PTABLE, ltPartitionTable(PARTITIONS)),
-];
-const info = (indexes: number[], names: string[]) => [
-  ltTag(LT_TAG.OTA_PART_INFO, ltPartInfo(indexes, names)),
-];
+const header = (parts: LtPartitionSpec[] = PARTITIONS) =>
+  ltHeaderTags({ BOARD: "cb3s", FAL_PTABLE: ltPartitionTable(parts) });
 
 // As the build writes them: the app for the flasher's single scheme and the
 // device's first slot, the download partition for the device alone.
@@ -109,11 +103,7 @@ describe("parseLibreTinyImage, by where the blocks lie", () => {
     const odd = [{ name: "app", offset: 0x11000, length: 0x800 }];
     const file = makeLibreTinyUf2({
       family: FAMILY,
-      headerTags: [
-        ltTag(LT_TAG.BOARD, "cb3s"),
-        ltTag(LT_TAG.OTA_FORMAT_2, new Uint8Array([2])),
-        ltTag(LT_TAG.FAL_PTABLE, ltPartitionTable(odd)),
-      ],
+      headerTags: header(odd),
       blocks: [{ addr: 0, fill: 0x01, tags: APP }],
     });
 
@@ -125,11 +115,7 @@ describe("parseLibreTinyImage, by where the blocks lie", () => {
     const odd = [{ name: "app", offset: 0x11800, length: 0x2000 }];
     const file = makeLibreTinyUf2({
       family: FAMILY,
-      headerTags: [
-        ltTag(LT_TAG.BOARD, "cb3s"),
-        ltTag(LT_TAG.OTA_FORMAT_2, new Uint8Array([2])),
-        ltTag(LT_TAG.FAL_PTABLE, ltPartitionTable(odd)),
-      ],
+      headerTags: header(odd),
       blocks: [{ addr: 0, fill: 0x01, tags: APP }],
     });
 

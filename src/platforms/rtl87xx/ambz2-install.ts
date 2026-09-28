@@ -17,13 +17,13 @@ import {
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
 import type { HandoffSpec } from "../handoff.js";
+import type { LibreTinyImage } from "../libretiny-uf2.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
 import { loadAmbz2Image, runAmbz2 } from "./index.js";
-import type { LibreTinyImage } from "./libretiny-uf2.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {

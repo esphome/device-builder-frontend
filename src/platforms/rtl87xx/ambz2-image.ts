@@ -5,14 +5,23 @@
  */
 import { Uf2FamilyError } from "../../util/uf2.js";
 import { XMODEM_BLOCK_SIZE } from "../../util/xmodem.js";
-import { type LibreTinyImage, parseLibreTinyImage } from "../libretiny/uf2.js";
-
-export * from "../libretiny/uf2.js";
+import {
+  type LibreTinyImage,
+  type LibreTinyParseOptions,
+  parseLibreTinyImage,
+} from "../libretiny-uf2.js";
 
 /** Realtek AmebaZ2 (RTL8720C), the family the UART engine can flash. */
 export const UF2_FAMILY_AMBZ2 = 0xe08f7564;
 /** Realtek AmebaZ (RTL8710B): a different ROM protocol, refused up front. */
 export const UF2_FAMILY_AMBZ = 0x22e0d6fc;
+
+/** What the RTL8720C flasher writes, and how. */
+export const AMBZ2_PARSE: LibreTinyParseOptions = {
+  scheme: "flasher-ota1",
+  blockSize: XMODEM_BLOCK_SIZE,
+  blocksFrom: "run",
+};
 
 /** Why an AmebaZ2 image was refused; ``key`` is the install dialogs' title copy. */
 export class Ambz2ImageError extends Error {
@@ -32,11 +41,7 @@ export class Ambz2ImageError extends Error {
  */
 export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
   try {
-    return parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2], {
-      scheme: "flasher-ota1",
-      blockSize: XMODEM_BLOCK_SIZE,
-      blocksFrom: "run",
-    });
+    return parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2], AMBZ2_PARSE);
   } catch (err) {
     throw new Ambz2ImageError(
       err instanceof Uf2FamilyError

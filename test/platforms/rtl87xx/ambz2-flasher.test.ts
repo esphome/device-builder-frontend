@@ -3,12 +3,12 @@ import { driveFakeTimers } from "../../_fake-timers.js";
 import { disconnectEvents } from "../../_web-serial.js";
 import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 
+import type { LibreTinyImage } from "../../../src/platforms/libretiny-uf2.js";
 import {
   Ambz2ConsoleError,
   Ambz2VerifyError,
   flashAmbz2,
 } from "../../../src/platforms/rtl87xx/ambz2-flasher.js";
-import type { LibreTinyImage } from "../../../src/platforms/rtl87xx/libretiny-uf2.js";
 
 const STX = 0x02;
 const EOT = 0x04;

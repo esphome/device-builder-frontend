@@ -34,17 +34,14 @@ import { ltPartInfo, ltTag, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.j
 import { lapsedPick } from "../../_web-serial.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
+import { type LibreTinyImage, LT_TAG } from "../../../src/platforms/libretiny-uf2.js";
+import { UF2_FAMILY_AMBZ } from "../../../src/platforms/rtl87xx/ambz2-image.js";
 import {
   rtlAmbz2Install,
   rtlDoFlash,
   rtlImage,
   startRtlAmbz2Install,
 } from "../../../src/platforms/rtl87xx/ambz2-install.js";
-import {
-  type LibreTinyImage,
-  LT_TAG,
-  UF2_FAMILY_AMBZ,
-} from "../../../src/platforms/rtl87xx/libretiny-uf2.js";
 import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 import {
   asHost,

@@ -13,7 +13,7 @@ import {
   UF2_FLAG_HAS_TAGS,
   UF2_FLAG_NOT_MAIN_FLASH,
   type Uf2Range,
-} from "../../util/uf2.js";
+} from "../util/uf2.js";
 
 export const LT_TAG = {
   OTA_FORMAT_2: 0x6c8492,
