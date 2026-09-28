@@ -75,7 +75,7 @@ export interface UartInstall {
     port: SerialPort,
     image: LibreTinyImage,
     hooks: UartFlashHooks
-  ): Promise<{ rebooted: boolean } | { detail: string; error: unknown; key?: string }>;
+  ): Promise<{ rebooted: boolean } | { detail: string; error: unknown }>;
 }
 
 type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" | "error";
@@ -241,7 +241,7 @@ export abstract class UartInstallDialog extends LitElement {
     if (!live()) return;
     if ("detail" in result) {
       this._fail(
-        this._localize(result.key ?? this.install.copy.failed),
+        this._localize(this.install.copy.failed),
         connectFailureDetail(result.error, this._localize, () => result.detail)
       );
       return;

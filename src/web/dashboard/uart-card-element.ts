@@ -19,7 +19,7 @@ import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({ upload: mdiUpload, "text-box-outline": mdiTextBoxOutline });
 
-/** A family's card: its copy, its logs and its install dialog. */
+/** A family's card: its copy and its logs. */
 export interface UartCard {
   readonly copy: {
     readonly title: string;

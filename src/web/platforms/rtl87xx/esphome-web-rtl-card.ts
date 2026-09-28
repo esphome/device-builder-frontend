@@ -2,7 +2,7 @@ import { html } from "lit";
 import { customElement } from "lit/decorators.js";
 
 import { RTL87XX_SERIAL_LOGS } from "../../../platforms/rtl87xx/index.js";
-import { type UartCard, UartCardElement } from "../../dashboard/uart-card.js";
+import { type UartCard, UartCardElement } from "../../dashboard/uart-card-element.js";
 import "./esphome-web-install-rtl-dialog.js";
 
 const RTL_CARD: UartCard = {
