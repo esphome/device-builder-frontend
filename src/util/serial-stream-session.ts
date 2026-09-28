@@ -62,18 +62,19 @@ export abstract class SerialStreamSession {
     return until(p, this.onAbort);
   }
 
-  /** ``p``, or the reason the session ended once it has. */
-  private untilGone<T>(p: Promise<T>): Promise<T> {
-    if (this.readEnded) {
+  /** ``p``, or the abort, or the reason the session ended once it has. */
+  private untilAbortedOrGone<T>(p: Promise<T>): Promise<T> {
+    const aborted = this.signal?.aborted;
+    if (aborted || this.readEnded) {
       p.catch(() => {});
-      return Promise.reject(this.readEnded);
+      return Promise.reject(aborted ? this.signal?.reason : this.readEnded);
     }
-    return until(p, this.onGone);
+    return until(p, this.onAbort, this.onGone);
   }
 
   protected async writeBytes(bytes: Uint8Array): Promise<void> {
     try {
-      await this.race(this.untilGone(this.writer.write(bytes)));
+      await this.untilAbortedOrGone(this.writer.write(bytes));
     } catch (err) {
       // The browser can fail the write before the read, or the port, says so.
       const lost = deviceLostFrom(err);
@@ -133,11 +134,22 @@ export abstract class SerialStreamSession {
   }
 }
 
-/** ``p``, or the reason ``waiting`` is told first. */
-function until<T>(p: Promise<T>, waiting: Set<(reason: unknown) => void>): Promise<T> {
+/**
+ * ``p``, or the reason one of ``waiting`` is told first. The wait is
+ * forgotten by all of them once it is over, whichever way it ended.
+ */
+function until<T>(
+  p: Promise<T>,
+  ...waiting: Set<(reason: unknown) => void>[]
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    waiting.add(reject);
-    p.then(resolve, reject).finally(() => waiting.delete(reject));
+    const forget = () => waiting.forEach((set) => set.delete(told));
+    const told = (reason: unknown) => {
+      forget();
+      reject(reason);
+    };
+    waiting.forEach((set) => set.add(told));
+    p.then(resolve, reject).finally(forget);
   });
 }
 

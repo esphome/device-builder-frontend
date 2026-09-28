@@ -132,6 +132,35 @@ describe("SerialStreamSession", () => {
     await expect(second).rejects.toMatchObject({ name: "AbortError" });
   });
 
+  it("keeps nothing of a stuck write that the abort ended", async () => {
+    const abort = new AbortController();
+    const session = new Session(stuckPort().port, abort.signal);
+    const waits = session as unknown as { onAbort: Set<unknown>; onGone: Set<unknown> };
+    const write = session.write(new Uint8Array([1]));
+    expect(waits.onGone.size).toBe(1);
+
+    abort.abort(new DOMException("stop", "AbortError"));
+
+    await expect(write).rejects.toMatchObject({ name: "AbortError" });
+    // The write itself never returns, and is not waited for by anything.
+    expect(waits.onAbort.size).toBe(0);
+    expect(waits.onGone.size).toBe(0);
+  });
+
+  it("keeps nothing of a stuck write that the device going away ended", async () => {
+    const { port } = stuckPort();
+    const session = new Session(port, new AbortController().signal);
+    const waits = session as unknown as { onAbort: Set<unknown>; onGone: Set<unknown> };
+    const write = session.write(new Uint8Array([1]));
+    expect(waits.onAbort.size).toBe(1);
+
+    port.fire();
+
+    await expect(write).rejects.toBeInstanceOf(SerialDeviceLostError);
+    expect(waits.onAbort.size).toBe(0);
+    expect(waits.onGone.size).toBe(0);
+  });
+
   it("keeps nothing of a write that is over, however many there were", async () => {
     const port = Object.assign(makeDisconnectPort(), {
       readable: new ReadableStream<Uint8Array>(),
