@@ -140,6 +140,37 @@ describe("SerialByteSession", () => {
     await expect(driveFakeTimers(read)).rejects.toMatchObject({ name: "AbortError" });
   });
 
+  it("keeps no timer and no one to wake once a wait is over", async () => {
+    const abort = new AbortController();
+    const { session, arrive } = open(abort.signal);
+    const state = session as unknown as { wake: unknown };
+
+    // Its time ran out.
+    await expect(driveFakeTimers(session.readByte(5))).resolves.toBeNull();
+    expect(state.wake).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Bytes came.
+    const read = session.readByte(1000);
+    arrive(1);
+    await expect(driveFakeTimers(read)).resolves.toBe(1);
+    expect(state.wake).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+
+    // The abort came.
+    const aborted = session.readByte(1000);
+    aborted.catch(() => {});
+    abort.abort(new DOMException("stop", "AbortError"));
+    await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+    expect(state.wake).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+
+    // It was aborted before it started.
+    await expect(session.readByte(1000)).rejects.toMatchObject({ name: "AbortError" });
+    expect(state.wake).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("keeps nothing of a read that timed out, however many there were", async () => {
     const { session } = open(new AbortController().signal);
     const waits = session as unknown as { onAbort: Set<unknown> };

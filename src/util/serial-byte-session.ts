@@ -24,19 +24,25 @@ export abstract class SerialByteSession extends SerialStreamSession {
   /** Resolves true when bytes arrived, false on timeout; throws once the port is gone. */
   protected waitForData(timeoutMs: number): Promise<boolean> {
     if (this.readEnded) return Promise.reject(this.readEnded);
-    let timer: ReturnType<typeof setTimeout>;
+    if (this.signal?.aborted) return Promise.reject(this.signal.reason);
+    // However the wait ends (bytes, its time, the abort, the port), its
+    // timer and its place as the one to wake go with it.
+    let over = (): void => {};
     const arrived = new Promise<boolean>((resolve) => {
-      timer = setTimeout(() => resolve(false), timeoutMs);
-      this.wake = () => {
+      const wake = (): void => resolve(true);
+      const timer = setTimeout(() => resolve(false), timeoutMs);
+      this.wake = wake;
+      over = () => {
         clearTimeout(timer);
-        this.wake = null;
-        resolve(true);
+        if (this.wake === wake) this.wake = null;
       };
     });
-    return this.race(arrived).then((got) => {
-      if (got && this.readEnded && this.buf.length === 0) throw this.readEnded;
-      return got;
-    });
+    return this.race(arrived)
+      .then((got) => {
+        if (got && this.readEnded && this.buf.length === 0) throw this.readEnded;
+        return got;
+      })
+      .finally(over);
   }
 
   drain(): void {
