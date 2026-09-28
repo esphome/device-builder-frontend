@@ -10,7 +10,7 @@ type FlashHooks = {
   onProgress: (p: number) => void;
   onLog?: (line: string) => void;
   onLinked?: () => void;
-  onWaitingForStrap?: () => void;
+  onWaiting?: () => void;
   signal?: AbortSignal;
 };
 vi.mock("../../../src/util/web-serial.js", () => ({
@@ -206,7 +206,7 @@ describe("rtlDoFlash", () => {
     mocks.flashAmbz2.mockImplementation(async (_p, _i, hooks) => {
       steps.push(host._step);
       hooks.onLog?.("Writing 0xC000 (1 bytes)");
-      hooks.onWaitingForStrap?.();
+      hooks.onWaiting?.();
       steps.push(host._step);
       hooks.onLinked?.();
       steps.push(host._step);

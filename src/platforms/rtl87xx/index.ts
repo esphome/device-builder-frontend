@@ -10,6 +10,7 @@ export * from "./rtl87xx-platform.js";
 export * from "./serial-logs.js";
 
 import { getErrorMessage } from "../../util/error-message.js";
+import type { LibreTinyFlashResult } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
 
@@ -54,16 +55,27 @@ export async function loadAmbz2Image(
  * same three flows. ``rebooted`` is false when the adapter has no control
  * lines and the user resets the board by hand; a failure (the engine chunk,
  * the link, the write) comes back as its detail, with the error for a flow
- * that has a line of its own for it. Never throws.
+ * that has a line of its own for it, and a failed chunk fetch names its
+ * copy. Never throws.
  */
 export async function runAmbz2(
   port: SerialPort,
   image: LibreTinyImage,
   hooks: Ambz2FlashHooks
-): Promise<{ rebooted: boolean } | { detail: string; error: unknown }> {
+): Promise<LibreTinyFlashResult> {
+  let engine: Awaited<ReturnType<typeof loadAmbz2Engine>>;
   try {
-    const { flashAmbz2 } = await loadAmbz2Engine();
-    return { rebooted: await flashAmbz2(port, image, hooks) };
+    engine = await loadAmbz2Engine();
+  } catch (err) {
+    console.error("[rtl87xx] Could not load the engine chunk:", err);
+    return {
+      detail: getErrorMessage(err),
+      error: err,
+      key: "firmware.engine_load_failed",
+    };
+  }
+  try {
+    return { rebooted: await engine.flashAmbz2(port, image, hooks) };
   } catch (err) {
     return { detail: getErrorMessage(err), error: err };
   }

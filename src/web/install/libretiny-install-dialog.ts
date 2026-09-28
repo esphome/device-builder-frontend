@@ -5,6 +5,10 @@ import { property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
 import { localizeContext } from "../../context/index.js";
+import type {
+  LibreTinyFlashHooks,
+  LibreTinyFlashResult,
+} from "../../platforms/libretiny-flash.js";
 import type { LibreTinyImage } from "../../platforms/libretiny-uf2.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getErrorMessage } from "../../util/error-message.js";
@@ -30,16 +34,6 @@ import {
 import { parseFailureCopy, Preparation, type Prepared } from "./preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
-
-/** What a flash over the serial adapter reports while it runs. */
-export interface LibreTinyFlashHooks {
-  signal?: AbortSignal;
-  onLog: (line: string) => void;
-  /** The chip did not answer by itself; the user has to get it into its downloader. */
-  onWaiting: () => void;
-  onLinked: () => void;
-  onProgress: (percent: number) => void;
-}
 
 /**
  * A chip family whose LibreTiny UF2 is flashed over its serial adapter: how
@@ -68,12 +62,12 @@ export interface LibreTinyInstall {
   load(
     bytes: Uint8Array
   ): Promise<{ image: LibreTinyImage } | { key: string; detail: string }>;
-  /** Never throws. ``rebooted`` is false when the board has to be reset by hand. */
+  /** Never throws. */
   run(
     port: SerialPort,
     image: LibreTinyImage,
     hooks: LibreTinyFlashHooks
-  ): Promise<{ rebooted: boolean } | { detail: string; error: unknown }>;
+  ): Promise<LibreTinyFlashResult>;
 }
 
 type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" | "error";
@@ -239,7 +233,7 @@ export abstract class LibreTinyInstallDialog extends LitElement {
     if (!live()) return;
     if ("detail" in result) {
       this._fail(
-        this._localize(this.install.copy.failed),
+        this._localize(result.key ?? this.install.copy.failed),
         connectFailureDetail(result.error, this._localize, () => result.detail)
       );
       return;

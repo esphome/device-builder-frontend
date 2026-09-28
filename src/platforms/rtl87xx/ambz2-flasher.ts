@@ -10,6 +10,7 @@ import { SerialStreamSession } from "../../util/serial-stream-session.js";
 import { sleep } from "../../util/sleep.js";
 import { settledWithin } from "../../util/with-deadline.js";
 import { type XmodemIo, xmodemSend } from "../../util/xmodem.js";
+import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 
 const AMBZ2_BAUD_RATE = 115200;
@@ -40,16 +41,8 @@ const REG_FLASH_MODE = 0x40000038;
 const REG_FLASH_UNLOCK = 0x40002800;
 const FLASH_UNLOCK_VALUE = 0x7effffff;
 
-export interface Ambz2FlashHooks {
-  onProgress: (percent: number) => void;
-  /** One line per step, for the install dialog's details log. */
-  onLog?: (line: string) => void;
-  /** The chip is linked and the write is starting. */
-  onLinked?: () => void;
-  /** The automatic reset produced nothing; the user has to strap the board. */
-  onWaitingForStrap?: () => void;
-  signal?: AbortSignal;
-}
+/** ``onWaiting``: the automatic reset produced nothing; the user has to strap the board. */
+export type Ambz2FlashHooks = LibreTinyFlashHooks;
 
 /** No ROM answered while the user had the chance to enter download mode. */
 export class Ambz2LinkError extends Error {
@@ -346,7 +339,7 @@ export async function flashAmbz2(
     rom = new RomLink(port, hooks.signal);
     if (!(await autoLink(port, rom, log))) {
       log("No answer from the ROM; waiting for download mode (PA00 to 3.3V, then reset)");
-      hooks.onWaitingForStrap?.();
+      hooks.onWaiting?.();
       if (!(await linkRom(rom, STRAP_WAIT_MS))) throw new Ambz2LinkError();
     }
     hooks.onLinked?.();

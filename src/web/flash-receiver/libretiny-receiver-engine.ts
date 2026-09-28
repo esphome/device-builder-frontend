@@ -46,7 +46,7 @@ export function libretinyReceiverEngine(
           if ("detail" in result) {
             hooks.onState(
               "error",
-              `${localize(copy.failed)}: ${connectFailureDetail(result.error, localize, () => result.detail)}`
+              `${localize(result.key ?? copy.failed)}: ${connectFailureDetail(result.error, localize, () => result.detail)}`
             );
             return null;
           }

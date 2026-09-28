@@ -154,13 +154,13 @@ describe("flashAmbz2", () => {
     const progress: number[] = [];
     const log: string[] = [];
     const onLinked = vi.fn();
-    const onWaitingForStrap = vi.fn();
+    const onWaiting = vi.fn();
     await driveFakeTimers(
       flashAmbz2(rom.port, image, {
         onProgress: (p) => progress.push(p),
         onLog: (line) => log.push(line),
         onLinked,
-        onWaitingForStrap,
+        onWaiting,
       })
     );
     expect(log).toEqual([
@@ -200,7 +200,7 @@ describe("flashAmbz2", () => {
     expect(rom.written.get(0xc000)![1500]).toBe(0x1a);
     expect(rom.written.get(0x4000)!.slice(0, 100)).toEqual([...image.runs[1].data]);
     expect(onLinked).toHaveBeenCalledOnce();
-    expect(onWaitingForStrap).not.toHaveBeenCalled();
+    expect(onWaiting).not.toHaveBeenCalled();
     expect(last(progress)).toBe(100);
     expect(progress.every((p, i) => i === 0 || p >= progress[i - 1])).toBe(true);
     expect(rom.raw.close).toHaveBeenCalledOnce();
@@ -208,24 +208,24 @@ describe("flashAmbz2", () => {
 
   it("retries the automatic reset when the first pulse does not reach the chip", async () => {
     const rom = fakeRom({ lostResets: 1 });
-    const onWaitingForStrap = vi.fn();
+    const onWaiting = vi.fn();
     const log: string[] = [];
     await expect(
       driveFakeTimers(
         flashAmbz2(rom.port, image, {
           onProgress: () => {},
           onLog: (l) => log.push(l),
-          onWaitingForStrap,
+          onWaiting,
         })
       )
     ).resolves.toBe(true);
-    expect(onWaitingForStrap).not.toHaveBeenCalled();
+    expect(onWaiting).not.toHaveBeenCalled();
     expect(log).toContain("No answer from the ROM; resetting again (attempt 2 of 3)");
   });
 
   it("falls back to the strap guide and keeps polling until the ROM answers", async () => {
     const rom = fakeRom({ linkAfterPings: 25, noSignals: true });
-    const onWaitingForStrap = vi.fn();
+    const onWaiting = vi.fn();
     const onLinked = vi.fn();
     const log: string[] = [];
     // No control lines: the flash lands but the board stays in the ROM, and
@@ -235,12 +235,12 @@ describe("flashAmbz2", () => {
         flashAmbz2(rom.port, image, {
           onProgress: () => {},
           onLog: (l) => log.push(l),
-          onWaitingForStrap,
+          onWaiting,
           onLinked,
         })
       )
     ).resolves.toBe(false);
-    expect(onWaitingForStrap).toHaveBeenCalledOnce();
+    expect(onWaiting).toHaveBeenCalledOnce();
     expect(onLinked).toHaveBeenCalledOnce();
     expect(rom.commands.filter((c) => c === "ping").length).toBeGreaterThan(25);
     expect(last(rom.commands)).toBe("disc");

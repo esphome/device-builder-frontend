@@ -85,7 +85,7 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   const result = await runAmbz2(port, image, {
     signal: abort.signal,
     onLog: installLog(host, stillCurrent),
-    onWaitingForStrap: () => {
+    onWaiting: () => {
       if (!stillCurrent()) return;
       host._step = "rtl-wait";
       host._statusMessage = host._localize("firmware.rtl_wait_title");
@@ -103,7 +103,7 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   if (!stillCurrent()) return;
   if ("detail" in result) {
     host._fail(
-      host._localize("firmware.rtl_flash_failed"),
+      host._localize(result.key ?? "firmware.rtl_flash_failed"),
       connectFailureDetail(result.error, host._localize, () => result.detail)
     );
     return;

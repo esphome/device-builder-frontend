@@ -24,6 +24,5 @@ export const RTL_INSTALL: LibreTinyInstall = {
   guideUrl: LIBRETINY_AMBZ2_GUIDE_URL,
   loadEngine: loadAmbz2Engine,
   load: loadAmbz2Image,
-  run: (port, image, { onWaiting, ...hooks }) =>
-    runAmbz2(port, image, { ...hooks, onWaitingForStrap: onWaiting }),
+  run: runAmbz2,
 };

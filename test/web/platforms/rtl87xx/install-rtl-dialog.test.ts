@@ -137,7 +137,7 @@ describe("esphome-web-install-rtl-dialog", () => {
   it("shows the strap guide while the engine waits for download mode", async () => {
     let strapped!: () => void;
     mocks.flashAmbz2.mockImplementation(async (_port, _image, hooks) => {
-      hooks.onWaitingForStrap?.();
+      hooks.onWaiting?.();
       await new Promise<void>((resolve) => (strapped = resolve));
       return true;
     });

@@ -5,36 +5,33 @@ const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
   openPortForLogs: vi.fn(),
 }));
-vi.mock("../../../../src/web/logs/esphome-web-logs-dialog.js", () => ({}));
-vi.mock("../../../../src/web/logs/open-port-for-logs.js", () => ({
+vi.mock("../../../src/web/logs/esphome-web-logs-dialog.js", () => ({}));
+vi.mock("../../../src/web/logs/open-port-for-logs.js", () => ({
   openPortForLogs: mocks.openPortForLogs,
 }));
-vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
+vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
 }));
 vi.mock(
-  "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js",
+  "../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js",
   () => ({})
 );
-vi.mock("../../../../src/web/dashboard/esphome-web-card.js", () => ({}));
-vi.mock("../../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
+vi.mock("../../../src/web/dashboard/esphome-web-card.js", () => ({}));
+vi.mock("../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => ({}));
 
-import { identityLocalize, mount } from "../../../_dom.js";
-import { expectTooltipsAnchored } from "../../../_tooltip-anchors.js";
-import { RTL87XX_SERIAL_LOGS } from "../../../../src/platforms/rtl87xx/serial-logs.js";
-import { ESPHomeWebRtlCard } from "../../../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js";
+import { identityLocalize, mount } from "../../_dom.js";
+import { expectTooltipsAnchored } from "../../_tooltip-anchors.js";
+import { RTL87XX_SERIAL_LOGS } from "../../../src/platforms/rtl87xx/serial-logs.js";
+import type { LibreTinyCardElement } from "../../../src/web/dashboard/libretiny-card-element.js";
+import { ESPHomeWebRtlCard } from "../../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const mountCard = () =>
-  mount(new ESPHomeWebRtlCard(), {
-    _localize: identityLocalize,
-  } as Partial<ESPHomeWebRtlCard>);
-const logsDialog = (el: ESPHomeWebRtlCard) =>
+const logsDialog = (el: LibreTinyCardElement) =>
   el.shadowRoot!.querySelector("esphome-web-logs-dialog") as any;
 
 beforeEach(() => {
@@ -45,7 +42,21 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-describe("esphome-web-rtl-card", () => {
+// What a family's card is: its element, its logs policy, its copy and its dialog.
+describe.each([
+  {
+    name: "esphome-web-rtl-card",
+    Card: ESPHomeWebRtlCard,
+    // Release the lines, reset over RTS.
+    policy: RTL87XX_SERIAL_LOGS,
+    is: { reset: "rts-pulse", releaseLinesAfterOpen: true },
+    title: "web.rtl.title",
+    dialog: "esphome-web-install-rtl-dialog",
+  },
+])("$name", ({ Card, policy, is, title, dialog: installDialog }) => {
+  const mountCard = () =>
+    mount(new Card(), { _localize: identityLocalize } as Partial<LibreTinyCardElement>);
+
   it("anchors every action tooltip to a real button id", async () => {
     expectTooltipsAnchored(await mountCard(), 1);
   });
@@ -62,18 +73,29 @@ describe("esphome-web-rtl-card", () => {
     expect(mocks.openPortForLogs).toHaveBeenCalledWith(
       port,
       expect.any(Function),
-      RTL87XX_SERIAL_LOGS
+      policy
     );
     const dialog = logsDialog(el);
     expect(dialog.port).toBe(port);
     expect(dialog.hasAttribute("open")).toBe(true);
-    // One policy for both the open and the dialog's reopens: release the
-    // lines, reset over RTS.
-    expect(dialog.policy).toBe(RTL87XX_SERIAL_LOGS);
-    expect(RTL87XX_SERIAL_LOGS).toEqual({
-      reset: "rts-pulse",
-      releaseLinesAfterOpen: true,
-    });
+    // One policy for both the open and the dialog's reopens.
+    expect(dialog.policy).toBe(policy);
+    expect(policy).toEqual(is);
+    expect(dialog.deviceLabel).toBe(title);
+  });
+
+  it("opens its own install dialog", async () => {
+    const el = await mountCard();
+    const install = () => el.shadowRoot!.querySelector(installDialog) as HTMLElement;
+    expect(install().hasAttribute("open")).toBe(false);
+
+    (el.shadowRoot!.querySelector(".action-btn--primary") as HTMLElement).click();
+    await el.updateComplete;
+    expect(install().hasAttribute("open")).toBe(true);
+
+    install().dispatchEvent(new CustomEvent("after-hide"));
+    await el.updateComplete;
+    expect(install().hasAttribute("open")).toBe(false);
   });
 
   it("stays closed when the picker is dismissed or the port will not open", async () => {
