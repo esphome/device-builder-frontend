@@ -98,6 +98,28 @@ describe.each([
     expect(install().hasAttribute("open")).toBe(false);
   });
 
+  it("opens its install dialog anew for a click that came while it was hiding", async () => {
+    const el = await mountCard();
+    const install = () => el.shadowRoot!.querySelector(installDialog) as HTMLElement;
+    const button = el.shadowRoot!.querySelector(".action-btn--primary") as HTMLElement;
+    button.click();
+    await el.updateComplete;
+
+    // The dialog is on its way out, and its after-hide comes after the click.
+    button.click();
+    install().dispatchEvent(new CustomEvent("after-hide"));
+    await el.updateComplete;
+    // Closed first, so that the dialog starts over.
+    expect(install().hasAttribute("open")).toBe(false);
+    await vi.waitFor(() => expect(install().hasAttribute("open")).toBe(true));
+
+    // The one click is used up: the next hide closes the dialog.
+    install().dispatchEvent(new CustomEvent("after-hide"));
+    await el.updateComplete;
+    await el.updateComplete;
+    expect(install().hasAttribute("open")).toBe(false);
+  });
+
   it("stays closed when the picker is dismissed or the port will not open", async () => {
     const el = await mountCard();
     mocks.requestSerialPort.mockResolvedValue(null);

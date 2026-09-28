@@ -45,6 +45,8 @@ export abstract class LibreTinyCardElement extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _installOpen = false;
+  // Install was clicked while the dialog was on its way out.
+  private _installAgain = false;
   @state() private _logsPort?: SerialPort;
   // A picker is up; a second click must not open another beside it.
   private _picking = false;
@@ -58,6 +60,23 @@ export abstract class LibreTinyCardElement extends LitElement {
     } finally {
       this._picking = false;
     }
+  }
+
+  private _openInstall(): void {
+    // Open, the dialog covers this button, so a click that finds it set
+    // came while it was hiding: its after-hide is yet to come and would
+    // close what the click asked for.
+    if (this._installOpen) this._installAgain = true;
+    this._installOpen = true;
+  }
+
+  private async _onInstallHidden(): Promise<void> {
+    this._installOpen = false;
+    if (!this._installAgain) return;
+    this._installAgain = false;
+    // The dialog is told that it closed before it opens anew.
+    await this.updateComplete;
+    this._installOpen = true;
   }
 
   private _onLogsHidden(): void {
@@ -74,10 +93,7 @@ export abstract class LibreTinyCardElement extends LitElement {
         <span slot="header">${this._localize(copy.title)}</span>
         ${this._localize(copy.hint)}
         <div class="card-actions-row" slot="actions">
-          <button
-            class="action-btn action-btn--primary"
-            @click=${() => (this._installOpen = true)}
-          >
+          <button class="action-btn action-btn--primary" @click=${this._openInstall}>
             <wa-icon library="mdi" name="upload"></wa-icon>
             ${this._localize("dashboard.install")}
           </button>
@@ -92,7 +108,7 @@ export abstract class LibreTinyCardElement extends LitElement {
           <wa-tooltip for="btn-logs">${this._localize(copy.logs)}</wa-tooltip>
         </div>
       </esphome-web-card>
-      ${this.renderInstall(this._installOpen, () => (this._installOpen = false))}
+      ${this.renderInstall(this._installOpen, () => void this._onInstallHidden())}
       <esphome-web-logs-dialog
         .port=${this._logsPort}
         ?open=${this._logsPort !== undefined}
