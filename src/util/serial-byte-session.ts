@@ -13,6 +13,9 @@ export abstract class SerialByteSession extends SerialStreamSession {
   private wake: (() => void) | null = null;
 
   protected onBytes(bytes: Uint8Array): void {
+    // An empty chunk is no arrival: woken for it, a read would find
+    // nothing and take that for its time running out.
+    if (bytes.length === 0) return;
     for (const b of bytes) this.buf.push(b);
     this.wake?.();
   }

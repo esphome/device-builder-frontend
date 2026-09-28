@@ -38,6 +38,18 @@ describe("SerialByteSession", () => {
     expect([...(await driveFakeTimers(session.readBytes(2, 100)))]).toEqual([2, 3]);
   });
 
+  it("waits on past a chunk that holds nothing", async () => {
+    const { session, arrive } = open();
+    const read = session.readByte(100);
+    await vi.advanceTimersByTimeAsync(10);
+
+    arrive();
+    await vi.advanceTimersByTimeAsync(10);
+    arrive(7);
+
+    expect(await driveFakeTimers(read)).toBe(7);
+  });
+
   it("gives nothing when no byte comes in time", async () => {
     const { session } = open();
 
