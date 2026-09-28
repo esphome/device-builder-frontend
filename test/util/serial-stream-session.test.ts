@@ -230,6 +230,37 @@ describe("SerialStreamSession", () => {
     await expect(session.wait(Promise.resolve(1))).rejects.toBe(stop);
   });
 
+  it("ends the waits that are under way when it is closed", async () => {
+    const session = new Session(stuckPort().port, new AbortController().signal);
+    const waits = session as unknown as { onAbort: Set<unknown>; onGone: Set<unknown> };
+    const never = session.wait(new Promise<void>(() => {}));
+    const write = session.write(new Uint8Array([1]));
+    never.catch(() => {});
+    write.catch(() => {});
+
+    const why = new Error("the flash failed");
+    void session.close(why);
+
+    await expect(never).rejects.toBe(why);
+    await expect(write).rejects.toBe(why);
+    expect(waits.onAbort.size).toBe(0);
+    expect(waits.onGone.size).toBe(0);
+  });
+
+  it("ends a wait that is under way when it is closed with nothing wrong", async () => {
+    const port = Object.assign(makeDisconnectPort(), {
+      readable: new ReadableStream<Uint8Array>(),
+      writable: new WritableStream<Uint8Array>(),
+    });
+    const session = new Session(port, new AbortController().signal);
+    const never = session.wait(new Promise<void>(() => {}));
+    never.catch(() => {});
+
+    await session.close();
+
+    await expect(never).rejects.toThrow("Serial session closed");
+  });
+
   it("stops listening to the abort when it is closed", async () => {
     const abort = new AbortController();
     const remove = vi.spyOn(abort.signal, "removeEventListener");

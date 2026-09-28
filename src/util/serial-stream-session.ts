@@ -130,6 +130,11 @@ export abstract class SerialStreamSession {
     this.watch.dispose();
     // A signal that outlives the session keeps nothing of it.
     this.signal?.removeEventListener("abort", this.onAborted);
+    // No wait outlives the session either: one that is still under way has
+    // nothing left to wait for.
+    const closed = failure ?? new Error("Serial session closed");
+    tell(this.onAbort, closed);
+    tell(this.onGone, closed);
     const writer =
       failure !== undefined ? this.writer.abort(failure) : this.writer.close();
     // Best effort: a dead port rejects these or never settles them.
