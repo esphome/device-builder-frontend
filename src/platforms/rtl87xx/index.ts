@@ -14,7 +14,7 @@ import type { LibreTinyImage } from "../libretiny-uf2.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
 
 export const loadAmbz2Engine = () => import("./ambz2-flasher.js");
-export const loadLibreTinyParser = () => import("./ambz2-image.js");
+export const loadAmbz2Parser = () => import("./ambz2-image.js");
 
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */
 export interface Ambz2ImageFailure {
@@ -32,9 +32,9 @@ export interface Ambz2ImageFailure {
 export async function loadAmbz2Image(
   bytes: Uint8Array
 ): Promise<{ image: LibreTinyImage } | Ambz2ImageFailure> {
-  let parser: Awaited<ReturnType<typeof loadLibreTinyParser>>;
+  let parser: Awaited<ReturnType<typeof loadAmbz2Parser>>;
   try {
-    parser = await loadLibreTinyParser();
+    parser = await loadAmbz2Parser();
   } catch (err) {
     console.error("[rtl87xx] Could not load the parser chunk:", err);
     return { key: "firmware.engine_load_failed", detail: getErrorMessage(err) };
