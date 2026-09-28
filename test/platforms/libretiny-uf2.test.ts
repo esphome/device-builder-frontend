@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BW15_PARTITIONS,
   ltHeaderTags,
-  ltPartInfo,
+  ltPartInfoTags,
   ltPartitionTable,
   ltTag,
   makeLibreTinyUf2,
@@ -24,10 +24,9 @@ import { Uf2FamilyError } from "../../src/util/uf2.js";
 
 // Scheme slots: device single, device OTA1, device OTA2, flasher single,
 // flasher OTA1, flasher OTA2.
-const OTA_INFO = ltPartInfo([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]);
-const BOOT_INFO = ltPartInfo([0, 0, 0, 0, 1, 1], ["boot"]);
-const OTA2_WIPE_INFO = ltPartInfo([0, 0, 0, 0, 2, 1], ["ota1", "ota2"]);
-const info = (bytes: Uint8Array) => [ltTag(LT_TAG.OTA_PART_INFO, bytes)];
+const OTA_INFO = ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]);
+const BOOT_INFO = ltPartInfoTags([0, 0, 0, 0, 1, 1], ["boot"]);
+const OTA2_WIPE_INFO = ltPartInfoTags([0, 0, 0, 0, 2, 1], ["ota1", "ota2"]);
 
 // As the RTL8720C flasher parses: the first OTA slot, blocks from the run.
 const parse = (bytes: Uint8Array) =>
@@ -37,10 +36,10 @@ describe("parseLibreTinyImage", () => {
   it("resolves the flasher's OTA1 runs through the file's partition table", () => {
     const uf2 = makeLibreTinyUf2({
       blocks: [
-        { addr: 0x0, fill: 0xa1, tags: info(OTA_INFO) },
+        { addr: 0x0, fill: 0xa1, tags: OTA_INFO },
         { addr: 0x100, fill: 0xa2 },
-        { addr: 0x0, fill: 0xb1, tags: info(BOOT_INFO) },
-        { addr: 0x0, fill: 0xc1, tags: info(OTA2_WIPE_INFO) },
+        { addr: 0x0, fill: 0xb1, tags: BOOT_INFO },
+        { addr: 0x0, fill: 0xc1, tags: OTA2_WIPE_INFO },
       ],
     });
     const image = parse(uf2);
@@ -58,11 +57,11 @@ describe("parseLibreTinyImage", () => {
   });
 
   it("skips groups the flasher scheme does not write (device-only data)", () => {
-    const deviceOnly = ltPartInfo([1, 0, 0, 0, 0, 0], ["ota1"]);
+    const deviceOnly = ltPartInfoTags([1, 0, 0, 0, 0, 0], ["ota1"]);
     const uf2 = makeLibreTinyUf2({
       blocks: [
-        { addr: 0x0, tags: info(deviceOnly) },
-        { addr: 0x0, fill: 0xb1, tags: info(BOOT_INFO) },
+        { addr: 0x0, tags: deviceOnly },
+        { addr: 0x0, fill: 0xb1, tags: BOOT_INFO },
       ],
     });
     expect(parse(uf2).runs.map((r) => r.address)).toEqual([0x4000]);
@@ -71,11 +70,11 @@ describe("parseLibreTinyImage", () => {
   it("overwrites a run's first pages in place when a later group restarts it (the image header)", () => {
     const uf2 = makeLibreTinyUf2({
       blocks: [
-        { addr: 0x0, fill: 0x11, tags: info(OTA_INFO) },
+        { addr: 0x0, fill: 0x11, tags: OTA_INFO },
         { addr: 0x100, fill: 0x12 },
         { addr: 0x200, fill: 0x13 },
         // The header, written last so a partial flash never looks bootable.
-        { addr: 0x0, fill: 0x21, tags: info(OTA_INFO) },
+        { addr: 0x0, fill: 0x21, tags: OTA_INFO },
         { addr: 0x100, fill: 0x22 },
       ],
     });
@@ -102,11 +101,11 @@ describe("parseLibreTinyImage", () => {
         ltTag(LT_TAG.FAL_PTABLE, table),
       ],
       blocks: [
-        { addr: 0x0, fill: 0xb1, tags: info(BOOT_INFO) },
+        { addr: 0x0, fill: 0xb1, tags: BOOT_INFO },
         { addr: 0x100, fill: 0xb2 },
         { addr: 0x200, fill: 0xb3 },
         { addr: 0x300, fill: 0xb4 },
-        { addr: 0x0, fill: 0xa1, tags: info(ltPartInfo([0, 0, 0, 0, 1, 1], ["ota1"])) },
+        { addr: 0x0, fill: 0xa1, tags: ltPartInfoTags([0, 0, 0, 0, 1, 1], ["ota1"]) },
       ],
     });
     expect(parse(uf2).runs.map((r) => [r.address, r.data.length])).toEqual([
@@ -120,7 +119,7 @@ describe("parseLibreTinyImage", () => {
     // start nor its cursor, so it opens a second run inside that block.
     const uf2 = makeLibreTinyUf2({
       blocks: [
-        { addr: 0x0, fill: 0xa1, tags: info(OTA_INFO) },
+        { addr: 0x0, fill: 0xa1, tags: OTA_INFO },
         { addr: 0x200, fill: 0xa2 },
       ],
     });
@@ -130,7 +129,7 @@ describe("parseLibreTinyImage", () => {
   it("rejects a run whose XModem padding would reach past its partition", () => {
     // boot ends at 0x8000; a page at 0x7F00 fits, but its 1 KiB block does not.
     const uf2 = makeLibreTinyUf2({
-      blocks: [{ addr: 0x7f00, tags: info(BOOT_INFO) }],
+      blocks: [{ addr: 0x7f00, tags: BOOT_INFO }],
     });
     expect(() => parse(uf2)).toThrow(/pads past 'boot'/);
   });
@@ -138,7 +137,7 @@ describe("parseLibreTinyImage", () => {
   it("refuses another Realtek family, naming it", () => {
     const uf2 = makeLibreTinyUf2({
       family: UF2_FAMILY_AMBZ,
-      blocks: [{ addr: 0, tags: info(BOOT_INFO) }],
+      blocks: [{ addr: 0, tags: BOOT_INFO }],
     });
     let err: unknown;
     try {
@@ -153,7 +152,7 @@ describe("parseLibreTinyImage", () => {
   it("refuses a file without a family id", () => {
     const uf2 = makeLibreTinyUf2({
       family: null,
-      blocks: [{ addr: 0, tags: info(BOOT_INFO) }],
+      blocks: [{ addr: 0, tags: BOOT_INFO }],
     });
     expect(() => parse(uf2)).toThrow(Uf2FamilyError);
   });
@@ -165,14 +164,14 @@ describe("parseLibreTinyImage", () => {
   ] as const)("rejects a header with %s", (_name, over, message) => {
     const uf2 = makeLibreTinyUf2({
       headerTags: ltHeaderTags(over),
-      blocks: [{ addr: 0, tags: info(BOOT_INFO) }],
+      blocks: [{ addr: 0, tags: BOOT_INFO }],
     });
     expect(() => parse(uf2)).toThrow(message);
   });
 
   it("rejects a group naming a partition the table lacks", () => {
     const uf2 = makeLibreTinyUf2({
-      blocks: [{ addr: 0, tags: info(ltPartInfo([0, 0, 0, 0, 1, 1], ["kvs"])) }],
+      blocks: [{ addr: 0, tags: ltPartInfoTags([0, 0, 0, 0, 1, 1], ["kvs"]) }],
     });
     expect(() => parse(uf2)).toThrow(/'kvs' not in table/);
   });
@@ -180,7 +179,7 @@ describe("parseLibreTinyImage", () => {
   it("rejects a page running past the end of its partition", () => {
     // boot is 0x8000 long; a 256-byte page at 0x7F80 ends 128 bytes past it.
     const uf2 = makeLibreTinyUf2({
-      blocks: [{ addr: 0x7f80, tags: info(BOOT_INFO) }],
+      blocks: [{ addr: 0x7f80, tags: BOOT_INFO }],
     });
     expect(() => parse(uf2)).toThrow(/past 'boot'/);
   });
@@ -191,29 +190,29 @@ describe("parseLibreTinyImage", () => {
   });
 
   it("rejects a file with nothing to flash", () => {
-    const deviceOnly = ltPartInfo([1, 0, 0, 0, 0, 0], ["ota1"]);
-    const uf2 = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: info(deviceOnly) }] });
+    const deviceOnly = ltPartInfoTags([1, 0, 0, 0, 0, 0], ["ota1"]);
+    const uf2 = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: deviceOnly }] });
     expect(() => parse(uf2)).toThrow(/nothing to flash/);
   });
 });
 
 describe("parseLibreTinyBlocks", () => {
   it("accepts the payload-less header block and reads its tags", () => {
-    const uf2 = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: info(BOOT_INFO) }] });
+    const uf2 = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: BOOT_INFO }] });
     const blocks = parseLibreTinyBlocks(uf2);
     expect(blocks).toHaveLength(2);
     expect(blocks[0].notMainFlash).toBe(true);
     expect(blocks[0].data.length).toBe(0);
     expect(new TextDecoder().decode(blocks[0].tags.get(LT_TAG.BOARD))).toBe("bw15");
-    expect(blocks[1].tags.get(LT_TAG.OTA_PART_INFO)).toEqual(BOOT_INFO);
+    expect(blocks[1].tags.get(LT_TAG.OTA_PART_INFO)).toEqual(BOOT_INFO[0].data);
   });
 
   it("rejects a tag with an impossible size", () => {
-    const short = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: info(BOOT_INFO) }] });
+    const short = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: BOOT_INFO }] });
     short[32] = 2; // the header block's first tag claims less than its own header
     expect(() => parseLibreTinyBlocks(short)).toThrow(/malformed tag/);
 
-    const past = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: info(BOOT_INFO) }] });
+    const past = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: BOOT_INFO }] });
     past[32] = 0xff; // a 255-byte tag, then one at 256 that runs past the region
     past[32 + 256] = 0xff;
     expect(() => parseLibreTinyBlocks(past)).toThrow(/malformed tag/);
