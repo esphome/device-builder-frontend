@@ -3,7 +3,7 @@
  * was unplugged it can stay pending, and the engine would wait on it without
  * end (#1896).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { makeDisconnectPort } from "../_web-serial.js";
 import { SerialDeviceLostError } from "../../src/util/serial-open-error.js";
@@ -215,6 +215,26 @@ describe("SerialStreamSession", () => {
 
     expect(waits.onAbort.size).toBe(0);
     expect(waits.onGone.size).toBe(0);
+  });
+
+  it("stops listening to the abort when it is closed", async () => {
+    const abort = new AbortController();
+    const remove = vi.spyOn(abort.signal, "removeEventListener");
+    const port = Object.assign(makeDisconnectPort(), {
+      readable: new ReadableStream<Uint8Array>(),
+      writable: new WritableStream<Uint8Array>(),
+    });
+    const session = new Session(port, abort.signal);
+    const waits = session as unknown as { onAbort: Set<unknown> };
+
+    await session.close();
+
+    expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+    // An abort that comes later finds no one to tell.
+    const told = vi.fn();
+    waits.onAbort.add(told);
+    abort.abort();
+    expect(told).not.toHaveBeenCalled();
   });
 
   it("stops listening to the port when it is closed", async () => {

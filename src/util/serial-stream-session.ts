@@ -38,15 +38,15 @@ export abstract class SerialStreamSession {
     }
     this.reader = port.readable.getReader();
     this.writer = port.writable.getWriter();
-    signal?.addEventListener("abort", () => tell(this.onAbort, signal.reason), {
-      once: true,
-    });
+    signal?.addEventListener("abort", this.onAborted, { once: true });
     // The read loop ends by itself when the device goes; the port's own
     // report is for a read that stays pending too.
     this.watch = watchPortLost(port);
     this.watch.gone.catch((err: Error) => this.end(err));
     void this.readLoop();
   }
+
+  private readonly onAborted = (): void => tell(this.onAbort, this.signal?.reason);
 
   /** Bytes as they arrive; runs on the read loop. */
   protected abstract onBytes(bytes: Uint8Array): void;
@@ -124,6 +124,8 @@ export abstract class SerialStreamSession {
   async close(failure?: unknown): Promise<void> {
     this.active = false;
     this.watch.dispose();
+    // A signal that outlives the session keeps nothing of it.
+    this.signal?.removeEventListener("abort", this.onAborted);
     const writer =
       failure !== undefined ? this.writer.abort(failure) : this.writer.close();
     // Best effort: a dead port rejects these or never settles them.
