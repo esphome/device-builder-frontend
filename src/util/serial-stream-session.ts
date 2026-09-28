@@ -38,7 +38,11 @@ export abstract class SerialStreamSession {
     }
     this.reader = port.readable.getReader();
     this.writer = port.writable.getWriter();
-    signal?.addEventListener("abort", this.onAborted, { once: true });
+    // A signal that is aborted already has no abort left to tell of; every
+    // wait finds that by itself.
+    if (signal && !signal.aborted) {
+      signal.addEventListener("abort", this.onAborted, { once: true });
+    }
     // The read loop ends by itself when the device goes; the port's own
     // report is for a read that stays pending too.
     this.watch = watchPortLost(port);

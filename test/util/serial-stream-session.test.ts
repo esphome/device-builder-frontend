@@ -217,6 +217,19 @@ describe("SerialStreamSession", () => {
     expect(waits.onGone.size).toBe(0);
   });
 
+  it("does not listen to a signal that is aborted already, and ends every wait on it", async () => {
+    const abort = new AbortController();
+    const stop = new DOMException("stop", "AbortError");
+    abort.abort(stop);
+    const add = vi.spyOn(abort.signal, "addEventListener");
+
+    const session = new Session(stuckPort().port, abort.signal);
+
+    expect(add).not.toHaveBeenCalled();
+    await expect(session.write(new Uint8Array([1]))).rejects.toBe(stop);
+    await expect(session.wait(Promise.resolve(1))).rejects.toBe(stop);
+  });
+
   it("stops listening to the abort when it is closed", async () => {
     const abort = new AbortController();
     const remove = vi.spyOn(abort.signal, "removeEventListener");
