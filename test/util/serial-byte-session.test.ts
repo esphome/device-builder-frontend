@@ -140,6 +140,20 @@ describe("SerialByteSession", () => {
     await expect(driveFakeTimers(read)).rejects.toMatchObject({ name: "AbortError" });
   });
 
+  it("keeps nothing of a read that timed out, however many there were", async () => {
+    const { session } = open(new AbortController().signal);
+    const waits = session as unknown as { onAbort: Set<unknown> };
+
+    const pending = session.readByte(5);
+    expect(waits.onAbort.size).toBe(1);
+    await expect(driveFakeTimers(pending)).resolves.toBeNull();
+    for (let i = 0; i < 50; i++) {
+      await expect(driveFakeTimers(session.readByte(5))).resolves.toBeNull();
+    }
+
+    expect(waits.onAbort.size).toBe(0);
+  });
+
   it("tells every wait of the abort", async () => {
     const abort = new AbortController();
     const { session, arrive } = open(abort.signal);

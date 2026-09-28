@@ -1,8 +1,8 @@
 /**
  * The transport half of a Web Serial protocol session: the reader and writer
- * locks, a background read loop feeding ``onBytes``, an abort promise raced
- * against every wait (an in-flight stream read or write cannot be
- * interrupted, so the abort has to win the race instead), and a bounded
+ * locks, a background read loop feeding ``onBytes``, the abort told to every
+ * wait that is under way (an in-flight stream read or write cannot be
+ * interrupted, so the wait ends with the abort instead), and a bounded
  * teardown. Engines extend it with their framing.
  *
  * A write is also raced against the device going away: written to a device
