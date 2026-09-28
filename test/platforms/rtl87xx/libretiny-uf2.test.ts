@@ -26,7 +26,12 @@ const BOOT_INFO = ltPartInfo([0, 0, 0, 0, 1, 1], ["boot"]);
 const OTA2_WIPE_INFO = ltPartInfo([0, 0, 0, 0, 2, 1], ["ota1", "ota2"]);
 const info = (bytes: Uint8Array) => [ltTag(LT_TAG.OTA_PART_INFO, bytes)];
 
-const parse = (bytes: Uint8Array) => parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2]);
+const parse = (bytes: Uint8Array) =>
+  parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2], {
+    scheme: "flasher-ota1",
+    blockSize: 1024,
+    blocksFrom: "run",
+  });
 
 describe("parseLibreTinyImage", () => {
   it("resolves the flasher's OTA1 runs through the file's partition table", () => {
