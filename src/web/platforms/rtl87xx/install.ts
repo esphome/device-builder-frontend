@@ -1,0 +1,28 @@
+/** The RTL8720C (AmebaZ2) as web.esphome.io installs it: through the ROM downloader. */
+import { LIBRETINY_AMBZ2_GUIDE_URL } from "../../../common/docs.js";
+import { loadAmbz2Image, runAmbz2 } from "../../../platforms/rtl87xx/index.js";
+import type { UartInstall } from "../../install/uart-install-dialog.js";
+
+export const RTL_INSTALL: UartInstall = {
+  copy: {
+    title: "web.rtl.install_title",
+    intro: "web.rtl.install_intro",
+    fileLabel: "web.rtl.install_file_label",
+    filePlaceholder: "web.rtl.install_file_placeholder",
+    howtoTitle: "web.rtl.install_howto_title",
+    howtoLast: "web.rtl.install_howto_3",
+    connecting: "firmware.rtl_connecting",
+    connectDetail: "firmware.rtl_connect_desc",
+    waiting: "firmware.rtl_wait_title",
+    waitDetail: "firmware.rtl_wait_desc",
+    guideLink: "firmware.rtl_guide_link",
+    done: "web.rtl.install_done",
+    doneByHand: "firmware.rtl_done_manual_reset",
+    failed: "firmware.rtl_flash_failed",
+    badFile: "firmware.rtl_bad_uf2",
+  },
+  guideUrl: LIBRETINY_AMBZ2_GUIDE_URL,
+  load: loadAmbz2Image,
+  run: (port, image, { onWaiting, ...hooks }) =>
+    runAmbz2(port, image, { ...hooks, onWaitingForStrap: onWaiting }),
+};

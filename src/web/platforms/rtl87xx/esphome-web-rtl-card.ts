@@ -1,98 +1,30 @@
-import { consume } from "@lit/context";
-import { mdiTextBoxOutline, mdiUpload } from "@mdi/js";
-import { html, LitElement } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { html } from "lit";
+import { customElement } from "lit/decorators.js";
 
-import type { LocalizeFunc } from "../../../common/localize.js";
-import { localizeContext } from "../../../context/index.js";
 import { RTL87XX_SERIAL_LOGS } from "../../../platforms/rtl87xx/index.js";
-import { actionBtnStyles } from "../../../styles/action-buttons.js";
-import { espHomeStyles } from "../../../styles/shared.js";
+import { type UartCard, UartCardElement } from "../../dashboard/uart-card.js";
 import "./esphome-web-install-rtl-dialog.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
-import { cardActionsRowStyles } from "../../dashboard/card-actions-row.js";
-import "../../logs/esphome-web-logs-dialog.js";
-import { pickPortForLogs } from "../../util/pick-port-for-logs.js";
-import "../../dashboard/esphome-web-card.js";
 
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
+const RTL_CARD: UartCard = {
+  copy: {
+    title: "web.rtl.title",
+    hint: "web.rtl.connect_hint",
+    logs: "web.rtl.logs",
+  },
+  logs: RTL87XX_SERIAL_LOGS,
+};
 
-registerMdiIcons({ upload: mdiUpload, "text-box-outline": mdiTextBoxOutline });
-
-/**
- * RTL8720C (AmebaZ2) card: no connected state; each install picks its own
- * port and flashes through the ROM downloader, and each logs session picks
- * its own port.
- */
+/** RTL8720C (AmebaZ2) card: install through the ROM downloader, and logs. */
 @customElement("esphome-web-rtl-card")
-export class ESPHomeWebRtlCard extends LitElement {
-  @consume({ context: localizeContext, subscribe: true })
-  @state()
-  private _localize: LocalizeFunc = (key) => key;
+export class ESPHomeWebRtlCard extends UartCardElement {
+  protected readonly card = RTL_CARD;
 
-  @state() private _installOpen = false;
-  @state() private _logsPort?: SerialPort;
-  // A picker is up; a second click must not open another beside it.
-  private _picking = false;
-
-  private async _showLogs(): Promise<void> {
-    if (this._picking || this._logsPort) return;
-    this._picking = true;
-    try {
-      const port = await pickPortForLogs(this, this._localize, RTL87XX_SERIAL_LOGS);
-      if (port) this._logsPort = port;
-    } finally {
-      this._picking = false;
-    }
+  protected renderInstall(open: boolean, onHide: () => void) {
+    return html`<esphome-web-install-rtl-dialog
+      ?open=${open}
+      @after-hide=${onHide}
+    ></esphome-web-install-rtl-dialog>`;
   }
-
-  private _onLogsHidden(): void {
-    this._logsPort = undefined;
-  }
-
-  protected render() {
-    return html`
-      <esphome-web-card
-        status=${this._localize("web.status.not_connected")}
-        variant="neutral"
-      >
-        <span slot="header">${this._localize("web.rtl.title")}</span>
-        ${this._localize("web.rtl.connect_hint")}
-        <div class="card-actions-row" slot="actions">
-          <button
-            class="action-btn action-btn--primary"
-            @click=${() => (this._installOpen = true)}
-          >
-            <wa-icon library="mdi" name="upload"></wa-icon>
-            ${this._localize("dashboard.install")}
-          </button>
-          <button
-            id="btn-logs"
-            class="action-btn action-btn--ghost action-btn--tile"
-            aria-label=${this._localize("web.rtl.logs")}
-            @click=${this._showLogs}
-          >
-            <wa-icon library="mdi" name="text-box-outline"></wa-icon>
-          </button>
-          <wa-tooltip for="btn-logs">${this._localize("web.rtl.logs")}</wa-tooltip>
-        </div>
-      </esphome-web-card>
-      <esphome-web-install-rtl-dialog
-        ?open=${this._installOpen}
-        @after-hide=${() => (this._installOpen = false)}
-      ></esphome-web-install-rtl-dialog>
-      <esphome-web-logs-dialog
-        .port=${this._logsPort}
-        ?open=${this._logsPort !== undefined}
-        .deviceLabel=${this._localize("web.rtl.title")}
-        .policy=${RTL87XX_SERIAL_LOGS}
-        @after-hide=${this._onLogsHidden}
-      ></esphome-web-logs-dialog>
-    `;
-  }
-
-  static styles = [espHomeStyles, actionBtnStyles, cardActionsRowStyles];
 }
 
 declare global {
