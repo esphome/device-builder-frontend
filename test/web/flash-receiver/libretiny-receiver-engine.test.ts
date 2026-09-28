@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const rtl = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
+const bk = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
 const port = vi.hoisted(() => ({}) as SerialPort);
 // The picker is the helper's own; here the run gets a port as if picked.
 vi.mock("../../../src/web/flash-receiver/serial-run.js", () => ({
@@ -16,10 +17,20 @@ vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
   loadAmbz2Image: rtl.load,
 }));
 
+vi.mock("../../../src/platforms/bk72xx/index.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  loadBekenEngine: async () => ({}),
+  runBeken: bk.run,
+  loadBekenImage: bk.load,
+}));
+
 import { recordingHooks as hooks } from "../_receiver-hooks.js";
+import { BK72XX_SERIAL_LOGS } from "../../../src/platforms/bk72xx/serial-logs.js";
 import { RTL87XX_SERIAL_LOGS } from "../../../src/platforms/rtl87xx/serial-logs.js";
 import { libretinyReceiverEngine } from "../../../src/web/flash-receiver/libretiny-receiver-engine.js";
 import type { ReceiverRun } from "../../../src/web/flash-receiver/receiver-engine.js";
+import { BK_INSTALL } from "../../../src/web/platforms/bk72xx/install.js";
+import { bkUartReceiverEngine } from "../../../src/web/platforms/bk72xx/receiver-engine.js";
 import { RTL_INSTALL } from "../../../src/web/platforms/rtl87xx/install.js";
 import { rtlAmbz2ReceiverEngine } from "../../../src/web/platforms/rtl87xx/receiver-engine.js";
 
@@ -42,6 +53,16 @@ describe.each([
     keys: "firmware.rtl_",
     logs: RTL87XX_SERIAL_LOGS,
     result: { rebooted: true },
+  },
+  {
+    name: "bkUartReceiverEngine",
+    engine: bkUartReceiverEngine,
+    install: BK_INSTALL,
+    mocks: bk,
+    keys: "firmware.bk_",
+    logs: BK72XX_SERIAL_LOGS,
+    // The flash went over UART1; the logs are on another pad.
+    result: { logsElsewhere: true, note: { message: "web.bk.logs_elsewhere" } },
   },
 ])("$name", ({ engine, install, mocks, keys, logs, result }) => {
   async function prepared(): Promise<ReceiverRun> {
@@ -152,6 +173,24 @@ describe("rtlAmbz2ReceiverEngine", () => {
   });
 });
 
+describe("bkUartReceiverEngine", () => {
+  it("names a failure by the copy of its own, as the dialog does", async () => {
+    bk.load.mockResolvedValue({ image });
+    const plan = await bkUartReceiverEngine.prepare(uf2, false, localize);
+    bk.run.mockResolvedValue({
+      detail: "built for a BK7238",
+      key: "firmware.bk_wrong_chip",
+    });
+    const h = hooks();
+
+    expect("run" in plan && (await plan.run(h))).toBeNull();
+
+    expect(h.states[h.states.length - 1]).toBe(
+      "error:firmware.bk_wrong_chip: built for a BK7238"
+    );
+  });
+});
+
 describe("libretinyReceiverEngine", () => {
   // A family whose board can be left in its downloader and has no line for it.
   const bare = libretinyReceiverEngine(
@@ -170,6 +209,24 @@ describe("libretinyReceiverEngine", () => {
     expect("run" in plan && (await plan.run(hooks()))).toEqual({
       rebooted: false,
       note: { message: "web.install.done_reset_by_hand" },
+    });
+  });
+
+  it("asks for the reset that is left before it says where the logs are", async () => {
+    const elsewhere = libretinyReceiverEngine(
+      {
+        ...RTL_INSTALL,
+        copy: { ...RTL_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
+        load: async () => ({ image }),
+        run: async () => ({ rebooted: false }),
+      },
+      RTL87XX_SERIAL_LOGS
+    );
+    const plan = await elsewhere.prepare(uf2, false, localize);
+
+    expect("run" in plan && (await plan.run(hooks()))).toEqual({
+      logsElsewhere: true,
+      note: { message: "firmware.rtl_done_manual_reset web.bk.logs_elsewhere" },
     });
   });
 });

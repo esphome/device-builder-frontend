@@ -293,6 +293,7 @@ describe("openFlasher", () => {
   it.each([
     ["a Pico UF2", "rp2-picoboot"],
     ["an nRF52 DFU package", "nrf-dfu"],
+    ["a BK72xx UF2", "bk-uart"],
   ] as const)(
     "hands %s to a receiver that lists its flasher, and to no other",
     (_n, id) => {

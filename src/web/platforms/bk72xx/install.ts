@@ -18,6 +18,7 @@ export const BK_INSTALL: LibreTinyInstall = {
     guideLink: "firmware.bk_guide_link",
     // Says where the logs are: the flash goes over UART1, the logs come from UART2.
     done: "firmware.bk_done",
+    logsElsewhere: "web.bk.logs_elsewhere",
     failed: "firmware.bk_flash_failed",
     badFile: "firmware.bk_bad_uf2",
   },

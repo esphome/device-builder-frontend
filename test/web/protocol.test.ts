@@ -47,6 +47,7 @@ describe("isHandoffFlasher", () => {
     expect(isHandoffFlasher("rtl-ambz2")).toBe(true);
     expect(isHandoffFlasher("rp2-picoboot")).toBe(true);
     expect(isHandoffFlasher("nrf-dfu")).toBe(true);
+    expect(isHandoffFlasher("bk-uart")).toBe(true);
     expect(isHandoffFlasher("rtl-ambz1")).toBe(false);
     expect(isHandoffFlasher("toString")).toBe(false);
     expect(isHandoffFlasher(undefined)).toBe(false);

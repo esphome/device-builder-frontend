@@ -140,6 +140,20 @@ describe("handOffToFlasher", () => {
     });
   });
 
+  it.each(["bk7231", "bk7238", "bk7251"])(
+    "hands the UF2 of a %s to the Beken flasher, without erase",
+    (mcu) => {
+      const host = makeHost();
+      host._device.target_platform = "bk72xx";
+      host._device.mcu = mcu;
+      handOffToFlasher(asHost(host));
+      expect(openFlasher.mock.calls[0][3]).toMatchObject({
+        flasher: "bk-uart",
+        erase: false,
+      });
+    }
+  );
+
   it("reads the flasher from the device's platform, and names an outdated receiver", () => {
     const host = makeHost();
     host._device.target_platform = "rtl87xx";

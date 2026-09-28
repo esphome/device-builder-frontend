@@ -2096,7 +2096,8 @@
       "connect_hint": "Install the UF2 of your ESPHome build on your Beken BK72xx device through a USB serial adapter, or read its logs. To install, wire adapter RX to TX1 and adapter TX to RX1; for the logs, move adapter RX to TX2.",
       "logs": "Serial logs",
       "install_title": "Install firmware on a BK72xx",
-      "install_intro": "There is no ready-made ESPHome Web firmware for the BK72xx yet. Build your device in the ESPHome Device Builder and install its UF2 from here."
+      "install_intro": "There is no ready-made ESPHome Web firmware for the BK72xx yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
+      "logs_elsewhere": "To read the logs, move adapter RX to the pad marked TX2, unless your configuration puts the logs elsewhere."
     },
     "rtl": {
       "title": "RTL8720C Device",

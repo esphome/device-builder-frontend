@@ -147,6 +147,18 @@ describe("startBekenInstall", () => {
     ).toBeLessThan(seams.loadBekenImage.mock.invocationCallOrder[0]);
   });
 
+  it("names an empty build by the flow that asked for it", async () => {
+    const inApp = makeHost({ binaries: [] });
+    await startBekenInstall(asHost(inApp));
+    expect(inApp._statusMessage).toBe("firmware.no_binaries");
+
+    // The hand-off to web.esphome.io reads through the same download.
+    const handoff = makeHost({ binaries: [] });
+    Object.assign(handoff, { _installer: "web-flash" });
+    await startBekenInstall(asHost(handoff));
+    expect(handoff._statusMessage).toBe("firmware.no_flashable_binary");
+  });
+
   it("fails when the build produced no UF2", async () => {
     const host = makeHost({ binaries: [bin("firmware.bin", "bin")] });
 
@@ -370,6 +382,24 @@ describe("bekenDoFlash", () => {
 });
 
 describe("bekenInstall", () => {
+  it("hands its UF2 to web.esphome.io's Beken flasher, checked as the in-app flow checks it", async () => {
+    const handoff = bekenInstall.handoff!;
+
+    expect(handoff).toMatchObject({
+      flasher: "bk-uart",
+      erase: false,
+      noArtifactKey: "firmware.no_uf2",
+    });
+    expect(
+      handoff.pick([bin("firmware.bin", "bin"), bin("firmware.uf2", "uf2")], "bk72xx")
+        ?.file
+    ).toBe("firmware.uf2");
+    expect(await handoff.check!(new Uint8Array(uf2()))).toBeNull();
+    expect(await handoff.check!(new Uint8Array(uf2(AMBZ2)))).toMatchObject({
+      key: "firmware.bk_wrong_family",
+    });
+  });
+
   it("goes back to the ready step as the Retry target", () => {
     const host = readyHost();
     host._step = "error";

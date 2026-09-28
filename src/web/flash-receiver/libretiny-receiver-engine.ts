@@ -55,6 +55,16 @@ export function libretinyReceiverEngine(
           const byHand = result.rebooted
             ? undefined
             : (copy.doneByHand ?? "web.install.done_reset_by_hand");
+          if (copy.logsElsewhere) {
+            // A reset that is left to do comes before where the logs are.
+            const elsewhere = localize(copy.logsElsewhere);
+            return {
+              logsElsewhere: true,
+              note: {
+                message: byHand ? `${localize(byHand)} ${elsewhere}` : elsewhere,
+              },
+            };
+          }
           return {
             rebooted: result.rebooted,
             note: byHand ? { message: localize(byHand) } : undefined,

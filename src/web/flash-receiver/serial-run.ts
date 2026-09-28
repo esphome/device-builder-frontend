@@ -5,12 +5,16 @@ import type { ReceiverNote, ReceiverRun, ReceiverRunHooks } from "./receiver-eng
 
 /**
  * Flash over ``port`` (closed, authorized). Null when it failed; the hooks
- * carried the detail. Never throws.
+ * carried the detail. ``logsElsewhere`` when the board does not log on the
+ * port it was flashed over; otherwise whether it is booting, for the logs
+ * that follow. Never throws.
  */
 export type SerialReceiverRun = (
   port: SerialPort,
   hooks: ReceiverRunHooks
-) => Promise<{ rebooted: boolean; note?: ReceiverNote } | null>;
+) => Promise<
+  ({ note?: ReceiverNote } & ({ rebooted: boolean } | { logsElsewhere: true })) | null
+>;
 
 /**
  * The serial port picker, for a run to open first: nothing is awaited before
@@ -31,7 +35,8 @@ export async function pickSerialPort(
 
 /**
  * The run of a flasher that writes over one serial port: the picker, then
- * ``run`` on what it picked, whose port the logs follow.
+ * ``run`` on what it picked, whose port the logs follow unless the board
+ * logs elsewhere.
  */
 export function serialRun(localize: LocalizeFunc, run: SerialReceiverRun): ReceiverRun {
   return async (hooks) => {
@@ -48,11 +53,11 @@ export function serialRun(localize: LocalizeFunc, run: SerialReceiverRun): Recei
     }
 
     const result = await run(port, hooks);
-    return (
-      result && {
-        note: result.note,
-        logs: { port, knownPorts, rebooted: result.rebooted },
-      }
-    );
+    if (!result) return null;
+    if ("logsElsewhere" in result) return { note: result.note };
+    return {
+      note: result.note,
+      logs: { port, knownPorts, rebooted: result.rebooted },
+    };
   };
 }

@@ -51,6 +51,11 @@ export interface LibreTinyInstall {
     readonly done: string;
     /** The flash went through and the board has to be reset by hand; the dialog has a line for a family without its own. */
     readonly doneByHand?: string;
+    /**
+     * The board logs on another port than the one it is flashed over, and
+     * this says which; the flash receiver opens no logs then.
+     */
+    readonly logsElsewhere?: string;
     readonly failed: string;
     readonly badFile: string;
   };
