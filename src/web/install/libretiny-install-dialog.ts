@@ -49,18 +49,14 @@ export interface LibreTinyInstall {
   readonly copy: {
     readonly title: string;
     readonly intro: string;
-    readonly fileLabel: string;
-    readonly filePlaceholder: string;
-    readonly howtoTitle: string;
-    readonly howtoLast: string;
     readonly connecting: string;
     readonly connectDetail: string;
     readonly waiting: string;
     readonly waitDetail: string;
     readonly guideLink: string;
     readonly done: string;
-    /** The flash went through and the board has to be reset by hand. */
-    readonly doneByHand: string;
+    /** The flash went through and the board has to be reset by hand, where that can be. */
+    readonly doneByHand?: string;
     readonly failed: string;
     readonly badFile: string;
   };
@@ -264,7 +260,7 @@ export abstract class LibreTinyInstallDialog extends LitElement {
       case "flashing":
         return this._localize("firmware.status_flashing");
       case "success":
-        return this._localize(this._manualReset ? copy.doneByHand : copy.done);
+        return this._localize((this._manualReset && copy.doneByHand) || copy.done);
       default:
         return this._errorTitle;
     }
@@ -288,10 +284,10 @@ export abstract class LibreTinyInstallDialog extends LitElement {
     return html`
       <p>${this._localize(copy.intro)}</p>
       ${renderFilePicker({
-        label: this._localize(copy.fileLabel),
+        label: this._localize("web.install.uf2_file_label"),
         accept: ".uf2",
         file: this._file,
-        placeholder: this._localize(copy.filePlaceholder),
+        placeholder: this._localize("web.install.uf2_file_placeholder"),
         onChange: this._onFileChange,
         preparing:
           this._image.state.kind === "pending"
@@ -299,11 +295,11 @@ export abstract class LibreTinyInstallDialog extends LitElement {
             : undefined,
         error: this._fileError,
       })}
-      <p>${this._localize(copy.howtoTitle)}</p>
+      <p>${this._localize("web.install.uf2_howto_title")}</p>
       <ol>
         <li>${this._localize("web.install.upload_howto_1")}</li>
         <li>${this._localize("web.install.upload_howto_2")}</li>
-        <li>${this._localize(copy.howtoLast)}</li>
+        <li>${this._localize("web.install.uf2_howto_3")}</li>
       </ol>
     `;
   }

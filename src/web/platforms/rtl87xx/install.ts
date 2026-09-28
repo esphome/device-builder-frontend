@@ -7,10 +7,6 @@ export const RTL_INSTALL: LibreTinyInstall = {
   copy: {
     title: "web.rtl.install_title",
     intro: "web.rtl.install_intro",
-    fileLabel: "web.rtl.install_file_label",
-    filePlaceholder: "web.rtl.install_file_placeholder",
-    howtoTitle: "web.rtl.install_howto_title",
-    howtoLast: "web.rtl.install_howto_3",
     connecting: "firmware.rtl_connecting",
     connectDetail: "firmware.rtl_connect_desc",
     waiting: "firmware.rtl_wait_title",

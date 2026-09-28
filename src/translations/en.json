@@ -2060,6 +2060,10 @@
       "upload_howto_1": "Open your ESPHome Device Builder and find your device.",
       "upload_howto_2": "From the device menu, choose Install, then Manual download.",
       "upload_howto_3": "Choose the Factory format and save the .bin file.",
+      "uf2_file_label": "LibreTiny UF2 (.uf2)",
+      "uf2_file_placeholder": "No file selected",
+      "uf2_howto_title": "To get the UF2 of your ESPHome project:",
+      "uf2_howto_3": "Choose the UF2 format and save the .uf2 file.",
       "adoptable_title": "Prepare your device for first use",
       "adoptable_intro": "This installs a basic version of ESPHome on your device and helps you connect it to your network.",
       "adoptable_detail": "Once installed, your ESPHome Device Builder shows the device and lets you take control, creating a local configuration you can manage over the network.",
@@ -2075,10 +2079,6 @@
       "logs": "Serial logs",
       "install_title": "Install firmware on an RTL8720C",
       "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8720C yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
-      "install_file_label": "LibreTiny UF2 (.uf2)",
-      "install_file_placeholder": "No file selected",
-      "install_howto_title": "To get the UF2 of your ESPHome project:",
-      "install_howto_3": "Choose the UF2 format and save the .uf2 file.",
       "install_done": "Installation complete. The board is starting the firmware."
     },
     "nrf": {

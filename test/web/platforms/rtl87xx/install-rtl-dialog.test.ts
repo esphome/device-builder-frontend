@@ -144,7 +144,7 @@ describe("esphome-web-install-rtl-dialog", () => {
     // Still on the setup step, with the file refused and nothing to install.
     expect(card(el)).toBeNull();
     expect(pickerText(el)).toEqual({
-      name: "web.rtl.install_file_placeholder",
+      name: "web.install.uf2_file_placeholder",
       status: "",
       error: "firmware.rtl_wrong_family: family 0x22e0d6fc",
     });
