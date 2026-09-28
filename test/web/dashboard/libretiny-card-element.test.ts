@@ -17,6 +17,7 @@ vi.mock(
   "../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js",
   () => ({})
 );
+vi.mock("../../../src/web/platforms/bk72xx/esphome-web-install-bk-dialog.js", () => ({}));
 vi.mock("../../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
@@ -25,8 +26,10 @@ vi.mock("@home-assistant/webawesome/dist/components/tooltip/tooltip.js", () => (
 
 import { identityLocalize, mount } from "../../_dom.js";
 import { expectTooltipsAnchored } from "../../_tooltip-anchors.js";
+import { BK72XX_SERIAL_LOGS } from "../../../src/platforms/bk72xx/serial-logs.js";
 import { RTL87XX_SERIAL_LOGS } from "../../../src/platforms/rtl87xx/serial-logs.js";
 import type { LibreTinyCardElement } from "../../../src/web/dashboard/libretiny-card-element.js";
+import { ESPHomeWebBkCard } from "../../../src/web/platforms/bk72xx/esphome-web-bk-card.js";
 import { ESPHomeWebRtlCard } from "../../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -52,6 +55,15 @@ describe.each([
     is: { reset: "rts-pulse", releaseLinesAfterOpen: true },
     title: "web.rtl.title",
     dialog: "esphome-web-install-rtl-dialog",
+  },
+  {
+    name: "esphome-web-bk-card",
+    Card: ESPHomeWebBkCard,
+    // Release the lines, and no reset over a line that reaches nothing.
+    policy: BK72XX_SERIAL_LOGS,
+    is: { releaseLinesAfterOpen: true },
+    title: "web.bk.title",
+    dialog: "esphome-web-install-bk-dialog",
   },
 ])("$name", ({ Card, policy, is, title, dialog: installDialog }) => {
   const mountCard = () =>

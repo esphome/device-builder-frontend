@@ -24,6 +24,11 @@ describe("readMode", () => {
     expect(readMode("?foo=bar&nrf")).toBe("nrf");
   });
 
+  it("returns bk when the bk param is present", () => {
+    expect(readMode("?bk")).toBe("bk");
+    expect(modeUrl("bk", new URL("https://web.esphome.io/"))).toBe("/?bk");
+  });
+
   it("returns rtl when the rtl param is present", () => {
     expect(readMode("?rtl")).toBe("rtl");
     expect(modeUrl("rtl", new URL("https://web.esphome.io/"))).toBe("/?rtl");

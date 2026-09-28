@@ -5,13 +5,20 @@
  * ``public/web/static/logo/``, its copy, and one entry here.
  */
 import { portFamily } from "../../platforms/port-family.js";
+import { bkWebMode } from "./bk72xx/mode.js";
 import { espWebMode } from "./esp/mode.js";
 import { nrfWebMode } from "./nrf52/mode.js";
 import { picoWebMode } from "./rp2/mode.js";
 import { rtlWebMode } from "./rtl87xx/mode.js";
 import type { WebPlatform } from "./web-platform.js";
 
-export const WEB_PLATFORMS = [espWebMode, picoWebMode, nrfWebMode, rtlWebMode] as const;
+export const WEB_PLATFORMS = [
+  espWebMode,
+  picoWebMode,
+  nrfWebMode,
+  rtlWebMode,
+  bkWebMode,
+] as const;
 
 export type WebMode = (typeof WEB_PLATFORMS)[number]["mode"];
 

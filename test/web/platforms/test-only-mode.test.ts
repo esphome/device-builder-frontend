@@ -12,6 +12,7 @@ vi.mock("../../../src/web/platforms/esp/esphome-web-esp-connect-card.js", () => 
 vi.mock("../../../src/web/platforms/rp2/esphome-web-pico-connect-card.js", () => ({}));
 vi.mock("../../../src/web/platforms/nrf52/esphome-web-nrf-card.js", () => ({}));
 vi.mock("../../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js", () => ({}));
+vi.mock("../../../src/web/platforms/bk72xx/esphome-web-bk-card.js", () => ({}));
 vi.mock("../../../src/web/dashboard/esphome-web-unsupported-card.js", () => ({}));
 vi.mock("../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));

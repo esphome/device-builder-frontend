@@ -43,6 +43,13 @@ hardware classes behave differently:
   asserts both lines) holds the chip in reset. Every logs open releases
   both lines right away (`RTL87XX_SERIAL_LOGS` in `src/platforms/rtl87xx/serial-logs.ts`); the install
   dialog's engine drives them itself and falls back to the manual strap.
+- **BK72xx modules** (CB3S, T1 and the like, on a plain adapter): installing
+  goes over UART1 (TX1, RX1) and the logs come from UART2 unless the
+  configuration moves them. There is no strap: a chip that runs ESPHome
+  reboots into its downloader when it sees the link packet, another one has
+  to be reset while the engine polls. Every logs open releases both lines
+  (`BK72XX_SERIAL_LOGS` in `src/platforms/bk72xx/serial-logs.ts`), and no
+  Reset device is offered.
 - **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
   dialog's Reset Device instead touches the port at 1200 baud into
   BOOTSEL and reboots it over WebUSB (`RP2_SERIAL_LOGS` in
@@ -56,7 +63,7 @@ hardware classes behave differently:
 | Path                                   | What                                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                                                  |
-| `web-mode.ts`, `header/`               | The mode switch (ESP, `?pico`, `?nrf`, `?rtl`) and the header, both read from the registry |
+| `web-mode.ts`, `header/`               | The modes (ESP, `?pico`, `?nrf`, `?rtl`, `?bk`) and the header, read from the registry     |
 | `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                      |
 | `platforms/<name>/`                    | Each family's `mode.ts`, cards and install dialogs; `platforms/registry.ts` lists them     |
 | `install/`                             | Pieces the install dialogs share: the progress card and the file picker                    |
