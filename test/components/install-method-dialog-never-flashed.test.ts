@@ -101,9 +101,16 @@ describe("install-method-dialog never-flashed ordering", () => {
   });
 
   it("promotes server-serial when the platform has no browser row", async () => {
-    const d = await mount({ neverFlashed: true, platform: "bk72xx" });
+    const d = await mount({ neverFlashed: true, platform: "ln882x" });
     const order = rowIconOrder(d);
     expect(order[0]).toBe("serial-port");
+    expect(order[order.length - 1]).toBe("wifi");
+  });
+
+  it("promotes the BK72xx row for a never-flashed bk72xx", async () => {
+    const d = await mount({ neverFlashed: true, platform: "bk72xx", mcu: "bk7238" });
+    const order = rowIconOrder(d);
+    expect(order[0]).toBe("chip");
     expect(order[order.length - 1]).toBe("wifi");
   });
 

@@ -42,6 +42,7 @@ const SAMPLE_PLATFORM: Record<string, string> = {
   nrf52: "nrf52",
   rp2: "rp2040",
   rtl87xx: "rtl87xx",
+  bk72xx: "bk72xx",
 };
 
 // The chips of each split platform its flasher writes, and one it does not
@@ -49,6 +50,8 @@ const SAMPLE_PLATFORM: Record<string, string> = {
 const CHIPS: Record<string, { takes: string[]; refuses?: string }> = {
   rp2: { takes: ["rp2040", "rp2350"] },
   rtl87xx: { takes: ["rtl8720c"], refuses: "rtl8710b" },
+  // Both protocols of the platform are written by the one flasher.
+  bk72xx: { takes: ["bk7231", "bk7238", "bk7251"] },
 };
 
 const byId = PLATFORMS.map((p) => [p.id, p] as const);
@@ -175,11 +178,13 @@ describe("PLATFORMS", () => {
 
   // The behaviour each platform's logs policy must keep: the RTS pulse only
   // where the port has a reset line, the line release only on RTL8720C kits,
-  // their own reset for the Pico and nRF52, and Bluetooth only on nRF52.
+  // their own reset for the Pico and nRF52, no Web Serial logs for a BK72xx,
+  // and Bluetooth only on nRF52.
   it.each([
     ["nrf52", { reset: "platform", releaseLinesAfterOpen: false, ble: true }],
     ["rp2", { reset: "platform", releaseLinesAfterOpen: false, ble: false }],
     ["rtl87xx", { reset: "rts-pulse", releaseLinesAfterOpen: true, ble: false }],
+    ["bk72xx", { reset: undefined, releaseLinesAfterOpen: false, ble: false }],
   ] as const)("%s keeps its logs policy", (id, expected) => {
     const logs = PLATFORMS.find((p) => p.id === id)?.logs;
     const reset = logs?.serial?.reset;
@@ -202,10 +207,15 @@ describe("PLATFORMS", () => {
   });
 
   it("covers every registered platform in the logs policy table", () => {
-    expect(PLATFORMS.map((p) => p.id).sort()).toEqual(["nrf52", "rp2", "rtl87xx"]);
+    expect(PLATFORMS.map((p) => p.id).sort()).toEqual([
+      "bk72xx",
+      "nrf52",
+      "rp2",
+      "rtl87xx",
+    ]);
   });
 
-  it.each(["esp32", "esp8266", "bk72xx", null])(
+  it.each(["esp32", "esp8266", "ln882x", null])(
     "leaves %s to the built-in paths",
     (platform) => {
       expect(platformFor(platform)).toBeUndefined();

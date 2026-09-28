@@ -1,6 +1,6 @@
 /**
  * What the Device Builder knows about one platform beyond ESP (nRF52, Pico,
- * RTL8720C): its in-app compile-then-flash flow and its logs policy. Each
+ * RTL8720C, BK72xx): its in-app compile-then-flash flow and its logs policy. Each
  * platform's ``dashboard.ts`` exports one ``PlatformSupport``,
  * ``registry.ts`` lists them, and the install dialog, the method rows,
  * ``applyInstallMethod`` and the logs code read everything platform-specific

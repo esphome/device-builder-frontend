@@ -73,6 +73,10 @@ export const DECODER_URL =
 // from DECODER_URL.
 export const DECODER_ORIGIN = new URL(DECODER_URL).origin;
 
+/** LibreTiny's Beken BK72xx page: wiring and how the chip enters its downloader. */
+export const LIBRETINY_BEKEN_GUIDE_URL =
+  "https://docs.libretiny.eu/docs/platform/beken-72xx/";
+
 /** LibreTiny's AmebaZ2 (RTL8720C) page: wiring and the download-mode strap. */
 export const LIBRETINY_AMBZ2_GUIDE_URL =
   "https://docs.libretiny.eu/docs/platform/realtek-ambz2/";

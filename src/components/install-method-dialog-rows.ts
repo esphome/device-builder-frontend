@@ -169,10 +169,11 @@ export function renderBleNusOption(
 }
 
 /**
- * A platform flasher's row (nRF52 DFU, Pico, RTL8720C). With Web Serial it
- * flashes here; on an insecure origin a flasher that can hand off sends its
- * firmware to web.esphome.io instead, with ``handoffDesc`` in place of the
- * in-app copy. A flasher that says when it is ``available`` goes by that.
+ * A platform flasher's row (nRF52 DFU, Pico, RTL8720C, BK72xx). With Web
+ * Serial it flashes here; on an insecure origin a flasher that can hand off
+ * sends its firmware to web.esphome.io instead, with ``handoffDesc`` in place
+ * of the in-app copy. A flasher that says when it is ``available`` goes by
+ * that.
  */
 export function renderPlatformFlashOption(
   ctx: MethodRowContext,

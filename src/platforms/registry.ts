@@ -7,6 +7,7 @@
  * behaviour. Never imported from ``src/web``.
  */
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import { bk72xxPlatform } from "./bk72xx/dashboard.js";
 import { ESP_SERIAL_LOGS } from "./esp/serial-logs.js";
 import { nrf52Platform } from "./nrf52/dashboard.js";
 import type { AnyBrowserInstall, PlatformSupport } from "./platform-support.js";
@@ -18,6 +19,7 @@ export const PLATFORMS: readonly PlatformSupport[] = [
   nrf52Platform,
   rp2Platform,
   rtl87xxPlatform,
+  bk72xxPlatform,
 ];
 
 /** The descriptor for a device's target platform, if any. */

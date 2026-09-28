@@ -91,6 +91,8 @@ const hasRp2Row = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_rp2_uf2");
 const hasRtlRow = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_rtl_ambz2");
+const hasBkRow = (d: ESPHomeInstallMethodDialog): boolean =>
+  hasRowTitled(d, "dashboard.install_method_bk_uart");
 const hasServerSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="serial-port"]');
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -234,6 +236,38 @@ describe("install-method-dialog platform gating", () => {
     expect(hasServerSerialRow(d)).toBe(true);
   });
 
+  // The Beken downloader is spoken over Web Serial; the row keeps
+  // server-serial beside it as the backend path.
+  it.each(["bk7231", "bk7238", "bk7251"])(
+    "shows the BK72xx row for bk72xx with chip %s",
+    async (mcu) => {
+      const d = await mount("bk72xx", "install", mcu);
+      expect(hasBkRow(d)).toBe(true);
+      expect(hasRtlRow(d)).toBe(false);
+      expect(hasServerSerialRow(d)).toBe(true);
+    }
+  );
+
+  // A chip the backend could not name is not offered the row.
+  it("hides the BK72xx row for bk72xx with no chip", async () => {
+    const d = await mount("bk72xx", "install", null);
+    expect(hasBkRow(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  it.each(["esp32", "rtl87xx", "ln882x"])(
+    "hides the BK72xx row for %s",
+    async (platform) => {
+      expect(hasBkRow(await mount(platform))).toBe(false);
+    }
+  );
+
+  it("hides the BK72xx row in logs mode and without Web Serial", async () => {
+    expect(hasBkRow(await mount("bk72xx", "logs"))).toBe(false);
+    setWebSerialEnv({ serial: false, secure: true, href: "http://localhost:6052/" });
+    expect(hasBkRow(await mount("bk72xx"))).toBe(false);
+  });
+
   it.each(["esp32", "bk72xx"])("hides the Pico row for %s", async (platform) => {
     const d = await mount(platform);
     expect(hasRp2Row(d)).toBe(false);
@@ -309,11 +343,14 @@ describe("install-method-dialog logs-mode platform gating", () => {
     }
   );
 
-  it("keeps logs on server-serial for bk72xx", async () => {
-    const d = await mount("bk72xx", "logs");
-    expect(hasWebSerialRow(d)).toBe(false);
-    expect(hasServerSerialRow(d)).toBe(true);
-  });
+  it.each(["bk72xx", "ln882x"])(
+    "keeps logs on server-serial for %s",
+    async (platform) => {
+      const d = await mount(platform, "logs");
+      expect(hasWebSerialRow(d)).toBe(false);
+      expect(hasServerSerialRow(d)).toBe(true);
+    }
+  );
 
   // nRF52 gets the Web Serial row for logs (USB-CDC console); on localhost
   // that collapses the server-serial row, same as ESP and RP2.

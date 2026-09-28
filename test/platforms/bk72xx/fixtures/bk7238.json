@@ -1,0 +1,300 @@
+{
+  "name": "bk7238",
+  "reference": "bk7231tools 2.1.2, driven as ltchiptool 4.14.4 flash_write_uf2 does",
+  "chip": {
+    "protocol": "FULL",
+    "boot_crc": 1810565412,
+    "chip_id": 29240,
+    "flash_id": "c84015",
+    "sr": 124
+  },
+  "detected": {
+    "protocol": "FULL",
+    "chip": "BK7238",
+    "bootloader": "BK7238_1_0_14",
+    "flash_size": 2097152,
+    "boot_version": null
+  },
+  "warnings": [],
+  "flash_sha256": "bc0452aca24ed9dd29056776e676eb54888bf220c05f44091a2ee6556c3c3070",
+  "frames": [
+    {
+      "dir": "tx",
+      "length": 5,
+      "hex": "01e0fc0100"
+    },
+    {
+      "dir": "rx",
+      "length": 8,
+      "hex": "040e0501e0fc0100"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fc09100000000000010000"
+    },
+    {
+      "dir": "rx",
+      "length": 11,
+      "hex": "040e0801e0fc10dbf61494"
+    },
+    {
+      "dir": "tx",
+      "length": 5,
+      "hex": "01e0fc0100"
+    },
+    {
+      "dir": "rx",
+      "length": 8,
+      "hex": "040e0501e0fc0100"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fc050300008000"
+    },
+    {
+      "dir": "rx",
+      "length": 15,
+      "hex": "040e0c01e0fc030000800038720000"
+    },
+    {
+      "dir": "tx",
+      "length": 12,
+      "hex": "01e0fcfff405000e9f000000"
+    },
+    {
+      "dir": "rx",
+      "length": 15,
+      "hex": "040eff01e0fcf406000e0000c84015"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fcfff402000c05"
+    },
+    {
+      "dir": "rx",
+      "length": 13,
+      "hex": "040eff01e0fcf404000c00057c"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fcfff402000c35"
+    },
+    {
+      "dir": "rx",
+      "length": 13,
+      "hex": "040eff01e0fcf404000c003500"
+    },
+    {
+      "dir": "tx",
+      "length": 11,
+      "hex": "01e0fcfff404000d010000"
+    },
+    {
+      "dir": "rx",
+      "length": 14,
+      "hex": "040eff01e0fcf405000d00010000"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fcfff402000c05"
+    },
+    {
+      "dir": "rx",
+      "length": 13,
+      "hex": "040eff01e0fcf404000c000500"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fcfff402000c35"
+    },
+    {
+      "dir": "rx",
+      "length": 13,
+      "hex": "040eff01e0fcf404000c003500"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fc091000102100ff1f2100"
+    },
+    {
+      "dir": "rx",
+      "length": 11,
+      "hex": "040e0801e0fc10168874b5"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fcfff406000f2000102100"
+    },
+    {
+      "dir": "rx",
+      "length": 16,
+      "hex": "040eff01e0fcf407000f002000102100"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fc091000102100ff1f2100"
+    },
+    {
+      "dir": "rx",
+      "length": 11,
+      "hex": "040e0801e0fc10f598ab0e"
+    },
+    {
+      "dir": "tx",
+      "length": 4108,
+      "head": "01e0fcfff40510070010210007264564",
+      "sha256": "60b27107a7bc29409a07abf8ceff09e08598f0bd7d99ebf8301f0b93387698ea"
+    },
+    {
+      "dir": "rx",
+      "length": 15,
+      "hex": "040eff01e0fcf40600070000102100"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fc091000102100ff1f2100"
+    },
+    {
+      "dir": "rx",
+      "length": 11,
+      "hex": "040e0801e0fc1088e9025f"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fcfff406000f2000202100"
+    },
+    {
+      "dir": "rx",
+      "length": 16,
+      "hex": "040eff01e0fcf407000f002000202100"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fcfff406000f2000302100"
+    },
+    {
+      "dir": "rx",
+      "length": 16,
+      "hex": "040eff01e0fcf407000f002000302100"
+    },
+    {
+      "dir": "tx",
+      "length": 4108,
+      "head": "01e0fcfff405100700302100c8e70928",
+      "sha256": "fa872941f916d830271e268068682ed2e08bc00456964e5c112db52824d28c19"
+    },
+    {
+      "dir": "rx",
+      "length": 15,
+      "hex": "040eff01e0fcf40600070000302100"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fc091000302100ff3f2100"
+    },
+    {
+      "dir": "rx",
+      "length": 11,
+      "hex": "040e0801e0fc108fba675e"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fcfff402000c05"
+    },
+    {
+      "dir": "rx",
+      "length": 13,
+      "hex": "040eff01e0fcf404000c000500"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fcfff402000c35"
+    },
+    {
+      "dir": "rx",
+      "length": 13,
+      "hex": "040eff01e0fcf404000c003500"
+    },
+    {
+      "dir": "tx",
+      "length": 11,
+      "hex": "01e0fcfff404000d010000"
+    },
+    {
+      "dir": "rx",
+      "length": 14,
+      "hex": "040eff01e0fcf405000d00010000"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fcfff402000c05"
+    },
+    {
+      "dir": "rx",
+      "length": 13,
+      "hex": "040eff01e0fcf404000c000500"
+    },
+    {
+      "dir": "tx",
+      "length": 9,
+      "hex": "01e0fcfff402000c35"
+    },
+    {
+      "dir": "rx",
+      "length": 13,
+      "hex": "040eff01e0fcf404000c003500"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fcfff406000f2000903200"
+    },
+    {
+      "dir": "rx",
+      "length": 16,
+      "hex": "040eff01e0fcf407000f002000903200"
+    },
+    {
+      "dir": "tx",
+      "length": 124,
+      "head": "01e0fcfff4750006009f3200ffffffff",
+      "sha256": "22f10fe79bd10aca52fa5551acfa04465561d4bfe2805feede5b8266daaf4304"
+    },
+    {
+      "dir": "rx",
+      "length": 16,
+      "hex": "040eff01e0fcf407000600009f320070"
+    },
+    {
+      "dir": "tx",
+      "length": 13,
+      "hex": "01e0fc0910009f3200ff9f3200"
+    },
+    {
+      "dir": "rx",
+      "length": 11,
+      "hex": "040e0801e0fc1096084f1e"
+    },
+    {
+      "dir": "tx",
+      "length": 6,
+      "hex": "01e0fc020ea5"
+    }
+  ]
+}
