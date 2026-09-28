@@ -33,7 +33,7 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 
 /** What a flash over the serial adapter reports while it runs. */
 export interface LibreTinyFlashHooks {
-  signal: AbortSignal;
+  signal?: AbortSignal;
   onLog: (line: string) => void;
   /** The chip did not answer by itself; the user has to get it into its downloader. */
   onWaiting: () => void;
