@@ -29,7 +29,6 @@ import { schemaPathOf, stripConstraintProse } from "../../util/constraint-groups
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
-import type { OptionRawValue } from "../../util/option-match.js";
 import { findOptionValue } from "../../util/option-match.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
@@ -463,14 +462,7 @@ export function renderStringField(
   // by featured components to pin the field to one of a few values
   // (e.g. a PIR pin to one of two FPC-connector GPIOs).
   if (entry.suggestions && entry.suggestions.length > 0) {
-    return renderSuggestionSelect(
-      entry,
-      path,
-      raw as OptionRawValue,
-      invalid,
-      disabled,
-      ctx
-    );
+    return renderSuggestionSelect(entry, path, raw, invalid, disabled, ctx);
   }
   // Password inputs render the dedicated component so they get a
   // reveal/hide toggle. Keeping the show-state inside the component
@@ -531,7 +523,7 @@ export function renderStringField(
 export function renderSuggestionSelect(
   entry: ConfigEntry,
   path: string[],
-  value: OptionRawValue,
+  value: unknown,
   invalid: boolean,
   disabled: boolean,
   ctx: RenderCtx
@@ -552,11 +544,10 @@ export function renderSuggestionSelect(
             coerceValueToEntryType(entry, (e.target as HTMLSelectElement).value)
           )}
       >
-        ${suggestions.map((v) => {
-          return html`<wa-option value=${v} ?selected=${v === selectedValue}
-            >${v}</wa-option
-          >`;
-        })}
+        ${suggestions.map(
+          (v) =>
+            html`<wa-option value=${v} ?selected=${v === selectedValue}>${v}</wa-option>`
+        )}
       </wa-select>
       ${renderFieldError(path, ctx)}
     </div>

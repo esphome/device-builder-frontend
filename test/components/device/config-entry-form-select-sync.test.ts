@@ -4,7 +4,7 @@
  * ``_syncSelectValues`` pushes each field's value onto its wa-select after
  * every render: it waits for the select's first update only, skips a select
  * already showing the value, and otherwise scans the options for a case or
- * GPIO match.
+ * bare-decimal match.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -97,32 +97,9 @@ describe("_syncSelectValues", () => {
     expect(select.value).toBe("3");
   });
 
-  it("maps a bare GPIO number onto its GPIO option", async () => {
-    const select = fakeSelect({ value: "", options: ["GPIO8", "GPIO9"] });
-    await sync(select, 9);
-    expect(select.value).toBe("GPIO9");
-  });
-
   it.each([
-    ["P0.27", ["P0.26", "P0.27"], "P0.27"],
-    [27, ["P0.26", "P0.27"], "P0.27"],
-    ["P0.27", ["GPIO26", "GPIO27"], "GPIO27"],
-    ["P23", ["GPIO22", "GPIO23"], "GPIO23"],
-    ["PA02", ["GPIO1", "GPIO2"], "GPIO2"],
-    ["PB03", ["GPIO18", "GPIO19"], "GPIO19"],
-    ["GPIO19", ["PB02", "PB03"], "PB03"],
-  ])("maps pin %s onto its board option", async (raw, options, expected) => {
-    const select = fakeSelect({ value: "", options });
-    await sync(select, raw);
-    expect(select.value).toBe(expected);
-  });
-
-  it.each([
-    ["GPIO9", 9],
     ["3.0", 3],
     ["ESP32C6", "esp32c6"],
-    ["P0.27", 27],
-    ["PB03", "GPIO19"],
   ])("skips the scan when the select shows %s for %s", async (current, raw) => {
     const select = fakeSelect({ value: current, options: ["x", current] });
     await sync(select, raw);
@@ -130,9 +107,10 @@ describe("_syncSelectValues", () => {
     expect(select.value).toBe(current);
   });
 
-  it("leaves a pin with no matching option untouched", async () => {
-    const select = fakeSelect({ value: "", options: ["GPIO1", "GPIO2"] });
-    await sync(select, "P0.30");
-    expect(select.value).toBe("P0.30");
+  it("skips the scan for an unset field", async () => {
+    const select = fakeSelect({ value: "", options: ["a", "b"] });
+    await sync(select, undefined);
+    expect(select.scans).toBe(0);
+    expect(select.value).toBe("");
   });
 });

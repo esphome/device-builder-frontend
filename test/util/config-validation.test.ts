@@ -416,7 +416,7 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, 4)?.code).toBe("validation.invalid_option");
   });
 
-  it("does not take a pin alias or a pin block for an ordinary option", () => {
+  it("does not take a pin alias for an ordinary option", () => {
     const entry = makeEntry({
       type: ConfigEntryType.SELECT,
       options: [
@@ -425,8 +425,6 @@ describe("validateEntry", () => {
       ],
     });
     expect(validateEntry(entry, "GPIO1")?.code).toBe("validation.invalid_option");
-    expect(validateEntry(entry, "01")?.code).toBe("validation.invalid_option");
-    expect(validateEntry(entry, { number: 1 })?.code).toBe("validation.invalid_option");
   });
 
   it("accepts a case-only difference against the options (upper=True enums)", () => {

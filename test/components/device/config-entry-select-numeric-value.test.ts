@@ -26,7 +26,6 @@ describe("renderSelectField — a bare YAML decimal", () => {
   it.each([
     [3, "3.0"],
     [1.1, "1.1"],
-    ["3.0", "3.0"],
   ])("marks the option spelled for %s as selected", (value, expected) => {
     const entry = makeEntry(ConfigEntryType.SELECT, { options: OPTIONS });
     const tpl = renderSelectField(entry, ["rev"], makeRenderCtx({ rev: value }));

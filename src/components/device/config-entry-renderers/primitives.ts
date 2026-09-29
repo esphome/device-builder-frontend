@@ -4,8 +4,7 @@ import { chipNameToVariant } from "../../../util/chip-variant.js";
 import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import { isValuePresent, nearCanonicalOption } from "../../../util/config-validation.js";
 import { isHexColor } from "../../../util/label-style.js";
-import type { OptionRawValue } from "../../../util/option-match.js";
-import { findOptionValue, optionShowsValue } from "../../../util/option-match.js";
+import { findOptionValue } from "../../../util/option-match.js";
 import { renderOptionStack } from "../../../util/option-stack.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
@@ -103,20 +102,18 @@ function resolveEsp32Variant(ctx: RenderCtx): string {
 }
 
 // Keep options whose `variants` is absent/empty or includes the device's
-// variant — plus the currently-stored value, so a board swap can't hide what
-// the YAML still holds. Falls back to all options when the variant is unknown or
-// the filter would empty the select (e.g. psram on a no-PSRAM variant).
+// variant — plus *selected*, the option the stored value spells, so a board
+// swap can't hide what the YAML still holds. Falls back to all options when the
+// variant is unknown or the filter would empty the select (e.g. psram on a
+// no-PSRAM variant).
 function filterOptionsByVariant<T extends { value: string; variants?: string[] }>(
   options: T[],
   variant: string,
-  current: OptionRawValue = ""
+  selected: string | null
 ): T[] {
   if (!variant) return options;
   const kept = options.filter(
-    (o) =>
-      !o.variants?.length ||
-      o.variants.includes(variant) ||
-      optionShowsValue(o.value, current)
+    (o) => !o.variants?.length || o.variants.includes(variant) || o.value === selected
   );
   return kept.length > 0 ? kept : options;
 }
@@ -151,7 +148,6 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
   const value = String(raw ?? "");
-  const current = raw as OptionRawValue;
   const onSelectChange = (e: Event) =>
     ctx.emitChange(
       path,
@@ -162,7 +158,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   // Featured suggestions override options — board author narrowed the choice.
   // Always strict select; suggestions are a closed set.
   if (entry.suggestions && entry.suggestions.length > 0) {
-    return renderSuggestionSelect(entry, path, current, invalid, disabled, ctx);
+    return renderSuggestionSelect(entry, path, raw, invalid, disabled, ctx);
   }
   // The device's ESP32 variant, used to filter per-variant options (and derive
   // the esp32 variant default below); resolved once per render.
@@ -179,7 +175,14 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
       <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx, { path })}
         <esphome-options-combobox
-          .options=${filterOptionsByVariant(entry.options, variant, value)}
+          .options=${filterOptionsByVariant(
+            entry.options,
+            variant,
+            findOptionValue(
+              raw,
+              entry.options.map((o) => o.value)
+            )
+          )}
           .value=${value}
           label=${entry.label}
           placeholder=${String(entry.default_value ?? "")}
@@ -210,13 +213,13 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   );
   const placeholder = defaultOption?.label ?? defaultStr;
   const { clearable, visibleOptions } = selectOptions(entry);
-  // Filtered after the (entry-keyed) selectOptions memo since it depends on the board.
-  const shownOptions = filterOptionsByVariant(visibleOptions, variant, current);
-  // One winner, in the same rung order the post-render select sync uses.
+  // One winner, by the same matcher the post-render select sync uses.
   const selectedValue = findOptionValue(
-    current,
-    shownOptions.map((o) => o.value)
+    raw,
+    visibleOptions.map((o) => o.value)
   );
+  // Filtered after the (entry-keyed) selectOptions memo since it depends on the board.
+  const shownOptions = filterOptionsByVariant(visibleOptions, variant, selectedValue);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx, { path })}
