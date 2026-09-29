@@ -29,7 +29,7 @@ import { schemaPathOf, stripConstraintProse } from "../../util/constraint-groups
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
-import { optionShowsValue } from "../../util/option-match.js";
+import { findOptionValue } from "../../util/option-match.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
 import {
@@ -529,6 +529,8 @@ export function renderSuggestionSelect(
   ctx: RenderCtx
 ) {
   const placeholder = String(entry.default_value ?? "");
+  const suggestions = (entry.suggestions ?? []).map(String);
+  const selectedValue = findOptionValue(value, suggestions);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx, { path })}
@@ -542,9 +544,8 @@ export function renderSuggestionSelect(
             coerceValueToEntryType(entry, (e.target as HTMLSelectElement).value)
           )}
       >
-        ${(entry.suggestions ?? []).map((s) => {
-          const v = String(s);
-          return html`<wa-option value=${v} ?selected=${optionShowsValue(v, value)}
+        ${suggestions.map((v) => {
+          return html`<wa-option value=${v} ?selected=${v === selectedValue}
             >${v}</wa-option
           >`;
         })}

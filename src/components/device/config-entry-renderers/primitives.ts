@@ -4,7 +4,7 @@ import { chipNameToVariant } from "../../../util/chip-variant.js";
 import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import { isValuePresent, nearCanonicalOption } from "../../../util/config-validation.js";
 import { isHexColor } from "../../../util/label-style.js";
-import { optionShowsValue } from "../../../util/option-match.js";
+import { findOptionValue, optionShowsValue } from "../../../util/option-match.js";
 import { renderOptionStack } from "../../../util/option-stack.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
@@ -111,10 +111,11 @@ function filterOptionsByVariant<T extends { value: string; variants?: string[] }
   current = ""
 ): T[] {
   if (!variant) return options;
-  const cur = current.toLowerCase();
   const kept = options.filter(
     (o) =>
-      !o.variants?.length || o.variants.includes(variant) || o.value.toLowerCase() === cur
+      !o.variants?.length ||
+      o.variants.includes(variant) ||
+      optionShowsValue(o.value, current)
   );
   return kept.length > 0 ? kept : options;
 }
@@ -209,6 +210,11 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   const { clearable, visibleOptions } = selectOptions(entry);
   // Filtered after the (entry-keyed) selectOptions memo since it depends on the board.
   const shownOptions = filterOptionsByVariant(visibleOptions, variant, value);
+  // One winner, in the same rung order the post-render select sync uses.
+  const selectedValue = findOptionValue(
+    value,
+    shownOptions.map((o) => o.value)
+  );
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx, { path })}
@@ -225,7 +231,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
             : nothing
         }
         ${shownOptions.map((opt) => {
-          const selected = optionShowsValue(opt.value, value);
+          const selected = opt.value === selectedValue;
           const isDefault = defaultStr !== "" && opt.value.toLowerCase() === defaultLower;
           // wa-select activates the first option when nothing is committed,
           // so the default gets a muted note (like the pin menu's notes) —
