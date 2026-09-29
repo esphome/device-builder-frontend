@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseFlowList,
+  parsePlainDecimal,
   parseScalar,
   splitInlineComment,
   splitTrimmedInlineComment,
@@ -178,6 +179,25 @@ describe("parseScalar", () => {
     expect(parseScalar("ON")).toBe(true);
     expect(parseScalar("Off")).toBe(false);
   });
+});
+
+describe("parsePlainDecimal", () => {
+  it.each([
+    ["3", 3],
+    ["3.0", 3],
+    ["1.10", 1.1],
+    ["-2.5", -2.5],
+    ["1_000", 1000],
+  ])("reads %s as %s", (text, expected) => {
+    expect(parsePlainDecimal(text)).toBe(expected);
+  });
+
+  it.each(["", "0x10", "010", "1e3", "GPIO9", "3.0.1", "9007199254740993"])(
+    "returns null for %s",
+    (text) => {
+      expect(parsePlainDecimal(text)).toBeNull();
+    }
+  );
 });
 
 describe("parseFlowList", () => {

@@ -4,6 +4,7 @@ import { chipNameToVariant } from "../../../util/chip-variant.js";
 import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import { isValuePresent, nearCanonicalOption } from "../../../util/config-validation.js";
 import { isHexColor } from "../../../util/label-style.js";
+import { optionShowsValue } from "../../../util/option-match.js";
 import { renderOptionStack } from "../../../util/option-stack.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import type { OptionsComboboxValueChange } from "../../options-combobox-event.js";
@@ -197,10 +198,6 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
       </div>
     `;
   }
-  // Option values are sometimes stored case-differently than the YAML uses
-  // (ESP32C6 vs esp32c6) — case-insensitive compare so the matching option
-  // still flags as selected.
-  const valueLower = value.toLowerCase();
   const defaultStr =
     boardDerivedVariantDefault(entry, ctx, variant) ??
     (entry.default_value != null ? String(entry.default_value) : "");
@@ -228,7 +225,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
             : nothing
         }
         ${shownOptions.map((opt) => {
-          const selected = opt.value.toLowerCase() === valueLower;
+          const selected = optionShowsValue(opt.value, value);
           const isDefault = defaultStr !== "" && opt.value.toLowerCase() === defaultLower;
           // wa-select activates the first option when nothing is committed,
           // so the default gets a muted note (like the pin menu's notes) —

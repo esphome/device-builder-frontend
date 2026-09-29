@@ -85,6 +85,12 @@ describe("_syncSelectValues", () => {
     expect(select.value).toBe("ESP32C6");
   });
 
+  it("maps a bare YAML decimal onto the option spelled with its trailing zero", async () => {
+    const select = fakeSelect({ value: "", options: ["2.0", "3.0", "3.1"] });
+    await sync(select, 3);
+    expect(select.value).toBe("3.0");
+  });
+
   it("maps a bare GPIO number onto its GPIO option", async () => {
     const select = fakeSelect({ value: "", options: ["GPIO8", "GPIO9"] });
     await sync(select, 9);
@@ -107,6 +113,7 @@ describe("_syncSelectValues", () => {
 
   it.each([
     ["GPIO9", 9],
+    ["3.0", 3],
     ["ESP32C6", "esp32c6"],
     ["P0.27", 27],
     ["PB03", "GPIO19"],

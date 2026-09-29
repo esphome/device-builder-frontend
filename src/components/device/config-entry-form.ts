@@ -48,7 +48,7 @@ import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { hasMaterialValue } from "../../util/material-value.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
-import { parseBoardGpio } from "../../util/pin/gpio.js";
+import { findOptionValue, optionShowsValue } from "../../util/option-match.js";
 import {
   fetchPinRegistryModes,
   getCachedPinRegistryModes,
@@ -811,24 +811,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   /** Whether a select's value is the raw value or its option spelling. */
   private _showsValue(current: string, raw: string): boolean {
-    if (current === raw) return true;
-    if (!current || !raw) return false;
-    if (current.toLowerCase() === raw.toLowerCase()) return true;
-    const gpio = parseBoardGpio(raw);
-    return gpio !== null && parseBoardGpio(current) === gpio;
+    return optionShowsValue(current, raw);
   }
 
   private _matchOptionValue(select: HTMLElement, raw: string): string {
-    if (!raw) return raw;
     const options = Array.from(
-      select.querySelectorAll<HTMLElement & { value: string }>("wa-option")
+      select.querySelectorAll<HTMLElement & { value: string }>("wa-option"),
+      (o) => o.value ?? ""
     );
-    const lower = raw.toLowerCase();
-    const exact = options.find((o) => o.value?.toLowerCase() === lower);
-    if (exact) return exact.value;
-    const gpio = parseBoardGpio(raw);
-    if (gpio === null) return raw;
-    return options.find((o) => parseBoardGpio(o.value) === gpio)?.value ?? raw;
+    return findOptionValue(raw, options) ?? raw;
   }
 
   /**

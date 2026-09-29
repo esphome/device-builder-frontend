@@ -135,12 +135,17 @@ export const coerceYamlScalar = (
   if (wasQuoted) return text;
   const bool = parseYamlBoolean(text);
   if (bool !== null) return bool;
+  return parsePlainDecimal(text) ?? text;
+};
+
+/** The number a plain-decimal scalar reads as, or null when *text* is not one. */
+export const parsePlainDecimal = (text: string): number | null => {
   // Underscore digit separators (``1_000``) are loader numerics; strip
   // them for Number() once the shape matched (between digits only, a
   // strict subset of the resolver's grammar).
   if (PLAIN_INT_RE.test(text)) {
     const n = Number(text.replace(/_/g, ""));
-    return Number.isSafeInteger(n) ? n : text;
+    return Number.isSafeInteger(n) ? n : null;
   }
   // Floats trade text fidelity for the loader's value: ``1.50`` re-emits
   // as ``1.5`` and extra precision truncates to the same double PyYAML
@@ -149,9 +154,9 @@ export const coerceYamlScalar = (
   // a plain string anyway.
   if (PLAIN_FLOAT_RE.test(text)) {
     const n = Number(text.replace(/_/g, ""));
-    return Number.isFinite(n) ? n : text;
+    return Number.isFinite(n) ? n : null;
   }
-  return text;
+  return null;
 };
 
 /** The literal string of an inline scalar: a double-quoted one unescaped, else quotes stripped, never type-coerced. */

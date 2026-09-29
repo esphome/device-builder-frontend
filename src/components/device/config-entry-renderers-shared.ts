@@ -29,6 +29,7 @@ import { schemaPathOf, stripConstraintProse } from "../../util/constraint-groups
 import { resolveEntryLabel } from "../../util/entry-label.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
+import { optionShowsValue } from "../../util/option-match.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
 import {
@@ -527,7 +528,6 @@ export function renderSuggestionSelect(
   disabled: boolean,
   ctx: RenderCtx
 ) {
-  const valueLower = value.toLowerCase();
   const placeholder = String(entry.default_value ?? "");
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
@@ -544,7 +544,7 @@ export function renderSuggestionSelect(
       >
         ${(entry.suggestions ?? []).map((s) => {
           const v = String(s);
-          return html`<wa-option value=${v} ?selected=${v.toLowerCase() === valueLower}
+          return html`<wa-option value=${v} ?selected=${optionShowsValue(v, value)}
             >${v}</wa-option
           >`;
         })}
