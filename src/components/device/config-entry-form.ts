@@ -48,6 +48,7 @@ import { overlayBoardLockedPresets } from "../../util/featured-locks.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { hasMaterialValue } from "../../util/material-value.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import type { OptionRawValue } from "../../util/option-match.js";
 import { findOptionValue, optionShowsValue } from "../../util/option-match.js";
 import {
   fetchPinRegistryModes,
@@ -789,7 +790,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // A select holding the raw value as its own spelling never re-syncs,
       // so a late-mounting option list must always include the value's
       // option (the lazy id-reference list keeps the selected one mounted).
-      if (this._showsValue(current, raw)) continue;
+      if (this._showsValue(current, value)) continue;
       // wa-select filters its `value` against the exact string of an
       // option's `value`; case mismatches between YAML and catalog
       // would silently drop the value. Look up the matching option
@@ -802,7 +803,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // `"PB03"`) that differs from the option's. Normalise both sides
       // through the shared pin parser so a freshly seeded i2c bus lands
       // on the right option instead of showing an empty select.
-      const desired = this._matchOptionValue(select, raw);
+      const desired = this._matchOptionValue(select, value) ?? raw;
       if (current !== desired) {
         select.value = desired;
       }
@@ -810,16 +811,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
   }
 
   /** Whether a select's value is the raw value or its option spelling. */
-  private _showsValue(current: string, raw: string): boolean {
-    return optionShowsValue(current, raw);
+  private _showsValue(current: string, value: OptionRawValue): boolean {
+    return optionShowsValue(current, value);
   }
 
-  private _matchOptionValue(select: HTMLElement, raw: string): string {
+  private _matchOptionValue(select: HTMLElement, value: OptionRawValue): string | null {
     const options = Array.from(
       select.querySelectorAll<HTMLElement & { value: string }>("wa-option"),
       (o) => o.value ?? ""
     );
-    return findOptionValue(raw, options) ?? raw;
+    return findOptionValue(value, options);
   }
 
   /**

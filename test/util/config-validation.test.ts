@@ -400,6 +400,22 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, "2")).toBeNull();
   });
 
+  it("accepts a bare YAML decimal that spells an option, not a quoted one", () => {
+    // esp32's minimum_chip_revision options are "3.0" etc.; a bare ``3.0``
+    // reads as the number 3 and esphome accepts it, while a quoted ``"3"``
+    // is the string esphome rejects.
+    const entry = makeEntry({
+      type: ConfigEntryType.SELECT,
+      options: [
+        { label: "2.0", value: "2.0" },
+        { label: "3.0", value: "3.0" },
+      ],
+    });
+    expect(validateEntry(entry, 3)).toBeNull();
+    expect(validateEntry(entry, "3")?.code).toBe("validation.invalid_option");
+    expect(validateEntry(entry, 4)?.code).toBe("validation.invalid_option");
+  });
+
   it("accepts a case-only difference against the options (upper=True enums)", () => {
     // esp32 `variant` options are uppercase (`ESP32`) but boards write `esp32`;
     // cv.one_of(..., upper=True) accepts it, so it must not hard-fail.

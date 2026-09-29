@@ -91,6 +91,12 @@ describe("_syncSelectValues", () => {
     expect(select.value).toBe("3.0");
   });
 
+  it("leaves a quoted numeric string on its own spelling", async () => {
+    const select = fakeSelect({ value: "", options: ["2.0", "3.0", "3.1"] });
+    await sync(select, "3");
+    expect(select.value).toBe("3");
+  });
+
   it("maps a bare GPIO number onto its GPIO option", async () => {
     const select = fakeSelect({ value: "", options: ["GPIO8", "GPIO9"] });
     await sync(select, 9);

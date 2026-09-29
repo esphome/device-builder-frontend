@@ -4,6 +4,7 @@ import { chipNameToVariant } from "../../../util/chip-variant.js";
 import { coerceValueToEntryType } from "../../../util/coerce-entry-value.js";
 import { isValuePresent, nearCanonicalOption } from "../../../util/config-validation.js";
 import { isHexColor } from "../../../util/label-style.js";
+import type { OptionRawValue } from "../../../util/option-match.js";
 import { findOptionValue, optionShowsValue } from "../../../util/option-match.js";
 import { renderOptionStack } from "../../../util/option-stack.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
@@ -108,7 +109,7 @@ function resolveEsp32Variant(ctx: RenderCtx): string {
 function filterOptionsByVariant<T extends { value: string; variants?: string[] }>(
   options: T[],
   variant: string,
-  current = ""
+  current: OptionRawValue = ""
 ): T[] {
   if (!variant) return options;
   const kept = options.filter(
@@ -150,6 +151,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
   const value = String(raw ?? "");
+  const current = raw as OptionRawValue;
   const onSelectChange = (e: Event) =>
     ctx.emitChange(
       path,
@@ -160,7 +162,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   // Featured suggestions override options — board author narrowed the choice.
   // Always strict select; suggestions are a closed set.
   if (entry.suggestions && entry.suggestions.length > 0) {
-    return renderSuggestionSelect(entry, path, value, invalid, disabled, ctx);
+    return renderSuggestionSelect(entry, path, current, invalid, disabled, ctx);
   }
   // The device's ESP32 variant, used to filter per-variant options (and derive
   // the esp32 variant default below); resolved once per render.
@@ -209,10 +211,10 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   const placeholder = defaultOption?.label ?? defaultStr;
   const { clearable, visibleOptions } = selectOptions(entry);
   // Filtered after the (entry-keyed) selectOptions memo since it depends on the board.
-  const shownOptions = filterOptionsByVariant(visibleOptions, variant, value);
+  const shownOptions = filterOptionsByVariant(visibleOptions, variant, current);
   // One winner, in the same rung order the post-render select sync uses.
   const selectedValue = findOptionValue(
-    value,
+    current,
     shownOptions.map((o) => o.value)
   );
   return html`

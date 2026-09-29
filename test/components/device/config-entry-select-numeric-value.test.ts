@@ -33,11 +33,14 @@ describe("renderSelectField — a bare YAML decimal", () => {
     expect(selectedOptions(tpl)).toEqual([expected]);
   });
 
-  it("selects nothing for a revision the catalog does not list", () => {
-    const entry = makeEntry(ConfigEntryType.SELECT, { options: OPTIONS });
-    const tpl = renderSelectField(entry, ["rev"], makeRenderCtx({ rev: 4 }));
-    expect(selectedOptions(tpl)).toEqual([]);
-  });
+  it.each([[4], ["3"]])(
+    "selects nothing for %o, which spells no listed revision",
+    (value) => {
+      const entry = makeEntry(ConfigEntryType.SELECT, { options: OPTIONS });
+      const tpl = renderSelectField(entry, ["rev"], makeRenderCtx({ rev: value }));
+      expect(selectedOptions(tpl)).toEqual([]);
+    }
+  );
 
   it("marks one option when several spellings present the value", () => {
     const options = ["9", "9.0", "GPIO9"].map((value) => ({ value, label: value }));
@@ -78,7 +81,7 @@ describe("renderSuggestionSelect — a bare YAML decimal", () => {
     const tpl = renderSuggestionSelect(
       entry,
       ["rev"],
-      "3",
+      3,
       false,
       false,
       makeRenderCtx({})
