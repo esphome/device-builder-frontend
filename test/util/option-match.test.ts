@@ -10,11 +10,17 @@ describe("optionShowsValue", () => {
     ["3.0", 3],
     ["1.1", 1.1],
     ["1.10", 1.1],
+  ])("option %s presents %s", (option, raw) => {
+    expect(optionShowsValue(option, raw)).toBe(true);
+  });
+
+  it.each<[string, string | number]>([
     ["GPIO9", 9],
     ["GPIO9", "9"],
     ["P0.27", "27"],
-  ])("option %s presents %s", (option, raw) => {
-    expect(optionShowsValue(option, raw)).toBe(true);
+  ])("option %s presents pin %s only for a pin select", (option, raw) => {
+    expect(optionShowsValue(option, raw, { pins: true })).toBe(true);
+    expect(optionShowsValue(option, raw)).toBe(false);
   });
 
   it.each<[string, string | number | null | undefined]>([
@@ -29,6 +35,11 @@ describe("optionShowsValue", () => {
     ["3.0", undefined],
   ])("option %s does not present %s", (option, raw) => {
     expect(optionShowsValue(option, raw)).toBe(false);
+  });
+
+  it("never matches a non-primitive, even as a pin", () => {
+    expect(optionShowsValue("GPIO1", { number: 1 }, { pins: true })).toBe(false);
+    expect(optionShowsValue("1", ["1"])).toBe(false);
   });
 });
 
@@ -47,14 +58,18 @@ describe("findOptionValue", () => {
     expect(findOptionValue("esp32c6", ["ESP32C6", "ESP32S3"])).toBe("ESP32C6");
   });
 
-  it("falls through to the board GPIO alias", () => {
-    expect(findOptionValue("9", ["GPIO8", "GPIO9"])).toBe("GPIO9");
-    expect(findOptionValue("P0.27", ["GPIO26", "GPIO27"])).toBe("GPIO27");
+  it("falls through to the board GPIO alias for a pin select only", () => {
+    expect(findOptionValue("9", ["GPIO8", "GPIO9"], { pins: true })).toBe("GPIO9");
+    expect(findOptionValue("P0.27", ["GPIO26", "GPIO27"], { pins: true })).toBe("GPIO27");
+    expect(findOptionValue("9", ["GPIO8", "GPIO9"])).toBeNull();
+    expect(findOptionValue("GPIO1", ["1", "2"])).toBeNull();
+    expect(findOptionValue("01", ["1", "2"])).toBeNull();
   });
 
   it("returns null for an empty value or one no option presents", () => {
     expect(findOptionValue("", REVISIONS)).toBeNull();
     expect(findOptionValue(null, REVISIONS)).toBeNull();
+    expect(findOptionValue({ number: 3 }, REVISIONS)).toBeNull();
     expect(findOptionValue(4, REVISIONS)).toBeNull();
     expect(findOptionValue("P0.30", ["GPIO1", "GPIO2"])).toBeNull();
   });

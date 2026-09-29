@@ -192,7 +192,7 @@ export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError
     // presents as an option is never flagged as one it does not list.
     if (
       findOptionValue(
-        raw as string | number | boolean,
+        raw,
         entry.options.map((o) => o.value)
       ) === null
     ) {

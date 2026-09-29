@@ -812,7 +812,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   /** Whether a select's value is the raw value or its option spelling. */
   private _showsValue(current: string, value: OptionRawValue): boolean {
-    return optionShowsValue(current, value);
+    return optionShowsValue(current, value, { pins: true });
   }
 
   private _matchOptionValue(select: HTMLElement, value: OptionRawValue): string | null {
@@ -820,7 +820,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       select.querySelectorAll<HTMLElement & { value: string }>("wa-option"),
       (o) => o.value ?? ""
     );
-    return findOptionValue(value, options);
+    return findOptionValue(value, options, { pins: true });
   }
 
   /**
