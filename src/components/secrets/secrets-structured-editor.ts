@@ -400,6 +400,8 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     this._addOpen = false;
     // Trim like the name: a pasted value often carries an invisible trailing
     // newline or space the masked field hides, and it would be stored verbatim.
+    // Deliberate trade-off: a value that really starts or ends with whitespace
+    // (a rare WPA passphrase) must be added through the raw YAML editor.
     this._emit(addSecret(this.value, this._addKey(), this._addValue.trim()));
   };
 
