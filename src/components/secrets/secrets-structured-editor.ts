@@ -398,7 +398,9 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
       return;
     }
     this._addOpen = false;
-    this._emit(addSecret(this.value, this._addKey(), this._addValue));
+    // Trim like the name: a pasted value often carries an invisible trailing
+    // newline or space the masked field hides, and it would be stored verbatim.
+    this._emit(addSecret(this.value, this._addKey(), this._addValue.trim()));
   };
 
   // A splice helper returns null when its target line no longer matches

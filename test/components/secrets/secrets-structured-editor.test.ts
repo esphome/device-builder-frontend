@@ -264,6 +264,19 @@ describe("esphome-secrets-structured-editor", () => {
     expect(captured.value).toBe("wifi_ssid: home\ntemp_sensor__ap_password: xyz\n");
   });
 
+  test("the add dialog trims pasted whitespace around the value", async () => {
+    const el = await mount("wifi_ssid: home\n");
+    const captured = onChange(el);
+    const view = el as unknown as AddView;
+    view._openAdd();
+    view._addName = "api_key";
+    view._addValue = " nrqvcTSj8lMIVUGuLnkwCLwGH+HqSSyNvHUnLdlqXX4=\n";
+    view._confirmAdd();
+    expect(captured.value).toBe(
+      "wifi_ssid: home\napi_key: nrqvcTSj8lMIVUGuLnkwCLwGH+HqSSyNvHUnLdlqXX4=\n"
+    );
+  });
+
   test("the add dialog rejects an invalid name and stays open", async () => {
     const el = await mount("wifi_ssid: home\n");
     const captured = onChange(el);
