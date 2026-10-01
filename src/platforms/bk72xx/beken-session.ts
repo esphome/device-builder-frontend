@@ -47,12 +47,26 @@ const PROBE_LENGTH = 256;
 const FLASH_SIZES = [0x200000, 0x400000, 0x800000, 0x1000000];
 const ERASED = 0xff;
 const CRC_ERASED_SECTOR = 0xf154670a;
+/** Where the bootloader ends; nothing here erases or writes below it. */
+const BOOT_END = 0x11000;
+/** The CRC of a blank bootloader, under either protocol's count. */
+const CRC_NO_BOOTLOADER = [PROBE_LENGTH, PROBE_LENGTH + 1].map((length) =>
+  crc32(new Uint8Array(length).fill(ERASED))
+);
 
 /** The flash is one whose status register is not known, so it stays protected. */
 export class BekenUnknownFlashError extends Error {
   constructor(readonly flashId: string) {
     super(`Flash ID not known: ${flashId}`);
     this.name = "BekenUnknownFlashError";
+  }
+}
+
+/** The first flash sector is blank, so no firmware written to the chip can start. */
+export class BekenNoBootloaderError extends Error {
+  constructor() {
+    super("The bootloader is missing: the start of the flash is blank");
+    this.name = "BekenNoBootloaderError";
   }
 }
 
@@ -161,6 +175,7 @@ export class BekenSession {
   /** The chip, its protocol and its flash, as bk7231tools finds them out. */
   async detect(): Promise<BekenChipInfo> {
     const bootCrc = await this.crc(0, PROBE_LENGTH);
+    if (CRC_NO_BOOTLOADER.includes(bootCrc)) throw new BekenNoBootloaderError();
     this.bootloader = BOOTLOADERS.find((b) => b.crc === bootCrc) ?? null;
     let chip = this.bootloader?.chip ?? null;
     if (this.bootloader) {
@@ -271,6 +286,7 @@ export class BekenSession {
   }
 
   private async erase(start: number): Promise<void> {
+    this.outsideBootloader(start);
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.eraseOnce(start);
@@ -282,6 +298,7 @@ export class BekenSession {
   }
 
   private async writeSector(start: number, data: Uint8Array): Promise<void> {
+    this.outsideBootloader(start);
     const sector = padded(data, SECTOR_SIZE);
     for (let attempt = 0; ; attempt++) {
       try {
@@ -298,6 +315,7 @@ export class BekenSession {
 
   /** Up to a page, with what came before it in the page as erased bytes. */
   private async writePage(start: number, data: Uint8Array): Promise<void> {
+    this.outsideBootloader(start);
     const reply = await this.link.command(flashWrite(this.at(start), data));
     // The count comes back in one byte, so a whole page reads 0. bk7231tools
     // compares it with 256 and fails every whole page; the CRC that follows
@@ -318,6 +336,7 @@ export class BekenSession {
     // gives a size that means nothing.
     if (this.protocol === "full") this.statusSize();
     for (const { address, data } of runs) {
+      this.outsideBootloader(address);
       if (address + data.length > this.flashSize) {
         throw new Error(
           `The run at ${formatAddress(address)} does not fit the flash of ${this.flashSize} bytes`
@@ -360,6 +379,15 @@ export class BekenSession {
       at += sector.length;
       done += sector.length;
       onBytes(done);
+    }
+  }
+
+  /** Refuse an address inside the bootloader. */
+  private outsideBootloader(address: number): void {
+    if (address < BOOT_END) {
+      throw new Error(
+        `${formatAddress(address)} is inside the bootloader, which is left as it is`
+      );
     }
   }
 }

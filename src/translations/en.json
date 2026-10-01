@@ -584,6 +584,7 @@
     "bk_wrong_family": "This firmware is not built for a Beken BK72xx chip.",
     "bk_wrong_chip": "This firmware is built for another chip than the one connected.",
     "bk_unknown_flash": "The flash memory of this chip is not known, so it cannot be unlocked for writing.",
+    "bk_no_bootloader": "This chip has no bootloader: the start of its flash is blank, so no firmware written to it could start. Nothing was written. Restore the bootloader from a backup of this chip, then install again.",
     "engine_load_failed": "Could not load the flashing tools. Reload the page and try again.",
     "rtl_wrong_family": "This firmware is not built for an RTL8720C (AmebaZ2), the only Realtek chip the browser can flash.",
     "nrf_no_dfu_package": "This build did not produce a DFU package (firmware.zip). Browser DFU needs the Adafruit nRF52 bootloader build.",

@@ -66,6 +66,7 @@ describe("runBeken", () => {
   it("names a failure of the flash that has no copy of its own by its detail alone", async () => {
     vi.doMock("../../../src/platforms/bk72xx/beken-flasher.js", () => ({
       BekenChipMismatchError: class extends Error {},
+      BekenNoBootloaderError: class extends Error {},
       BekenUnknownFlashError: class extends Error {},
       flashBeken: vi.fn().mockRejectedValue(new Error("no answer")),
     }));
@@ -74,6 +75,22 @@ describe("runBeken", () => {
     expect(await runBeken(PORT, IMAGE, HOOKS)).toMatchObject({
       key: undefined,
       detail: "no answer",
+    });
+  });
+
+  it("names a chip without a bootloader by its own copy", async () => {
+    class BekenNoBootloaderError extends Error {}
+    vi.doMock("../../../src/platforms/bk72xx/beken-flasher.js", () => ({
+      BekenChipMismatchError: class extends Error {},
+      BekenNoBootloaderError,
+      BekenUnknownFlashError: class extends Error {},
+      flashBeken: vi.fn().mockRejectedValue(new BekenNoBootloaderError("blank")),
+    }));
+    const { runBeken } = await import("../../../src/platforms/bk72xx/index.js");
+
+    expect(await runBeken(PORT, IMAGE, HOOKS)).toMatchObject({
+      key: "firmware.bk_no_bootloader",
+      detail: "blank",
     });
   });
 

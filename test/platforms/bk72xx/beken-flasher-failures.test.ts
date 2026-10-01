@@ -3,6 +3,7 @@ import { driveFakeTimers } from "../../_fake-timers.js";
 import {
   BekenChipMismatchError,
   BekenLinkError,
+  BekenNoBootloaderError,
   BekenResponseError,
   BekenUnknownFlashError,
   flashBeken,
@@ -13,6 +14,7 @@ import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 import {
   BK7231N,
   BK7231T,
+  BK7238,
   BK7252,
   count,
   expectImage,
@@ -58,6 +60,44 @@ describe("flashBeken, when it cannot go on", () => {
     expect(count(chip, 0x0f, true)).toBe(0);
     expect(chip.flash[0x11000]).toBe(oldByte(0x11000));
     expect(chip.raw.close).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { name: "the BootROM", spec: { ...BK7238, boot_crc: null }, family: FAMILY.bk7238 },
+    {
+      name: "a bootloader's protocol",
+      spec: { ...BK7231T, boot_crc: null },
+      family: FAMILY.t,
+    },
+  ])(
+    "refuses a chip whose bootloader is blank under $name, before anything is written",
+    async ({ spec, family }) => {
+      const { chip, done } = flash(spec, referenceImage(family));
+      chip.flash.fill(0xff, 0, 0x1000);
+
+      await expect(driveFakeTimers(done)).rejects.toBeInstanceOf(BekenNoBootloaderError);
+
+      expect(count(chip, 0x0f, true)).toBe(0);
+      expect(count(chip, 0x07, true)).toBe(0);
+      expect(chip.flash[0x11000]).toBe(oldByte(0x11000));
+      expect(chip.raw.close).toHaveBeenCalledOnce();
+    }
+  );
+
+  it("refuses a run inside the bootloader before anything is erased", async () => {
+    const image = referenceImage(FAMILY.n);
+    const inside: LibreTinyImage = {
+      ...image,
+      runs: [{ address: 0x10000, data: new Uint8Array(16) }, ...image.runs],
+    };
+    const { chip, done } = flash(BK7231N, inside);
+
+    await expect(driveFakeTimers(done)).rejects.toThrow(
+      "0x10000 is inside the bootloader, which is left as it is"
+    );
+
+    expect(count(chip, 0x0f, true)).toBe(0);
+    expect(chip.flash[0x10000]).toBe(oldByte(0x10000));
   });
 
   it("fails when the flash fits neither protocol", async () => {

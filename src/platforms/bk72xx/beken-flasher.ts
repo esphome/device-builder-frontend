@@ -22,7 +22,7 @@ import { reboot } from "./beken-packets.js";
 import { type BekenChipInfo, BekenSession } from "./beken-session.js";
 
 export { BekenResponseError } from "./beken-link.js";
-export { BekenUnknownFlashError } from "./beken-session.js";
+export { BekenNoBootloaderError, BekenUnknownFlashError } from "./beken-session.js";
 
 /** How long each try gets to produce a linked downloader. */
 const AUTO_LINK_MS = 2000;

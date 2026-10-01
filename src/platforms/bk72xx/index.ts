@@ -54,7 +54,8 @@ export interface BekenFlashFailure {
   key?:
     | "firmware.engine_load_failed"
     | "firmware.bk_wrong_chip"
-    | "firmware.bk_unknown_flash";
+    | "firmware.bk_unknown_flash"
+    | "firmware.bk_no_bootloader";
 }
 
 /**
@@ -89,7 +90,9 @@ export async function runBeken(
         ? "firmware.bk_wrong_chip"
         : err instanceof engine.BekenUnknownFlashError
           ? "firmware.bk_unknown_flash"
-          : undefined;
+          : err instanceof engine.BekenNoBootloaderError
+            ? "firmware.bk_no_bootloader"
+            : undefined;
     return { detail: getErrorMessage(err), error: err, key };
   }
 }
