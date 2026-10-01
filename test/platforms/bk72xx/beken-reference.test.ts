@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
+import { SR_PROTECT_MASK } from "../../../src/platforms/bk72xx/beken-chips.js";
 import { flashBeken } from "../../../src/platforms/bk72xx/beken-flasher.js";
 import { type ChipSpec, fakeBeken, type Frame, referenceImage } from "./_fake-beken.js";
 import basicUnknown from "./fixtures/basic-unknown-bootloader.json";
@@ -65,8 +66,10 @@ function withoutIdleStatusWrites(frames: RecordedFrame[]): RecordedFrame[] {
       sr =
         byteAt(frame, 11) === 0x35 ? (sr & 0xff) | (value << 8) : (sr & 0xff00) | value;
     }
-    if (frame.dir === "tx" && byteAt(frame, 7) === 0x0d && !(sr & 0x407c)) {
-      // Its answer, then one read back per byte written.
+    if (frame.dir === "tx" && byteAt(frame, 7) === 0x0d && !(sr & SR_PROTECT_MASK)) {
+      // A long header of 7 bytes, the code and the 0x01 opcode leave the
+      // register's bytes; skip its answer, then a read back (sent and
+      // answered) per byte.
       i += 1 + 2 * (frame.length - 9);
       continue;
     }
