@@ -395,6 +395,8 @@ describe("the adapter's lines", () => {
 });
 
 describe("paced writes", () => {
+  // One 128-byte chunk on the wire at 115200, rounded up.
+  const PERIOD = 12;
   const WRITTEN = [
     ...[0x04, 0x0e, 0xff, 0x01, 0xe0, 0xfc, 0xf4, 0x06, 0x00, 0x07],
     ...[0x00, 0x00, 0x10, 0x01, 0x00],
@@ -417,7 +419,7 @@ describe("paced writes", () => {
 
     await vi.advanceTimersByTimeAsync(200);
     expect(sent).toHaveLength(1);
-    expect(Math.max(...writes)).toBeLessThanOrEqual(64);
+    expect(Math.max(...writes)).toBeLessThanOrEqual(128);
     expect([...(await done)]).toEqual([0x00, 0x00, 0x10, 0x01, 0x00]);
   });
 
@@ -427,21 +429,6 @@ describe("paced writes", () => {
     await driveFakeTimers(link.command(checkCrc(0, 256)));
 
     expect(writes).toEqual([13]);
-  });
-
-  it("stretches the pace by the scale", async () => {
-    const { link, sent } = scripted([WRITTEN]);
-    link.paceScale = 3;
-
-    const done = link.command(flashWrite4k(0x11000, new Uint8Array(4096)));
-    done.catch(() => {});
-
-    // Enough time at the wire rate, a third of what scale 3 takes.
-    await vi.advanceTimersByTimeAsync(400);
-    expect(sent).toHaveLength(0);
-    await vi.advanceTimersByTimeAsync(700);
-    expect(sent).toHaveLength(1);
-    await done;
   });
 
   it("does not burst the backlog after a stall", async () => {
@@ -469,7 +456,7 @@ describe("paced writes", () => {
     done.catch(() => {});
     await vi.advanceTimersByTimeAsync(0);
     stallNext = true;
-    await vi.advanceTimersByTimeAsync(6);
+    await vi.advanceTimersByTimeAsync(PERIOD);
     const before = writes.length;
 
     // A long stall leaves a backlog behind the schedule.
@@ -480,7 +467,22 @@ describe("paced writes", () => {
     release();
     await vi.advanceTimersByTimeAsync(0);
     expect(writes.length).toBe(before);
-    await vi.advanceTimersByTimeAsync(6);
+    await vi.advanceTimersByTimeAsync(PERIOD);
     expect(writes.length).toBe(before + 1);
+  });
+
+  it("fails between chunks when the device goes away", async () => {
+    const { link, writes, drop } = scripted([WRITTEN]);
+
+    const done = link.command(flashWrite4k(0x11000, new Uint8Array(4096)));
+    const failed = expect(done).rejects.toBeInstanceOf(SerialDeviceLostError);
+    await vi.advanceTimersByTimeAsync(0);
+    const before = writes.length;
+
+    drop();
+    await vi.advanceTimersByTimeAsync(0);
+
+    await failed;
+    expect(writes.length).toBe(before);
   });
 });

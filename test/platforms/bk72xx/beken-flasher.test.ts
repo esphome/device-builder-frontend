@@ -316,26 +316,6 @@ describe("flashBeken", () => {
     expect(count(chip, 0x0f, true)).toBe(5);
   });
 
-  it("slows the writes once a sector failed, and says so", async () => {
-    const image = referenceImage(FAMILY.t);
-    const { chip, log, done } = flash(BK7231T, image, { badCrcs: 1 });
-
-    await driveFakeTimers(done);
-
-    expectImage(chip, image);
-    expect(log).toContain("Slowing the writes to 67% of the wire rate");
-  });
-
-  it("steps the pace down once more when the slower write fails too", async () => {
-    const image = referenceImage(FAMILY.t);
-    const { chip, log, done } = flash(BK7231T, image, { badCrcs: 2 });
-
-    await driveFakeTimers(done);
-
-    expectImage(chip, image);
-    expect(log).toContain("Slowing the writes to 33% of the wire rate");
-  });
-
   it("writes a sector again when the chip does not answer the write", async () => {
     const image = referenceImage(FAMILY.n);
     const { chip, done } = flash(BK7231N, image, { swallowWrites: 1 });

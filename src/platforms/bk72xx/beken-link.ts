@@ -19,8 +19,11 @@ import {
 export const BEKEN_BAUD_RATE = 115200;
 /** What a command waits for its response. */
 export const COMMAND_MS = 1000;
-/** One full-speed USB packet. */
-const PACE_CHUNK = 64;
+/**
+ * What one paced write carries. A bridge without backpressure has been
+ * seen to buffer less than 512 bytes, so two chunks in flight still fit.
+ */
+const PACE_CHUNK = 128;
 // Start, eight data and stop bits per byte on the wire.
 const MS_PER_BYTE = 10_000 / BEKEN_BAUD_RATE;
 /** What one LinkCheck waits before the next is sent, as bk7231tools does. */
@@ -39,12 +42,6 @@ export class BekenResponseError extends Error {
 }
 
 export class BekenLink extends SerialByteSession {
-  /**
-   * Stretch on the write pace: 1 is the wire rate. A bridge whose UART
-   * drains below its claimed baud needs real margin, not exactness.
-   */
-  paceScale = 1;
-
   // When the response to the command under way has to have started,
   // whatever keeps arriving: a firmware that logs on this port would hold
   // a wait that starts anew with every byte open without end. A payload
@@ -125,14 +122,15 @@ export class BekenLink extends SerialByteSession {
     // them and drops the overflow, so each chunk waits for the wire to have
     // room. The wire is the bottleneck either way; this costs no time.
     // Never catch up after a stall: the backlog sent in one burst is what
-    // overflows the bridge's small buffer.
+    // overflows the bridge's small buffer. Never go slower either: a
+    // bootloader drops a 4 KiB frame that takes much over half a second.
     let due = Date.now();
     for (let at = 0; at < frame.length; at += PACE_CHUNK) {
       const wait = due - Date.now();
-      if (wait > 0) await sleep(wait);
+      if (wait > 0) await this.untilAbortedOrGone(sleep(wait));
       const chunk = frame.subarray(at, at + PACE_CHUNK);
       await this.writeBytes(chunk);
-      due = Math.max(due, Date.now()) + chunk.length * MS_PER_BYTE * this.paceScale;
+      due = Math.max(due, Date.now()) + chunk.length * MS_PER_BYTE;
     }
   }
 

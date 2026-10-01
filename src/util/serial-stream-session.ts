@@ -67,7 +67,7 @@ export abstract class SerialStreamSession {
   }
 
   /** ``p``, or the abort, or the reason the session ended once it has. */
-  private untilAbortedOrGone<T>(p: Promise<T>): Promise<T> {
+  protected untilAbortedOrGone<T>(p: Promise<T>): Promise<T> {
     const aborted = this.signal?.aborted;
     if (aborted || this.readEnded) {
       p.catch(() => {});
