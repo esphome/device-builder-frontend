@@ -11,14 +11,18 @@ import { settledWithin } from "../../util/with-deadline.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 import { type BekenChip, familyOf } from "./beken-chips.js";
-import { BekenLink, releaseLines, resetOverLines } from "./beken-link.js";
+import {
+  BEKEN_BAUD_RATE,
+  BekenLink,
+  releaseLines,
+  resetOverLines,
+} from "./beken-link.js";
 import { reboot } from "./beken-packets.js";
 import { type BekenChipInfo, BekenSession } from "./beken-session.js";
 
 export { BekenResponseError } from "./beken-link.js";
 export { BekenUnknownFlashError } from "./beken-session.js";
 
-const BEKEN_BAUD_RATE = 115200;
 /** How long each try gets to produce a linked downloader. */
 const AUTO_LINK_MS = 2000;
 /**

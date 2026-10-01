@@ -15,18 +15,32 @@ import {
 } from "../../../src/platforms/bk72xx/beken-packets.js";
 import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 
-/** A port that answers every write with what the test scripted for it. */
+/** A port that answers every command frame with what the test scripted for it. */
 function scripted(answers: (number[] | null)[]) {
   let out!: ReadableStreamDefaultController<Uint8Array>;
   const sent: Uint8Array[] = [];
+  const writes: number[] = [];
+  const rx: number[] = [];
+  // A frame arrives in paced chunks; an answer goes out once it is whole.
+  const frameLength = (): number | null => {
+    if (rx.length < 5) return null;
+    if (rx[3] !== 0xff) return 4 + rx[3];
+    if (rx.length < 8) return null;
+    return 7 + (rx[5] | (rx[6] << 8));
+  };
   const port = {
     ...disconnectEvents(),
     readable: new ReadableStream<Uint8Array>({ start: (c) => (out = c) }),
     writable: new WritableStream<Uint8Array>({
       write: (chunk) => {
-        sent.push(chunk);
-        const answer = answers.shift();
-        if (answer) out.enqueue(new Uint8Array(answer));
+        writes.push(chunk.length);
+        rx.push(...chunk);
+        for (let length = frameLength(); length !== null && rx.length >= length;) {
+          sent.push(new Uint8Array(rx.splice(0, length)));
+          length = frameLength();
+          const answer = answers.shift();
+          if (answer) out.enqueue(new Uint8Array(answer));
+        }
       },
     }),
     setSignals: vi.fn(async (_s: SerialOutputSignals) => {}),
@@ -36,6 +50,7 @@ function scripted(answers: (number[] | null)[]) {
     link,
     port,
     sent,
+    writes,
     /** Bytes that arrive by themselves, not as the answer to a write. */
     arrive: (bytes: number[]) => out.enqueue(new Uint8Array(bytes)),
     drop: () => out.close(),
@@ -376,5 +391,41 @@ describe("the adapter's lines", () => {
 
     expect(await releaseLines(port as unknown as SerialPort)).toBe(false);
     expect(await resetOverLines(port as unknown as SerialPort)).toBe(false);
+  });
+});
+
+describe("paced writes", () => {
+  const WRITTEN = [
+    ...[0x04, 0x0e, 0xff, 0x01, 0xe0, 0xfc, 0xf4, 0x06, 0x00, 0x07],
+    ...[0x00, 0x00, 0x10, 0x01, 0x00],
+  ];
+
+  it("sends a long frame in chunks no faster than the wire drains them", async () => {
+    const { link, sent, writes } = scripted([WRITTEN]);
+
+    const done = link.command(flashWrite4k(0x11000, new Uint8Array(4096)));
+    done.catch(() => {});
+
+    // The first chunk goes out at once; a 4109-byte frame takes ~357 ms
+    // at 115200, so at 200 ms the frame must still be on its way.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(writes.length).toBeGreaterThan(0);
+    expect(writes.length).toBeLessThan(10);
+    expect(sent).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(sent).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(200);
+    expect(sent).toHaveLength(1);
+    expect(Math.max(...writes)).toBeLessThanOrEqual(64);
+    expect([...(await done)]).toEqual([0x00, 0x00, 0x10, 0x01, 0x00]);
+  });
+
+  it("writes a short frame whole, with nothing to wait on", async () => {
+    const { link, writes } = scripted([CRC]);
+
+    await driveFakeTimers(link.command(checkCrc(0, 256)));
+
+    expect(writes).toEqual([13]);
   });
 });

@@ -15,8 +15,14 @@ import {
   RESPONSE_PREAMBLE,
 } from "./beken-packets.js";
 
+/** The engine's wire rate; a chip in its downloader stays at it. */
+export const BEKEN_BAUD_RATE = 115200;
 /** What a command waits for its response. */
 export const COMMAND_MS = 1000;
+/** One full-speed USB packet. */
+const PACE_CHUNK = 64;
+// Start, eight data and stop bits per byte on the wire.
+const MS_PER_BYTE = 10_000 / BEKEN_BAUD_RATE;
 /** What one LinkCheck waits before the next is sent, as bk7231tools does. */
 const LINK_POLL_MS = 5;
 /** The answers to the LinkChecks still on their way are let through, then dropped. */
@@ -107,9 +113,22 @@ export class BekenLink extends SerialByteSession {
     }
   }
 
+  /** Write ``frame`` no faster than the wire drains it. */
+  private async writePaced(frame: Uint8Array): Promise<void> {
+    // A bridge without backpressure takes bytes faster than its UART sends
+    // them and drops the overflow, so each chunk waits for the wire to have
+    // room. The wire is the bottleneck either way; this costs no time.
+    const start = Date.now();
+    for (let at = 0; at < frame.length; at += PACE_CHUNK) {
+      const wait = start + at * MS_PER_BYTE - Date.now();
+      if (wait > 0) await sleep(wait);
+      await this.writeBytes(frame.subarray(at, at + PACE_CHUNK));
+    }
+  }
+
   /** Send ``command`` and return the payload of its response, empty for one without. */
   async command(command: BekenCommand, timeoutMs = COMMAND_MS): Promise<Uint8Array> {
-    await this.writeBytes(encodeCommand(command));
+    await this.writePaced(encodeCommand(command));
     this.deadline = Date.now() + timeoutMs;
     if (command.reply === undefined) return new Uint8Array(0);
     return this.response(command, command.reply);
