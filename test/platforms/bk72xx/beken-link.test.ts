@@ -429,6 +429,21 @@ describe("paced writes", () => {
     expect(writes).toEqual([13]);
   });
 
+  it("stretches the pace by the scale", async () => {
+    const { link, sent } = scripted([WRITTEN]);
+    link.paceScale = 3;
+
+    const done = link.command(flashWrite4k(0x11000, new Uint8Array(4096)));
+    done.catch(() => {});
+
+    // Enough time at the wire rate, a third of what scale 3 takes.
+    await vi.advanceTimersByTimeAsync(400);
+    expect(sent).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(700);
+    expect(sent).toHaveLength(1);
+    await done;
+  });
+
   it("does not burst the backlog after a stall", async () => {
     let out!: ReadableStreamDefaultController<Uint8Array>;
     const writes: number[] = [];

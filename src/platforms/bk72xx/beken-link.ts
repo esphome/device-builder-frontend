@@ -39,6 +39,12 @@ export class BekenResponseError extends Error {
 }
 
 export class BekenLink extends SerialByteSession {
+  /**
+   * Stretch on the write pace: 1 is the wire rate. A bridge whose UART
+   * drains below its claimed baud needs real margin, not exactness.
+   */
+  paceScale = 1;
+
   // When the response to the command under way has to have started,
   // whatever keeps arriving: a firmware that logs on this port would hold
   // a wait that starts anew with every byte open without end. A payload
@@ -126,7 +132,7 @@ export class BekenLink extends SerialByteSession {
       if (wait > 0) await sleep(wait);
       const chunk = frame.subarray(at, at + PACE_CHUNK);
       await this.writeBytes(chunk);
-      due = Math.max(due, Date.now()) + chunk.length * MS_PER_BYTE;
+      due = Math.max(due, Date.now()) + chunk.length * MS_PER_BYTE * this.paceScale;
     }
   }
 

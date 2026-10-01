@@ -280,6 +280,18 @@ export class BekenSession {
     }
   }
 
+  /**
+   * One step down the pace ladder, for the rest of the flash. A bridge
+   * that corrupted a full-speed write needs margin under its real drain
+   * rate, as esptool steps its baud down.
+   */
+  private slowDown(): void {
+    const next = this.link.paceScale < 1.5 ? 1.5 : 3;
+    if (this.link.paceScale >= next) return;
+    this.link.paceScale = next;
+    this.log(`Slowing the writes to ${Math.round(100 / next)}% of the wire rate`);
+  }
+
   private async writeSector(start: number, data: Uint8Array): Promise<void> {
     const sector = padded(data, SECTOR_SIZE);
     for (let attempt = 0; ; attempt++) {
@@ -290,6 +302,7 @@ export class BekenSession {
       } catch (err) {
         if (!(err instanceof BekenResponseError) || attempt >= WRITE_RETRIES) throw err;
         this.log(`Writing ${formatAddress(start)} failed, erasing and writing again`);
+        this.slowDown();
         await this.erase(start);
       }
     }
