@@ -62,7 +62,7 @@
     "@rspack/core": "2.2.7",
     "@rspack/dev-server": "2.2.1",
     "@swc/helpers": "0.5.23",
-    "@types/node": "26.6.2",
+    "@types/node": "26.6.3",
     "@types/w3c-web-serial": "^1.0.8",
     "@types/w3c-web-usb": "^1.0.14",
     "@types/web-bluetooth": "0.0.21",
