@@ -79,6 +79,8 @@ export interface FakeOptions {
   shortReads?: number;
   /** An address past the flash reads as nothing, so its size cannot be told. */
   noWrapAround?: boolean;
+  /** The sector at this address is erased before the flash. */
+  erasedAt?: number;
   /** LinkChecks after a CRC that the chip lets pass, this many times a second long. */
   deafAfterCrc?: number;
   /** A page write reports fewer bytes than it was given. */
@@ -127,6 +129,9 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
   let shortReads = opts.shortReads ?? 0;
   let failedEraseStatus = opts.failedEraseStatus ?? 0;
   let ignoredErases = opts.ignoredErases?.times ?? 0;
+  if (opts.erasedAt !== undefined) {
+    flash.fill(0xff, opts.erasedAt, opts.erasedAt + SECTOR);
+  }
 
   const reply = (code: number, long: boolean, payload: Uint8Array) => {
     const head = long

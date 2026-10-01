@@ -187,6 +187,19 @@ describe("flashBeken, when it cannot go on", () => {
     expect(count(chip, 0x0f, true)).toBe(0);
   });
 
+  it("fails rather than guess the size of the flash from an erased sector", async () => {
+    const { chip, done } = flash(BK7252, referenceImage(FAMILY.bk7251), {
+      erasedAt: 0x11000,
+    });
+
+    await expect(driveFakeTimers(done)).rejects.toThrow(
+      "Could not tell the size of the flash: the sector at 0x11000 is uniform"
+    );
+
+    expect(count(chip, 0x09, true)).toBe(1);
+    expect(count(chip, 0x0f, true)).toBe(0);
+  });
+
   it("fails when a page was not written whole", async () => {
     const { done } = flash(BK7231T, referenceImage(FAMILY.t), { shortPageWrites: true });
 
