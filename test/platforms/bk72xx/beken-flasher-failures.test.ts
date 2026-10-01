@@ -124,6 +124,16 @@ describe("flashBeken, when it cannot go on", () => {
     expect(chip.flash[0x11000]).toBe(oldByte(0x11000));
   });
 
+  it("fails on a blank sector whose erase never takes", async () => {
+    const { done } = flash(BK7231N, referenceImage(FAMILY.n), {
+      ignoredErases: { address: 0x12000, times: 100 },
+    });
+
+    await expect(driveFakeTimers(done)).rejects.toThrow(
+      "The erase at 0x12000 did not take"
+    );
+  });
+
   it("fails when the flash fits neither protocol", async () => {
     const { chip, done } = flash(
       { ...BK7252, boot_crc: null },

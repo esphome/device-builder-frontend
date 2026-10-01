@@ -87,6 +87,8 @@ export interface FakeOptions {
   srReadStatus?: number;
   /** Erases that take but answer with a status of 1, before they answer 0. */
   failedEraseStatus?: number;
+  /** Erases of the sector at ``address`` that answer as done and leave it as it is. */
+  ignoredErases?: { address: number; times: number };
 }
 
 export interface Frame {
@@ -124,6 +126,7 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
   let badReads = opts.badReads ?? 0;
   let shortReads = opts.shortReads ?? 0;
   let failedEraseStatus = opts.failedEraseStatus ?? 0;
+  let ignoredErases = opts.ignoredErases?.times ?? 0;
 
   const reply = (code: number, long: boolean, payload: Uint8Array) => {
     const head = long
@@ -242,8 +245,9 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
         return true;
       }
       if (long && code === 0x0f) {
-        if (writable() && !opts.deadErase) {
-          const base = at(u32(p, 1)) & ~(SECTOR - 1);
+        const base = at(u32(p, 1)) & ~(SECTOR - 1);
+        const ignored = base === opts.ignoredErases?.address && ignoredErases-- > 0;
+        if (writable() && !opts.deadErase && !ignored) {
           flash.fill(0xff, base, base + SECTOR);
         }
         const status = failedEraseStatus-- > 0 ? 1 : 0;

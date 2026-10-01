@@ -119,6 +119,30 @@ describe("flashBeken", () => {
     expect(chip.statusRegister()).toBe(0);
   });
 
+  it("erases a blank sector again when its CRC shows the erase did not take", async () => {
+    const image = referenceImage(FAMILY.n);
+    const { chip, log, done } = flash(BK7231N, image, {
+      ignoredErases: { address: 0x12000, times: 1 },
+    });
+
+    await driveFakeTimers(done);
+
+    expectImage(chip, image);
+    expect(log).toContain("Erasing 0x12000 failed, erasing again");
+  });
+
+  it("does not check a blank sector under a bootloader's protocol", async () => {
+    const image = referenceImage(FAMILY.t);
+    const { chip, log, done } = flash(BK7231T, image, {
+      ignoredErases: { address: 0x12000, times: 1 },
+    });
+
+    await driveFakeTimers(done);
+
+    expect(log.some((l) => l.endsWith("failed, erasing again"))).toBe(false);
+    expect(chip.flash[0x12000]).toBe(oldByte(0x12000));
+  });
+
   it("tries an erase again when the BootROM says it failed", async () => {
     const image = referenceImage(FAMILY.n);
     const { chip, log, done } = flash(BK7231N, image, { failedEraseStatus: 1 });

@@ -46,10 +46,13 @@ const hex = (bytes: Uint8Array) =>
 const sha256 = async (bytes: Uint8Array<ArrayBuffer>) =>
   hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
 
-const byteAt = (frame: RecordedFrame, at: number): number | undefined =>
-  frame.hex && frame.hex.length >= 2 * at + 2
-    ? parseInt(frame.hex.slice(2 * at, 2 * at + 2), 16)
+/** A byte of the frame; a long one is written down by its head alone. */
+const byteAt = (frame: RecordedFrame, at: number): number | undefined => {
+  const hex = frame.hex ?? frame.head;
+  return hex && hex.length >= 2 * at + 2
+    ? parseInt(hex.slice(2 * at, 2 * at + 2), 16)
     : undefined;
+};
 
 /**
  * The recorded frames without the status register writes bk7231tools makes
@@ -74,6 +77,41 @@ function withoutIdleStatusWrites(frames: RecordedFrame[]): RecordedFrame[] {
       continue;
     }
     kept.push(frame);
+  }
+  return kept;
+}
+
+const isErase = (frame: RecordedFrame) =>
+  frame.dir === "tx" && byteAt(frame, 3) === 0xff && byteAt(frame, 7) === 0x0f;
+const isWrite = (frame: RecordedFrame) =>
+  frame.dir === "tx" && byteAt(frame, 3) === 0xff && byteAt(frame, 7) === 0x07;
+const isCrc = (frame: RecordedFrame) =>
+  frame.dir === "tx" && byteAt(frame, 3) !== 0xff && byteAt(frame, 4) === 0x10;
+// The chip's answer for an erased sector, without its final XOR.
+const ERASED_SECTOR_ANSWER = "f598ab0e";
+
+/**
+ * The engine's frames without its CRC of a sector left blank, which
+ * bk7231tools does not check: right after the erase, answered as erased,
+ * and with no write of that sector after it.
+ */
+function withoutBlankChecks(frames: RecordedFrame[]): RecordedFrame[] {
+  const kept: RecordedFrame[] = [];
+  let before: RecordedFrame | undefined;
+  for (let i = 0; i < frames.length; i++) {
+    const [crc, answer, next] = [frames[i], frames[i + 1], frames[i + 2]];
+    if (
+      isCrc(crc) &&
+      before &&
+      isErase(before) &&
+      answer?.hex?.endsWith(ERASED_SECTOR_ANSWER) &&
+      !(next && isWrite(next))
+    ) {
+      i += 1;
+      continue;
+    }
+    if (crc.dir === "tx") before = crc;
+    kept.push(crc);
   }
   return kept;
 }
@@ -124,7 +162,7 @@ describe("the engine puts on the wire what bk7231tools does", () => {
     );
 
     vi.useRealTimers();
-    expect(await Promise.all(chip.frames.map(summarise))).toEqual(
+    expect(withoutBlankChecks(await Promise.all(chip.frames.map(summarise)))).toEqual(
       withoutIdleStatusWrites(recorded.frames)
     );
     expect(await sha256(chip.flash)).toBe(recorded.flash_sha256);

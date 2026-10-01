@@ -292,15 +292,25 @@ export class BekenSession {
     this.eraseChecked = true;
   }
 
-  private async erase(start: number): Promise<void> {
+  /** ``blank``: nothing is written over the sector, so its CRC proves the erase. */
+  private async erase(start: number, blank = false): Promise<void> {
     this.outsideBootloader(start);
     for (let attempt = 0; ; attempt++) {
       try {
-        return await this.eraseOnce(start);
+        await this.eraseOnce(start);
+        // A CRC locks a bootloader's flash until the next link; not per sector.
+        if (blank && !this.crcLocks) await this.verifyErased(start);
+        return;
       } catch (err) {
         if (!(err instanceof BekenResponseError) || attempt >= ERASE_RETRIES) throw err;
         this.log(`Erasing ${formatAddress(start)} failed, erasing again`);
       }
+    }
+  }
+
+  private async verifyErased(start: number): Promise<void> {
+    if ((await this.crc(start, start + SECTOR_SIZE)) !== CRC_ERASED_SECTOR) {
+      throw new BekenResponseError(`The erase at ${formatAddress(start)} did not take`);
     }
   }
 
@@ -381,8 +391,9 @@ export class BekenSession {
     }
     while (done < data.length) {
       const sector = data.subarray(done, done + SECTOR_SIZE);
-      await this.erase(at);
-      if (sector.some((b) => b !== ERASED)) await this.writeSector(at, sector);
+      const blank = sector.every((b) => b === ERASED);
+      await this.erase(at, blank);
+      if (!blank) await this.writeSector(at, sector);
       at += sector.length;
       done += sector.length;
       onBytes(done);
