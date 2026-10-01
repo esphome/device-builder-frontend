@@ -15,6 +15,7 @@ export interface ReceiverInput {
   parts: FlashPart[];
   erase: boolean;
   flasher: HandoffFlasher;
+  logsOnFlashPort?: boolean;
 }
 
 /** A checked image: its plan, and the logs policy of the flasher that runs it. */
@@ -41,7 +42,12 @@ export async function prepareForReceiver(
     return { failure: localize(TOOLS_LOAD_FAILED), retryable: true };
   }
   try {
-    const plan = await engine.prepare(input.parts, input.erase, localize);
+    const plan = await engine.prepare(
+      input.parts,
+      input.erase,
+      localize,
+      input.logsOnFlashPort === true
+    );
     if ("error" in plan) {
       return { failure: plan.error, retryable: plan.retryable === true };
     }

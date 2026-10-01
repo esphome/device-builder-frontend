@@ -229,4 +229,22 @@ describe("libretinyReceiverEngine", () => {
       note: { message: "firmware.rtl_done_manual_reset web.bk.logs_elsewhere" },
     });
   });
+
+  it("opens the logs on the flashed port when the opener says they are there", async () => {
+    const onFlashPort = libretinyReceiverEngine(
+      {
+        ...RTL_INSTALL,
+        copy: { ...RTL_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
+        load: async () => ({ image }),
+        run: async () => ({ rebooted: true }),
+      },
+      RTL87XX_SERIAL_LOGS
+    );
+    const plan = await onFlashPort.prepare(uf2, false, localize, true);
+
+    expect("run" in plan && (await plan.run(hooks()))).toEqual({
+      rebooted: true,
+      note: undefined,
+    });
+  });
 });

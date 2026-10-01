@@ -194,6 +194,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       parts,
       erase: msg.erase !== false,
       flasher: msg.flasher ?? DEFAULT_HANDOFF_FLASHER,
+      logsOnFlashPort: msg.logsOnFlashPort === true,
     });
   }
 

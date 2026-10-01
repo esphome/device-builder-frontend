@@ -54,7 +54,11 @@ export function openFlasher(
   firmware: ArrayBuffer,
   name: string,
   deviceName: string,
-  { flasher, erase }: Pick<HandoffSpec, "flasher" | "erase">,
+  {
+    flasher,
+    erase,
+    logsOnFlashPort,
+  }: Pick<HandoffSpec, "flasher" | "erase"> & { logsOnFlashPort?: boolean },
   cb: FlasherCallbacks
 ): (() => void) | null {
   const nonce = randomNonce();
@@ -142,6 +146,7 @@ export function openFlasher(
           deviceName,
           erase,
           flasher,
+          ...(logsOnFlashPort && { logsOnFlashPort }),
           parts: [{ address: 0, data: bytes }],
         };
         win.postMessage(frame, FLASHER_ORIGIN, [bytes]);

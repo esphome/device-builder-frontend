@@ -139,6 +139,7 @@ const BK_UART_HANDOFF: HandoffSpec = {
     const parsed = await loadBekenImage(bytes);
     return "key" in parsed ? parsed : null;
   },
+  logsOnFlashPort: bkLogsOnFlashPort,
 };
 
 export const bekenInstall: BrowserInstall<"bk-uart"> = {

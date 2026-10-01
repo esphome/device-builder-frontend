@@ -72,6 +72,22 @@ describe("openFlasher", () => {
     expect(teardown).toBeNull();
   });
 
+  it("says the logs are on the flashed port only when they are", () => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    openFlasher(
+      new ArrayBuffer(8),
+      "f.uf2",
+      "dev",
+      { flasher: "bk-uart", erase: false, logsOnFlashPort: true },
+      makeCallbacks()
+    );
+
+    emit(fakeWin, { type: "esphome-web-flash:ready", flashers: ["bk-uart"] });
+
+    expect(fakeWin.postMessage.mock.calls[0][0].logsOnFlashPort).toBe(true);
+  });
+
   it("opens with nonce+origin, hands off on ready, and reports progress + done", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     const open = vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
@@ -100,6 +116,7 @@ describe("openFlasher", () => {
     // The default hand-off is esptool's whole-chip factory write.
     expect(msg.flasher).toBe("esp");
     expect(msg.erase).toBe(true);
+    expect("logsOnFlashPort" in msg).toBe(false);
     expect(targetOrigin).toBe(FLASHER_ORIGIN);
     expect(transfer).toHaveLength(1);
 

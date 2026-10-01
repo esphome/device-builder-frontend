@@ -17,7 +17,7 @@ export function libretinyReceiverEngine(
   const { copy } = install;
   return {
     logs,
-    async prepare(parts, _erase, localize) {
+    async prepare(parts, _erase, localize, logsOnFlashPort = false) {
       const uf2 = singleWholePart(parts);
       const parsed = uf2
         ? await install.load(uf2)
@@ -55,7 +55,7 @@ export function libretinyReceiverEngine(
           const byHand = result.rebooted
             ? undefined
             : (copy.doneByHand ?? "web.install.done_reset_by_hand");
-          if (copy.logsElsewhere) {
+          if (copy.logsElsewhere && !logsOnFlashPort) {
             // A reset that is left to do comes before where the logs are.
             const elsewhere = localize(copy.logsElsewhere);
             return {

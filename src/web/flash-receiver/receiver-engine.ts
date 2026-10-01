@@ -95,7 +95,9 @@ export interface ReceiverEngine {
   prepare(
     parts: FlashPart[],
     erase: boolean,
-    localize: LocalizeFunc
+    localize: LocalizeFunc,
+    /** The opener says the device logs on the port the flash goes over. */
+    logsOnFlashPort?: boolean
   ): Promise<ReceiverPlan | { error: string; retryable?: boolean }>;
 }
 

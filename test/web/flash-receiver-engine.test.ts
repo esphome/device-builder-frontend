@@ -35,7 +35,8 @@ const engines = vi.hoisted(() => {
       prepare: vi.fn(
         async (
           _parts: unknown,
-          _erase: boolean
+          _erase: boolean,
+          _logsOnFlashPort?: boolean
         ): Promise<{ run: typeof run } | { error: string; retryable?: boolean }> => ({
           run,
         })
@@ -73,8 +74,13 @@ vi.mock("../../src/web/flash-receiver/receiver-engine.js", async () => {
     const { prepare, logs } = await engine;
     return {
       logs,
-      prepare: async (parts: unknown, erase: boolean) => {
-        const plan = await prepare(parts, erase);
+      prepare: async (
+        parts: unknown,
+        erase: boolean,
+        _localize: unknown,
+        logsOnFlashPort?: boolean
+      ) => {
+        const plan = await prepare(parts, erase, logsOnFlashPort);
         return "run" in plan ? { run: serialRun((k) => k, plan.run) } : plan;
       },
     };
@@ -203,6 +209,12 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(engines.esp.run).toHaveBeenCalledOnce();
     expect(engines.rtl.prepare).not.toHaveBeenCalled();
     expect(engines.esp.prepare.mock.calls[0][1]).toBe(true); // erase defaults on
+    expect(engines.esp.prepare.mock.calls[0][2]).toBe(false);
+  });
+
+  it("passes on that the logs are on the flashed port", async () => {
+    await handOff({ flasher: "rtl-ambz2", logsOnFlashPort: true });
+    expect(engines.rtl.prepare.mock.calls[0][2]).toBe(true);
   });
 
   it("runs the named engine and relays its states to the opener", async () => {
