@@ -90,27 +90,39 @@ const isCrc = (frame: RecordedFrame) =>
 // The chip's answer for an erased sector, without its final XOR.
 const ERASED_SECTOR_ANSWER = "f598ab0e";
 
+/** The four bytes of a frame from ``at``, as written down. */
+const wordAt = (frame: RecordedFrame, at: number) =>
+  [0, 1, 2, 3].map((n) => byteAt(frame, at + n)).join(",");
+
 /**
  * The engine's frames without its CRC of a sector left blank, which
  * bk7231tools does not check: right after the erase, answered as erased,
- * and with no write of that sector after it.
+ * with no write of that sector after it, and not the check of a first erase
+ * (a CRC of the same sector before the erase, then one after).
  */
 function withoutBlankChecks(frames: RecordedFrame[]): RecordedFrame[] {
   const kept: RecordedFrame[] = [];
   let before: RecordedFrame | undefined;
+  let beforeErase: RecordedFrame | undefined;
   for (let i = 0; i < frames.length; i++) {
     const [crc, answer, next] = [frames[i], frames[i + 1], frames[i + 2]];
+    const firstEraseCheck =
+      beforeErase !== undefined &&
+      isCrc(beforeErase) &&
+      before !== undefined &&
+      wordAt(beforeErase, 5) === wordAt(before, 9);
     if (
       isCrc(crc) &&
       before &&
       isErase(before) &&
+      !firstEraseCheck &&
       answer?.hex?.endsWith(ERASED_SECTOR_ANSWER) &&
       !(next && isWrite(next))
     ) {
       i += 1;
       continue;
     }
-    if (crc.dir === "tx") before = crc;
+    if (crc.dir === "tx") [beforeErase, before] = [before, crc];
     kept.push(crc);
   }
   return kept;

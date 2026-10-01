@@ -272,17 +272,18 @@ export class BekenSession {
     }
   }
 
-  private async eraseOnce(start: number): Promise<void> {
+  /** Erase the sector; true when its CRC already showed it blank. */
+  private async eraseOnce(start: number): Promise<boolean> {
     const erase = () =>
       this.link.command(flashEraseSector(this.at(start), this.protocol === "full"));
     // A bootloader does not let an erase after a CRC through, so there is
     // nothing to compare; the BootROM's first erase is looked at.
     if (this.eraseChecked || this.crcLocks) {
       await erase();
-      return;
+      return false;
     }
     // An erased sector shows nothing, so the next one is looked at instead.
-    if ((await this.crc(start, start + SECTOR_SIZE)) === CRC_ERASED_SECTOR) return;
+    if ((await this.crc(start, start + SECTOR_SIZE)) === CRC_ERASED_SECTOR) return true;
     await erase();
     if ((await this.crc(start, start + SECTOR_SIZE)) !== CRC_ERASED_SECTOR) {
       throw new BekenResponseError(
@@ -290,6 +291,7 @@ export class BekenSession {
       );
     }
     this.eraseChecked = true;
+    return true;
   }
 
   /** ``blank``: nothing is written over the sector, so its CRC proves the erase. */
@@ -297,9 +299,9 @@ export class BekenSession {
     this.outsideBootloader(start);
     for (let attempt = 0; ; attempt++) {
       try {
-        await this.eraseOnce(start);
+        const shown = await this.eraseOnce(start);
         // A CRC locks a bootloader's flash until the next link; not per sector.
-        if (blank && !this.crcLocks) await this.verifyErased(start);
+        if (blank && !shown && !this.crcLocks) await this.verifyErased(start);
         return;
       } catch (err) {
         if (!(err instanceof BekenResponseError) || attempt >= ERASE_RETRIES) throw err;
