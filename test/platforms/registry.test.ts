@@ -178,13 +178,13 @@ describe("PLATFORMS", () => {
 
   // The behaviour each platform's logs policy must keep: the RTS pulse only
   // where the port has a reset line, the line release on the LibreTiny
-  // boards, their own reset for the Pico and nRF52, none for a BK72xx on a
-  // plain adapter, and Bluetooth only on nRF52.
+  // boards, their own reset for the Pico and nRF52, and Bluetooth only on
+  // nRF52.
   it.each([
     ["nrf52", { reset: "platform", releaseLinesAfterOpen: false, ble: true }],
     ["rp2", { reset: "platform", releaseLinesAfterOpen: false, ble: false }],
     ["rtl87xx", { reset: "rts-pulse", releaseLinesAfterOpen: true, ble: false }],
-    ["bk72xx", { reset: undefined, releaseLinesAfterOpen: true, ble: false }],
+    ["bk72xx", { reset: "rts-pulse", releaseLinesAfterOpen: true, ble: false }],
   ] as const)("%s keeps its logs policy", (id, expected) => {
     const logs = PLATFORMS.find((p) => p.id === id)?.logs;
     const reset = logs?.serial?.reset;

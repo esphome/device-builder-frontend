@@ -59,9 +59,9 @@ describe.each([
   {
     name: "esphome-web-bk-card",
     Card: ESPHomeWebBkCard,
-    // Release the lines, and no reset over a line that reaches nothing.
+    // Release the lines, reset over RTS.
     policy: BK72XX_SERIAL_LOGS,
-    is: { releaseLinesAfterOpen: true },
+    is: { reset: "rts-pulse", releaseLinesAfterOpen: true },
     title: "web.bk.title",
     dialog: "esphome-web-install-bk-dialog",
   },

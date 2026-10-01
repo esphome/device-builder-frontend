@@ -48,8 +48,9 @@ hardware classes behave differently:
   configuration moves them. There is no strap: a chip that runs ESPHome
   reboots into its downloader when it sees the link packet, another one has
   to be reset while the engine polls. Every logs open releases both lines
-  (`BK72XX_SERIAL_LOGS` in `src/platforms/bk72xx/serial-logs.ts`), and no
-  Reset device is offered.
+  (`BK72XX_SERIAL_LOGS` in `src/platforms/bk72xx/serial-logs.ts`), and
+  Reset device pulses RTS: that resets a board whose adapter wires RTS to
+  CEN and does nothing on one wired TX, RX and GND only.
 - **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
   dialog's Reset Device instead touches the port at 1200 baud into
   BOOTSEL and reboots it over WebUSB (`RP2_SERIAL_LOGS` in
