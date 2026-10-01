@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
+  dispatchShowLogsAfterInstall: vi.fn(() => true),
   flashBeken: vi.fn<(p: unknown, i: unknown, hooks: FlashHooks) => Promise<void>>(),
 }));
 type FlashHooks = {
@@ -14,6 +15,9 @@ type FlashHooks = {
 };
 vi.mock("../../../src/util/web-serial.js", () => ({
   requestSerialPort: mocks.requestSerialPort,
+}));
+vi.mock("../../../src/util/post-install-dispatch.js", () => ({
+  dispatchShowLogsAfterInstall: mocks.dispatchShowLogsAfterInstall,
 }));
 vi.mock("../../../src/platforms/bk72xx/beken-flasher.js", async (importOriginal) => ({
   ...(await importOriginal<
@@ -89,10 +93,20 @@ function makeHost(opts: { binaries?: FirmwareBinary[]; uf2?: ArrayBuffer } = {})
       binaries: opts.binaries ?? [bin("firmware.uf2", "uf2"), bin("firmware.bin", "bin")],
       downloadBytes: opts.uf2 ?? uf2(),
     },
-    { _logsPort: null as SerialPort | null }
+    {
+      _logsPort: null as SerialPort | null,
+      _open: true,
+      _showLogsAfterInstall: false,
+    }
   );
 }
 type Host = ReturnType<typeof makeHost>;
+
+/** The device, its logger moved by its config. */
+const logging = (
+  logger_interface: string | null,
+  logger_baud_rate: number | null = null
+): ConfiguredDevice => ({ ...device, logger_interface, logger_baud_rate });
 
 function readyHost(): Host {
   const host = makeHost();
@@ -287,6 +301,61 @@ describe("bekenDoFlash", () => {
     expect(host._logsPort).toBeNull();
   });
 
+  it("opens the logs on the flashed port when the config puts them on UART1", async () => {
+    const host = readyHost();
+    host._device = logging("UART1");
+    host._showLogsAfterInstall = true;
+    const port = {};
+    mocks.requestSerialPort.mockResolvedValue(port);
+    mocks.flashBeken.mockResolvedValue(undefined);
+
+    await bekenDoFlash(asHost(host));
+
+    expect(host._statusMessage).toBe("firmware.status_done");
+    expect(host._logsPort).toBe(port);
+    expect(mocks.dispatchShowLogsAfterInstall).toHaveBeenCalledWith(
+      host,
+      expect.objectContaining({ webSerialPort: port, targetPlatform: "bk72xx" })
+    );
+    expect(host._open).toBe(false);
+  });
+
+  it("keeps the UART1 port for Show logs without opening them unasked", async () => {
+    const host = readyHost();
+    host._device = logging("UART1");
+    const port = {};
+    mocks.requestSerialPort.mockResolvedValue(port);
+    mocks.flashBeken.mockResolvedValue(undefined);
+
+    await bekenDoFlash(asHost(host));
+
+    expect(host._step).toBe("done");
+    expect(host._logsPort).toBe(port);
+    expect(mocks.dispatchShowLogsAfterInstall).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { why: "an explicit UART2", device: logging("UART2"), message: "firmware.bk_done" },
+    {
+      why: "a disabled logger",
+      device: logging("UART1", 0),
+      message: "firmware.status_done",
+    },
+  ])("keeps no port for $why", async ({ device: config, message }) => {
+    const host = readyHost();
+    host._device = config;
+    host._showLogsAfterInstall = true;
+    mocks.requestSerialPort.mockResolvedValue({});
+    mocks.flashBeken.mockResolvedValue(undefined);
+
+    await bekenDoFlash(asHost(host));
+
+    expect(host._step).toBe("done");
+    expect(host._statusMessage).toBe(message);
+    expect(host._logsPort).toBeNull();
+    expect(mocks.dispatchShowLogsAfterInstall).not.toHaveBeenCalled();
+  });
+
   it("drops what the engine reports once the dialog moved on", async () => {
     const host = readyHost();
     mocks.requestSerialPort.mockResolvedValue({});
@@ -430,5 +499,17 @@ describe("bekenInstall", () => {
     expect(link.target).toBe("_blank");
     expect(link.rel).toBe("noopener noreferrer");
     expect(link.textContent).toBe("firmware.bk_guide_link");
+  });
+});
+
+describe("bekenInstall.holdsPort", () => {
+  it.each([
+    { why: "logs on UART1", config: logging("UART1"), holds: true },
+    { why: "the default UART2", config: logging(null), holds: false },
+    { why: "an explicit UART2", config: logging("UART2"), holds: false },
+    { why: "a disabled logger", config: logging("UART1", 0), holds: false },
+    { why: "no device", config: null, holds: false },
+  ])("is $holds for $why", ({ config, holds }) => {
+    expect(bekenInstall.holdsPort(config)).toBe(holds);
   });
 });

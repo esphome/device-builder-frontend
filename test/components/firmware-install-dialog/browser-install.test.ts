@@ -46,7 +46,7 @@ const doFlash = vi.fn();
 const fakeFlasher: BrowserInstall<"test-only-flash"> = {
   id: "test-only-flash",
   methodKey: "fake",
-  holdsPort: true,
+  holdsPort: () => true,
   image: fakeImage,
   start: vi.fn(async (host) => {
     fakeImage.set(host, { bytes: 1 });

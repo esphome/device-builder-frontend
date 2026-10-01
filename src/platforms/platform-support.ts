@@ -19,6 +19,7 @@
  */
 import type { TemplateResult } from "lit";
 
+import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import type { SerialLineHooks } from "../util/serial-log-stream.js";
@@ -93,8 +94,8 @@ export interface BrowserInstall<Id extends FlasherId> {
   readonly icon?: string;
   /** Offered under "Advanced options" rather than in the main list. */
   readonly advanced?: boolean;
-  /** The flash leaves a port the logs can reopen (the show-logs toggle). */
-  readonly holdsPort: boolean;
+  /** Whether the flash leaves a port the logs can reopen (the show-logs toggle). */
+  readonly holdsPort: (device: ConfiguredDevice | null) => boolean;
   /** Where the flow keeps its parsed image; Retry skips the compile while it holds one. */
   readonly image: FlashImageSlot<object>;
   /** Compile, download and parse, then show the first user-gesture step. */

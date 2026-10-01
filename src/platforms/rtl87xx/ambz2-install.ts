@@ -139,7 +139,7 @@ export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {
   // The RTL8710B (AmebaZ) is the same platform and another ROM protocol.
   chips: ["rtl8720c"],
   // The logs reopen the flash's port (Show logs on Done, the after-install toggle).
-  holdsPort: true,
+  holdsPort: () => true,
   image: rtlImage,
   start: startRtlAmbz2Install,
   showFirstStep: showReadyStep,

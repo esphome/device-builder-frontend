@@ -352,7 +352,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
   if (isRunning) {
     // Installers whose flash leaves a port the logs can reopen.
     const showToggle =
-      host._installer === "web-serial" || host._flasher?.holdsPort === true;
+      host._installer === "web-serial" || host._flasher?.holdsPort(host._device) === true;
     return html`
       <div class="footer">
         ${

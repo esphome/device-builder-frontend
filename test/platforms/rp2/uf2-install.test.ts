@@ -419,9 +419,9 @@ describe("logs after a Pico install", () => {
 
   it("holds a port only where the WebUSB write runs", () => {
     try {
-      expect(rp2Uf2Install.holdsPort).toBe(true);
+      expect(rp2Uf2Install.holdsPort(null)).toBe(true);
       mocks.webUsb = false;
-      expect(rp2Uf2Install.holdsPort).toBe(false);
+      expect(rp2Uf2Install.holdsPort(null)).toBe(false);
     } finally {
       mocks.webUsb = true;
     }

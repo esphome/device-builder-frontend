@@ -14,6 +14,7 @@ import {
   pickSerialPortOrFail,
   pickUf2,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
+import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
 import type { HandoffSpec } from "../handoff.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
@@ -23,6 +24,7 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { loadBekenImage, runBeken } from "./index.js";
+import { bkLogsOnFlashPort } from "./serial-logs.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -108,8 +110,16 @@ export async function bekenDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<
     );
     return;
   }
-  // The adapter is on UART1 now; the logs are on another pad.
-  host._statusMessage = host._localize("firmware.bk_done");
+  // The adapter is on UART1, so the logs follow only a config that moved
+  // them there; a disabled logger has none to point at.
+  if (bkLogsOnFlashPort(device)) {
+    host._statusMessage = host._localize("firmware.status_done");
+    finishWithLogsPort(host, port);
+    return;
+  }
+  host._statusMessage = host._localize(
+    device?.logger_baud_rate === 0 ? "firmware.status_done" : "firmware.bk_done"
+  );
   host._step = "done";
 }
 
@@ -132,9 +142,9 @@ export const bekenInstall: BrowserInstall<"bk-uart"> = {
   id: "bk-uart",
   methodKey: "bk_uart",
   chips: ["bk7231", "bk7238", "bk7251"],
-  // The flash goes over UART1 and the logs come from UART2, unless the
-  // config moves them: the port used is not the one the logs are on.
-  holdsPort: false,
+  // The flash goes over UART1; the logs are on that port only when the
+  // config moves them there from UART2.
+  holdsPort: bkLogsOnFlashPort,
   image: bekenImage,
   start: startBekenInstall,
   showFirstStep: showReadyStep,

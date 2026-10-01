@@ -17,6 +17,7 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 }));
 
 import { identityLocalize } from "../_dom.js";
+import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { findTemplatesByAnchor, visitTemplates } from "../_lit-template-walker.js";
 import type {
   ESPHomeFirmwareInstallDialog,
@@ -26,6 +27,7 @@ import {
   flasherStepView,
   renderFooter,
 } from "../../src/components/firmware-install-dialog/renderers.js";
+import { bekenInstall } from "../../src/platforms/bk72xx/beken-install.js";
 import {
   nrfDfuInstall,
   nrfDoFlash,
@@ -61,6 +63,7 @@ function footerHost(step: string) {
     _flashBusy: false,
     _flasher: null as AnyBrowserInstall | null,
     _logsPort: null as SerialPort | null,
+    _device: null as ConfiguredDevice | null,
   };
 }
 
@@ -131,6 +134,24 @@ describe("firmware-install-dialog footer", () => {
     expect(values).not.toContain(host._cancel);
     expect(stepRuns(host)).toEqual([rtlDoFlash]);
   });
+
+  it.each([
+    { logger: "UART1", shown: true },
+    { logger: null, shown: false },
+  ])(
+    "shows the BK72xx logs toggle when the logger is on $logger: $shown",
+    ({ logger, shown }) => {
+      const host = footerHost("flashing");
+      host._flasher = bekenInstall;
+      host._device = {
+        logger_interface: logger,
+        logger_baud_rate: null,
+      } as ConfiguredDevice;
+      expect(footerValuesDeep(host).includes("command.show_logs_after_install")).toBe(
+        shown
+      );
+    }
+  );
 
   it("keeps Stop on a flasher step without buttons (rtl-connect)", () => {
     const host = footerHost("rtl-connect");

@@ -157,7 +157,7 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
 export const nrfDfuInstall: BrowserInstall<"nrf-dfu"> = {
   id: "nrf-dfu",
   methodKey: "nrf_dfu",
-  holdsPort: false,
+  holdsPort: () => false,
   image: nrfPackage,
   start: startNrfDfuInstall,
   showFirstStep: showResetStep,

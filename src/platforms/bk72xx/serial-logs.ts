@@ -1,3 +1,4 @@
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { SerialLogsPolicy } from "../serial-logs.js";
 
 /**
@@ -10,3 +11,11 @@ export const BK72XX_SERIAL_LOGS: SerialLogsPolicy = {
   reset: "rts-pulse",
   releaseLinesAfterOpen: true,
 };
+
+/**
+ * Whether the device logs on UART1, the port the install flashes over. The
+ * BK72xx default is UART2, which the backend reports as no interface.
+ */
+export const bkLogsOnFlashPort = (
+  device: Pick<ConfiguredDevice, "logger_interface" | "logger_baud_rate"> | null
+): boolean => device?.logger_interface === "UART1" && device.logger_baud_rate !== 0;

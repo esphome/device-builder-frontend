@@ -168,9 +168,7 @@ export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   // The chips PICOBOOT writes; one the backend could not name is not offered.
   chips: PICO_CHIPS,
   // Only the WebUSB write can end in logs; the UF2 download path never does.
-  get holdsPort() {
-    return isWebUsbSupported();
-  },
+  holdsPort: () => isWebUsbSupported(),
   image: rp2Image,
   start: startRp2Uf2Install,
   handoff: RP2_PICOBOOT_HANDOFF,
