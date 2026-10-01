@@ -77,6 +77,19 @@ describe("flashBeken", () => {
     }
   );
 
+  it("keeps the port open while the reboot is on its way", async () => {
+    const { chip, done } = flash(BK7231N, referenceImage(FAMILY.n));
+    let closedAt = 0;
+    chip.raw.close.mockImplementation(async () => {
+      closedAt = Date.now();
+    });
+
+    await driveFakeTimers(done);
+
+    const rebootAt = last(chip.frames)!.at;
+    expect(closedAt - rebootAt).toBeGreaterThanOrEqual(100);
+  });
+
   it("clears the protection of the flash on the BootROM protocol, and leaves the rest of its status", async () => {
     const { chip, done } = flash({ ...BK7231N, sr: 0x437e }, referenceImage(FAMILY.n));
 

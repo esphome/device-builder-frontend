@@ -88,6 +88,8 @@ export interface FakeOptions {
 export interface Frame {
   dir: "tx" | "rx";
   bytes: Uint8Array;
+  /** ``Date.now()`` when the frame was whole. */
+  at: number;
 }
 
 const u32 = (bytes: Uint8Array, at: number) =>
@@ -125,7 +127,7 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
     const size = payload.length + 1;
     const tail = long ? [size & 0xff, size >> 8, code] : [];
     const frame = concat(new Uint8Array([...head, ...tail]), payload);
-    frames.push({ dir: "rx", bytes: frame });
+    frames.push({ dir: "rx", bytes: frame, at: Date.now() });
     out.enqueue(opts.noise ? concat(opts.noise, frame) : frame);
   };
 
@@ -259,7 +261,7 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
     const head = long ? 7 : 4;
     if (rx.length < head + size) return false;
     const frame = new Uint8Array(rx.splice(0, head + size));
-    frames.push({ dir: "tx", bytes: frame });
+    frames.push({ dir: "tx", bytes: frame, at: Date.now() });
     answer(frame[head], long, frame.subarray(head + 1));
     return true;
   };
