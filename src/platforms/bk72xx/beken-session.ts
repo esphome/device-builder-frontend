@@ -39,6 +39,7 @@ import {
 const CRC_BYTES_PER_SECOND = 400_000;
 /** Retries, so one more attempt than this. */
 const READ_RETRIES = 20;
+const ERASE_RETRIES = 3;
 const WRITE_RETRIES = 10;
 /** Where the app sits on every known layout, readable under both protocols. */
 const PROBE_ADDRESS = 0x11000;
@@ -274,7 +275,7 @@ export class BekenSession {
       try {
         return await this.eraseOnce(start);
       } catch (err) {
-        if (!(err instanceof BekenResponseError) || attempt >= WRITE_RETRIES) throw err;
+        if (!(err instanceof BekenResponseError) || attempt >= ERASE_RETRIES) throw err;
         this.log(`Erasing ${formatAddress(start)} failed, erasing again`);
       }
     }

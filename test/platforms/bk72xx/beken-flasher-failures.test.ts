@@ -170,7 +170,7 @@ describe("flashBeken, when it cannot go on", () => {
     expect(count(chip, 0x0f, true)).toBe(0);
   });
 
-  it("fails after eleven tries when an erase does not take", async () => {
+  it("fails after four tries when an erase does not take", async () => {
     // Protected in a way the status register does not show.
     const { chip, log, done } = flash(BK7231N, referenceImage(FAMILY.n), {
       deadErase: true,
@@ -182,9 +182,9 @@ describe("flashBeken, when it cannot go on", () => {
     await expect(done).rejects.toBeInstanceOf(BekenResponseError);
 
     expect(log.filter((l) => l === "Erasing 0x11000 failed, erasing again")).toHaveLength(
-      10
+      3
     );
-    expect(count(chip, 0x0f, true)).toBe(11);
+    expect(count(chip, 0x0f, true)).toBe(4);
     expect(count(chip, 0x07, true)).toBe(0);
   });
 
