@@ -33,6 +33,7 @@ vi.mock("../../../src/platforms/bk72xx/index.js", async (importOriginal) => {
   return { ...real, loadBekenImage: seams.loadBekenImage };
 });
 
+import { argsLocalize } from "../../_dom.js";
 import {
   ltHeaderTags,
   ltPartInfoTags,
@@ -295,7 +296,7 @@ describe("bekenDoFlash", () => {
     ]);
     expect(host._log.lines).toContain("Writing 0x11000 (256 bytes)");
     expect(host._step).toBe("done");
-    expect(host._statusMessage).toBe("firmware.bk_done");
+    expect(host._statusMessage).toBe("firmware.bk_done_logs_on_uart2");
     expect(host._flashAbort).toBeNull();
     // The flash went over UART1; the logs are on another port by default.
     expect(host._logsPort).toBeNull();
@@ -335,7 +336,11 @@ describe("bekenDoFlash", () => {
   });
 
   it.each([
-    { why: "an explicit UART2", device: logging("UART2"), message: "firmware.bk_done" },
+    {
+      why: "an explicit UART2",
+      device: logging("UART2"),
+      message: "firmware.bk_done_logs_on_uart2 | logger: hardware_uart: UART1",
+    },
     {
       why: "a disabled logger",
       device: logging("UART1", 0),
@@ -343,6 +348,7 @@ describe("bekenDoFlash", () => {
     },
   ])("keeps no port for $why", async ({ device: config, message }) => {
     const host = readyHost();
+    host._localize = argsLocalize;
     host._device = config;
     host._showLogsAfterInstall = true;
     mocks.requestSerialPort.mockResolvedValue({});

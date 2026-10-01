@@ -24,7 +24,7 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { loadBekenImage, runBeken } from "./index.js";
-import { bkLogsOnFlashPort } from "./serial-logs.js";
+import { BK_LOGS_ON_FLASH_PORT_SETTING, bkLogsOnFlashPort } from "./serial-logs.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -117,9 +117,12 @@ export async function bekenDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<
     finishWithLogsPort(host, port);
     return;
   }
-  host._statusMessage = host._localize(
-    device?.logger_baud_rate === 0 ? "firmware.status_done" : "firmware.bk_done"
-  );
+  host._statusMessage =
+    device?.logger_baud_rate === 0
+      ? host._localize("firmware.status_done")
+      : host._localize("firmware.bk_done_logs_on_uart2", {
+          setting: BK_LOGS_ON_FLASH_PORT_SETTING,
+        });
   host._step = "done";
 }
 

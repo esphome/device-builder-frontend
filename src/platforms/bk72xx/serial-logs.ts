@@ -12,6 +12,9 @@ export const BK72XX_SERIAL_LOGS: SerialLogsPolicy = {
   releaseLinesAfterOpen: true,
 };
 
+/** The config that puts the logs on the port the install flashes over. */
+export const BK_LOGS_ON_FLASH_PORT_SETTING = "logger: hardware_uart: UART1";
+
 /**
  * Whether the device logs on UART1, the port the install flashes over. The
  * BK72xx default is UART2, which the backend reports as no interface.
