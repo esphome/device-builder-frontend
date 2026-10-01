@@ -9,6 +9,7 @@ import {
   flashBeken,
 } from "../../../src/platforms/bk72xx/beken-flasher.js";
 import { BekenLink } from "../../../src/platforms/bk72xx/beken-link.js";
+import { BekenSession } from "../../../src/platforms/bk72xx/beken-session.js";
 import type { LibreTinyImage } from "../../../src/platforms/libretiny-uf2.js";
 import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 import {
@@ -98,6 +99,19 @@ describe("flashBeken, when it cannot go on", () => {
 
     expect(count(chip, 0x0f, true)).toBe(0);
     expect(chip.flash[0x10000]).toBe(oldByte(0x10000));
+  });
+
+  it("refuses a write inside the bootloader even past the run check", async () => {
+    const chip = fakeBeken(BK7231N);
+    await chip.raw.open();
+    const session = new BekenSession(new BekenLink(chip.port), () => {});
+
+    await expect(
+      driveFakeTimers(session.program(0x10000, new Uint8Array(0x1000), () => {}))
+    ).rejects.toThrow("0x10000 is inside the bootloader, which is left as it is");
+
+    expect(count(chip, 0x0f, true)).toBe(0);
+    expect(count(chip, 0x07, true)).toBe(0);
   });
 
   it("fails when the flash fits neither protocol", async () => {
