@@ -17,8 +17,8 @@ vi.mock("../../src/platforms/rp2/web-usb.js", async (importOriginal) => ({
 }));
 
 import { identityLocalize } from "../_dom.js";
-import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { findTemplatesByAnchor, visitTemplates } from "../_lit-template-walker.js";
+import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type {
   ESPHomeFirmwareInstallDialog,
   InstallFailureKind,
