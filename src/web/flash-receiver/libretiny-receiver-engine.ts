@@ -17,7 +17,7 @@ export function libretinyReceiverEngine(
   const { copy } = install;
   return {
     logs,
-    async prepare(parts, _erase, localize, logs) {
+    async prepare(parts, _erase, localize, logsAt) {
       const uf2 = singleWholePart(parts);
       const parsed = uf2
         ? await install.load(uf2)
@@ -56,13 +56,13 @@ export function libretinyReceiverEngine(
             ? undefined
             : (copy.doneByHand ?? "web.install.done_reset_by_hand");
           // A device without serial logs has none to open nor point at.
-          if (logs === "off") {
+          if (logsAt === "off") {
             return {
               logsElsewhere: true,
               note: byHand ? { message: localize(byHand) } : undefined,
             };
           }
-          if (copy.logsElsewhere && logs !== "flash-port") {
+          if (copy.logsElsewhere && logsAt !== "flash-port") {
             // A reset that is left to do comes before where the logs are.
             const elsewhere = localize(copy.logsElsewhere);
             return {

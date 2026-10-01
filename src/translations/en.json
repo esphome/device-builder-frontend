@@ -578,7 +578,6 @@
     "bk_wait_title": "Waiting for download mode…",
     "bk_wait_desc": "The chip did not answer. Reset it now: connect CEN to GND for a moment, or power it off and on again. Flashing starts as soon as it answers, so keep the tab that does the flashing open and in front. Check that the adapter is on the pads marked RX1 and TX1 (P10 and P11) and that the chip has a stable 3.3 V supply.",
     "bk_guide_link": "LibreTiny flashing guide for BK72xx",
-    "bk_done": "Installation complete. With serial logging on, the logs come out on UART2, the pad marked TX2, unless the logger is set to UART1, the port used to install. To read them on this port, move the logger to UART1 in the configuration.",
     "bk_done_logs_on_uart2": "Installation complete. The logs come out on UART2, the pad marked TX2, not on the port used to install. Read them there, or set {setting} to get them on this port.",
     "bk_flash_failed": "UART flash failed",
     "bk_bad_uf2": "Invalid LibreTiny UF2 image",

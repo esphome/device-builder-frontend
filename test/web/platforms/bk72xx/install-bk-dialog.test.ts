@@ -75,7 +75,7 @@ describe("esphome-web-install-bk-dialog", () => {
 
     expect(mocks.runBeken).toHaveBeenCalledWith(PORT, IMAGE, expect.any(Object));
     expect(card(el).state).toBe("success");
-    expect(card(el).statusMessage).toBe("firmware.bk_done");
+    expect(card(el).statusMessage).toBe("firmware.status_done web.bk.logs_elsewhere");
   });
 
   it("shows the reset guide while the engine waits for the chip", async () => {

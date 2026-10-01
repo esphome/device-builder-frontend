@@ -260,12 +260,17 @@ export abstract class LibreTinyInstallDialog extends LitElement {
         return this._localize(copy.waiting);
       case "flashing":
         return this._localize("firmware.status_flashing");
-      case "success":
-        return this._localize(
+      case "success": {
+        const done = this._localize(
           this._manualReset
             ? (copy.doneByHand ?? "web.install.done_reset_by_hand")
             : copy.done
         );
+        // Where the logs are follows, as the receiver's note has it.
+        return copy.logsElsewhere
+          ? `${done} ${this._localize(copy.logsElsewhere)}`
+          : done;
+      }
       default:
         return this._errorTitle;
     }
