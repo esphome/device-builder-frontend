@@ -107,7 +107,7 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   const options = {
     flasher: handoff.flasher,
     erase: handoff.erase,
-    logsOnFlashPort: handoff.logsOnFlashPort?.(host._device),
+    logs: handoff.logs?.(host._device),
   };
   const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, options, {
     onProgress: (pct) => {

@@ -120,23 +120,24 @@ describe("handOffToFlasher", () => {
   });
 
   it.each([
-    { logger: "UART1", sent: true },
-    { logger: null, sent: false },
+    { logger: "UART1", baud: null, sent: "flash-port" },
+    { logger: null, baud: null, sent: undefined },
+    { logger: "UART1", baud: 0, sent: "off" },
   ])(
-    "says the BK72xx logs are on the flashed port when the logger is on $logger",
-    ({ logger, sent }) => {
+    "says where the BK72xx logs are: $logger at baud $baud is $sent",
+    ({ logger, baud, sent }) => {
       const host = makeHost();
       host._device = {
         ...host._device,
         target_platform: "bk72xx",
         mcu: "bk7238",
         logger_interface: logger,
-        logger_baud_rate: null,
+        logger_baud_rate: baud,
       } as typeof host._device;
       handOffToFlasher(asHost(host));
       expect(openFlasher.mock.calls[0][3]).toMatchObject({
         flasher: "bk-uart",
-        logsOnFlashPort: sent,
+        logs: sent,
       });
     }
   );

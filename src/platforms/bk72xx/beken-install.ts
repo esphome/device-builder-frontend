@@ -24,7 +24,11 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { loadBekenImage, runBeken } from "./index.js";
-import { BK_LOGS_ON_FLASH_PORT_SETTING, bkLogsOnFlashPort } from "./serial-logs.js";
+import {
+  BK_LOGS_ON_FLASH_PORT_SETTING,
+  bkHandoffLogs,
+  bkLogsOnFlashPort,
+} from "./serial-logs.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -139,7 +143,7 @@ const BK_UART_HANDOFF: HandoffSpec = {
     const parsed = await loadBekenImage(bytes);
     return "key" in parsed ? parsed : null;
   },
-  logsOnFlashPort: bkLogsOnFlashPort,
+  logs: bkHandoffLogs,
 };
 
 export const bekenInstall: BrowserInstall<"bk-uart"> = {

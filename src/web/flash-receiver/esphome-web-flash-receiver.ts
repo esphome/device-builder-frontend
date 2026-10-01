@@ -25,6 +25,7 @@ import {
   type FirmwareMessage,
   type FlashState,
   HANDOFF_FLASHERS,
+  handoffLogsOf,
 } from "./protocol.js";
 import {
   RECEIVER_ENGINES,
@@ -194,7 +195,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       parts,
       erase: msg.erase !== false,
       flasher: msg.flasher ?? DEFAULT_HANDOFF_FLASHER,
-      logsOnFlashPort: msg.logsOnFlashPort === true,
+      logs: handoffLogsOf(msg.logs),
     });
   }
 

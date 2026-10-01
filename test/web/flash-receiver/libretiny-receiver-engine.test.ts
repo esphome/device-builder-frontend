@@ -240,10 +240,28 @@ describe("libretinyReceiverEngine", () => {
       },
       RTL87XX_SERIAL_LOGS
     );
-    const plan = await onFlashPort.prepare(uf2, false, localize, true);
+    const plan = await onFlashPort.prepare(uf2, false, localize, "flash-port");
 
     expect("run" in plan && (await plan.run(hooks()))).toEqual({
       rebooted: true,
+      note: undefined,
+    });
+  });
+
+  it("opens no logs and points nowhere for a device without serial logs", async () => {
+    const off = libretinyReceiverEngine(
+      {
+        ...RTL_INSTALL,
+        copy: { ...RTL_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
+        load: async () => ({ image }),
+        run: async () => ({ rebooted: true }),
+      },
+      RTL87XX_SERIAL_LOGS
+    );
+    const plan = await off.prepare(uf2, false, localize, "off");
+
+    expect("run" in plan && (await plan.run(hooks()))).toEqual({
+      logsElsewhere: true,
       note: undefined,
     });
   });

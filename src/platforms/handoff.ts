@@ -72,8 +72,8 @@ export interface HandoffSpec {
    * tab is offered.
    */
   check?: (bytes: Uint8Array) => Promise<{ key: string; detail: string } | null>;
-  /** Whether the device logs on the port the flash goes over; absent means no. */
-  logsOnFlashPort?: (device: ConfiguredDevice | null) => boolean;
+  /** Where the device's serial logs are, for the receiver; absent when not known. */
+  logs?: (device: ConfiguredDevice | null) => HandoffLogs | undefined;
 }
 
 /**
@@ -114,14 +114,13 @@ export interface FirmwareMessage {
    * 0, which the receiver parses itself.
    */
   flasher?: HandoffFlasher;
-  /**
-   * The device logs on the port the flash goes over, so the receiver opens
-   * them after the install. Absent means it does not, or the opener does not
-   * know; for a flasher whose logs are always there it is not looked at.
-   */
-  logsOnFlashPort?: boolean;
+  /** Where the device's serial logs are, when the opener knows; absent: elsewhere or unknown. */
+  logs?: HandoffLogs;
   parts: FlashPartMessage[];
 }
+
+/** ``"flash-port"``: on the port the flash goes over; ``"off"``: the device has none. */
+export type HandoffLogs = "flash-port" | "off";
 
 export type FlashState = "connecting" | "installing" | "done" | "error";
 

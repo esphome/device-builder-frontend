@@ -3,7 +3,7 @@
  * ids from ``src/platforms/handoff.ts`` plus the checks on the untrusted
  * inbound payload.
  */
-import type { FlashPartMessage } from "../../platforms/handoff.js";
+import type { FlashPartMessage, HandoffLogs } from "../../platforms/handoff.js";
 
 export * from "../../platforms/handoff.js";
 
@@ -13,6 +13,10 @@ export * from "../../platforms/handoff.js";
 const MAX_FLASH_PARTS = 64;
 const MAX_FLASH_BYTES = 64 * 1024 * 1024; // 64 MiB, per part and in total
 const MAX_FLASH_ADDRESS = 0x1_0000_0000; // 4 GiB — a 32-bit flash address space
+
+/** The inbound ``logs`` field, or undefined for anything that is not one. */
+export const handoffLogsOf = (value: unknown): HandoffLogs | undefined =>
+  value === "flash-port" || value === "off" ? value : undefined;
 
 /** Runtime guard for a well-formed, plausibly-sized ``parts`` array. */
 export function isFlashParts(parts: unknown): parts is FlashPartMessage[] {
