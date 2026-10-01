@@ -428,4 +428,44 @@ describe("paced writes", () => {
 
     expect(writes).toEqual([13]);
   });
+
+  it("does not burst the backlog after a stall", async () => {
+    let out!: ReadableStreamDefaultController<Uint8Array>;
+    const writes: number[] = [];
+    let release!: () => void;
+    let stallNext = false;
+    const port = {
+      ...disconnectEvents(),
+      readable: new ReadableStream<Uint8Array>({ start: (c) => (out = c) }),
+      writable: new WritableStream<Uint8Array>({
+        write: (chunk: Uint8Array) => {
+          writes.push(chunk.length);
+          if (!stallNext) return undefined;
+          stallNext = false;
+          return new Promise<void>((r) => (release = r));
+        },
+      }),
+      setSignals: vi.fn(async (_s: SerialOutputSignals) => {}),
+    };
+    void out;
+    const link = new BekenLink(port as unknown as SerialPort);
+
+    const done = link.command(flashWrite4k(0x11000, new Uint8Array(4096)));
+    done.catch(() => {});
+    await vi.advanceTimersByTimeAsync(0);
+    stallNext = true;
+    await vi.advanceTimersByTimeAsync(6);
+    const before = writes.length;
+
+    // A long stall leaves a backlog behind the schedule.
+    await vi.advanceTimersByTimeAsync(100);
+    expect(writes.length).toBe(before);
+
+    // Released, the pace starts over from here instead of catching up.
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(writes.length).toBe(before);
+    await vi.advanceTimersByTimeAsync(6);
+    expect(writes.length).toBe(before + 1);
+  });
 });

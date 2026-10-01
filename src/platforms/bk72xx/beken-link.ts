@@ -118,11 +118,15 @@ export class BekenLink extends SerialByteSession {
     // A bridge without backpressure takes bytes faster than its UART sends
     // them and drops the overflow, so each chunk waits for the wire to have
     // room. The wire is the bottleneck either way; this costs no time.
-    const start = Date.now();
+    // Never catch up after a stall: the backlog sent in one burst is what
+    // overflows the bridge's small buffer.
+    let due = Date.now();
     for (let at = 0; at < frame.length; at += PACE_CHUNK) {
-      const wait = start + at * MS_PER_BYTE - Date.now();
+      const wait = due - Date.now();
       if (wait > 0) await sleep(wait);
-      await this.writeBytes(frame.subarray(at, at + PACE_CHUNK));
+      const chunk = frame.subarray(at, at + PACE_CHUNK);
+      await this.writeBytes(chunk);
+      due = Math.max(due, Date.now()) + chunk.length * MS_PER_BYTE;
     }
   }
 
