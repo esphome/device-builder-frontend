@@ -15,6 +15,7 @@ import {
   CHIP_BY_ID,
   FLASH_SR_SIZE,
   REG_CHIP_ID,
+  SR_LOCK_MASK,
   SR_PROTECT_MASK,
 } from "./beken-chips.js";
 import { type BekenLink, BekenResponseError, COMMAND_MS } from "./beken-link.js";
@@ -253,10 +254,15 @@ export class BekenSession {
     return size;
   }
 
-  /** Clear the flash's block protection, which the BootROM leaves to the host. */
+  /**
+   * Clear the flash's block protection, which the BootROM leaves to the host.
+   * A register with none set is not written.
+   */
   private async unprotect(): Promise<void> {
     const size = this.statusSize();
-    const cleared = (await this.statusRegister(size)) & ~SR_PROTECT_MASK;
+    const sr = await this.statusRegister(size);
+    if (!(sr & SR_PROTECT_MASK)) return;
+    const cleared = sr & ~(SR_PROTECT_MASK | SR_LOCK_MASK);
     await this.link.command(flashWriteSr(cleared, size));
     const now = await this.statusRegister(size);
     if ((cleared & SR_PROTECT_MASK) !== (now & SR_PROTECT_MASK)) {
@@ -267,7 +273,8 @@ export class BekenSession {
   }
 
   private async eraseOnce(start: number): Promise<void> {
-    const erase = () => this.link.command(flashEraseSector(this.at(start)));
+    const erase = () =>
+      this.link.command(flashEraseSector(this.at(start), this.protocol === "full"));
     // A bootloader does not let an erase after a CRC through, so there is
     // nothing to compare; the BootROM's first erase is looked at.
     if (this.eraseChecked || this.crcLocks) {

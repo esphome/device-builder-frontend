@@ -90,12 +90,53 @@ describe("flashBeken", () => {
     expect(closedAt - rebootAt).toBeGreaterThanOrEqual(100);
   });
 
-  it("clears the protection of the flash on the BootROM protocol, and leaves the rest of its status", async () => {
+  it("clears the protection of the flash on the BootROM protocol, and keeps the rest of its status but the locks", async () => {
     const { chip, done } = flash({ ...BK7231N, sr: 0x437e }, referenceImage(FAMILY.n));
 
     await driveFakeTimers(done);
 
-    expect(chip.statusRegister()).toBe(0x0302);
+    expect(chip.statusRegister()).toBe(0x0202);
+  });
+
+  it("leaves a status register with nothing protected alone", async () => {
+    const image = referenceImage(FAMILY.n);
+    const { chip, done } = flash({ ...BK7231N, sr: 0x0200 }, image);
+
+    await driveFakeTimers(done);
+
+    expectImage(chip, image);
+    expect(count(chip, 0x0d, true)).toBe(0);
+    expect(chip.statusRegister()).toBe(0x0200);
+  });
+
+  it("never sets a lock bit when it writes the status register back", async () => {
+    const image = referenceImage(FAMILY.n);
+    const { chip, done } = flash({ ...BK7231N, sr: 0x39fc }, image);
+
+    await driveFakeTimers(done);
+
+    expectImage(chip, image);
+    expect(chip.statusRegister()).toBe(0);
+  });
+
+  it("tries an erase again when the BootROM says it failed", async () => {
+    const image = referenceImage(FAMILY.n);
+    const { chip, log, done } = flash(BK7231N, image, { failedEraseStatus: 1 });
+
+    await driveFakeTimers(done);
+
+    expectImage(chip, image);
+    expect(log.some((l) => l.endsWith("failed, erasing again"))).toBe(true);
+  });
+
+  it("does not look at the status byte of a bootloader's erase", async () => {
+    const image = referenceImage(FAMILY.t);
+    const { chip, log, done } = flash(BK7231T, image, { failedEraseStatus: 3 });
+
+    await driveFakeTimers(done);
+
+    expectImage(chip, image);
+    expect(log.some((l) => l.endsWith("failed, erasing again"))).toBe(false);
   });
 
   it("writes a status register of one byte as one byte", async () => {

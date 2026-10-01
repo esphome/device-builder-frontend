@@ -83,6 +83,10 @@ export interface FakeOptions {
   deafAfterCrc?: number;
   /** A page write reports fewer bytes than it was given. */
   shortPageWrites?: boolean;
+  /** The status byte every status register read answers with. */
+  srReadStatus?: number;
+  /** Erases that take but answer with a status of 1, before they answer 0. */
+  failedEraseStatus?: number;
 }
 
 export interface Frame {
@@ -119,6 +123,7 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
   let deafUntil = 0;
   let badReads = opts.badReads ?? 0;
   let shortReads = opts.shortReads ?? 0;
+  let failedEraseStatus = opts.failedEraseStatus ?? 0;
 
   const reply = (code: number, long: boolean, payload: Uint8Array) => {
     const head = long
@@ -222,7 +227,7 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
       }
       if (long && code === 0x0c && full) {
         const value = p[0] === 0x35 ? (sr >> 8) & 0xff : sr & 0xff;
-        reply(0x0c, true, new Uint8Array([0, p[0], value]));
+        reply(0x0c, true, new Uint8Array([opts.srReadStatus ?? 0, p[0], value]));
         return true;
       }
       if (long && code === 0x0d && full) {
@@ -241,7 +246,8 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
           const base = at(u32(p, 1)) & ~(SECTOR - 1);
           flash.fill(0xff, base, base + SECTOR);
         }
-        reply(0x0f, true, concat(new Uint8Array([0]), p));
+        const status = failedEraseStatus-- > 0 ? 1 : 0;
+        reply(0x0f, true, concat(new Uint8Array([status]), p));
         return true;
       }
       return false;

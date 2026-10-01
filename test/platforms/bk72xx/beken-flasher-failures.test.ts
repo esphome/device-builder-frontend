@@ -114,6 +114,16 @@ describe("flashBeken, when it cannot go on", () => {
     expect(count(chip, 0x07, true)).toBe(0);
   });
 
+  it("stops at a status register read that failed, before anything is written", async () => {
+    const { chip, done } = flash(BK7231N, referenceImage(FAMILY.n), { srReadStatus: 1 });
+
+    await expect(driveFakeTimers(done)).rejects.toThrow("FlashReadSR: status 1");
+
+    expect(count(chip, 0x0d, true)).toBe(0);
+    expect(count(chip, 0x0f, true)).toBe(0);
+    expect(chip.flash[0x11000]).toBe(oldByte(0x11000));
+  });
+
   it("fails when the flash fits neither protocol", async () => {
     const { chip, done } = flash(
       { ...BK7252, boot_crc: null },

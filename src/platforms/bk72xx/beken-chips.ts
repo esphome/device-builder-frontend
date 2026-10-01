@@ -106,6 +106,12 @@ export const FLASH_SR_SIZE: Readonly<Record<string, 1 | 2>> = {
 /** Block protection (BP0 to BP4) and CMP, the bits that keep a write out. */
 export const SR_PROTECT_MASK = 0x407c;
 
+/**
+ * The status register's own protection (SRP0, SRP1) and the security
+ * register locks (LB1 to LB3): never set, since setting any can be for good.
+ */
+export const SR_LOCK_MASK = 0x3980;
+
 /** A LibreTiny UF2 family and the chips its image runs on. */
 export interface BekenFamily {
   id: number;

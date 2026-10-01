@@ -131,6 +131,7 @@ const flashReadRegister = (command: number): BekenCommand => ({
   payload: new Uint8Array([command]),
   reply: 0x0c,
   echo: { at: 1, length: 1 },
+  status: [0],
   least: 3,
 });
 
@@ -148,6 +149,7 @@ export const flashWriteSr = (value: number, size: 1 | 2): BekenCommand => ({
       : new Uint8Array([FLASH_WRITE_SR, value & 0xff, (value >> 8) & 0xff]),
   reply: 0x0d,
   echo: { at: 1, length: size + 1 },
+  status: [0],
   least: 3,
 });
 
@@ -157,16 +159,19 @@ export const flashGetId = (): BekenCommand => ({
   long: true,
   payload: u32(FLASH_READ_ID),
   reply: 0x0e,
+  status: [0],
   least: 5,
 });
 
-export const flashEraseSector = (start: number): BekenCommand => ({
+/** ``checked``: the BootROM's status byte is looked at; a bootloader's is not known. */
+export const flashEraseSector = (start: number, checked = false): BekenCommand => ({
   name: "FlashErase",
   code: 0x0f,
   long: true,
   payload: concat(new Uint8Array([ERASE_SECTOR_4K]), u32(start)),
   reply: 0x0f,
   echo: { at: 1, length: 5 },
+  ...(checked && { status: [0] }),
   least: 6,
 });
 
