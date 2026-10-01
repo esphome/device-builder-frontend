@@ -193,7 +193,7 @@ describe("flashBeken, when it cannot go on", () => {
     });
 
     await expect(driveFakeTimers(done)).rejects.toThrow(
-      "Could not tell the size of the flash: the sector at 0x11000 is uniform"
+      "Could not tell the size of the flash: the sector at 0x11000 is blank"
     );
 
     expect(count(chip, 0x09, true)).toBe(1);
