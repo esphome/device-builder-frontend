@@ -26,6 +26,7 @@ const QUOTED_PATH_RE = /"([^"]*[/\\])([^"/\\]+)"/g;
  *  than the walker's RE_PAIR_LINE — any non-`:` key token, so quoted or
  *  dotted keys still match. */
 const PAIR_RE = /^\s*([^\s:#][^:]*?)\s*:(?:\s+(.*))?$/;
+const GLUED_COLON_RE = /^\s*([A-Za-z_][\w.-]*):\S/;
 
 /** Analysis walks never scan further than this many lines. */
 export const WALK_BOUND = 50;
@@ -200,6 +201,13 @@ function botchedDashKey(text: string): string | null {
   return key !== undefined && key.length > 1 && key[0] === "-" && key[1] !== "-"
     ? key
     : null;
+}
+
+/** The key of a `key:value` line whose colon is glued to its value
+ *  (`password:!secret x`), which the scanner reads as one plain scalar. */
+export function gluedColonKey(text: string): string | null {
+  if (parseListItemMarker(text) || lineKeyToken(text) !== null) return null;
+  return stripComment(text).match(GLUED_COLON_RE)?.[1] ?? null;
 }
 
 /** A `- ` list marker typed without its space (`-platform:`), which the
@@ -834,9 +842,9 @@ export interface YamlAutoFix {
    *  refuses when the line no longer starts there. */
   fromIndent: number;
   /** Absent means re-indent; "dash-space" inserts a space after the dash,
-   *  "comment-out" inserts `# ` at the line's indent, "remove-line" deletes
-   *  the whole line. */
-  kind?: "dash-space" | "comment-out" | "remove-line";
+   *  "colon-space" inserts one after the key's colon, "comment-out" inserts
+   *  `# ` at the line's indent, "remove-line" deletes the whole line. */
+  kind?: "dash-space" | "colon-space" | "comment-out" | "remove-line";
 }
 
 /** A humanized YAML error: display text, best line to jump to, optional auto-fix. */
@@ -904,6 +912,25 @@ export function describeYamlError(
         }),
         jumpLine: ctx.line,
         squiggleLine: ctx.line,
+      };
+    }
+    const glued = ctx && readLine ? readLine(ctx.line) : undefined;
+    const gluedKey = glued === undefined ? null : gluedColonKey(glued);
+    if (ctx && glued !== undefined && gluedKey !== null) {
+      return {
+        text: localize("yaml_editor.error_colon_space_fix", {
+          line: ctx.line,
+          key: gluedKey,
+        }),
+        jumpLine: ctx.line,
+        squiggleLine: ctx.line,
+        fix: {
+          line: ctx.line,
+          indent: 0,
+          key: gluedKey,
+          fromIndent: indentOf(glued),
+          kind: "colon-space",
+        },
       };
     }
   }

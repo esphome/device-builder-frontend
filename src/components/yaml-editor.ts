@@ -39,6 +39,7 @@ import {
 } from "../util/yaml-cursor-paths.js";
 import {
   emptyBlockFixKind,
+  gluedColonKey,
   lineKeyToken,
   type YamlAutoFix,
 } from "../util/yaml-error-analysis.js";
@@ -647,7 +648,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       const doc = view.state.doc;
       if (fix.line < 1 || fix.line > doc.lines) return null;
       const t = doc.line(fix.line);
-      if (lineKeyToken(t.text) !== fix.key || indentOf(t.text) !== fix.fromIndent) {
+      const key =
+        fix.kind === "colon-space" ? gluedColonKey(t.text) : lineKeyToken(t.text);
+      if (key !== fix.key || indentOf(t.text) !== fix.fromIndent) {
         return null;
       }
       // A dedent must have the spaces it wants to remove.
@@ -667,10 +670,10 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     if (line === null) return "stale";
 
     const doc = view.state.doc;
-    // The dash-space repair inserts after the stuck dash; comment-out
-    // inserts `# ` at the line's indent; remove-line deletes the whole
-    // line; indent repairs insert or remove leading spaces at the line
-    // start. Pure arithmetic on the resolved line + its doc, so both
+    // The dash-space repair inserts after the stuck dash, colon-space after
+    // the glued colon; comment-out inserts `# ` at the line's indent;
+    // remove-line deletes the whole line; indent repairs insert or remove
+    // leading spaces at the line start. Pure arithmetic on the resolved line + its doc, so both
     // invocations (pre-await proposal, post-await dispatch) stay
     // consistent with the doc they resolved against.
     const changeAt = (
@@ -680,6 +683,8 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       const at = target.from;
       if (fix.kind === "dash-space")
         return { from: at + fix.fromIndent + 1, insert: " " };
+      if (fix.kind === "colon-space")
+        return { from: at + fix.fromIndent + fix.key.length + 1, insert: " " };
       if (fix.kind === "comment-out") return { from: at + fix.fromIndent, insert: "# " };
       if (fix.kind === "remove-line")
         return { from: at, to: Math.min(target.to + 1, docLength) };

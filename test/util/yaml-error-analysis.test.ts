@@ -709,6 +709,26 @@ describe("describeYamlError", () => {
     });
   });
 
+  it("names a colon stuck to its value instead of the indent hint", async () => {
+    const { describeYamlError } = await import("../../src/util/yaml-error-analysis.js");
+    const doc = [
+      "ota:", // 1
+      "  - platform: esphome", // 2
+      "    password:!secret ota_pwd", // 3
+      "      esp32_ble_tracker:", // 4
+    ];
+    const read = (n: number): string | undefined => doc[n - 1];
+    const msg =
+      'while scanning a simple key\n  in "x.yaml", line 3, column 5\n' +
+      "could not find expected ':'\n  in \"x.yaml\", line 4, column 24";
+    expect(describeYamlError(msg, { line: 4, col: 24 }, localize, read)).toEqual({
+      text: 'yaml_editor.error_colon_space_fix:{"line":3,"key":"password"}',
+      jumpLine: 3,
+      squiggleLine: 3,
+      fix: { line: 3, indent: 0, key: "password", fromIndent: 4, kind: "colon-space" },
+    });
+  });
+
   it("keeps the indent hint for a missing ':' whose context line has one", async () => {
     const { describeYamlError } = await import("../../src/util/yaml-error-analysis.js");
     const aligned = ["sensor:", "  - platform: dht", "    model: DHT11"];

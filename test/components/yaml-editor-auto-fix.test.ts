@@ -217,6 +217,27 @@ describe("yaml-editor applyAutoFix (#1884)", () => {
     expect(validateYaml).not.toHaveBeenCalled();
   });
 
+  it("applies a colon-space fix by inserting the space after the colon", async () => {
+    const validateYaml = vi.fn(async () => CLEAN);
+    const broken = "ota:\n  - platform: esphome\n    password:!secret ota_pwd\n";
+    const fixed = "ota:\n  - platform: esphome\n    password: !secret ota_pwd\n";
+    const el = await mountEditor(validateYaml, broken);
+    const view = viewOf(el);
+    const fix = {
+      line: 3,
+      indent: 0,
+      key: "password",
+      fromIndent: 4,
+      kind: "colon-space" as const,
+    };
+
+    expect(await el.applyAutoFix(fix)).toBe("applied");
+    expect(view.state.doc.toString()).toBe(fixed);
+    expect(validateYaml).toHaveBeenCalledWith("x.yaml", fixed);
+    // Already repaired: the glued shape is gone, so a second click is stale.
+    expect(await el.applyAutoFix(fix)).toBe("stale");
+  });
+
   it("applies a fix whose diagnosis was anchored on a different line", async () => {
     const validateYaml = vi.fn(async () => CLEAN);
     // The continuation shape: `input: true` dedented out of `mode:`, blamed
