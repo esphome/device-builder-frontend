@@ -673,9 +673,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
     // The dash-space repair inserts after the stuck dash, colon-space after
     // the glued colon; comment-out inserts `# ` at the line's indent;
     // remove-line deletes the whole line; indent repairs insert or remove
-    // leading spaces at the line start. Pure arithmetic on the resolved line + its doc, so both
-    // invocations (pre-await proposal, post-await dispatch) stay
-    // consistent with the doc they resolved against.
+    // leading spaces at the line start. Pure arithmetic on the resolved
+    // line + its doc, so both invocations (pre-await proposal, post-await
+    // dispatch) stay consistent with the doc they resolved against.
     const changeAt = (
       target: Line,
       docLength: number

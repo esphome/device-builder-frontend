@@ -903,35 +903,37 @@ export function describeYamlError(
   // when that line really has no ':', name it instead of the indent hint.
   if (lower.includes("could not find expected ':'") && lower.includes("simple key")) {
     const ctx = parseYamlErrorContext(message);
-    const token = ctx && readLine ? readLine(ctx.line)?.trim() : undefined;
-    if (ctx && token && !token.includes(":")) {
-      return {
-        text: localize("yaml_editor.error_missing_colon_hint", {
-          line: ctx.line,
-          key: token.length > 24 ? `${token.slice(0, 24)}…` : token,
-        }),
-        jumpLine: ctx.line,
-        squiggleLine: ctx.line,
-      };
-    }
-    const glued = ctx && readLine ? readLine(ctx.line) : undefined;
-    const gluedKey = glued === undefined ? null : gluedColonKey(glued);
-    if (ctx && glued !== undefined && gluedKey !== null) {
-      return {
-        text: localize("yaml_editor.error_colon_space_fix", {
-          line: ctx.line,
-          key: gluedKey,
-        }),
-        jumpLine: ctx.line,
-        squiggleLine: ctx.line,
-        fix: {
-          line: ctx.line,
-          indent: 0,
-          key: gluedKey,
-          fromIndent: indentOf(glued),
-          kind: "colon-space",
-        },
-      };
+    const ctxText = ctx && readLine ? readLine(ctx.line) : undefined;
+    if (ctx && ctxText !== undefined) {
+      const token = ctxText.trim();
+      if (token && !token.includes(":")) {
+        return {
+          text: localize("yaml_editor.error_missing_colon_hint", {
+            line: ctx.line,
+            key: token.length > 24 ? `${token.slice(0, 24)}…` : token,
+          }),
+          jumpLine: ctx.line,
+          squiggleLine: ctx.line,
+        };
+      }
+      const gluedKey = gluedColonKey(ctxText);
+      if (gluedKey !== null) {
+        return {
+          text: localize("yaml_editor.error_colon_space_fix", {
+            line: ctx.line,
+            key: gluedKey,
+          }),
+          jumpLine: ctx.line,
+          squiggleLine: ctx.line,
+          fix: {
+            line: ctx.line,
+            indent: 0,
+            key: gluedKey,
+            fromIndent: indentOf(ctxText),
+            kind: "colon-space",
+          },
+        };
+      }
     }
   }
   // Same option set twice in a block.
