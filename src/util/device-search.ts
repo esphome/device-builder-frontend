@@ -69,14 +69,22 @@ export interface DeviceRowSearchFields {
   address: string;
   ip_addresses: string[];
   platform: string;
+  project_name: string;
+  project_version: string;
   mac_address: string | null | undefined;
 }
 
 /**
  * True when *row* matches *loweredQuery* across any of its
  * user-visible identity fields: friendly_name (or name),
- * configuration filename, address, any resolved IP, platform, or
- * MAC address (separator-insensitive, via ``matchesMacAddress``).
+ * configuration filename, address, any resolved IP, platform,
+ * project name / version, or MAC address (separator-insensitive,
+ * via ``matchesMacAddress``).
+ *
+ * Project version is searchable but deliberately has no facet: a
+ * version string is a high-cardinality free-text value, so typing
+ * ``2026.09`` to pull up every straggler beats a checkbox list of
+ * every build a fleet has ever run.
  *
  * ``loweredQuery`` must already be lower-cased (matching
  * ``matchesDeviceName`` / ``matchesMacAddress``). An empty query
@@ -98,7 +106,9 @@ export function matchesDeviceRow(
     row.config.toLowerCase().includes(loweredQuery) ||
     row.address.toLowerCase().includes(loweredQuery) ||
     row.ip_addresses.some((ip) => ip.toLowerCase().includes(loweredQuery)) ||
-    row.platform.toLowerCase().includes(loweredQuery)
+    row.platform.toLowerCase().includes(loweredQuery) ||
+    row.project_name.toLowerCase().includes(loweredQuery) ||
+    row.project_version.toLowerCase().includes(loweredQuery)
   ) {
     return true;
   }

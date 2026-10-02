@@ -12,8 +12,8 @@ import "../filters/filters-popover.js";
  *  one per dimension, so the toolbar stays one line regardless of
  *  how many dimensions or selections are active. The labels section
  *  always renders (it is the create path even when the catalog is
- *  empty); area / platform only render when the configured-device
- *  list has at least one usable value to filter by, so a fresh
+ *  empty); area / platform / project / network only render when the
+ *  configured-device list has at least one usable value to filter by, so a fresh
  *  dashboard with a single-platform fleet doesn't sprout an empty /
  *  single-bucket section that adds no signal.
  *
@@ -32,6 +32,8 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
       selectedLabels: host._selectedLabels,
       selectedAreas: host._selectedAreas,
       selectedPlatforms: host._selectedPlatforms,
+      selectedProjects: host._selectedProjects,
+      selectedNetworks: host._selectedNetworks,
       selectedStates: host._selectedStates,
       selectedUpdateStatus: host._selectedUpdateStatus,
     },
@@ -43,6 +45,10 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
       if (patch.selectedAreas !== undefined) host._selectedAreas = patch.selectedAreas;
       if (patch.selectedPlatforms !== undefined)
         host._selectedPlatforms = patch.selectedPlatforms;
+      if (patch.selectedProjects !== undefined)
+        host._selectedProjects = patch.selectedProjects;
+      if (patch.selectedNetworks !== undefined)
+        host._selectedNetworks = patch.selectedNetworks;
       if (patch.selectedStates !== undefined) host._selectedStates = patch.selectedStates;
       if (patch.selectedUpdateStatus !== undefined)
         host._selectedUpdateStatus = patch.selectedUpdateStatus;

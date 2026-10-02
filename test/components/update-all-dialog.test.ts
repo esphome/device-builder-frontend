@@ -97,6 +97,8 @@ describe("update-all-dialog", () => {
       labels: [],
       areas: [],
       platforms: ["rp2"],
+      projects: [],
+      networks: [],
       states: [DeviceState.OFFLINE],
       updates: ["modified"],
     });
@@ -146,6 +148,8 @@ describe("update-all-dialog", () => {
       selectedLabels: [],
       selectedAreas: [],
       selectedPlatforms: [],
+      selectedProjects: [],
+      selectedNetworks: [],
       selectedStates: [DeviceState.OFFLINE],
       selectedUpdateStatus: ["update_available"],
     };

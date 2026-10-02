@@ -107,6 +107,8 @@ describe("matchesDeviceRow", () => {
       address: "kitchen.local",
       ip_addresses: ["192.168.1.42"],
       platform: "esp32",
+      project_name: "",
+      project_version: "",
       mac_address: "94:c9:60:12:34:56",
       ...overrides,
     };
@@ -123,6 +125,18 @@ describe("matchesDeviceRow", () => {
     expect(matchesDeviceRow(_row(), "kitchen.local")).toBe(true);
     expect(matchesDeviceRow(_row(), "192.168.1.42")).toBe(true);
     expect(matchesDeviceRow(_row(), "esp32")).toBe(true);
+  });
+
+  it("matches on project name and project version", () => {
+    const row = _row({
+      project_name: "dcoulson.ble-rrn00-wroom06",
+      project_version: "2026.09.06.0+ble2026.09.12.0",
+    });
+    expect(matchesDeviceRow(row, "rrn00")).toBe(true);
+    // The project version has no facet by design; typing a partial
+    // version is how the user pulls up a fleet's stragglers.
+    expect(matchesDeviceRow(row, "2026.09.06")).toBe(true);
+    expect(matchesDeviceRow(row, "wroom07")).toBe(false);
   });
 
   it("matches across any of several IP addresses", () => {
