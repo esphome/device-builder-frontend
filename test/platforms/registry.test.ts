@@ -187,7 +187,7 @@ describe("PLATFORMS", () => {
     ["rp2", { reset: "platform", releaseLinesAfterOpen: false, ble: false }],
     ["rtl87xx", { reset: "rts-pulse", releaseLinesAfterOpen: true, ble: false }],
     ["bk72xx", { reset: "rts-pulse", releaseLinesAfterOpen: true, ble: false }],
-    ["ln882x", { reset: undefined, releaseLinesAfterOpen: false, ble: false }],
+    ["ln882x", { reset: "rts-pulse", releaseLinesAfterOpen: true, ble: false }],
   ] as const)("%s keeps its logs policy", (id, expected) => {
     const logs = PLATFORMS.find((p) => p.id === id)?.logs;
     const reset = logs?.serial?.reset;

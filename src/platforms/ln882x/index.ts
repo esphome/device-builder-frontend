@@ -7,6 +7,7 @@ export type * from "./ln882x-flasher.js";
 export type * from "../libretiny-uf2.js";
 export type * from "./ln882x-image.js";
 export * from "./ln882x-platform.js";
+export * from "./serial-logs.js";
 
 import { getErrorMessage } from "../../util/error-message.js";
 import type { LibreTinyFlashResult } from "../libretiny-flash.js";
