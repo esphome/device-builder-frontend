@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
   dispatchShowLogsAfterInstall: vi.fn(() => true),
   flashLn882x: vi.fn<(p: unknown, i: unknown, hooks: FlashHooks) => Promise<boolean>>(),
+  loadRamcode: vi.fn(async () => new Uint8Array(0)),
 }));
 type FlashHooks = {
   onProgress: (p: number) => void;
@@ -24,6 +25,7 @@ vi.mock("../../../src/platforms/ln882x/ln882x-flasher.js", async (importOriginal
     typeof import("../../../src/platforms/ln882x/ln882x-flasher.js")
   >()),
   flashLn882x: mocks.flashLn882x,
+  loadRamcode: mocks.loadRamcode,
 }));
 const seams = vi.hoisted(() => ({ loadLn882xImage: vi.fn() }));
 vi.mock("../../../src/platforms/ln882x/index.js", async (importOriginal) => {
@@ -133,6 +135,8 @@ describe("startLn882xInstall", () => {
     expect(host._binaries.map((b) => b.file)).toEqual(["firmware.uf2"]);
     expect(host._step).toBe("ln-ready");
     expect(host._statusMessage).toBe("firmware.ln_ready_title");
+    // The engine and the RAM code start loading while the user reads on.
+    await vi.waitFor(() => expect(mocks.loadRamcode).toHaveBeenCalledOnce());
   });
 
   it("does nothing without a device", async () => {

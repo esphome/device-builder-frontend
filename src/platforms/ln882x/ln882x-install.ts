@@ -22,7 +22,7 @@ import {
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
-import { loadLn882xImage, runLn882x } from "./index.js";
+import { loadLn882xImage, prefetchLn882x, runLn882x } from "./index.js";
 import { LN_LOGS_ON_FLASH_PORT_SETTING, lnLogsOnFlashPort } from "./serial-logs.js";
 
 declare module "../platform-support.js" {
@@ -51,6 +51,7 @@ export async function startLn882xInstall(
   }
   lnImage.set(host, parsed.image);
   host._binaries = [artifact.binary];
+  prefetchLn882x();
   showReadyStep(host);
 }
 

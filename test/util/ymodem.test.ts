@@ -116,7 +116,7 @@ describe("ymodemSend", () => {
   it("gives up when the end of the file is never acknowledged", async () => {
     const rx = fakeReceiver([C, ACK, C, ACK]);
     await expect(ymodemSend(rx.io, "a", bytes(10), { retries: 1 })).rejects.toThrow(
-      "End of transfer was not acknowledged"
+      "the end of the file was not acknowledged after 1 retries"
     );
   });
 

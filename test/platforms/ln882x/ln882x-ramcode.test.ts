@@ -14,10 +14,14 @@ const hex = (bytes: Uint8Array) =>
 afterEach(() => {
   resetRamcodeCache();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
-const respond = (body: Uint8Array, status = 200) =>
-  vi.fn(async () => new Response(new Uint8Array(body), { status }));
+const respond = (body: Uint8Array, status = 200) => {
+  const fetchFn = vi.fn(async () => new Response(new Uint8Array(body), { status }));
+  vi.stubGlobal("fetch", fetchFn);
+  return fetchFn;
+};
 
 /** Pretend ``body`` is the release's file by matching its digest. */
 function asTheRelease(body: Uint8Array) {
@@ -36,28 +40,36 @@ describe("loadRamcode", () => {
     asTheRelease(body);
     const fetchFn = respond(body);
 
-    expect(await loadRamcode(fetchFn)).toEqual(body);
-    expect(await loadRamcode(fetchFn)).toEqual(body);
+    const [first, second] = await Promise.all([loadRamcode(), loadRamcode()]);
+    expect(first).toEqual(body);
+    expect(second).toBe(first);
+    expect(await loadRamcode()).toBe(first);
     expect(fetchFn).toHaveBeenCalledTimes(1);
     expect(fetchFn).toHaveBeenCalledWith(LN882H_RAMCODE_URL);
   });
 
   it("refuses a file whose hash is not the release's", async () => {
-    const err = await loadRamcode(respond(new Uint8Array([9]))).catch((e) => e);
+    respond(new Uint8Array([9]));
+    const err = await loadRamcode().catch((e) => e);
 
     expect(err).toBeInstanceOf(Ln882xRamcodeError);
     expect(err.key).toBe("firmware.ln_ramcode_mismatch");
   });
 
   it("names a failed download, by status or by network error", async () => {
-    const byStatus = await loadRamcode(respond(new Uint8Array(0), 404)).catch((e) => e);
+    respond(new Uint8Array(0), 404);
+    const byStatus = await loadRamcode().catch((e) => e);
     expect(byStatus.key).toBe("firmware.ln_ramcode_unavailable");
     expect(byStatus.message).toContain("HTTP 404");
 
-    const offline = vi.fn(async () => {
-      throw new TypeError("Failed to fetch");
-    });
-    const byNetwork = await loadRamcode(offline).catch((e) => e);
+    // The failure was not kept: this is a fresh try.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      })
+    );
+    const byNetwork = await loadRamcode().catch((e) => e);
     expect(byNetwork.key).toBe("firmware.ln_ramcode_unavailable");
     expect(byNetwork.message).toContain("Failed to fetch");
   });

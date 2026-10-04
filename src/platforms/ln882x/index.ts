@@ -17,6 +17,17 @@ import type { Ln882xFlashHooks } from "./ln882x-flasher.js";
 export const loadLn882xEngine = () => import("./ln882x-flasher.js");
 export const loadLn882xParser = () => import("./ln882x-image.js");
 
+/**
+ * Start fetching the engine chunk and the RAM code while the user reads the
+ * ready step and picks a port; the flash then finds both cached. A failure
+ * here is left for the flash itself to report.
+ */
+export function prefetchLn882x(): void {
+  loadLn882xEngine()
+    .then((engine) => engine.loadRamcode())
+    .catch(() => {});
+}
+
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */
 export interface Ln882xImageFailure {
   key: "firmware.engine_load_failed" | "firmware.ln_wrong_family" | "firmware.ln_bad_uf2";

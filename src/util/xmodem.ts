@@ -93,6 +93,43 @@ export function buildBlock(
   return block;
 }
 
+/**
+ * The receiver's reply to a block: ACK, NAK or CAN, or null when none came
+ * in time. Anything else (the 'C' a receiver repeats while it waits, line
+ * noise) is skipped, as the reference senders do.
+ */
+async function awaitReply(io: XmodemIo, timeoutMs: number): Promise<number | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const left = deadline - Date.now();
+    if (left <= 0) return null;
+    const byte = await io.readByte(left);
+    if (byte === null || byte === ACK || byte === NAK || byte === CAN) return byte;
+  }
+}
+
+/** Write ``frame`` until the receiver ACKs it; ``label`` names it in the errors. */
+export async function sendFrame(
+  io: XmodemIo,
+  frame: Uint8Array,
+  label: string,
+  retries: number,
+  timeoutMs: number
+): Promise<void> {
+  for (let errors = 0; ; errors++) {
+    await io.write(frame);
+    const reply = await awaitReply(io, timeoutMs);
+    if (reply === ACK) return;
+    if (reply === CAN) throw new XmodemError(`Receiver cancelled at ${label}`);
+    if (errors >= retries) {
+      throw new XmodemError(`${label} was not acknowledged after ${retries} retries`);
+    }
+  }
+}
+
+/** The end of a file, sent until ACKed (a receiver may NAK the first). */
+export const EOT_FRAME = new Uint8Array([EOT]);
+
 export async function xmodemSend(
   io: XmodemIo,
   data: Uint8Array,
@@ -102,27 +139,15 @@ export async function xmodemSend(
   let seq = 1;
   for (let off = 0; off < data.length; off += XMODEM_BLOCK_SIZE) {
     const payload = data.subarray(off, Math.min(off + XMODEM_BLOCK_SIZE, data.length));
-    const block = buildBlock(seq, payload, crcMode);
-    let acked = false;
-    for (let errors = 0; !acked; errors++) {
-      await io.write(block);
-      const reply = await io.readByte(timeoutMs);
-      if (reply === ACK) {
-        acked = true;
-      } else if (reply === CAN) {
-        throw new XmodemError(`Receiver cancelled at block ${seq}`);
-      } else if (errors >= retries) {
-        throw new XmodemError(
-          `Block ${seq} was not acknowledged after ${retries} retries`
-        );
-      }
-    }
+    await sendFrame(
+      io,
+      buildBlock(seq, payload, crcMode),
+      `block ${seq}`,
+      retries,
+      timeoutMs
+    );
     seq = (seq + 1) & 0xff;
     onBlock?.(off + payload.length);
   }
-  for (let errors = 0; ; errors++) {
-    await io.write(new Uint8Array([EOT]));
-    if ((await io.readByte(timeoutMs)) === ACK) return;
-    if (errors >= retries) throw new XmodemError("End of transfer was not acknowledged");
-  }
+  await sendFrame(io, EOT_FRAME, "the end of the file", retries, timeoutMs);
 }

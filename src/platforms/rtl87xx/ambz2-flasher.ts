@@ -7,6 +7,7 @@
  */
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import { SerialByteSession } from "../../util/serial-byte-session.js";
+import { resetIntoFirmware } from "../../util/serial-control-lines.js";
 import { sleep } from "../../util/sleep.js";
 import { settledWithin } from "../../util/with-deadline.js";
 import { type XmodemIo, xmodemSend } from "../../util/xmodem.js";
@@ -128,24 +129,6 @@ async function autoLink(
     if (!driven) return false;
   }
   return false;
-}
-
-/**
- * Release the strap and pulse reset so the board comes up in the firmware.
- * False when the lines could not be driven (no control lines on this
- * adapter, or the port is gone): the board is still in the ROM and the
- * user has to reset it.
- */
-async function bootFirmware(port: SerialPort): Promise<boolean> {
-  const pulse = async (): Promise<boolean> => {
-    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-    await sleep(RESET_HOLD_MS);
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-    return true;
-  };
-  // A line change on a board that was unplugged can stay pending; the flash
-  // error that led here must still be reported.
-  return Promise.race([pulse().catch(() => false), sleep(TEARDOWN_MS).then(() => false)]);
 }
 
 /** One ping; true when the ROM downloader answered. */
@@ -313,7 +296,7 @@ export async function flashAmbz2(
     await rom?.close(failure).catch(() => {});
     // DTR still holds the strap, so a reset now would land in the ROM again:
     // release it, then pulse RTS so the board comes up in the firmware.
-    rebooted = await bootFirmware(port);
+    rebooted = await resetIntoFirmware(port, RESET_HOLD_MS, TEARDOWN_MS);
     if (failure === undefined) {
       log(
         rebooted

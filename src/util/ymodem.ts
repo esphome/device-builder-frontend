@@ -4,7 +4,7 @@
  * length, EOT, then the empty header that ends the batch. Built on the
  * XModem blocks; the receiver's 'C' picks CRC-16 and NAK the plain checksum.
  */
-import { awaitStart, buildBlock, XmodemError, type XmodemIo } from "./xmodem.js";
+import { awaitStart, buildBlock, EOT_FRAME, sendFrame, type XmodemIo } from "./xmodem.js";
 
 export interface YmodemOptions {
   retries?: number;
@@ -20,44 +20,6 @@ export interface YmodemOptions {
 }
 
 export const YMODEM_BLOCK_SIZE = 128;
-const EOT = 0x04;
-const ACK = 0x06;
-const NAK = 0x15;
-const CAN = 0x18;
-
-/**
- * The receiver's reply to a block: ACK, NAK or CAN, or null when none came
- * in time. Anything else (the 'C' a receiver repeats while it waits) is
- * skipped, as the reference sender does.
- */
-async function awaitReply(io: XmodemIo, timeoutMs: number): Promise<number | null> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const left = deadline - Date.now();
-    if (left <= 0) return null;
-    const byte = await io.readByte(left);
-    if (byte === null) return null;
-    if (byte === ACK || byte === NAK || byte === CAN) return byte;
-  }
-}
-
-async function sendBlock(
-  io: XmodemIo,
-  block: Uint8Array,
-  label: string,
-  retries: number,
-  timeoutMs: number
-): Promise<void> {
-  for (let errors = 0; ; errors++) {
-    await io.write(block);
-    const reply = await awaitReply(io, timeoutMs);
-    if (reply === ACK) return;
-    if (reply === CAN) throw new XmodemError(`Receiver cancelled at ${label}`);
-    if (errors >= retries) {
-      throw new XmodemError(`${label} was not acknowledged after ${retries} retries`);
-    }
-  }
-}
 
 /** Block 0: the name, a NUL, then the length, the mtime (0, unknown) and the serial number. */
 function headerPayload(name: string, length: number): Uint8Array {
@@ -78,7 +40,7 @@ export async function ymodemSend(
 ): Promise<void> {
   const crcMode = await awaitStart(io, retries, timeoutMs);
   const header = headerPayload(name, data.length);
-  await sendBlock(
+  await sendFrame(
     io,
     buildBlock(0, header, crcMode, YMODEM_BLOCK_SIZE, 0),
     "the header block",
@@ -90,7 +52,7 @@ export async function ymodemSend(
   let seq = 1;
   for (let off = 0; off < data.length; off += YMODEM_BLOCK_SIZE) {
     const payload = data.subarray(off, Math.min(off + YMODEM_BLOCK_SIZE, data.length));
-    await sendBlock(
+    await sendFrame(
       io,
       buildBlock(seq, payload, crcMode, YMODEM_BLOCK_SIZE),
       `block ${seq}`,
@@ -100,16 +62,7 @@ export async function ymodemSend(
     seq = (seq + 1) & 0xff;
     onBlock?.(off + payload.length);
   }
-  // A receiver may NAK the first EOT to have it sent again.
-  for (let errors = 0; ; errors++) {
-    await io.write(new Uint8Array([EOT]));
-    const reply = await awaitReply(io, timeoutMs);
-    if (reply === ACK) break;
-    if (reply === CAN) throw new XmodemError("Receiver cancelled at the end of the file");
-    if (errors >= retries) {
-      throw new XmodemError("End of transfer was not acknowledged");
-    }
-  }
+  await sendFrame(io, EOT_FRAME, "the end of the file", retries, timeoutMs);
   // The empty header ends the batch; the reference sender does not wait
   // for its ACK, and whatever follows drains it.
   await io.write(buildBlock(0, new Uint8Array(0), crcMode, YMODEM_BLOCK_SIZE, 0));

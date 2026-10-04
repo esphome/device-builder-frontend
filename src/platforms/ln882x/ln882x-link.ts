@@ -30,14 +30,14 @@ export class LnLink extends SerialByteSession implements XmodemIo {
   /** Whether the RAM code is the one answering, so commands echo. */
   ramcode = false;
 
-  async write(data: Uint8Array | string): Promise<void> {
-    await this.writeBytes(typeof data === "string" ? encoder.encode(data) : data);
+  write(data: Uint8Array): Promise<void> {
+    return this.writeBytes(data);
   }
 
   /** Send one command line; the RAM code's echo of it is read back. */
   async send(command: string): Promise<void> {
     this.drain();
-    await this.write(`${command}\r\n`);
+    await this.writeBytes(encoder.encode(`${command}\r\n`));
     if (this.ramcode) await this.readBytes(command.length, ECHO_MS);
   }
 

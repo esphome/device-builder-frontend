@@ -8,7 +8,10 @@
  * here touches the DOM.
  */
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
-import { releaseControlLines } from "../../util/serial-control-lines.js";
+import {
+  releaseControlLines,
+  resetIntoFirmware,
+} from "../../util/serial-control-lines.js";
 import { sleep } from "../../util/sleep.js";
 import { settledWithin } from "../../util/with-deadline.js";
 import { ymodemSend } from "../../util/ymodem.js";
@@ -17,7 +20,7 @@ import type { LibreTinyImage } from "../libretiny-uf2.js";
 import { LnLink } from "./ln882x-link.js";
 import { loadRamcode } from "./ln882x-ramcode.js";
 
-export { Ln882xRamcodeError } from "./ln882x-ramcode.js";
+export { Ln882xRamcodeError, loadRamcode } from "./ln882x-ramcode.js";
 
 const LN882H_BAUD_RATE = 115200;
 const RAM_ADDRESS = 0x20000000;
@@ -105,22 +108,6 @@ async function releaseStrap(port: SerialPort): Promise<void> {
   }
 }
 
-/**
- * Pulse CEN with BOOT released so the board comes up in the firmware, for a
- * reboot the RAM code did not confirm. False when the lines could not be
- * driven.
- */
-async function pulseReset(port: SerialPort): Promise<boolean> {
-  const pulse = async (): Promise<boolean> => {
-    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-    await sleep(RESET_HOLD_MS);
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-    return true;
-  };
-  // A line change on a board that was unplugged can stay pending.
-  return Promise.race([pulse().catch(() => false), sleep(TEARDOWN_MS).then(() => false)]);
-}
-
 /** Catch the downloader: as it is, after a reset over the lines, then with the user's help. */
 async function enterDownloadMode(
   port: SerialPort,
@@ -160,7 +147,7 @@ async function bootRamcode(
   }
   log(`Loading the RAM code (${ramcode.length} bytes)`);
   await link.send(
-    `download [rambin] [0x${RAM_ADDRESS.toString(16).toUpperCase()}] [${ramcode.length}]`
+    `download [rambin] [${formatAddress(RAM_ADDRESS)}] [${ramcode.length}]`
   );
   await ymodemSend(link, "ramcode.bin", ramcode);
   await sleep(RAMCODE_START_MS);
@@ -189,7 +176,7 @@ async function writeRun(
 ): Promise<void> {
   log(`Writing ${formatAddress(address)} (${data.length} bytes)`);
   const tenth = tenthLogger(log, `Writing ${formatAddress(address)}`);
-  const reply = await link.command(`startaddr 0x${address.toString(16).toUpperCase()}`);
+  const reply = await link.command(`startaddr ${formatAddress(address)}`);
   if (!reply.includes("pppp")) throw new Ln882xStartAddrError(address);
   await link.send("upgrade");
   await ymodemSend(link, "firmware.bin", data, {
@@ -266,7 +253,8 @@ export async function flashLn882x(
   } finally {
     // A teardown failure must not replace the flash error nor skip the rest.
     await link?.close(failure).catch(() => {});
-    if (failure === undefined && !rebooted) rebooted = await pulseReset(port);
+    if (failure === undefined && !rebooted)
+      rebooted = await resetIntoFirmware(port, RESET_HOLD_MS, TEARDOWN_MS);
     // Not with BOOT held, which would send the next reset to the ROM again.
     await settledWithin(releaseControlLines(port), TEARDOWN_MS);
     if (failure === undefined) {

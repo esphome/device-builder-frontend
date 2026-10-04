@@ -7,10 +7,11 @@
  */
 import { vi } from "vitest";
 import { disconnectEvents } from "../../_web-serial.js";
+import { crc16Xmodem } from "../../../src/util/xmodem.js";
 
-export const FLASH_SIZE = 0x200000;
-export const ROM_VERSION = "Mar 14 2021/12:34:56";
-export const FLASH_ID = 0xeb6015;
+const FLASH_SIZE = 0x200000;
+const ROM_VERSION = "Mar 14 2021/12:34:56";
+const FLASH_ID = 0xeb6015;
 const SECTOR = 0x1000;
 const SOH = 0x01;
 const EOT = 0x04;
@@ -24,7 +25,7 @@ export const oldByte = (i: number) => (i * 7 + 3) % 251;
 /** The image's bytes, by offset in its run. */
 export const newByte = (i: number) => (i * 31 + 7) % 253;
 /** The stand-in RAM code's bytes. */
-export const ramcodeByte = (i: number) => (i * 13 + 5) % 256;
+const ramcodeByte = (i: number) => (i * 13 + 5) % 256;
 
 export const RAMCODE = Uint8Array.from({ length: 1000 }, (_, i) => ramcodeByte(i));
 
@@ -74,17 +75,6 @@ interface Ymodem {
   length: number;
   data: number[];
   naked: boolean;
-}
-
-function crc16(data: Uint8Array): number {
-  let crc = 0;
-  for (const byte of data) {
-    crc ^= byte << 8;
-    for (let i = 0; i < 8; i++) {
-      crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
-    }
-  }
-  return crc;
 }
 
 export function fakeLn882h(opts: FakeOptions = {}) {
@@ -179,7 +169,7 @@ export function fakeLn882h(opts: FakeOptions = {}) {
       const payload = block.subarray(3, 131);
       if (
         seq + block[2] !== 0xff ||
-        crc16(payload) !== ((block[131] << 8) | block[132])
+        crc16Xmodem(payload) !== ((block[131] << 8) | block[132])
       ) {
         reply([NAK]);
         continue;
@@ -266,7 +256,6 @@ export function fakeLn882h(opts: FakeOptions = {}) {
     flash,
     ram: () => ram,
     rebooted: () => rebooted,
-    mode: () => mode,
     dropLink: () => out.close(),
   };
 }
