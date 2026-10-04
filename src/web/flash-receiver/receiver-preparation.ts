@@ -8,6 +8,7 @@ import {
   RECEIVER_ENGINES,
   type ReceiverEngine,
   type ReceiverPlan,
+  type ReceiverRun,
 } from "./receiver-engine.js";
 
 /** What is to be flashed, as it was handed over or picked. */
@@ -28,6 +29,14 @@ export interface ReceiverPrepared extends ReceiverPlan {
   logs: SerialLogsPolicy;
   baudRate?: number;
 }
+
+/** ``run``, with no logs to follow it. */
+const withoutLogs =
+  (run: ReceiverRun): ReceiverRun =>
+  async (hooks) => {
+    const result = await run(hooks);
+    return result && result !== "dismissed" ? { ...result, logs: undefined } : result;
+  };
 
 /**
  * Load the flasher's engine and have it check the image. ``pending`` is the
@@ -52,7 +61,9 @@ export async function prepareForReceiver(
     if ("error" in plan) {
       return { failure: plan.error, retryable: plan.retryable === true };
     }
-    return { value: { ...plan, logs: engine.logs, baudRate: input.baudRate } };
+    // A device without serial logs has none to open, whichever engine flashed it.
+    const run = input.logs === "off" ? withoutLogs(plan.run) : plan.run;
+    return { value: { ...plan, run, logs: engine.logs, baudRate: input.baudRate } };
   } catch (err) {
     // An engine broke its never-throws contract: name the image, not the network.
     console.error("[flash receiver] The engine could not check the image:", err);

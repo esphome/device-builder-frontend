@@ -515,6 +515,14 @@ describe("esphome-web-flash-receiver engines", () => {
     expect((el as any)._logsOpen).toBe(false);
   });
 
+  it("opens no logs and parks no port for a device the opener says has none", async () => {
+    engines.rtl.run.mockResolvedValueOnce({ rebooted: false });
+    const { el } = await handOff({ flasher: "rtl-ambz2", logs: "off" });
+    expect((el as any)._flashDone).toBe(true);
+    expect((el as any)._logPort).toBeUndefined();
+    expect((el as any)._logsOpen).toBe(false);
+  });
+
   it("relays the strap instruction to the dashboard while the engine waits", async () => {
     engines.rtl.run.mockImplementationOnce(async (_port, hooks) => {
       hooks.onState("connecting", "linking");

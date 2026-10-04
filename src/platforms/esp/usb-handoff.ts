@@ -105,11 +105,13 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     host._errorMessage = "";
     host._statusMessage = host._localize("firmware.usb_flashing");
   };
+  const logBaudRate = resolveLogBaudRate(host._device?.logger_baud_rate);
   const options = {
     flasher: handoff.flasher,
     erase: handoff.erase,
-    logs: handoff.logs?.(host._device),
-    logBaudRate: resolveLogBaudRate(host._device?.logger_baud_rate) ?? undefined,
+    // A device without serial logs has none for the receiver to open.
+    logs: logBaudRate === null ? ("off" as const) : handoff.logs?.(host._device),
+    logBaudRate: logBaudRate ?? undefined,
   };
   const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, options, {
     onProgress: (pct) => {

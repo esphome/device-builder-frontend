@@ -153,6 +153,13 @@ describe("handOffToFlasher", () => {
     expect(openFlasher.mock.calls[0][3].logBaudRate).toBe(sent);
   });
 
+  it("tells the receiver an ESP device with its logger off has no logs", () => {
+    const host = makeHost();
+    host._device = { ...host._device, logger_baud_rate: 0 } as typeof host._device;
+    handOffToFlasher(asHost(host));
+    expect(openFlasher.mock.calls[0][3].logs).toBe("off");
+  });
+
   it("hands a Pico's UF2 to the PICOBOOT flasher, without erase", () => {
     const host = makeHost();
     host._device.target_platform = "rp2040";
