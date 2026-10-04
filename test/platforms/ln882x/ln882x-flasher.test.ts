@@ -143,6 +143,24 @@ describe("flashLn882x", () => {
     );
   });
 
+  it("sends runs that follow on from one another as one transfer, as ltchiptool does", async () => {
+    // A build's bootloader, partition table and app: the RAM code carries one
+    // transfer's tail into the next, so they must not go separately.
+    const bytes = (length: number, fill: number) => new Uint8Array(length).fill(fill);
+    const runs = [
+      { address: 0x0, data: bytes(0x6000, 0x11) },
+      { address: 0x6000, data: bytes(0x1000, 0x22) },
+      { address: 0x7000, data: bytes(300, 0x33) },
+    ];
+    const { chip, log, done } = flash({}, image(runs));
+    expect(await driveFakeTimers(done)).toBe(true);
+    expect(commands(chip).filter((c) => c.startsWith("startaddr"))).toEqual([
+      "startaddr 0x0",
+    ]);
+    expect(log).toContain("Writing 0x0 (28972 bytes)");
+    expectImage(chip, image(runs));
+  });
+
   it("opens the port only when it is not open yet", async () => {
     const { chip, done } = flash();
     await chip.port.open({ baudRate: 115200 });

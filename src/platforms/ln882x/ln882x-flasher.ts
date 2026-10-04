@@ -7,12 +7,14 @@
  * hold on common adapters. Loaded on demand by the install flow; nothing
  * here touches the DOM.
  */
+import { concat } from "../../util/bytes.js";
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import {
   releaseControlLines,
   resetIntoFirmware,
 } from "../../util/serial-control-lines.js";
 import { sleep } from "../../util/sleep.js";
+import type { Uf2Range } from "../../util/uf2.js";
 import { settledWithin } from "../../util/with-deadline.js";
 import { ymodemSend } from "../../util/ymodem.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
@@ -106,6 +108,26 @@ async function releaseStrap(port: SerialPort): Promise<void> {
   } catch {
     // No control lines: the user holds BOOT and can let go now.
   }
+}
+
+/**
+ * Runs that follow on from one another, joined into one transfer, as
+ * ltchiptool's collect_data joins them. The RAM code carries the tail of one
+ * transfer into the next (bootram_enter_file_mode resets cache_buffer_pos but
+ * not cache_tailing_pos), so a build's bootloader, partition table and app,
+ * which follow on from one another, have to go as one.
+ */
+function joinRuns(runs: readonly Uf2Range[]): Uf2Range[] {
+  const joined: Uf2Range[] = [];
+  for (const run of runs) {
+    const last = joined[joined.length - 1];
+    if (last && last.address + last.data.length === run.address) {
+      last.data = concat(last.data, run.data);
+    } else {
+      joined.push({ address: run.address, data: run.data });
+    }
+  }
+  return joined;
 }
 
 /** Catch the downloader: as it is, after a reset over the lines, then with the user's help. */
@@ -220,17 +242,18 @@ export async function flashLn882x(
     await bootRamcode(link, ramcode, log);
     await releaseStrap(port);
     const flash = await flashSize(link);
+    const runs = joinRuns(image.runs);
     log(
-      `Linked to the RAM code (flash ${flash.id}, ${flash.size / 0x100000} MiB); ${image.runs.length} runs to write`
+      `Linked to the RAM code (flash ${flash.id}, ${flash.size / 0x100000} MiB); ${runs.length} runs to write`
     );
-    const past = image.runs.find((run) => run.address + run.data.length > flash.size);
+    const past = runs.find((run) => run.address + run.data.length > flash.size);
     if (past) {
       throw new Ln882xFlashSizeError(
         `The image runs to ${formatAddress(past.address + past.data.length)}, past the end of the flash`
       );
     }
     let done = 0;
-    for (const run of image.runs) {
+    for (const run of runs) {
       await writeRun(
         link,
         run.address,
