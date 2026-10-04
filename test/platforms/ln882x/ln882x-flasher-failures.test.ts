@@ -37,6 +37,15 @@ describe("flashLn882x failures", () => {
     expect(chip.raw.open).not.toHaveBeenCalled();
   });
 
+  it("leaves the port alone when the dialog closed during the RAM code download", async () => {
+    const abort = new AbortController();
+    abort.abort();
+    const { chip, done } = flash({}, image(), { signal: abort.signal });
+    await expect(driveFakeTimers(done)).rejects.toMatchObject({ name: "AbortError" });
+    expect(chip.raw.open).not.toHaveBeenCalled();
+    expect(chip.signals).toEqual([]);
+  });
+
   it("gives up when nothing answers while the user had the chance", async () => {
     const { chip, log, done } = flash({ start: "firmware" });
     await expect(driveFakeTimers(done)).rejects.toBeInstanceOf(Ln882xLinkError);

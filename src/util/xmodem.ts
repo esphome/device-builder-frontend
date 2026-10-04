@@ -122,7 +122,9 @@ export async function sendFrame(
     if (reply === ACK) return;
     if (reply === CAN) throw new XmodemError(`Receiver cancelled at ${label}`);
     if (errors >= retries) {
-      throw new XmodemError(`${label} was not acknowledged after ${retries} retries`);
+      throw new XmodemError(
+        `${label} was not acknowledged after ${retries} ${retries === 1 ? "retry" : "retries"}`
+      );
     }
   }
 }
