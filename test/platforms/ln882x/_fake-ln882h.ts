@@ -43,6 +43,8 @@ export interface FakeOptions {
   start?: "rom" | "firmware" | "ramcode";
   /** Fail setSignals as an adapter without control lines would. */
   noSignals?: boolean;
+  /** Never settle a line change, as on a board unplugged mid change. */
+  hangSignals?: boolean;
   /**
    * A dev board whose adapter drives CEN from RTS and BOOT from DTR (both
    * active low). Otherwise the lines go nowhere, as on an adapter wired to
@@ -234,6 +236,7 @@ export function fakeLn882h(opts: FakeOptions = {}) {
     }),
     close: vi.fn(async () => {}),
     setSignals: vi.fn(async (s: SerialOutputSignals) => {
+      if (opts.hangSignals) await new Promise(() => {});
       if (opts.noSignals) throw new DOMException("no lines", "NetworkError");
       signals.push(s);
       if (!opts.wired) return;

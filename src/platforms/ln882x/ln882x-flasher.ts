@@ -15,7 +15,7 @@ import {
 } from "../../util/serial-control-lines.js";
 import { sleep } from "../../util/sleep.js";
 import type { Uf2Range } from "../../util/uf2.js";
-import { settledWithin } from "../../util/with-deadline.js";
+import { settledWithin, withDeadline } from "../../util/with-deadline.js";
 import { ymodemSend } from "../../util/ymodem.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
@@ -44,6 +44,8 @@ const RESET_HOLD_MS = 100;
 const ROM_SETTLE_MS = 100;
 /** How long the reboot and the close after a flash each get. */
 const TEARDOWN_MS = 2000;
+/** How long a change of the control lines gets; one can stay pending on an unplugged board. */
+const LINES_MS = 2000;
 
 /** ``onWaiting``: nothing answered; the user has to strap and reset the chip. */
 export type Ln882xFlashHooks = LibreTinyFlashHooks;
@@ -80,6 +82,18 @@ export class Ln882xStartAddrError extends Error {
   }
 }
 
+/** Change the control lines, giving up after ``LINES_MS``. */
+const setLines = (port: SerialPort, signals: SerialOutputSignals): Promise<void> =>
+  withDeadline(
+    port.setSignals(signals),
+    LINES_MS,
+    () => new Error("The adapter did not change its control lines")
+  );
+
+/** Release both lines, best effort and bounded. */
+const releaseLines = (port: SerialPort): Promise<boolean> =>
+  settledWithin(releaseControlLines(port), LINES_MS);
+
 /**
  * Reset into the downloader the way an ESP style auto-reset circuit wants
  * it, which also suits a board wired straight to the adapter (RTS on CEN,
@@ -89,14 +103,14 @@ export class Ln882xStartAddrError extends Error {
  */
 async function resetIntoDownload(port: SerialPort): Promise<boolean> {
   try {
-    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+    await setLines(port, { dataTerminalReady: false, requestToSend: true });
     await sleep(RESET_HOLD_MS);
-    await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+    await setLines(port, { dataTerminalReady: true, requestToSend: false });
     await sleep(ROM_SETTLE_MS);
     return true;
   } catch {
     // Not with a line left held, which could keep the chip in reset.
-    await releaseControlLines(port);
+    await releaseLines(port);
     return false;
   }
 }
@@ -104,7 +118,7 @@ async function resetIntoDownload(port: SerialPort): Promise<boolean> {
 /** Drop the BOOT strap; the BootROM only reads it at reset. */
 async function releaseStrap(port: SerialPort): Promise<void> {
   try {
-    await port.setSignals({ dataTerminalReady: false });
+    await setLines(port, { dataTerminalReady: false });
   } catch {
     // No control lines: the user holds BOOT and can let go now.
   }
@@ -149,7 +163,7 @@ async function enterDownloadMode(
 ): Promise<void> {
   // Chromium asserts both lines on open, which holds a chip whose CEN is on
   // RTS in reset.
-  await releaseControlLines(port);
+  await releaseLines(port);
   log("Looking for the chip's downloader");
   if (await link.link(AUTO_LINK_MS)) return;
   for (let attempt = 1; attempt <= AUTO_RESET_ATTEMPTS; attempt++) {
@@ -161,7 +175,7 @@ async function enterDownloadMode(
     if (!(await resetIntoDownload(port))) break;
     if (await link.link(AUTO_LINK_MS)) return;
   }
-  await releaseControlLines(port);
+  await releaseLines(port);
   log("No answer; waiting for download mode (BOOT, GPIOA9, to GND, then reset)");
   hooks.onWaiting?.();
   if (!(await link.link(STRAP_WAIT_MS))) throw new Ln882xLinkError();
@@ -241,6 +255,8 @@ export async function flashLn882x(
   const log = hooks.onLog ?? (() => {});
   // Before the port: a missing RAM code should not cost the user a strap.
   const ramcode = await loadRamcode();
+  // A dialog closed during the download must not see its board reset.
+  hooks.signal?.throwIfAborted();
   if (!port.readable) await port.open({ baudRate: LN882H_BAUD_RATE });
   let link: LnLink | undefined;
   let failure: unknown;
@@ -288,7 +304,7 @@ export async function flashLn882x(
     // A teardown failure must not replace the flash error nor skip the rest.
     await link?.close(failure).catch(() => {});
     // Not with BOOT held, which would send the next reset to the ROM again.
-    await settledWithin(releaseControlLines(port), TEARDOWN_MS);
+    await releaseLines(port);
     if (failure === undefined) {
       log(
         rebooted

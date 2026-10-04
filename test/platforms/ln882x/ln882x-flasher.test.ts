@@ -175,6 +175,14 @@ describe("flashLn882x", () => {
     expectImage(chip, image(runs));
   });
 
+  it("gives up on line changes that never settle instead of hanging", async () => {
+    // A chip strapped by hand behind an adapter whose line changes stay pending.
+    const { chip, done } = flash({ hangSignals: true });
+    expect(await driveFakeTimers(done)).toBe(true);
+    expectImage(chip);
+    expect(chip.raw.close).toHaveBeenCalled();
+  });
+
   it("opens the port only when it is not open yet", async () => {
     const { chip, done } = flash();
     await chip.port.open({ baudRate: 115200 });
