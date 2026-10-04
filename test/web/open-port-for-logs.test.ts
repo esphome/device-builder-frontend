@@ -30,6 +30,12 @@ describe("openPortForLogs", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it("opens at the baud it is given", async () => {
+    const port = makePort(async () => {});
+    await openPortForLogs(port as unknown as SerialPort, localize, {}, 9600);
+    expect(port.open).toHaveBeenCalledWith({ baudRate: 9600, bufferSize: 8192 });
+  });
+
   it("drops DTR and RTS after the open when asked to", async () => {
     const setSignals = vi.fn(async () => {});
     const port = { ...makePort(async () => {}), setSignals };

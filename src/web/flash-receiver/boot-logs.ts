@@ -10,7 +10,6 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { releaseControlLines } from "../../util/serial-control-lines.js";
-import { LOG_BAUD_RATE } from "../logs/serial-source.js";
 import { openLiveLogPort } from "./live-log-port.js";
 
 // Native-USB chips re-enumerate on reset; wait this long for the running
@@ -22,6 +21,8 @@ export interface BootLogsHost {
   _bootLogsGen: number;
   _logsOpen: boolean;
   _logPort?: SerialPort;
+  /** The baud the device logs at, from the hand-off or ESPHome's default. */
+  _logBaudRate: number;
   _localize: LocalizeFunc;
 }
 
@@ -36,7 +37,7 @@ export async function acquireBootLogs(
   const { port, error } = await openLiveLogPort(
     oldPort,
     before,
-    LOG_BAUD_RATE,
+    host._logBaudRate,
     LOG_REOPEN_TIMEOUT_MS,
     () => gen !== host._bootLogsGen
   );

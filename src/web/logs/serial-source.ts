@@ -27,6 +27,8 @@ export interface SerialLogSourceOptions {
   releaseLinesAfterOpen?: boolean;
   /** A reacquired handle after a re-enumeration; the parent card adopts it. */
   onPortReplaced?: (port: SerialPort) => void;
+  /** The baud a reopen uses; the device's own when its installer knew it. */
+  baudRate?: number;
 }
 
 export class SerialLogSource implements WebLogSource {
@@ -84,7 +86,7 @@ export class SerialLogSource implements WebLogSource {
       console.error("[Web Serial] Failed to close the dead logs port:", err);
     });
     const live = await openLiveSerialPort(dead, {
-      baudRate: LOG_BAUD_RATE,
+      baudRate: this.options.baudRate ?? LOG_BAUD_RATE,
       bufferSize: LOG_BUFFER_SIZE,
       cancelled,
     });

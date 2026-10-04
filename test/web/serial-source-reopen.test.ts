@@ -80,3 +80,19 @@ describe("SerialLogSource reopen line policy", () => {
     });
   });
 });
+
+describe("SerialLogSource reopen baud", () => {
+  it("reopens at the baud it was given", async () => {
+    const { dead } = ports();
+    const source = new SerialLogSource(dead, { reset: "rts-pulse", baudRate: 9600 });
+    await source.resume(hooks, () => false);
+    expect(mocks.openLiveSerialPort.mock.calls[0][1]).toMatchObject({ baudRate: 9600 });
+  });
+
+  it("reopens at ESPHome's default without one", async () => {
+    const { dead } = ports();
+    const source = new SerialLogSource(dead, { reset: "rts-pulse" });
+    await source.resume(hooks, () => false);
+    expect(mocks.openLiveSerialPort.mock.calls[0][1]).toMatchObject({ baudRate: 115200 });
+  });
+});

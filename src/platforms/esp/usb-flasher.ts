@@ -59,7 +59,11 @@ export function openFlasher(
     flasher,
     erase,
     logs,
-  }: Pick<HandoffSpec, "flasher" | "erase"> & { logs?: HandoffLogs },
+    logBaudRate,
+  }: Pick<HandoffSpec, "flasher" | "erase"> & {
+    logs?: HandoffLogs;
+    logBaudRate?: number;
+  },
   cb: FlasherCallbacks
 ): (() => void) | null {
   const nonce = randomNonce();
@@ -148,6 +152,7 @@ export function openFlasher(
           erase,
           flasher,
           ...(logs && { logs }),
+          ...(logBaudRate && { logBaudRate }),
           parts: [{ address: 0, data: bytes }],
         };
         win.postMessage(frame, FLASHER_ORIGIN, [bytes]);

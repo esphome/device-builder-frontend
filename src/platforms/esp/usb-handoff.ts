@@ -1,6 +1,7 @@
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
 import { downloadBuildArtifact } from "../../components/firmware-install-dialog/browser-flash-steps.js";
+import { resolveLogBaudRate } from "../../util/log-baud-rate.js";
 import { DEFAULT_HANDOFF_FLASHER, type HandoffSpec } from "../handoff.js";
 import { installOf, platformFor } from "../registry.js";
 import { openFlasher } from "./usb-flasher.js";
@@ -108,6 +109,9 @@ export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
     flasher: handoff.flasher,
     erase: handoff.erase,
     logs: handoff.logs?.(host._device),
+    // A device with serial logging off resolves to none, and the receiver
+    // keeps its default.
+    logBaudRate: resolveLogBaudRate(host._device?.logger_baud_rate) ?? undefined,
   };
   const teardown = openFlasher(firmware, host._usbFirmwareName, deviceName, options, {
     onProgress: (pct) => {

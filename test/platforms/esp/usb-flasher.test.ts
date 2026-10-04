@@ -88,6 +88,25 @@ describe("openFlasher", () => {
     expect(fakeWin.postMessage.mock.calls[0][0].logs).toBe("flash-port");
   });
 
+  it.each([
+    [9600, 9600],
+    [undefined, undefined],
+  ])("carries the logger baud %s only when the opener knows it", (baud, sent) => {
+    const fakeWin = { postMessage: vi.fn(), closed: false };
+    vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);
+    openFlasher(
+      new ArrayBuffer(8),
+      "f.uf2",
+      "dev",
+      { flasher: "bk-uart", erase: false, logBaudRate: baud },
+      makeCallbacks()
+    );
+
+    emit(fakeWin, { type: "esphome-web-flash:ready", flashers: ["bk-uart"] });
+
+    expect(fakeWin.postMessage.mock.calls[0][0].logBaudRate).toBe(sent);
+  });
+
   it("opens with nonce+origin, hands off on ready, and reports progress + done", () => {
     const fakeWin = { postMessage: vi.fn(), closed: false };
     const open = vi.spyOn(window, "open").mockReturnValue(fakeWin as unknown as Window);

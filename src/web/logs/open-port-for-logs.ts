@@ -16,10 +16,11 @@ import { LOG_BAUD_RATE, LOG_BUFFER_SIZE } from "./serial-source.js";
 export async function openPortForLogs(
   port: SerialPort,
   localize: LocalizeFunc,
-  policy: SerialLogsPolicy
+  policy: SerialLogsPolicy,
+  baudRate = LOG_BAUD_RATE
 ): Promise<boolean> {
   try {
-    await openSerialPort(port, { baudRate: LOG_BAUD_RATE, bufferSize: LOG_BUFFER_SIZE });
+    await openSerialPort(port, { baudRate, bufferSize: LOG_BUFFER_SIZE });
     // Chromium asserts DTR and RTS on open; on the RTL8720C kits those are
     // the download strap and the reset, so drop them before the board boots.
     if (policy.releaseLinesAfterOpen) await releaseControlLines(port);

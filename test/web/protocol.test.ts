@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isFlashParts, isHandoffFlasher } from "../../src/web/flash-receiver/protocol.js";
+import {
+  handoffLogBaudRateOf,
+  isFlashParts,
+  isHandoffFlasher,
+} from "../../src/web/flash-receiver/protocol.js";
 
 const part = (address = 0, bytes = 8) => ({ address, data: new ArrayBuffer(bytes) });
 
@@ -53,4 +57,18 @@ describe("isHandoffFlasher", () => {
     expect(isHandoffFlasher("toString")).toBe(false);
     expect(isHandoffFlasher(undefined)).toBe(false);
   });
+});
+
+describe("handoffLogBaudRateOf", () => {
+  it("takes a plausible UART baud", () => {
+    expect(handoffLogBaudRateOf(9600)).toBe(9600);
+    expect(handoffLogBaudRateOf(115200)).toBe(115200);
+  });
+
+  it.each([undefined, null, "9600", 0, -9600, 9600.5, 10_000_000])(
+    "ignores %s from the untrusted frame",
+    (value) => {
+      expect(handoffLogBaudRateOf(value)).toBeUndefined();
+    }
+  );
 });

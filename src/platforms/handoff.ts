@@ -118,6 +118,12 @@ export interface FirmwareMessage {
   flasher?: HandoffFlasher;
   /** Where the device's serial logs are, when the opener knows; absent: elsewhere or unknown. */
   logs?: HandoffLogs;
+  /**
+   * The baud the device logs at, when the opener knows it; absent means
+   * ESPHome's default. An older receiver ignores it and opens the logs at
+   * the default.
+   */
+  logBaudRate?: number;
   parts: FlashPartMessage[];
 }
 

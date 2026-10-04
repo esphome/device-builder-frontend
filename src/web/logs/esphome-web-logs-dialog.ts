@@ -83,6 +83,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
    */
   @property({ attribute: false }) policy: SerialLogsPolicy = {};
 
+  /** The baud a reconnect reopens the port at; ESPHome's default unless set. */
+  @property({ attribute: false }) baudRate?: number;
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;
@@ -180,6 +183,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     return new SerialLogSource(this.port, {
       reset: offeredReset(this.policy, this.port),
       releaseLinesAfterOpen: this.policy.releaseLinesAfterOpen,
+      baudRate: this.baudRate,
       // A read-error-only disconnect fires no DOM disconnect event, so the
       // card's watcher may still hold the dead handle for its other actions.
       onPortReplaced: (port) =>

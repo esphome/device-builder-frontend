@@ -18,6 +18,19 @@ const MAX_FLASH_ADDRESS = 0x1_0000_0000; // 4 GiB — a 32-bit flash address spa
 export const handoffLogsOf = (value: unknown): HandoffLogs | undefined =>
   value === "flash-port" || value === "off" ? value : undefined;
 
+// Plausible UART rates; anything else in the untrusted frame is ignored.
+const MIN_LOG_BAUD_RATE = 300;
+const MAX_LOG_BAUD_RATE = 4_000_000;
+
+/** The inbound ``logBaudRate`` field, or undefined for anything that is not a plausible baud. */
+export const handoffLogBaudRateOf = (value: unknown): number | undefined =>
+  typeof value === "number" &&
+  Number.isInteger(value) &&
+  value >= MIN_LOG_BAUD_RATE &&
+  value <= MAX_LOG_BAUD_RATE
+    ? value
+    : undefined;
+
 /** Runtime guard for a well-formed, plausibly-sized ``parts`` array. */
 export function isFlashParts(parts: unknown): parts is FlashPartMessage[] {
   if (!Array.isArray(parts) || parts.length === 0 || parts.length > MAX_FLASH_PARTS) {

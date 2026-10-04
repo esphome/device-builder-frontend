@@ -142,6 +142,17 @@ describe("handOffToFlasher", () => {
     }
   );
 
+  it.each([
+    { baud: null, sent: 115200 },
+    { baud: 9600, sent: 9600 },
+    { baud: 0, sent: undefined },
+  ])("hands over the logger baud: $baud is sent as $sent", ({ baud, sent }) => {
+    const host = makeHost();
+    host._device = { ...host._device, logger_baud_rate: baud } as typeof host._device;
+    handOffToFlasher(asHost(host));
+    expect(openFlasher.mock.calls[0][3].logBaudRate).toBe(sent);
+  });
+
   it("hands a Pico's UF2 to the PICOBOOT flasher, without erase", () => {
     const host = makeHost();
     host._device.target_platform = "rp2040";
