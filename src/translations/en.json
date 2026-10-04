@@ -2121,11 +2121,11 @@
     },
     "ln": {
       "title": "LN882H Device",
-      "connect_hint": "Install the UF2 of your ESPHome build on your Lightning LN882H device through a USB serial adapter, or read its logs. To install, wire adapter RX to TX0 (PA2) and adapter TX to RX0 (PA3), and connect BOOT (GPIOA9) to GND before the board powers up; for the logs, move adapter RX to TX1 (PB9).",
+      "connect_hint": "Install the UF2 of your ESPHome build on your Lightning LN882H device through a USB serial adapter, or read its logs. To install, wire adapter RX to TX0 (PA2) and adapter TX to RX0 (PA3), and connect BOOT (GPIOA9) to GND before the board powers up. The logs come out on UART1 (TX1 on PB9) by default; move adapter RX there for them, or leave it on TX0 if the logger is set to UART0.",
       "logs": "Serial logs",
       "install_title": "Install firmware on an LN882H",
       "install_intro": "There is no ready-made ESPHome Web firmware for the LN882H yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
-      "logs_elsewhere": "With serial logging on, the logs come out on UART1, TX1 on PB9, not on the port used to install; read them there."
+      "logs_elsewhere": "With serial logging on, the logs come out on UART1, TX1 on PB9, by default; read them there. If the logger is set to UART0, they come out on TX0 (PA2), the port used to install."
     },
     "rtl": {
       "title": "RTL8720C Device",
