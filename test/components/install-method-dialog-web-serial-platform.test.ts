@@ -379,9 +379,8 @@ describe("install-method-dialog platform gating", () => {
 describe("install-method-dialog logs-mode platform gating", () => {
   // The Pico's CDC console reads like any other port, so logs get the Web
   // Serial row; on localhost that collapses the server-serial row, as for ESP.
-  // The RTL8720C, the BK72xx and the LN882H log on a plain UART, read like
-  // any other port.
-  it.each(["rp2", "rp2040", "rp2350", "esp32", "rtl87xx", "bk72xx", "ln882x"])(
+  // The RTL8720C and the BK72xx log on a plain UART, read like any other port.
+  it.each(["rp2", "rp2040", "rp2350", "esp32", "rtl87xx", "bk72xx"])(
     "shows Web Serial logs and drops server-serial for %s",
     async (platform) => {
       const d = await mount(platform, "logs");
@@ -389,6 +388,12 @@ describe("install-method-dialog logs-mode platform gating", () => {
       expect(hasServerSerialRow(d)).toBe(false);
     }
   );
+
+  it("keeps logs on server-serial for ln882x", async () => {
+    const d = await mount("ln882x", "logs");
+    expect(hasWebSerialRow(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
+  });
 
   // nRF52 gets the Web Serial row for logs (USB-CDC console); on localhost
   // that collapses the server-serial row, same as ESP and RP2.

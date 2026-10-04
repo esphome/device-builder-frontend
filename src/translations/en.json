@@ -596,7 +596,6 @@
     "ln_guide_link": "LibreTiny flashing guide for the LN882H",
     "ln_flash_failed": "UART flash failed",
     "ln_done_manual_reset": "Installation complete. Release BOOT and reset the chip to start the firmware.",
-    "ln_done_logs_on_uart1": "Installation complete. The logs come out on UART1 (TX1 on PB9), not on the port used to install. Read them there, or set {setting} to get them on this port.",
     "ln_bad_uf2": "Invalid LibreTiny UF2 image",
     "ln_wrong_family": "This firmware is not built for a Lightning LN882H chip.",
     "ln_ramcode_unavailable": "Could not download the LN882H loader the chip needs for flashing. Check the internet connection and try again.",

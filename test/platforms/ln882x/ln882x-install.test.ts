@@ -35,7 +35,6 @@ vi.mock("../../../src/platforms/ln882x/index.js", async (importOriginal) => {
   return { ...real, loadLn882xImage: seams.loadLn882xImage };
 });
 
-import { argsLocalize } from "../../_dom.js";
 import {
   ltHeaderTags,
   ltPartInfoTags,
@@ -102,12 +101,6 @@ function makeHost(opts: { binaries?: FirmwareBinary[]; uf2?: ArrayBuffer } = {})
   );
 }
 type Host = ReturnType<typeof makeHost>;
-
-/** The device, its logger moved by its config. */
-const logging = (
-  logger_interface: string | null,
-  logger_baud_rate: number | null = null
-): ConfiguredDevice => ({ ...device, logger_interface, logger_baud_rate });
 
 function readyHost(): Host {
   const host = makeHost();
@@ -299,70 +292,10 @@ describe("lnDoFlash", () => {
     ]);
     expect(host._log.lines).toContain("Writing 0x7000 (256 bytes)");
     expect(host._step).toBe("done");
-    expect(host._statusMessage).toBe("firmware.ln_done_logs_on_uart1");
-    expect(host._flashAbort).toBeNull();
-    // The flash went over UART0; the logs are on UART1 by default.
-    expect(host._logsPort).toBeNull();
-  });
-
-  it("opens the logs on the flashed port when the config puts them on UART0", async () => {
-    const host = readyHost();
-    host._device = logging("UART0");
-    host._showLogsAfterInstall = true;
-    const port = {};
-    mocks.requestSerialPort.mockResolvedValue(port);
-    mocks.flashLn882x.mockResolvedValue(true);
-
-    await lnDoFlash(asHost(host));
-
     expect(host._statusMessage).toBe("firmware.status_done");
-    expect(host._logsPort).toBe(port);
-    expect(mocks.dispatchShowLogsAfterInstall).toHaveBeenCalledWith(
-      host,
-      expect.objectContaining({ webSerialPort: port, targetPlatform: "ln882x" })
-    );
-    expect(host._open).toBe(false);
-  });
-
-  it("keeps the UART0 port for Show logs without opening them unasked", async () => {
-    const host = readyHost();
-    host._device = logging("UART0");
-    const port = {};
-    mocks.requestSerialPort.mockResolvedValue(port);
-    mocks.flashLn882x.mockResolvedValue(true);
-
-    await lnDoFlash(asHost(host));
-
-    expect(host._step).toBe("done");
-    expect(host._logsPort).toBe(port);
-    expect(mocks.dispatchShowLogsAfterInstall).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    {
-      why: "an explicit UART1",
-      device: logging("UART1"),
-      message: "firmware.ln_done_logs_on_uart1 | logger: hardware_uart: UART0",
-    },
-    {
-      why: "a disabled logger",
-      device: logging("UART0", 0),
-      message: "firmware.status_done",
-    },
-  ])("keeps no port for $why", async ({ device: config, message }) => {
-    const host = readyHost();
-    host._localize = argsLocalize;
-    host._device = config;
-    host._showLogsAfterInstall = true;
-    mocks.requestSerialPort.mockResolvedValue({});
-    mocks.flashLn882x.mockResolvedValue(true);
-
-    await lnDoFlash(asHost(host));
-
-    expect(host._step).toBe("done");
-    expect(host._statusMessage).toBe(message);
+    expect(host._flashAbort).toBeNull();
+    // The logs stay on the server's serial port for now.
     expect(host._logsPort).toBeNull();
-    expect(mocks.dispatchShowLogsAfterInstall).not.toHaveBeenCalled();
   });
 
   it("drops what the engine reports once the dialog moved on", async () => {
@@ -422,7 +355,6 @@ describe("lnDoFlash", () => {
 
   it("asks for a reset by hand when the chip was not rebooted", async () => {
     const host = readyHost();
-    host._device = logging("UART0");
     host._showLogsAfterInstall = true;
     mocks.requestSerialPort.mockResolvedValue({});
     mocks.flashLn882x.mockResolvedValue(false);
@@ -514,13 +446,7 @@ describe("ln882xInstall", () => {
 });
 
 describe("ln882xInstall.holdsPort", () => {
-  it.each([
-    { why: "logs on UART0", config: logging("UART0"), holds: true },
-    { why: "the default UART1", config: logging(null), holds: false },
-    { why: "an explicit UART1", config: logging("UART1"), holds: false },
-    { why: "a disabled logger", config: logging("UART0", 0), holds: false },
-    { why: "no device", config: null, holds: false },
-  ])("is $holds for $why", ({ config, holds }) => {
-    expect(ln882xInstall.holdsPort(config)).toBe(holds);
+  it("keeps no port: the logs stay on the server's serial port", () => {
+    expect(ln882xInstall.holdsPort(device)).toBe(false);
   });
 });

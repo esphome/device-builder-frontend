@@ -14,7 +14,6 @@ import {
   pickSerialPortOrFail,
   pickUf2,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 import {
@@ -23,7 +22,6 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { loadLn882xImage, prefetchLn882x, runLn882x } from "./index.js";
-import { LN_LOGS_ON_FLASH_PORT_SETTING, lnLogsOnFlashPort } from "./serial-logs.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -104,24 +102,10 @@ export async function lnDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<voi
     );
     return;
   }
-  if (!result.rebooted) {
-    host._statusMessage = host._localize("firmware.ln_done_manual_reset");
-    host._step = "done";
-    return;
-  }
-  // The adapter is on UART0, so the logs follow only a config that moved
-  // them there; a disabled logger has none to point at.
-  if (lnLogsOnFlashPort(device)) {
-    host._statusMessage = host._localize("firmware.status_done");
-    finishWithLogsPort(host, port);
-    return;
-  }
-  host._statusMessage =
-    device?.logger_baud_rate === 0
-      ? host._localize("firmware.status_done")
-      : host._localize("firmware.ln_done_logs_on_uart1", {
-          setting: LN_LOGS_ON_FLASH_PORT_SETTING,
-        });
+  // Without a confirmed reboot the chip may still sit in its downloader.
+  host._statusMessage = host._localize(
+    result.rebooted ? "firmware.status_done" : "firmware.ln_done_manual_reset"
+  );
   host._step = "done";
 }
 
@@ -129,9 +113,8 @@ export const ln882xInstall: BrowserInstall<"ln-uart"> = {
   id: "ln-uart",
   methodKey: "ln_uart",
   chips: ["ln882h"],
-  // The flash goes over UART0; the logs are on that port only when the
-  // config moves them there from UART1.
-  holdsPort: lnLogsOnFlashPort,
+  // The logs stay on the server's serial port for now.
+  holdsPort: () => false,
   image: lnImage,
   start: startLn882xInstall,
   showFirstStep: showReadyStep,
