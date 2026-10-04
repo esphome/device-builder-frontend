@@ -2,10 +2,11 @@
  * Pins the shipped CSP against the origins the app actually talks to.
  *
  * The policies live in static meta tags in `public/index.html` and
- * `public/web/index.html` while the origins live in TypeScript, so nothing but this connects the two. A feature that
- * reaches a new origin passes every other test and is then dead on arrival in
- * the browser: the test environment does not enforce CSP, and the suite never
- * loads this file. That is exactly how the decoder iframe shipped blocked.
+ * `public/web/index.html` while the origins live in TypeScript, so nothing
+ * but this connects the two. A feature that reaches a new origin passes every
+ * other test and is then dead on arrival in the browser: the test environment
+ * does not enforce CSP, and the suite never loads this file. That is exactly
+ * how the decoder iframe shipped blocked.
  */
 import { describe, expect, it } from "vitest";
 // The shipped file itself, not a copy of its text: a policy asserted against a

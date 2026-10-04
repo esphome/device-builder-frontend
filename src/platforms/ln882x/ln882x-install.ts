@@ -121,14 +121,16 @@ export async function lnDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<voi
     return;
   }
   // The adapter is on UART0, so the logs follow only a config that moved
-  // them there; a disabled logger has none to point at.
-  if (lnLogsOnFlashPort(device)) {
+  // them there; a disabled logger has none to point at. The same answer the
+  // hand-off gives the receiver.
+  const logs = lnHandoffLogs(device);
+  if (logs === "flash-port") {
     host._statusMessage = host._localize("firmware.status_done");
     finishWithLogsPort(host, port);
     return;
   }
   host._statusMessage =
-    device?.logger_baud_rate === 0
+    logs === "off"
       ? host._localize("firmware.status_done")
       : host._localize("firmware.ln_done_logs_on_uart1", {
           setting: LN_LOGS_ON_FLASH_PORT_SETTING,
