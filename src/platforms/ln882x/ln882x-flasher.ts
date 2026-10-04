@@ -130,6 +130,16 @@ function joinRuns(runs: readonly Uf2Range[]): Uf2Range[] {
   return joined;
 }
 
+/**
+ * Reset over the lines for a reboot the RAM code did not confirm, and say
+ * whether it took: an adapter wired to TX, RX and GND alone takes the line
+ * changes too, so only a downloader that no longer answers counts.
+ */
+async function resetConfirmed(port: SerialPort, link: LnLink): Promise<boolean> {
+  if (!(await resetIntoFirmware(port, RESET_HOLD_MS, TEARDOWN_MS))) return false;
+  return (await link.ping()) === null;
+}
+
 /** Catch the downloader: as it is, after a reset over the lines, then with the user's help. */
 async function enterDownloadMode(
   port: SerialPort,
@@ -267,7 +277,9 @@ export async function flashLn882x(
       );
       done += run.data.length;
     }
-    rebooted = (await link.command("reboot")).includes("pppp");
+    rebooted =
+      (await link.command("reboot")).includes("pppp") ||
+      (await resetConfirmed(port, link));
     hooks.onProgress(100);
   } catch (err) {
     failure = err;
@@ -275,8 +287,6 @@ export async function flashLn882x(
   } finally {
     // A teardown failure must not replace the flash error nor skip the rest.
     await link?.close(failure).catch(() => {});
-    if (failure === undefined && !rebooted)
-      rebooted = await resetIntoFirmware(port, RESET_HOLD_MS, TEARDOWN_MS);
     // Not with BOOT held, which would send the next reset to the ROM again.
     await settledWithin(releaseControlLines(port), TEARDOWN_MS);
     if (failure === undefined) {

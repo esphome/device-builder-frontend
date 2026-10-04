@@ -66,6 +66,22 @@ describe("xmodemSend", () => {
     );
   });
 
+  it("skips a stray byte before the reply instead of sending the block again", async () => {
+    // Line noise or a receiver's repeated 'C' between a block and its ACK,
+    // as ltchiptool's sender skips it.
+    const rx = fakeReceiver([NAK, 0x43, 0x00, ACK, ACK]);
+    await xmodemSend(rx.io, bytes(4));
+    expect(rx.writes).toHaveLength(2);
+    expect(rx.writes[1]).toEqual(new Uint8Array([EOT]));
+  });
+
+  it("stops on a cancel at the end of the file", async () => {
+    const rx = fakeReceiver([NAK, ACK, CAN]);
+    await expect(xmodemSend(rx.io, bytes(4))).rejects.toThrow(
+      "Receiver cancelled at the end of the file"
+    );
+  });
+
   it("stops on a cancel from the receiver", async () => {
     const rx = fakeReceiver([NAK, CAN]);
     await expect(xmodemSend(rx.io, bytes(4))).rejects.toBeInstanceOf(XmodemError);
