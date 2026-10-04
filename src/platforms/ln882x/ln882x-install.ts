@@ -24,11 +24,7 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { loadLn882xImage, runLn882x, warmLn882x } from "./index.js";
-import {
-  LN_LOGS_ON_FLASH_PORT_SETTING,
-  lnHandoffLogs,
-  lnLogsOnFlashPort,
-} from "./serial-logs.js";
+import { lnHandoffLogs, lnLogsOnFlashPort } from "./serial-logs.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -115,26 +111,26 @@ export async function lnDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<voi
     );
     return;
   }
-  if (!result.rebooted) {
-    host._statusMessage = host._localize("firmware.ln_done_manual_reset");
-    host._step = "done";
-    return;
-  }
   // The adapter is on UART0, so the logs follow only a config that moved
   // them there; a disabled logger has none to point at. The same answer the
   // hand-off gives the receiver.
   const logs = lnHandoffLogs(device);
+  if (!result.rebooted) {
+    // The chip may still sit in its downloader: the port is kept for Show
+    // logs after the reset, but the logs do not open by themselves.
+    host._statusMessage = host._localize("firmware.ln_done_manual_reset");
+    if (logs === "flash-port") finishWithLogsPort(host, port, false);
+    else host._step = "done";
+    return;
+  }
   if (logs === "flash-port") {
     host._statusMessage = host._localize("firmware.status_done");
     finishWithLogsPort(host, port);
     return;
   }
-  host._statusMessage =
-    logs === "off"
-      ? host._localize("firmware.status_done")
-      : host._localize("firmware.ln_done_logs_on_uart1", {
-          setting: LN_LOGS_ON_FLASH_PORT_SETTING,
-        });
+  host._statusMessage = host._localize(
+    logs === "off" ? "firmware.status_done" : "firmware.ln_done_logs_on_uart1"
+  );
   host._step = "done";
 }
 

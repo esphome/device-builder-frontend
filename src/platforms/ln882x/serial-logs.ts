@@ -13,9 +13,6 @@ export const LN882X_SERIAL_LOGS: SerialLogsPolicy = {
   releaseLinesAfterOpen: true,
 };
 
-/** The config that puts the logs on the port the install flashes over. */
-export const LN_LOGS_ON_FLASH_PORT_SETTING = "logger: hardware_uart: UART0";
-
 /**
  * Whether the device logs on UART0, the port the install flashes over.
  * LibreTiny logs on UART1 (PB9) by default on a chip that has it, which the

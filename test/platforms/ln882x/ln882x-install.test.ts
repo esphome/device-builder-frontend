@@ -345,7 +345,7 @@ describe("lnDoFlash", () => {
     {
       why: "an explicit UART1",
       device: logging("UART1"),
-      message: "firmware.ln_done_logs_on_uart1 | logger: hardware_uart: UART0",
+      message: "firmware.ln_done_logs_on_uart1",
     },
     {
       why: "a disabled logger",
@@ -423,18 +423,33 @@ describe("lnDoFlash", () => {
     expect(host._errorMessage).toBe("The chip refused the start address 0x7000");
   });
 
-  it("asks for a reset by hand when the chip was not rebooted", async () => {
+  it("asks for a reset by hand when the chip was not rebooted, keeping the UART0 port for Show logs", async () => {
     const host = readyHost();
     host._device = logging("UART0");
     host._showLogsAfterInstall = true;
-    mocks.requestSerialPort.mockResolvedValue({});
+    const port = {};
+    mocks.requestSerialPort.mockResolvedValue(port);
     mocks.flashLn882x.mockResolvedValue(false);
 
     await lnDoFlash(asHost(host));
 
     expect(host._step).toBe("done");
     expect(host._statusMessage).toBe("firmware.ln_done_manual_reset");
+    // Not opened before the reset, but there for Show logs after it.
+    expect(host._logsPort).toBe(port);
     expect(mocks.dispatchShowLogsAfterInstall).not.toHaveBeenCalled();
+  });
+
+  it("keeps no port after a manual reset when the logs are elsewhere", async () => {
+    const host = readyHost();
+    host._device = logging(null);
+    mocks.requestSerialPort.mockResolvedValue({});
+    mocks.flashLn882x.mockResolvedValue(false);
+
+    await lnDoFlash(asHost(host));
+
+    expect(host._statusMessage).toBe("firmware.ln_done_manual_reset");
+    expect(host._logsPort).toBeNull();
   });
 
   it("names a board that was unplugged during the flash", async () => {
