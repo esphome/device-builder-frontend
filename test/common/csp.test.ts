@@ -62,7 +62,7 @@ describe("the shipped Content-Security-Policy", () => {
     // A path ending in a slash matches everything under it; the grant is the
     // one ltchiptool release, not cdn.jsdelivr.net.
     const sources = directive("connect-src").split(/\s+/);
-    const grant = sources.find((src) => src.includes("cdn.jsdelivr.net"));
+    const grant = sources.find((src) => src.startsWith("https://cdn.jsdelivr.net/"));
     expect(grant).toBeDefined();
     expect(grant!.endsWith("/")).toBe(true);
     expect(LN882H_RAMCODE_URL.startsWith(grant!)).toBe(true);
