@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 // duplicate would pass while the real page blocked everything.
 import html from "../../public/index.html?raw";
 import { DECODER_ORIGIN, DECODER_URL } from "../../src/common/docs.js";
+import { LN882H_RAMCODE_URL } from "../../src/platforms/ln882x/ln882x-ramcode.js";
 
 // Find the CSP meta tag, then read its content, so attribute order or an added
 // attribute (a reformat) doesn't break the test while the policy is unchanged.
@@ -55,5 +56,16 @@ describe("the shipped Content-Security-Policy", () => {
     expect(directive("connect-src")).not.toContain(DECODER_ORIGIN);
     expect(directive("script-src")).not.toContain(DECODER_ORIGIN);
     expect(directive("default-src")).not.toContain(DECODER_ORIGIN);
+  });
+
+  it("lets the LN882H flasher fetch its RAM code, and nothing else from the CDN", () => {
+    // A path ending in a slash matches everything under it; the grant is the
+    // one ltchiptool release, not cdn.jsdelivr.net.
+    const sources = directive("connect-src").split(/\s+/);
+    const grant = sources.find((src) => src.includes("cdn.jsdelivr.net"));
+    expect(grant).toBeDefined();
+    expect(grant!.endsWith("/")).toBe(true);
+    expect(LN882H_RAMCODE_URL.startsWith(grant!)).toBe(true);
+    expect(grant).not.toBe("https://cdn.jsdelivr.net/");
   });
 });

@@ -7,9 +7,9 @@
  * (`esphome run`) stays available, even on localhost where it's normally
  * collapsed into Web Serial.
  *
- * nRF52, RP2 and the RTL8720C are special cases: they don't get the esptool
- * Web Serial row but do get their own in-browser rows when Web Serial is
- * available. In logs mode the Web Serial row also covers them (their consoles
+ * nRF52, RP2, the RTL8720C, BK72xx and LN882H are special cases: they don't
+ * get the esptool Web Serial row but do get their own in-browser rows when Web
+ * Serial is available. In logs mode the Web Serial row also covers them (their consoles
  * read like any port).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -93,6 +93,8 @@ const hasRtlRow = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_rtl_ambz2");
 const hasBkRow = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_bk_uart");
+const hasLnRow = (d: ESPHomeInstallMethodDialog): boolean =>
+  hasRowTitled(d, "dashboard.install_method_ln_uart");
 const hasServerSerialRow = (d: ESPHomeInstallMethodDialog): boolean =>
   !!d.shadowRoot!.querySelector('wa-icon[name="serial-port"]');
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -268,6 +270,47 @@ describe("install-method-dialog platform gating", () => {
     expect(hasBkRow(await mount("bk72xx"))).toBe(false);
   });
 
+  // The LN882H downloader is spoken over Web Serial; the row keeps
+  // server-serial beside it as the backend path.
+  it("shows the LN882H row for ln882x with chip ln882h", async () => {
+    const d = await mount("ln882x", "install", "ln882h");
+    expect(hasLnRow(d)).toBe(true);
+    expect(hasBkRow(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  it("hides the LN882H row for ln882x with no chip", async () => {
+    const d = await mount("ln882x", "install", null);
+    expect(hasLnRow(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
+  });
+
+  it.each(["esp32", "bk72xx", "rtl87xx"])(
+    "hides the LN882H row for %s",
+    async (platform) => {
+      expect(hasLnRow(await mount(platform))).toBe(false);
+    }
+  );
+
+  it("hides the LN882H row in logs mode and without Web Serial", async () => {
+    expect(hasLnRow(await mount("ln882x", "logs", "ln882h"))).toBe(false);
+    setWebSerialEnv({ serial: false, secure: true, href: "http://localhost:6052/" });
+    expect(hasLnRow(await mount("ln882x", "install", "ln882h"))).toBe(false);
+  });
+
+  // No hand-off to web.esphome.io yet, so an insecure origin keeps the
+  // backend path only.
+  it("offers no LN882H row on an insecure origin", async () => {
+    setWebSerialEnv({
+      serial: false,
+      secure: false,
+      href: "http://homeassistant.local:8123/",
+    });
+    const d = await mount("ln882x", "install", "ln882h");
+    expect(hasLnRow(d)).toBe(false);
+    expect(hasServerSerialRow(d)).toBe(true);
+  });
+
   it.each(["esp32", "bk72xx"])("hides the Pico row for %s", async (platform) => {
     const d = await mount(platform);
     expect(hasRp2Row(d)).toBe(false);
@@ -336,8 +379,9 @@ describe("install-method-dialog platform gating", () => {
 describe("install-method-dialog logs-mode platform gating", () => {
   // The Pico's CDC console reads like any other port, so logs get the Web
   // Serial row; on localhost that collapses the server-serial row, as for ESP.
-  // The RTL8720C and the BK72xx log on a plain UART, read like any other port.
-  it.each(["rp2", "rp2040", "rp2350", "esp32", "rtl87xx", "bk72xx"])(
+  // The RTL8720C, the BK72xx and the LN882H log on a plain UART, read like
+  // any other port.
+  it.each(["rp2", "rp2040", "rp2350", "esp32", "rtl87xx", "bk72xx", "ln882x"])(
     "shows Web Serial logs and drops server-serial for %s",
     async (platform) => {
       const d = await mount(platform, "logs");
@@ -345,12 +389,6 @@ describe("install-method-dialog logs-mode platform gating", () => {
       expect(hasServerSerialRow(d)).toBe(false);
     }
   );
-
-  it("keeps logs on server-serial for ln882x", async () => {
-    const d = await mount("ln882x", "logs");
-    expect(hasWebSerialRow(d)).toBe(false);
-    expect(hasServerSerialRow(d)).toBe(true);
-  });
 
   // nRF52 gets the Web Serial row for logs (USB-CDC console); on localhost
   // that collapses the server-serial row, same as ESP and RP2.

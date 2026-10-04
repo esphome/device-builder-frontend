@@ -18,6 +18,7 @@ export interface XmodemOptions {
 }
 
 export const XMODEM_BLOCK_SIZE = 1024;
+const SOH = 0x01;
 const STX = 0x02;
 const EOT = 0x04;
 const ACK = 0x06;
@@ -45,7 +46,8 @@ export function crc16Xmodem(data: Uint8Array): number {
   return crc;
 }
 
-async function awaitStart(
+/** Wait for the receiver's opening byte; true for CRC-16 ('C'), false for checksum (NAK). */
+export async function awaitStart(
   io: XmodemIo,
   retries: number,
   timeoutMs: number
@@ -63,20 +65,30 @@ async function awaitStart(
   throw new XmodemError("Receiver never asked for the first block");
 }
 
-function buildBlock(seq: number, payload: Uint8Array, crcMode: boolean): Uint8Array {
-  const block = new Uint8Array(3 + XMODEM_BLOCK_SIZE + (crcMode ? 2 : 1));
-  block[0] = STX;
+/**
+ * One block: STX for 1024 bytes, SOH for 128, the payload padded with
+ * ``pad`` (YMODEM pads its header block with zeros), then the check.
+ */
+export function buildBlock(
+  seq: number,
+  payload: Uint8Array,
+  crcMode: boolean,
+  size = XMODEM_BLOCK_SIZE,
+  pad = PAD
+): Uint8Array {
+  const block = new Uint8Array(3 + size + (crcMode ? 2 : 1));
+  block[0] = size === XMODEM_BLOCK_SIZE ? STX : SOH;
   block[1] = seq;
   block[2] = 0xff - seq;
-  block.fill(PAD, 3, 3 + XMODEM_BLOCK_SIZE);
+  block.fill(pad, 3, 3 + size);
   block.set(payload, 3);
-  const data = block.subarray(3, 3 + XMODEM_BLOCK_SIZE);
+  const data = block.subarray(3, 3 + size);
   if (crcMode) {
     const crc = crc16Xmodem(data);
-    block[3 + XMODEM_BLOCK_SIZE] = crc >> 8;
-    block[4 + XMODEM_BLOCK_SIZE] = crc & 0xff;
+    block[3 + size] = crc >> 8;
+    block[4 + size] = crc & 0xff;
   } else {
-    block[3 + XMODEM_BLOCK_SIZE] = data.reduce((sum, b) => (sum + b) & 0xff, 0);
+    block[3 + size] = data.reduce((sum, b) => (sum + b) & 0xff, 0);
   }
   return block;
 }

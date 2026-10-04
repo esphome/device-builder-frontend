@@ -80,3 +80,7 @@ export const LIBRETINY_BEKEN_GUIDE_URL =
 /** LibreTiny's AmebaZ2 (RTL8720C) page: wiring and the download-mode strap. */
 export const LIBRETINY_AMBZ2_GUIDE_URL =
   "https://docs.libretiny.eu/docs/platform/realtek-ambz2/";
+
+/** LibreTiny's LN882H flashing guide: the UART0 wiring and the BOOT strap. */
+export const LIBRETINY_LN882H_FLASHING_URL =
+  "https://docs.libretiny.eu/link/flashing-ln882h";

@@ -9,6 +9,7 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import { bk72xxPlatform } from "./bk72xx/dashboard.js";
 import { ESP_SERIAL_LOGS } from "./esp/serial-logs.js";
+import { ln882xPlatform } from "./ln882x/dashboard.js";
 import { nrf52Platform } from "./nrf52/dashboard.js";
 import type { AnyBrowserInstall, PlatformSupport } from "./platform-support.js";
 import { rp2Platform } from "./rp2/dashboard.js";
@@ -20,6 +21,7 @@ export const PLATFORMS: readonly PlatformSupport[] = [
   rp2Platform,
   rtl87xxPlatform,
   bk72xxPlatform,
+  ln882xPlatform,
 ];
 
 /** The descriptor for a device's target platform, if any. */

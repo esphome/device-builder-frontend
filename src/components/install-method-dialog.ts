@@ -230,7 +230,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const hasWebSerial = availability === "available";
     const env = this._environment;
     // The esptool-js and external flashers are ESP-only; nRF52, RP2, the
-    // RTL8720C and BK72xx get their own in-app rows (renderPlatformFlashOption).
+    // RTL8720C, BK72xx and LN882H get their own in-app rows (renderPlatformFlashOption).
     const isEsptool = this._isEsptoolPlatform;
     const isLogs = this.mode === "logs";
     // Web Serial logs also cover every platform whose logs policy offers them

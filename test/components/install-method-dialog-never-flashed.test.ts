@@ -101,7 +101,8 @@ describe("install-method-dialog never-flashed ordering", () => {
   });
 
   it("promotes server-serial when the platform has no browser row", async () => {
-    const d = await mount({ neverFlashed: true, platform: "ln882x" });
+    // The RTL8710B is the rtl87xx platform with no browser flasher.
+    const d = await mount({ neverFlashed: true, platform: "rtl87xx", mcu: "rtl8710b" });
     const order = rowIconOrder(d);
     expect(order[0]).toBe("serial-port");
     expect(order[order.length - 1]).toBe("wifi");
@@ -109,6 +110,13 @@ describe("install-method-dialog never-flashed ordering", () => {
 
   it("promotes the BK72xx row for a never-flashed bk72xx", async () => {
     const d = await mount({ neverFlashed: true, platform: "bk72xx", mcu: "bk7238" });
+    const order = rowIconOrder(d);
+    expect(order[0]).toBe("chip");
+    expect(order[order.length - 1]).toBe("wifi");
+  });
+
+  it("promotes the LN882H row for a never-flashed ln882x", async () => {
+    const d = await mount({ neverFlashed: true, platform: "ln882x", mcu: "ln882h" });
     const order = rowIconOrder(d);
     expect(order[0]).toBe("chip");
     expect(order[order.length - 1]).toBe("wifi");
