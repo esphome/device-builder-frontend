@@ -20,7 +20,7 @@ import type { LibreTinyImage } from "../libretiny-uf2.js";
 import { LnLink } from "./ln882x-link.js";
 import { loadRamcode } from "./ln882x-ramcode.js";
 
-export { Ln882xRamcodeError, loadRamcode } from "./ln882x-ramcode.js";
+export { Ln882xRamcodeError } from "./ln882x-ramcode.js";
 
 const LN882H_BAUD_RATE = 115200;
 const RAM_ADDRESS = 0x20000000;
@@ -223,12 +223,11 @@ export async function flashLn882x(
     log(
       `Linked to the RAM code (flash ${flash.id}, ${flash.size / 0x100000} MiB); ${image.runs.length} runs to write`
     );
-    for (const run of image.runs) {
-      if (run.address + run.data.length > flash.size) {
-        throw new Ln882xFlashSizeError(
-          `The image runs to ${formatAddress(run.address + run.data.length)}, past the end of the flash`
-        );
-      }
+    const past = image.runs.find((run) => run.address + run.data.length > flash.size);
+    if (past) {
+      throw new Ln882xFlashSizeError(
+        `The image runs to ${formatAddress(past.address + past.data.length)}, past the end of the flash`
+      );
     }
     let done = 0;
     for (const run of image.runs) {

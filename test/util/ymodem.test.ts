@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { fakeReceiver } from "./_fake-modem-receiver.js";
+
 import { crc16Xmodem, XmodemError } from "../../src/util/xmodem.js";
 import { YMODEM_BLOCK_SIZE, ymodemSend } from "../../src/util/ymodem.js";
 
@@ -9,21 +11,6 @@ const ACK = 0x06;
 const NAK = 0x15;
 const CAN = 0x18;
 const C = 0x43;
-
-/** Scripted receiver: hands out ``replies`` one byte per read, null once exhausted. */
-function fakeReceiver(replies: number[]) {
-  const writes: Uint8Array[] = [];
-  const queue = [...replies];
-  return {
-    writes,
-    io: {
-      write: async (data: Uint8Array) => {
-        writes.push(data);
-      },
-      readByte: async () => queue.shift() ?? null,
-    },
-  };
-}
 
 const bytes = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 3) & 0xff);
 const payload = (block: Uint8Array) => block.subarray(3, 3 + YMODEM_BLOCK_SIZE);

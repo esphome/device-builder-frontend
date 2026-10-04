@@ -21,7 +21,7 @@ import {
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
-import { loadLn882xImage, prefetchLn882x, runLn882x } from "./index.js";
+import { loadLn882xImage, runLn882x, warmLn882x } from "./index.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -49,7 +49,8 @@ export async function startLn882xInstall(
   }
   lnImage.set(host, parsed.image);
   host._binaries = [artifact.binary];
-  prefetchLn882x();
+  // While the user reads on and picks the port; the flash names a failure.
+  void warmLn882x().catch(() => {});
   showReadyStep(host);
 }
 

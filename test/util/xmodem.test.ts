@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { fakeReceiver } from "./_fake-modem-receiver.js";
+
 import {
   crc16Xmodem,
   XMODEM_BLOCK_SIZE,
@@ -12,21 +14,6 @@ const EOT = 0x04;
 const ACK = 0x06;
 const NAK = 0x15;
 const CAN = 0x18;
-
-/** Scripted receiver: hands out ``replies`` one byte per read, null once exhausted. */
-function fakeReceiver(replies: number[]) {
-  const writes: Uint8Array[] = [];
-  const queue = [...replies];
-  return {
-    writes,
-    io: {
-      write: async (data: Uint8Array) => {
-        writes.push(data);
-      },
-      readByte: async () => queue.shift() ?? null,
-    },
-  };
-}
 
 const bytes = (n: number, fill = 0x5a) => new Uint8Array(n).fill(fill);
 

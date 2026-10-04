@@ -17,14 +17,16 @@ export const loadLn882xEngine = () => import("./ln882x-flasher.js");
 export const loadLn882xParser = () => import("./ln882x-image.js");
 
 /**
- * Start fetching the engine chunk and the RAM code while the user reads the
- * ready step and picks a port; the flash then finds both cached. A failure
- * here is left for the flash itself to report.
+ * The engine chunk and the RAM code it needs, fetched side by side, for a
+ * flow to start while the user picks a port: the flash then finds both
+ * cached. Rejects with whichever failed; the flash itself names it.
  */
-export function prefetchLn882x(): void {
-  loadLn882xEngine()
-    .then((engine) => engine.loadRamcode())
-    .catch(() => {});
+export async function warmLn882x(): Promise<unknown> {
+  const [engine] = await Promise.all([
+    loadLn882xEngine(),
+    import("./ln882x-ramcode.js").then((ramcode) => ramcode.loadRamcode()),
+  ]);
+  return engine;
 }
 
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */

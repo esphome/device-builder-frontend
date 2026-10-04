@@ -21,9 +21,9 @@ const C = 0x43;
 const enc = new TextEncoder();
 
 /** What the flash holds before the flash: never FF, so an erase shows. */
-export const oldByte = (i: number) => (i * 7 + 3) % 251;
+const oldByte = (i: number) => (i * 7 + 3) % 251;
 /** The image's bytes, by offset in its run. */
-export const newByte = (i: number) => (i * 31 + 7) % 253;
+const newByte = (i: number) => (i * 31 + 7) % 253;
 /** The stand-in RAM code's bytes. */
 const ramcodeByte = (i: number) => (i * 13 + 5) % 256;
 

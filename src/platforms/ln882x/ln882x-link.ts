@@ -8,7 +8,7 @@ import { SerialByteSession } from "../../util/serial-byte-session.js";
 import type { XmodemIo } from "../../util/xmodem.js";
 
 /** Who answered ``version``. */
-export type LnLinkState = "rom" | "ramcode";
+type LnLinkState = "rom" | "ramcode";
 
 /** Silence that ends a reply, as ltchiptool's read timeout. */
 const REPLY_QUIET_MS = 200;

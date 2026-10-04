@@ -25,6 +25,9 @@ vi.mock("../../../src/platforms/ln882x/ln882x-flasher.js", async (importOriginal
     typeof import("../../../src/platforms/ln882x/ln882x-flasher.js")
   >()),
   flashLn882x: mocks.flashLn882x,
+}));
+vi.mock("../../../src/platforms/ln882x/ln882x-ramcode.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   loadRamcode: mocks.loadRamcode,
 }));
 const seams = vi.hoisted(() => ({ loadLn882xImage: vi.fn() }));
