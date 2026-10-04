@@ -16,11 +16,17 @@ export interface ReceiverInput {
   erase: boolean;
   flasher: HandoffFlasher;
   logs?: HandoffLogs;
+  /** The baud the device logs at, when the opener said. */
+  baudRate?: number;
 }
 
-/** A checked image: its plan, and the logs policy of the flasher that runs it. */
+/**
+ * A checked image: its plan, the logs policy of the flasher that runs it,
+ * and the baud the device logs at when the opener said.
+ */
 export interface ReceiverPrepared extends ReceiverPlan {
   logs: SerialLogsPolicy;
+  baudRate?: number;
 }
 
 /**
@@ -46,7 +52,7 @@ export async function prepareForReceiver(
     if ("error" in plan) {
       return { failure: plan.error, retryable: plan.retryable === true };
     }
-    return { value: { ...plan, logs: engine.logs } };
+    return { value: { ...plan, logs: engine.logs, baudRate: input.baudRate } };
   } catch (err) {
     // An engine broke its never-throws contract: name the image, not the network.
     console.error("[flash receiver] The engine could not check the image:", err);

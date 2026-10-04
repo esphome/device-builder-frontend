@@ -222,6 +222,28 @@ describe("esphome-web-flash-receiver engines", () => {
     expect(engines.rtl.prepare.mock.calls[0][2]).toBe(passed);
   });
 
+  it.each([
+    { sent: 9600, kept: 9600 },
+    { sent: undefined, kept: 115200 },
+    { sent: "fast", kept: 115200 },
+  ])(
+    "keeps the logs baud $kept for a hand-off that sent $sent",
+    async ({ sent, kept }) => {
+      const { el } = await handOff({ logBaudRate: sent }, false);
+      expect((el as any)._logBaudRate).toBe(kept);
+    }
+  );
+
+  it("goes back to the default baud for a file picked after a hand-off", async () => {
+    const { el } = await handOff({ logBaudRate: 9600 }, false);
+    Object.defineProperty(el, "_fileInput", {
+      value: { files: [{ arrayBuffer: async () => new ArrayBuffer(4) }], value: "" },
+    });
+    await (el as any)._onFileChange();
+    await settled(el);
+    expect((el as any)._logBaudRate).toBe(115200);
+  });
+
   it("runs the named engine and relays its states to the opener", async () => {
     const { opener } = await handOff({ flasher: "rtl-ambz2", erase: false });
     expect(engines.rtl.run).toHaveBeenCalledOnce();

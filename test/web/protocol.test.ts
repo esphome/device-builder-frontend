@@ -60,9 +60,8 @@ describe("isHandoffFlasher", () => {
 });
 
 describe("handoffLogBaudRateOf", () => {
-  it("takes a plausible UART baud", () => {
-    expect(handoffLogBaudRateOf(9600)).toBe(9600);
-    expect(handoffLogBaudRateOf(115200)).toBe(115200);
+  it.each([9600, 115200])("takes the plausible UART baud %s", (value) => {
+    expect(handoffLogBaudRateOf(value)).toBe(value);
   });
 
   it.each([undefined, null, "9600", 0, -9600, 9600.5, 10_000_000])(

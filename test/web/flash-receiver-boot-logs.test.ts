@@ -44,23 +44,17 @@ afterEach(() => {
 });
 
 describe("esphome-web-flash-receiver boot logs hand-off", () => {
-  it("opens the boot logs at the baud the hand-off carried", async () => {
+  it.each([
+    { carried: 9600, opened: 9600 },
+    { carried: undefined, opened: 115200 },
+  ])("opens the boot logs at $opened for a hand-off baud of $carried", async (c) => {
     const el = await mount();
-    (el as any)._logBaudRate = 9600;
+    if (c.carried) (el as any)._logBaudRate = c.carried;
     openLiveLogPort.mockResolvedValue({ port: makePort(), error: null });
 
     await acquireBootLogs(el as any, {} as SerialPort, []);
 
-    expect(openLiveLogPort.mock.calls[0][2]).toBe(9600);
-  });
-
-  it("opens the boot logs at ESPHome's default when the hand-off said nothing", async () => {
-    const el = await mount();
-    openLiveLogPort.mockResolvedValue({ port: makePort(), error: null });
-
-    await acquireBootLogs(el as any, {} as SerialPort, []);
-
-    expect(openLiveLogPort.mock.calls[0][2]).toBe(115200);
+    expect(openLiveLogPort.mock.calls[0][2]).toBe(c.opened);
   });
 
   it("keeps the hand-off's baud for the Logs button", async () => {

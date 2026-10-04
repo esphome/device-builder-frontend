@@ -4,9 +4,12 @@
 //
 // Pure helper kept out of web-serial.ts so non-flashing callers (and Node
 // tests) don't pull in its esptool-js dependency.
+/** ESPHome's default UART log baud. */
+export const LOG_BAUD_RATE = 115200;
+
 export function resolveLogBaudRate(
   loggerBaudRate: number | null | undefined
 ): number | null {
   if (loggerBaudRate === 0) return null;
-  return loggerBaudRate ?? 115200;
+  return loggerBaudRate ?? LOG_BAUD_RATE;
 }

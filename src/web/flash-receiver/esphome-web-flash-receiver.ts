@@ -91,11 +91,10 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     (error) => this._onPrepared(error),
     getErrorMessage
   );
-  // The logs policy of the flasher that was last prepared. It outlives the
-  // preparation, for the logs of a flash that is already done.
+  // The logs policy of the flasher that was last prepared, and the baud its
+  // device logs at. They outlive the preparation, for the logs of a flash
+  // that is already done.
   private _logsPolicy: SerialLogsPolicy = ESP_SERIAL_LOGS;
-  // The baud the device logs at: the hand-off's, or ESPHome's default for a
-  // picked file or an opener that did not say.
   _logBaudRate = LOG_BAUD_RATE;
 
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
@@ -201,8 +200,8 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       erase: msg.erase !== false,
       flasher: msg.flasher ?? DEFAULT_HANDOFF_FLASHER,
       logs: handoffLogsOf(msg.logs),
+      baudRate: handoffLogBaudRateOf(msg.logBaudRate),
     });
-    this._logBaudRate = handoffLogBaudRateOf(msg.logBaudRate) ?? LOG_BAUD_RATE;
   }
 
   // A preparation ended: name why it failed, or show the firmware as ready.
@@ -212,7 +211,11 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     if (this._fileInput && this._preparation.state.kind === "idle") {
       this._fileInput.value = "";
     }
-    if (this._plan) this._logsPolicy = this._plan.logs;
+    if (this._plan) {
+      this._logsPolicy = this._plan.logs;
+      // A picked file, or an opener that did not say: ESPHome's default.
+      this._logBaudRate = this._plan.baudRate ?? LOG_BAUD_RATE;
+    }
     if (error !== null) this._setState("error", error);
     else if (this._firmware) this._setState("connecting", this._readyMessage());
     else this._resetForRetry();
@@ -254,8 +257,6 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._resetForRetry();
     this._preparation.clear();
     if (!file) return;
-    // A picked file comes with no device config, so the default applies.
-    this._logBaudRate = LOG_BAUD_RATE;
     this._setState("connecting", this._localize("web.install.preparing"));
     // The read is part of the preparation, which a newer pick supersedes.
     this._preparation.start(

@@ -3,7 +3,6 @@ import { randomNonce } from "../../util/random-nonce.js";
 import {
   DEFAULT_HANDOFF_FLASHER,
   type FirmwareMessage,
-  type HandoffLogs,
   type HandoffSpec,
   MSG_FIRMWARE,
   MSG_PROGRESS,
@@ -60,10 +59,8 @@ export function openFlasher(
     erase,
     logs,
     logBaudRate,
-  }: Pick<HandoffSpec, "flasher" | "erase"> & {
-    logs?: HandoffLogs;
-    logBaudRate?: number;
-  },
+  }: Pick<HandoffSpec, "flasher" | "erase"> &
+    Pick<FirmwareMessage, "logs" | "logBaudRate">,
   cb: FlasherCallbacks
 ): (() => void) | null {
   const nonce = randomNonce();
