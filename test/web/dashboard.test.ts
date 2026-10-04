@@ -8,6 +8,7 @@ vi.mock("../../src/web/platforms/rp2/esphome-web-pico-connect-card.js", () => ({
 vi.mock("../../src/web/platforms/nrf52/esphome-web-nrf-card.js", () => ({}));
 vi.mock("../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js", () => ({}));
 vi.mock("../../src/web/platforms/bk72xx/esphome-web-bk-card.js", () => ({}));
+vi.mock("../../src/web/platforms/ln882x/esphome-web-ln-card.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-unsupported-card.js", () => ({}));
 vi.mock("../../src/util/web-serial.js", () => ({ isWebSerialSupported: () => true }));
 
@@ -20,7 +21,7 @@ function setSearch(query: string): void {
 }
 
 async function mount(
-  mode: "esp" | "pico" | "rtl" | "bk" = "esp"
+  mode: "esp" | "pico" | "rtl" | "bk" | "ln" = "esp"
 ): Promise<ESPHomeWebDashboard> {
   const el = new ESPHomeWebDashboard();
   (el as any)._localize = (k: string) => k;
@@ -71,6 +72,14 @@ describe("esphome-web-dashboard BK72xx mode", () => {
     const el = await mount("bk");
     expect(el.shadowRoot!.querySelector("esphome-web-bk-card")).not.toBeNull();
     expect(el.shadowRoot!.textContent).toContain("web.intro.body_bk");
+  });
+});
+
+describe("esphome-web-dashboard LN882H mode", () => {
+  it("renders the LN882H card and its intro", async () => {
+    const el = await mount("ln");
+    expect(el.shadowRoot!.querySelector("esphome-web-ln-card")).not.toBeNull();
+    expect(el.shadowRoot!.textContent).toContain("web.intro.body_ln");
   });
 });
 

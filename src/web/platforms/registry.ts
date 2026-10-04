@@ -7,6 +7,7 @@
 import { portFamily } from "../../platforms/port-family.js";
 import { bkWebMode } from "./bk72xx/mode.js";
 import { espWebMode } from "./esp/mode.js";
+import { lnWebMode } from "./ln882x/mode.js";
 import { nrfWebMode } from "./nrf52/mode.js";
 import { picoWebMode } from "./rp2/mode.js";
 import { rtlWebMode } from "./rtl87xx/mode.js";
@@ -18,6 +19,7 @@ export const WEB_PLATFORMS = [
   nrfWebMode,
   rtlWebMode,
   bkWebMode,
+  lnWebMode,
 ] as const;
 
 export type WebMode = (typeof WEB_PLATFORMS)[number]["mode"];

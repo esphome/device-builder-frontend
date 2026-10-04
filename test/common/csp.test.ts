@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 // The shipped file itself, not a copy of its text: a policy asserted against a
 // duplicate would pass while the real page blocked everything.
 import html from "../../public/index.html?raw";
+import webHtml from "../../public/web/index.html?raw";
 import { DECODER_ORIGIN, DECODER_URL } from "../../src/common/docs.js";
 import { LN882H_RAMCODE_URL } from "../../src/platforms/ln882x/ln882x-ramcode.js";
 
@@ -67,5 +68,22 @@ describe("the shipped Content-Security-Policy", () => {
     expect(grant!.endsWith("/")).toBe(true);
     expect(LN882H_RAMCODE_URL.startsWith(grant!)).toBe(true);
     expect(grant).not.toBe("https://cdn.jsdelivr.net/");
+  });
+});
+
+describe("web.esphome.io's Content-Security-Policy", () => {
+  it("lets the LN882H flasher fetch its RAM code from the same release path", () => {
+    const meta = /<meta\b[^>]*\bhttp-equiv="Content-Security-Policy"[^>]*>/i.exec(
+      webHtml
+    )?.[0];
+    const policy = meta ? (/\bcontent="([^"]*)"/i.exec(meta)?.[1] ?? "") : "";
+    const connect = policy
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith("connect-src "))!
+      .split(/\s+/);
+    const grant = connect.find((src) => src.includes("cdn.jsdelivr.net"));
+    expect(grant?.endsWith("/")).toBe(true);
+    expect(LN882H_RAMCODE_URL.startsWith(grant!)).toBe(true);
   });
 });

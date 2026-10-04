@@ -31,7 +31,8 @@ export const MSG_PROGRESS = "esphome-web-flash:progress";
  * ``"rtl-ambz2"`` the RTL8720C ROM downloader, ``"rp2-picoboot"`` PICOBOOT
  * for the RP2040, ``"nrf-dfu"`` Nordic legacy DFU for the nRF52, ``"bk-uart"``
  * the UART downloader of a Beken BK72xx, under the BootROM's protocol or a
- * bootloader's, which the engine tells apart. Named after the flasher, not
+ * bootloader's, which the engine tells apart, ``"ln-uart"`` the LN882H's
+ * BootROM and the RAM code it loads. Named after the flasher, not
  * the platform: ``rtl87xx`` covers the RTL8710B too, whose ROM speaks another
  * protocol and gets its own id when it lands.
  */
@@ -41,6 +42,7 @@ export const HANDOFF_FLASHERS = [
   "rp2-picoboot",
   "nrf-dfu",
   "bk-uart",
+  "ln-uart",
 ] as const;
 export type HandoffFlasher = (typeof HANDOFF_FLASHERS)[number];
 /** What an absent ``flasher`` or ``flashers`` means: esptool, as in v1. */

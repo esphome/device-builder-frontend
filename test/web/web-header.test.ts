@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 async function mount(
-  mode: "esp" | "pico" | "nrf" | "rtl" | "bk",
+  mode: "esp" | "pico" | "nrf" | "rtl" | "bk" | "ln",
   minimal = false
 ): Promise<ESPHomeWebHeader> {
   const el = new ESPHomeWebHeader();
@@ -39,10 +39,10 @@ async function mount(
 }
 
 describe("esphome-web-header mode picker", () => {
-  it("renders a button for each of the five modes", async () => {
+  it("renders a button for each of the six modes", async () => {
     const el = await mount("esp");
     const btns = el.shadowRoot!.querySelectorAll(".mode-btn");
-    expect(btns.length).toBe(5);
+    expect(btns.length).toBe(6);
   });
 
   it("marks ESP as active when mode is esp", async () => {
@@ -86,6 +86,7 @@ describe("esphome-web-header mode picker", () => {
       "web.header.mode_nrf",
       "web.header.mode_rtl",
       "web.header.mode_bk",
+      "web.header.mode_ln",
     ]);
     expect(el.shadowRoot!.querySelector(".mode-picker")!.getAttribute("aria-label")).toBe(
       "web.header.mode_picker_label"

@@ -16,6 +16,7 @@ import {
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
+import type { HandoffSpec } from "../handoff.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 import {
   type BrowserInstall,
@@ -23,7 +24,11 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { loadLn882xImage, runLn882x, warmLn882x } from "./index.js";
-import { LN_LOGS_ON_FLASH_PORT_SETTING, lnLogsOnFlashPort } from "./serial-logs.js";
+import {
+  LN_LOGS_ON_FLASH_PORT_SETTING,
+  lnHandoffLogs,
+  lnLogsOnFlashPort,
+} from "./serial-logs.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -40,7 +45,12 @@ export async function startLn882xInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const artifact = await downloadBuildArtifact(host, device, pickUf2, "firmware.no_uf2");
+  const artifact = await downloadBuildArtifact(
+    host,
+    device,
+    pickUf2,
+    LN_UART_HANDOFF.noArtifactKey
+  );
   if (!artifact) return;
   const parsed = await loadLn882xImage(artifact.bytes);
   // Not for a dialog that moved to another device meanwhile.
@@ -126,6 +136,22 @@ export async function lnDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<voi
   host._step = "done";
 }
 
+// The same UF2 the in-app flow parses, handed whole to web.esphome.io's
+// ln-uart engine when this origin cannot flash. The RAM code erases as it
+// writes. The UF2 is parsed here first, as the in-app flow does, so that a
+// build that is not the LN882H's is named before the tab opens.
+const LN_UART_HANDOFF: HandoffSpec = {
+  flasher: "ln-uart",
+  erase: false,
+  pick: pickUf2,
+  noArtifactKey: "firmware.no_uf2",
+  check: async (bytes) => {
+    const parsed = await loadLn882xImage(bytes);
+    return "key" in parsed ? parsed : null;
+  },
+  logs: lnHandoffLogs,
+};
+
 export const ln882xInstall: BrowserInstall<"ln-uart"> = {
   id: "ln-uart",
   methodKey: "ln_uart",
@@ -136,6 +162,7 @@ export const ln882xInstall: BrowserInstall<"ln-uart"> = {
   image: lnImage,
   start: startLn882xInstall,
   showFirstStep: showReadyStep,
+  handoff: LN_UART_HANDOFF,
   steps: {
     // One click: the engine resets the chip itself, or the BOOT guide shows.
     "ln-ready": {

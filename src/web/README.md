@@ -51,6 +51,15 @@ hardware classes behave differently:
   (`BK72XX_SERIAL_LOGS` in `src/platforms/bk72xx/serial-logs.ts`), and
   Reset device pulses RTS: that resets a board whose adapter wires RTS to
   CEN and does nothing on one wired TX, RX and GND only.
+- **LN882H modules** (WL2S and the like, on a plain adapter): installing
+  goes over UART0 (TX0 on PA2, RX0 on PA3) at 115200 and the logs come from
+  UART1 (TX1 on PB9) unless the configuration moves them. The BootROM only
+  listens when BOOT (GPIOA9) is low as the chip starts: the engine resets a
+  board whose adapter drives CEN and BOOT, otherwise the user holds BOOT to
+  GND through a reset until the flash starts. The engine first fetches the
+  vendor RAM code from ltchiptool's release on jsDelivr, pinned by SHA-256.
+  Every logs open releases both lines (`LN882X_SERIAL_LOGS` in
+  `src/platforms/ln882x/serial-logs.ts`).
 - **Pico W**: native-USB CDC; a DTR/RTS pulse does nothing, so the logs
   dialog's Reset Device instead touches the port at 1200 baud into
   BOOTSEL and reboots it over WebUSB (`RP2_SERIAL_LOGS` in
@@ -64,7 +73,7 @@ hardware classes behave differently:
 | Path                                   | What                                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                                                  |
-| `web-mode.ts`, `header/`               | The modes (ESP, `?pico`, `?nrf`, `?rtl`, `?bk`) and the header, read from the registry     |
+| `web-mode.ts`, `header/`               | The modes (ESP, `?pico`, `?nrf`, `?rtl`, `?bk`, `?ln`) and the header, read from the registry |
 | `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                      |
 | `platforms/<name>/`                    | Each family's `mode.ts`, cards and install dialogs; `platforms/registry.ts` lists them     |
 | `install/`                             | Pieces the install dialogs share: the progress card and the file picker                    |

@@ -201,6 +201,7 @@ describe("esphome-web-flash-receiver engines", () => {
       "rp2-picoboot",
       "nrf-dfu",
       "bk-uart",
+      "ln-uart",
     ]);
   });
 

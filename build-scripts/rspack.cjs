@@ -130,7 +130,8 @@ const devtoolFor = (isProdBuild) =>
 // The exact connect-src directive in public/web/index.html. Kept as a constant
 // so the dev-only widening below can assert it still matches — a silent
 // string-replace miss would break HMR (no ws:/wss:) with no build error.
-const WEB_CSP_CONNECT_SRC = "connect-src 'self' data: https://firmware.esphome.io";
+const WEB_CSP_CONNECT_SRC =
+  "connect-src 'self' data: https://firmware.esphome.io https://cdn.jsdelivr.net/gh/libretiny-eu/ltchiptool@v4.14.4/";
 
 /**
  * In prod, ship the tight CSP verbatim. In dev, widen connect-src with ws:/wss:

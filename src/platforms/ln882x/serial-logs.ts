@@ -1,4 +1,5 @@
 import type { ConfiguredDevice } from "../../api/types/devices.js";
+import type { HandoffLogs } from "../handoff.js";
 import type { SerialLogsPolicy } from "../serial-logs.js";
 
 /**
@@ -23,3 +24,13 @@ export const LN_LOGS_ON_FLASH_PORT_SETTING = "logger: hardware_uart: UART0";
 export const lnLogsOnFlashPort = (
   device: Pick<ConfiguredDevice, "logger_interface" | "logger_baud_rate"> | null
 ): boolean => device?.logger_interface === "UART0" && device.logger_baud_rate !== 0;
+
+/** Where the device's serial logs are, for a receiver that installs it. */
+export const lnHandoffLogs = (
+  device: Pick<ConfiguredDevice, "logger_interface" | "logger_baud_rate"> | null
+): HandoffLogs | undefined =>
+  device?.logger_baud_rate === 0
+    ? "off"
+    : lnLogsOnFlashPort(device)
+      ? "flash-port"
+      : undefined;

@@ -15,6 +15,10 @@
           backend WebSocket exists here (this is a static site), so ws:/wss:
           are dropped in the prod build. The dev server injects ws:/wss: back
           for its HMR socket — see build-scripts/rspack.cjs.
+        * connect-src also adds https://cdn.jsdelivr.net/gh/libretiny-eu/ltchiptool@v4.14.4/
+          — the one ltchiptool release the LN882H flasher fetches its RAM
+          code from (platforms/ln882x/ln882x-ramcode.ts), scoped to that
+          path and checked against a pinned SHA-256 before it reaches a chip.
         * img-src keeps 'self' data: https: for the runtime-built MDI icon
           data: URIs and any remote logos.
       script-src falls back to default-src 'self' so injected
@@ -23,7 +27,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' data: https://firmware.esphome.io; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' data: https://firmware.esphome.io https://cdn.jsdelivr.net/gh/libretiny-eu/ltchiptool@v4.14.4/; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>ESPHome Web</title>
     <link rel="icon" type="image/svg+xml" href="/static/logo/esphome-favicon.svg" />

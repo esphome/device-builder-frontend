@@ -298,17 +298,15 @@ describe("install-method-dialog platform gating", () => {
     expect(hasLnRow(await mount("ln882x", "install", "ln882h"))).toBe(false);
   });
 
-  // No hand-off to web.esphome.io yet, so an insecure origin keeps the
-  // backend path only.
-  it("offers no LN882H row on an insecure origin", async () => {
+  // On an insecure origin the LN882H row hands the UF2 to web.esphome.io.
+  it("offers the LN882H hand-off on an insecure origin", async () => {
     setWebSerialEnv({
       serial: false,
       secure: false,
       href: "http://homeassistant.local:8123/",
     });
-    const d = await mount("ln882x", "install", "ln882h");
-    expect(hasLnRow(d)).toBe(false);
-    expect(hasServerSerialRow(d)).toBe(true);
+    expect(hasLnRow(await mount("ln882x", "install", "ln882h"))).toBe(true);
+    expect(hasLnRow(await mount("ln882x", "install", null))).toBe(false);
   });
 
   it.each(["esp32", "bk72xx"])("hides the Pico row for %s", async (platform) => {

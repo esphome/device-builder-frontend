@@ -116,4 +116,6 @@ export const RECEIVER_ENGINES: Record<HandoffFlasher, () => Promise<ReceiverEngi
     (await import("../platforms/nrf52/receiver-engine.js")).nrfDfuReceiverEngine,
   "bk-uart": async () =>
     (await import("../platforms/bk72xx/receiver-engine.js")).bkUartReceiverEngine,
+  "ln-uart": async () =>
+    (await import("../platforms/ln882x/receiver-engine.js")).lnUartReceiverEngine,
 };

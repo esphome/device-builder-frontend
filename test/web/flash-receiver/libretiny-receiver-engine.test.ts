@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const rtl = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
 const bk = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
+const ln = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
 const port = vi.hoisted(() => ({}) as SerialPort);
 // The picker is the helper's own; here the run gets a port as if picked.
 vi.mock("../../../src/web/flash-receiver/serial-run.js", () => ({
@@ -24,13 +25,23 @@ vi.mock("../../../src/platforms/bk72xx/index.js", async (importOriginal) => ({
   loadBekenImage: bk.load,
 }));
 
+vi.mock("../../../src/platforms/ln882x/index.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  loadLn882xEngine: async () => ({}),
+  runLn882x: ln.run,
+  loadLn882xImage: ln.load,
+}));
+
 import { recordingHooks as hooks } from "../_receiver-hooks.js";
 import { BK72XX_SERIAL_LOGS } from "../../../src/platforms/bk72xx/serial-logs.js";
+import { LN882X_SERIAL_LOGS } from "../../../src/platforms/ln882x/serial-logs.js";
 import { RTL87XX_SERIAL_LOGS } from "../../../src/platforms/rtl87xx/serial-logs.js";
 import { libretinyReceiverEngine } from "../../../src/web/flash-receiver/libretiny-receiver-engine.js";
 import type { ReceiverRun } from "../../../src/web/flash-receiver/receiver-engine.js";
 import { BK_INSTALL } from "../../../src/web/platforms/bk72xx/install.js";
 import { bkUartReceiverEngine } from "../../../src/web/platforms/bk72xx/receiver-engine.js";
+import { LN_INSTALL } from "../../../src/web/platforms/ln882x/install.js";
+import { lnUartReceiverEngine } from "../../../src/web/platforms/ln882x/receiver-engine.js";
 import { RTL_INSTALL } from "../../../src/web/platforms/rtl87xx/install.js";
 import { rtlAmbz2ReceiverEngine } from "../../../src/web/platforms/rtl87xx/receiver-engine.js";
 
@@ -63,6 +74,16 @@ describe.each([
     logs: BK72XX_SERIAL_LOGS,
     // The flash went over UART1; the logs are on another pad.
     result: { logsElsewhere: true, note: { message: "web.bk.logs_elsewhere" } },
+  },
+  {
+    name: "lnUartReceiverEngine",
+    engine: lnUartReceiverEngine,
+    install: LN_INSTALL,
+    mocks: ln,
+    keys: "firmware.ln_",
+    logs: LN882X_SERIAL_LOGS,
+    // The flash went over UART0; the logs are on UART1.
+    result: { logsElsewhere: true, note: { message: "web.ln.logs_elsewhere" } },
   },
 ])("$name", ({ engine, install, mocks, keys, logs, result }) => {
   async function prepared(): Promise<ReceiverRun> {

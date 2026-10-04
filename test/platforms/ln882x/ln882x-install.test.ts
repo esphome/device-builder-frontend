@@ -479,8 +479,32 @@ describe("lnDoFlash", () => {
 });
 
 describe("ln882xInstall", () => {
-  it("has no hand-off to web.esphome.io yet", () => {
-    expect(ln882xInstall.handoff).toBeUndefined();
+  it("hands its UF2 to web.esphome.io's LN882H flasher, checked as the in-app flow checks it", async () => {
+    const handoff = ln882xInstall.handoff!;
+
+    expect(handoff).toMatchObject({
+      flasher: "ln-uart",
+      erase: false,
+      noArtifactKey: "firmware.no_uf2",
+    });
+    expect(
+      handoff.pick([bin("firmware.bin", "bin"), bin("firmware.uf2", "uf2")], "ln882x")
+        ?.file
+    ).toBe("firmware.uf2");
+    expect(await handoff.check!(new Uint8Array(uf2()))).toBeNull();
+    expect(await handoff.check!(new Uint8Array(uf2(AMBZ2)))).toMatchObject({
+      key: "firmware.ln_wrong_family",
+    });
+  });
+
+  it.each([
+    { why: "logs on UART0", config: { logger_interface: "UART0" }, logs: "flash-port" },
+    { why: "the default UART1", config: { logger_interface: null }, logs: undefined },
+    { why: "a disabled logger", config: { logger_baud_rate: 0 }, logs: "off" },
+  ])("tells the receiver where the logs are for $why", ({ config, logs }) => {
+    expect(
+      ln882xInstall.handoff!.logs!({ ...device, logger_baud_rate: null, ...config })
+    ).toBe(logs);
   });
 
   it("goes back to the ready step as the Retry target", () => {
