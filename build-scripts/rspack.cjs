@@ -127,28 +127,28 @@ const definePlugin = (isProdBuild) =>
 const devtoolFor = (isProdBuild) =>
   isProdBuild ? "nosources-source-map" : "cheap-module-source-map";
 
-// The exact connect-src directive in public/web/index.html. Kept as a constant
-// so the dev-only widening below can assert it still matches — a silent
-// string-replace miss would break HMR (no ws:/wss:) with no build error.
-const WEB_CSP_CONNECT_SRC =
-  "connect-src 'self' data: https://firmware.esphome.io https://cdn.jsdelivr.net/gh/libretiny-eu/ltchiptool@v4.14.4/";
+// The connect-src directive of the CSP meta tag in public/web/index.html,
+// found by its name inside the tag's content so a grant added there needs no
+// copy here (the page's comments name the directive too).
+const WEB_CSP_CONNECT_SRC = /(?<=content="[^"]*)connect-src [^;"]*/g;
 
 /**
  * In prod, ship the tight CSP verbatim. In dev, widen connect-src with ws:/wss:
- * so the HMR client can connect. Throws if the expected connect-src directive
- * isn't present, so a reworded CSP fails the build loudly instead of silently
- * disabling hot reload.
+ * so the HMR client can connect. Throws unless the page has exactly one
+ * connect-src directive, so a reworded CSP fails the build loudly instead of
+ * silently disabling hot reload.
  */
 const widenDevConnectSrc = (html, isProdBuild) => {
-  if (!html.includes(WEB_CSP_CONNECT_SRC)) {
+  const found = html.match(WEB_CSP_CONNECT_SRC) ?? [];
+  if (found.length !== 1) {
     throw new Error(
-      `ESPHome Web: expected CSP directive "${WEB_CSP_CONNECT_SRC}" not found in ` +
-        "public/web/index.html. Update WEB_CSP_CONNECT_SRC in build-scripts/rspack.cjs " +
+      `ESPHome Web: expected one CSP connect-src directive in public/web/index.html, ` +
+        `found ${found.length}. Update widenDevConnectSrc in build-scripts/rspack.cjs ` +
         "to match, or dev HMR (ws:/wss:) will silently break."
     );
   }
   if (isProdBuild) return html;
-  return html.replace(WEB_CSP_CONNECT_SRC, `${WEB_CSP_CONNECT_SRC} ws: wss:`);
+  return html.replace(WEB_CSP_CONNECT_SRC, (directive) => `${directive} ws: wss:`);
 };
 
 /**

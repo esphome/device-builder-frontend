@@ -1,9 +1,9 @@
 /** An LN882H as web.esphome.io installs it: through the chip's UART downloader. */
 import { LIBRETINY_LN882H_FLASHING_URL } from "../../../common/docs.js";
 import {
-  loadLn882xEngine,
   loadLn882xImage,
   runLn882x,
+  warmLn882x,
 } from "../../../platforms/ln882x/index.js";
 import type { LibreTinyInstall } from "../../install/libretiny-install-dialog.js";
 
@@ -24,7 +24,8 @@ export const LN_INSTALL: LibreTinyInstall = {
     badFile: "firmware.ln_bad_uf2",
   },
   guideUrl: LIBRETINY_LN882H_FLASHING_URL,
-  loadEngine: loadLn882xEngine,
+  // The RAM code too, which the engine fetches before it touches the port.
+  loadEngine: warmLn882x,
   load: loadLn882xImage,
   run: runLn882x,
 };

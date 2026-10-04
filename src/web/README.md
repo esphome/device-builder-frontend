@@ -70,17 +70,17 @@ hardware classes behave differently:
 
 ## Where things live
 
-| Path                                   | What                                                                                       |
-| -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                                                  |
+| Path                                   | What                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `entrypoint.ts` / `esphome-web-app.ts` | App shell                                                                                     |
 | `web-mode.ts`, `header/`               | The modes (ESP, `?pico`, `?nrf`, `?rtl`, `?bk`, `?ln`) and the header, read from the registry |
-| `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                      |
-| `platforms/<name>/`                    | Each family's `mode.ts`, cards and install dialogs; `platforms/registry.ts` lists them     |
-| `install/`                             | Pieces the install dialogs share: the progress card and the file picker                    |
-| `logs/`                                | Log viewer dialog and its sources (Web Serial, Bluetooth for nRF52)                        |
-| `improv/`                              | Wi-Fi provisioning dialog                                                                  |
-| `flash-receiver/`                      | Flashes firmware a Device Builder hands over when it can't flash itself                    |
-| `util/`                                | Web-only helpers (firmware fetch, port pickers and release, disconnect watcher)            |
+| `dashboard/`                           | The dashboard, the shared card shell and the unsupported-browser card                         |
+| `platforms/<name>/`                    | Each family's `mode.ts`, cards and install dialogs; `platforms/registry.ts` lists them        |
+| `install/`                             | Pieces the install dialogs share: the progress card and the file picker                       |
+| `logs/`                                | Log viewer dialog and its sources (Web Serial, Bluetooth for nRF52)                           |
+| `improv/`                              | Wi-Fi provisioning dialog                                                                     |
+| `flash-receiver/`                      | Flashes firmware a Device Builder hands over when it can't flash itself                       |
+| `util/`                                | Web-only helpers (firmware fetch, port pickers and release, disconnect watcher)               |
 
 ### Adding a device family
 

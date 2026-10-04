@@ -28,6 +28,7 @@ vi.mock("../../../src/platforms/bk72xx/index.js", async (importOriginal) => ({
 vi.mock("../../../src/platforms/ln882x/index.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   loadLn882xEngine: async () => ({}),
+  warmLn882x: async () => ({}),
   runLn882x: ln.run,
   loadLn882xImage: ln.load,
 }));

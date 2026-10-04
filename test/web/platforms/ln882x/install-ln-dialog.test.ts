@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
   loadLn882xImage: vi.fn(),
   runLn882x: vi.fn(),
+  warmLn882x: vi.fn(),
 }));
 vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -18,16 +19,18 @@ vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
 vi.mock("../../../../src/platforms/ln882x/index.js", () => ({
   loadLn882xImage: mocks.loadLn882xImage,
   loadLn882xEngine: async () => ({}),
+  warmLn882x: mocks.warmLn882x,
   runLn882x: mocks.runLn882x,
 }));
 
 import { pickerText, pickFile } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
+import { UF2_FAMILY_LN882H } from "../../../../src/platforms/ln882x/ln882x-image.js";
 import { ESPHomeWebInstallLnDialog } from "../../../../src/web/platforms/ln882x/esphome-web-install-ln-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const IMAGE = { familyId: 0xa38090a8, board: "b", runs: [], totalBytes: 0 };
+const IMAGE = { familyId: UF2_FAMILY_LN882H, board: "b", runs: [], totalBytes: 0 };
 const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
 const uf2 = () => new File([new Uint8Array(8)], "firmware.uf2");
 
@@ -51,6 +54,7 @@ beforeEach(() => {
   mocks.loadLn882xImage.mockResolvedValue({ image: IMAGE });
   mocks.requestSerialPort.mockResolvedValue(PORT);
   mocks.runLn882x.mockResolvedValue({ rebooted: true });
+  mocks.warmLn882x.mockResolvedValue({});
 });
 
 afterEach(() => {
@@ -65,6 +69,8 @@ describe("esphome-web-install-ln-dialog", () => {
       "web.ln.install_title"
     );
     expect(el.shadowRoot!.textContent).toContain("web.ln.install_intro");
+    // The engine and its RAM code start loading once the file parses.
+    expect(mocks.warmLn882x).toHaveBeenCalledOnce();
   });
 
   it("asks for a reset by hand when the chip did not confirm its reboot", async () => {

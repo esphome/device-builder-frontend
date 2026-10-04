@@ -5,15 +5,11 @@ vi.mock("../../../../src/platforms/ln882x/index.js", () => ({
   runLn882x: mocks.runLn882x,
   loadLn882xImage: mocks.loadLn882xImage,
   loadLn882xEngine: async () => ({}),
+  warmLn882x: async () => ({}),
 }));
 
-import en from "../../../../src/translations/en.json";
+import { english } from "../../../_en-json.js";
 import { LN_INSTALL } from "../../../../src/web/platforms/ln882x/install.js";
-
-const english = (key: string): unknown =>
-  key
-    .split(".")
-    .reduce<unknown>((at, part) => (at as Record<string, unknown>)?.[part], en);
 
 beforeEach(() => {
   vi.resetAllMocks();

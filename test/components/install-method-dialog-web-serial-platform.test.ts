@@ -298,17 +298,6 @@ describe("install-method-dialog platform gating", () => {
     expect(hasLnRow(await mount("ln882x", "install", "ln882h"))).toBe(false);
   });
 
-  // On an insecure origin the LN882H row hands the UF2 to web.esphome.io.
-  it("offers the LN882H hand-off on an insecure origin", async () => {
-    setWebSerialEnv({
-      serial: false,
-      secure: false,
-      href: "http://homeassistant.local:8123/",
-    });
-    expect(hasLnRow(await mount("ln882x", "install", "ln882h"))).toBe(true);
-    expect(hasLnRow(await mount("ln882x", "install", null))).toBe(false);
-  });
-
   it.each(["esp32", "bk72xx"])("hides the Pico row for %s", async (platform) => {
     const d = await mount(platform);
     expect(hasRp2Row(d)).toBe(false);
@@ -344,7 +333,7 @@ describe("install-method-dialog platform gating", () => {
 
   // The HA add-on over plain http: Web Serial exists but is blocked here, so
   // the RTL8720C row hands the UF2 to web.esphome.io, as the ESP USB row does.
-  it("offers the RTL8720C, Pico, nRF52 and BK72xx hand-off on an insecure origin", async () => {
+  it("offers the RTL8720C, Pico, nRF52, BK72xx and LN882H hand-off on an insecure origin", async () => {
     // The browser hides navigator.serial on an insecure origin.
     setWebSerialEnv({
       serial: false,
@@ -367,10 +356,12 @@ describe("install-method-dialog platform gating", () => {
     expect(hasRp2Row(await mount("rp2"))).toBe(true);
     expect(hasNrfDfuRow(await mount("nrf52"))).toBe(true);
     expect(hasBkRow(await mount("bk72xx"))).toBe(true);
+    expect(hasLnRow(await mount("ln882x", "install", "ln882h"))).toBe(true);
     // The hand-off row is the same row: not for the RTL8710B, nor for a
     // BK72xx whose chip is not known.
     expect(hasRtlRow(await mount("rtl87xx", "install", "rtl8710b"))).toBe(false);
     expect(hasBkRow(await mount("bk72xx", "install", null))).toBe(false);
+    expect(hasLnRow(await mount("ln882x", "install", null))).toBe(false);
   });
 });
 

@@ -126,7 +126,11 @@ export abstract class LibreTinyInstallDialog extends LitElement {
   private async _parse(file: File): Promise<Prepared<LibreTinyImage, FilePickerError>> {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const parsed = await this.install.load(bytes);
-    if ("image" in parsed) return { value: parsed.image };
+    if ("image" in parsed) {
+      // While the user clicks Install and picks the port; the flash names a failure.
+      void this.install.loadEngine().catch(() => {});
+      return { value: parsed.image };
+    }
     const { key, retryable } = parseFailureCopy(parsed.key);
     return { failure: { title: this._localize(key), detail: parsed.detail }, retryable };
   }

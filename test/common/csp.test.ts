@@ -1,8 +1,8 @@
 /**
  * Pins the shipped CSP against the origins the app actually talks to.
  *
- * The policy lives in a static `public/index.html` meta tag while the origins
- * live in TypeScript, so nothing but this connects the two. A feature that
+ * The policies live in static meta tags in `public/index.html` and
+ * `public/web/index.html` while the origins live in TypeScript, so nothing but this connects the two. A feature that
  * reaches a new origin passes every other test and is then dead on arrival in
  * the browser: the test environment does not enforce CSP, and the suite never
  * loads this file. That is exactly how the decoder iframe shipped blocked.
@@ -17,19 +17,23 @@ import { LN882H_RAMCODE_URL } from "../../src/platforms/ln882x/ln882x-ramcode.js
 
 // Find the CSP meta tag, then read its content, so attribute order or an added
 // attribute (a reformat) doesn't break the test while the policy is unchanged.
-const cspMeta = /<meta\b[^>]*\bhttp-equiv="Content-Security-Policy"[^>]*>/i.exec(
-  html
-)?.[0];
-const csp = cspMeta ? (/\bcontent="([^"]*)"/i.exec(cspMeta)?.[1] ?? "") : "";
+const policyOf = (page: string): string => {
+  const meta = /<meta\b[^>]*\bhttp-equiv="Content-Security-Policy"[^>]*>/i.exec(
+    page
+  )?.[0];
+  return meta ? (/\bcontent="([^"]*)"/i.exec(meta)?.[1] ?? "") : "";
+};
+const csp = policyOf(html);
 
-/** One directive's values, or the empty string when it isn't declared. */
-const directive = (name: string): string =>
-  csp
+/** One directive's values in ``policy``, or the empty string when it isn't declared. */
+const directiveIn = (policy: string, name: string): string =>
+  policy
     .split(";")
     .map((part) => part.trim())
     .find((part) => part === name || part.startsWith(`${name} `))
     ?.slice(name.length)
     .trim() ?? "";
+const directive = (name: string): string => directiveIn(csp, name);
 
 describe("the shipped Content-Security-Policy", () => {
   it("is present, so the rest of these assertions mean something", () => {
@@ -58,32 +62,20 @@ describe("the shipped Content-Security-Policy", () => {
     expect(directive("script-src")).not.toContain(DECODER_ORIGIN);
     expect(directive("default-src")).not.toContain(DECODER_ORIGIN);
   });
+});
 
+describe.each([
+  ["the Device Builder", html],
+  ["web.esphome.io", webHtml],
+])("%s's Content-Security-Policy", (_name, page) => {
   it("lets the LN882H flasher fetch its RAM code, and nothing else from the CDN", () => {
     // A path ending in a slash matches everything under it; the grant is the
     // one ltchiptool release, not cdn.jsdelivr.net.
-    const sources = directive("connect-src").split(/\s+/);
+    const sources = directiveIn(policyOf(page), "connect-src").split(/\s+/);
     const grant = sources.find((src) => src.includes("cdn.jsdelivr.net"));
     expect(grant).toBeDefined();
     expect(grant!.endsWith("/")).toBe(true);
     expect(LN882H_RAMCODE_URL.startsWith(grant!)).toBe(true);
     expect(grant).not.toBe("https://cdn.jsdelivr.net/");
-  });
-});
-
-describe("web.esphome.io's Content-Security-Policy", () => {
-  it("lets the LN882H flasher fetch its RAM code from the same release path", () => {
-    const meta = /<meta\b[^>]*\bhttp-equiv="Content-Security-Policy"[^>]*>/i.exec(
-      webHtml
-    )?.[0];
-    const policy = meta ? (/\bcontent="([^"]*)"/i.exec(meta)?.[1] ?? "") : "";
-    const connect = policy
-      .split(";")
-      .map((part) => part.trim())
-      .find((part) => part.startsWith("connect-src "))!
-      .split(/\s+/);
-    const grant = connect.find((src) => src.includes("cdn.jsdelivr.net"));
-    expect(grant?.endsWith("/")).toBe(true);
-    expect(LN882H_RAMCODE_URL.startsWith(grant!)).toBe(true);
   });
 });
