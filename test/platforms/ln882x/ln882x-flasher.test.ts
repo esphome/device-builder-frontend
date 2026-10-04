@@ -135,6 +135,20 @@ describe("flashLn882x", () => {
     ]);
   });
 
+  it("does not take a reset its lines never reached for a reboot", async () => {
+    // An adapter wired to TX, RX and GND alone accepts the line changes; the
+    // RAM code still answering says the chip never reset.
+    const { chip, log, done } = flash({ silentReboot: true });
+    expect(await driveFakeTimers(done)).toBe(false);
+    expect(chip.signals).toContainEqual({
+      dataTerminalReady: false,
+      requestToSend: true,
+    });
+    expect(log[log.length - 1]).toBe(
+      "The chip did not confirm the reboot; release BOOT and reset it by hand"
+    );
+  });
+
   it("says the chip needs a reset by hand when nothing confirmed the reboot", async () => {
     const { log, done } = flash({ silentReboot: true, noSignals: true });
     expect(await driveFakeTimers(done)).toBe(false);
