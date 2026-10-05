@@ -62,6 +62,8 @@ export interface LibreTinyInstall<Image = LibreTinyImage> {
   };
   /** Where to read on when the chip does not get into its downloader. */
   readonly guideUrl: string;
+  /** The receiver opens the logs even when the reset is left to the user; they show the boot then. */
+  readonly logsBeforeReset?: boolean;
   /** Fetches the chunk ``run`` writes with, for one who wants it ahead of the run. */
   loadEngine(): Promise<unknown>;
   /** Never throws: a failure names its copy. */

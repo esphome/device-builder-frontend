@@ -51,7 +51,7 @@ const text = (el: any) => el.shadowRoot!.textContent ?? "";
 beforeEach(() => {
   mocks.loadAmbzImage.mockResolvedValue({ image: IMAGE });
   mocks.requestSerialPort.mockResolvedValue(PORT);
-  mocks.flashAmbz.mockResolvedValue(true);
+  mocks.flashAmbz.mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -59,13 +59,13 @@ afterEach(() => {
 });
 
 describe("esphome-web-install-rtl-ambz-dialog", () => {
-  it("flashes the parsed image, both slots and all, on the picked port", async () => {
+  it("flashes the parsed image, both slots and all, on the picked port and asks for the reset", async () => {
     const el = await mountDialog();
     await el._flash();
     await el.updateComplete;
     expect(mocks.flashAmbz).toHaveBeenCalledWith(PORT, IMAGE, expect.any(Object));
     expect(card(el).state).toBe("success");
-    expect(card(el).statusMessage).toBe("web.rtl.install_done");
+    expect(card(el).statusMessage).toBe("firmware.rtl_ambz_done_reset");
   });
 
   it("shows the TX2 strap guide while the engine waits for download mode", async () => {

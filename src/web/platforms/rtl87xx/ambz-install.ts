@@ -18,10 +18,13 @@ export const RTL_AMBZ_INSTALL: LibreTinyInstall<AmbzImage> = {
     waitDetail: "firmware.rtl_ambz_wait_desc",
     guideLink: "firmware.rtl_ambz_guide_link",
     done: "web.rtl.install_done",
+    doneByHand: "firmware.rtl_ambz_done_reset",
     failed: "firmware.rtl_flash_failed",
     badFile: "firmware.rtl_bad_uf2",
   },
   guideUrl: LIBRETINY_AMBZ_GUIDE_URL,
+  // Never booted by the engine, and its log is on the flash port.
+  logsBeforeReset: true,
   loadEngine: loadAmbzEngine,
   load: loadAmbzImage,
   run: runAmbz,

@@ -211,6 +211,19 @@ describe("rtlAmbz2ReceiverEngine", () => {
   });
 });
 
+describe("rtlAmbzReceiverEngine", () => {
+  it("opens an RTL8710B's logs at once while it waits for its reset", async () => {
+    ambz.load.mockResolvedValue({ image });
+    const plan = await rtlAmbzReceiverEngine.prepare(uf2, false, localize);
+    ambz.run.mockResolvedValue({ rebooted: false });
+
+    expect("run" in plan && (await plan.run(hooks()))).toEqual({
+      rebooted: true,
+      note: { message: "firmware.rtl_ambz_done_reset" },
+    });
+  });
+});
+
 describe("bkUartReceiverEngine", () => {
   it("names a failure by the copy of its own, as the dialog does", async () => {
     bk.load.mockResolvedValue({ image });

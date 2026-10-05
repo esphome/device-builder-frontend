@@ -73,7 +73,7 @@ export function libretinyReceiverEngine<Image>(
             };
           }
           return {
-            rebooted: result.rebooted,
+            rebooted: result.rebooted || install.logsBeforeReset === true,
             note: byHand ? { message: localize(byHand) } : undefined,
           };
         }),
