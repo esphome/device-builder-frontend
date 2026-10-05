@@ -226,6 +226,15 @@ describe("flashAmbz, a ROM slow to take the first block", () => {
     await expect(driveFakeTimers(done)).resolves.toBe(false);
   });
 
+  it("stops, writing nothing, when the ROM asks for CRC blocks", async () => {
+    const chip = fakeAmbz({ ota2Address: 0x08000000 | 0x80000, asksForCrc: true });
+    const before = chip.flash.slice(0xb000, 0xc000);
+    const done = flashAmbz(chip.port, IMAGE, { onProgress: () => {} });
+    await expect(driveFakeTimers(done)).rejects.toThrow(/CRC/);
+    expect(chip.flash.slice(0xb000, 0xc000)).toEqual(before);
+    expect(chip.raw.readable).toBeNull();
+  });
+
   it("waits for the receiver's NAK before the first block", async () => {
     const chip = fakeAmbz({ ota2Address: 0x08000000 | 0x80000, readyAfterMs: 1100 });
     const done = flashAmbz(chip.port, IMAGE, { onProgress: () => {} });

@@ -187,9 +187,13 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     await this.loudHandshake();
     await this.write(new Uint8Array([CMD_XMODEM_HANDSHAKE]));
     await this.expectAck("the XModem handshake");
-    await awaitStart(this, 0, XMODEM_START_MS).catch((err: unknown) => {
+    const crc = await awaitStart(this, 0, XMODEM_START_MS).catch((err: unknown) => {
       if (!(err instanceof XmodemNoStartError)) throw err;
+      return false;
     });
+    // Its blocks carry an 8-bit sum; a ROM asking for CRC would refuse every one.
+    if (crc)
+      throw new AmbzProtocolError("The ROM asked for CRC blocks, which it does not take");
     let seq = 1;
     for (let off = 0; off < data.length; off += XMODEM_BLOCK_SIZE) {
       const chunk = data.subarray(off, Math.min(off + XMODEM_BLOCK_SIZE, data.length));
