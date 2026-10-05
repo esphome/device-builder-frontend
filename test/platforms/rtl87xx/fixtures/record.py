@@ -295,13 +295,12 @@ def record(name: str, case: dict, uf2_path: Path) -> dict:
     amb = soc.amb
     amb.link()
     system_data = gen2bytes(amb.flash_read(0x9000, 4096, hash_check=False))
+    # The engine reads it twice, as an unchecked read could be garbled.
+    assert gen2bytes(amb.flash_read(0x9000, 4096, hash_check=False)) == system_data
     system = SystemData.unpack(system_data)
     ota_idx = 1 + (f"{system.ota2_switch:032b}".count("0") % 2)
     part_addr = ctx.get_offset("ota2", 0)
     rewrite = system.ota2_address & 0xFFFFFF != part_addr
-    if rewrite:
-        # The engine reads it again before a rewrite, as the unchecked read could be garbled.
-        assert gen2bytes(amb.flash_read(0x9000, 4096, hash_check=False)) == system_data
     amb.change_baudrate(115200)
     soc.conn.linked = True
     if rewrite:

@@ -193,13 +193,13 @@ export async function flashAmbz(
     if (!rom) throw new AmbzLinkError();
     hooks.onLinked?.();
     // Read at the link speed: the ROM does not answer FLASH_READ at 115200.
+    // The read has no checksum, and a garbled one would pick the slot the
+    // bootloader skips (or be written back): read it twice and compare.
     const system = await rom.flashRead(SYSTEM_OFFSET, 1);
-    const { slot, rewrite } = pickSlot(system, image.ota2Offset);
-    // The read has no checksum and a rewrite keeps the fields it does not
-    // set, so a garbled read would be written back: read it again first.
-    if (rewrite && !sameBytes(await rom.flashRead(SYSTEM_OFFSET, 1), system)) {
-      throw new Error("The system data read back differently; left it unchanged");
+    if (!sameBytes(await rom.flashRead(SYSTEM_OFFSET, 1), system)) {
+      throw new Error("The system data read back differently; wrote nothing");
     }
+    const { slot, rewrite } = pickSlot(system, image.ota2Offset);
     let link = await session.moveTo(WRITE_BAUD);
     if (rewrite) {
       log(

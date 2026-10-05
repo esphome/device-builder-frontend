@@ -198,6 +198,17 @@ describe("flashAmbz, a garbled system data read", () => {
     expect(chip.flash.slice(0x9000, 0xa000)).toEqual(before);
     expect(chip.raw.readable).toBeNull();
   });
+
+  it("writes no slot when the reads disagree and no rewrite is due", async () => {
+    const chip = fakeAmbz({ ota2Address: 0x08000000 | 0x80000, garblesFirstRead: true });
+    const before = chip.flash.slice();
+    const done = flashAmbz(chip.port, IMAGE, { onProgress: () => {} });
+    await expect(driveFakeTimers(done)).rejects.toThrow(
+      /system data read back differently/
+    );
+    expect(chip.flash).toEqual(before);
+    expect(chip.booted()).toBe(false);
+  });
 });
 
 describe("flashAmbz, a ROM slow to take the first block", () => {
