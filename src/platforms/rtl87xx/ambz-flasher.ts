@@ -93,6 +93,9 @@ export function pickSlot(
   return { slot: 1, rewrite };
 }
 
+const sameBytes = (a: Uint8Array, b: Uint8Array) =>
+  a.length === b.length && a.every((byte, i) => byte === b[i]);
+
 /** Opens and closes the port at each speed the ROM moves between. */
 class Session {
   link: AmbzLink | null = null;
@@ -181,8 +184,13 @@ export async function flashAmbz(
     hooks.onLinked?.();
     // Read at the link speed: the ROM does not answer FLASH_READ at 115200.
     const system = await rom.flashRead(SYSTEM_OFFSET, 1);
-    let link = await session.moveTo(WRITE_BAUD);
     const { slot, rewrite } = pickSlot(system, image.ota2Offset);
+    // The read has no checksum and a rewrite keeps the fields it does not
+    // set, so a garbled read would be written back: read it again first.
+    if (rewrite && !sameBytes(await rom.flashRead(SYSTEM_OFFSET, 1), system)) {
+      throw new Error("The system data read back differently; left it unchanged");
+    }
+    let link = await session.moveTo(WRITE_BAUD);
     if (rewrite) {
       log(
         `Pointing the system data at the second slot (${formatAddress(image.ota2Offset)})`

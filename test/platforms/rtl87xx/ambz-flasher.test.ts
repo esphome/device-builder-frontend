@@ -169,6 +169,23 @@ describe("pickSlot", () => {
   });
 });
 
+describe("flashAmbz, a garbled system data read", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+  });
+
+  it("does not write it back when a second read disagrees", async () => {
+    const chip = fakeAmbz({ ota2Address: 0x08100000, garblesFirstRead: true });
+    const before = chip.flash.slice(0x9000, 0xa000);
+    const done = flashAmbz(chip.port, IMAGE, { onProgress: () => {} });
+    await expect(driveFakeTimers(done)).rejects.toThrow(
+      /system data read back differently/
+    );
+    expect(chip.flash.slice(0x9000, 0xa000)).toEqual(before);
+    expect(chip.raw.readable).toBeNull();
+  });
+});
+
 describe("flashAmbz, a ROM slow to take the first block", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });

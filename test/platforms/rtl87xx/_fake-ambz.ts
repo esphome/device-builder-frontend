@@ -45,6 +45,8 @@ export interface FakeAmbzOptions {
    * NAKs for the first block (as an RTL8710BX does); a block before is lost.
    */
   readyAfterMs?: number;
+  /** Garble one byte of the first FLASH_READ, as a noisy line would. */
+  garblesFirstRead?: boolean;
 }
 
 export function fakeAmbz(opts: FakeAmbzOptions = {}) {
@@ -69,6 +71,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   let naked = false;
   let readyAt = 0;
   let magic = 0;
+  let reads = 0;
 
   const reply = (data: number[] | Uint8Array) => {
     const bytes = new Uint8Array(data);
@@ -89,7 +92,9 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
       reading = null;
       return;
     }
-    reply(flash.subarray(r.at, r.at + 1024));
+    const chunk = flash.slice(r.at, r.at + 1024);
+    if (opts.garblesFirstRead && reads === 1) chunk[0x50] ^= 0xff;
+    reply(chunk);
     r.at += 1024;
     r.left -= 1024;
   };
@@ -158,6 +163,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
       const count = (pending[4] | (pending[5] << 8)) * 4096;
       pending = [];
       reading = { at: offset, left: count };
+      reads++;
       sendChunk();
     }
   };
