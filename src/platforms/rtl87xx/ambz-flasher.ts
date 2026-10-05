@@ -152,7 +152,7 @@ async function enterDownloadMode(
   const link = await session.open(AMBZ_ROM_BAUD);
   if (await link.link(AUTO_LINK_MS)) return link;
   if (await resetIntoFirmware(port, RESET_HOLD_MS, LINES_MS)) {
-    log("No answer from the ROM; reset the board over RTS");
+    log("No answer from the ROM; pulsed RTS in case it drives the reset");
     if (await link.link(AUTO_LINK_MS)) return link;
   }
   log("No answer from the ROM; waiting for download mode (TX2 to GND, then reset)");

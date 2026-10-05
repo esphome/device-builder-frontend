@@ -34,6 +34,13 @@ export class XmodemError extends Error {
   }
 }
 
+/** The receiver stayed silent; the one start failure a sender may choose to go past. */
+export class XmodemNoStartError extends XmodemError {
+  constructor() {
+    super("Receiver never asked for the first block");
+  }
+}
+
 /** CRC-16/XMODEM: polynomial 0x1021, initial value 0. */
 export function crc16Xmodem(data: Uint8Array): number {
   let crc = 0;
@@ -62,7 +69,7 @@ export async function awaitStart(
     if (byte === CAN && ++cancels >= 2)
       throw new XmodemError("Receiver cancelled the transfer");
   }
-  throw new XmodemError("Receiver never asked for the first block");
+  throw new XmodemNoStartError();
 }
 
 /**

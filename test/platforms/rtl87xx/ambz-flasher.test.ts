@@ -39,8 +39,8 @@ const written = (chip: ReturnType<typeof fakeAmbz>, image = IMAGE.ota1) =>
 
 describe("flashAmbz", () => {
   it("reboots a running LibreTiny into download mode, writes at 115200 and boots", async () => {
-    const { chip, done } = flash({ start: "firmware" });
     const onWaiting = vi.fn();
+    const { chip, done } = flash({ start: "firmware" }, { onWaiting });
     await expect(driveFakeTimers(done)).resolves.toBe(true);
     expect(onWaiting).not.toHaveBeenCalled();
     expect(chip.bauds.slice(0, 3)).toEqual([115200, 1500000, 115200]);

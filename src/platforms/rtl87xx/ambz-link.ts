@@ -15,6 +15,7 @@ import {
   sendFrame,
   XMODEM_BLOCK_SIZE,
   type XmodemIo,
+  XmodemNoStartError,
 } from "../../util/xmodem.js";
 
 export const AMBZ_ROM_BAUD = 1500000;
@@ -105,6 +106,7 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     while (Date.now() < deadline) {
       await this.write(new Uint8Array([ACK]));
       if ((await this.readByte(QUIET_MS)) === null) return;
+      // ltchiptool discards up to 4 bytes per ACK: the one just read and these.
       this.buf.splice(0, 3);
     }
     throw new AmbzProtocolError("The ROM never went quiet");
@@ -176,7 +178,9 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     await this.loudHandshake();
     await this.write(new Uint8Array([CMD_XMODEM_HANDSHAKE]));
     await this.expectAck("the XModem handshake");
-    await awaitStart(this, 0, XMODEM_START_MS).catch(() => false);
+    await awaitStart(this, 0, XMODEM_START_MS).catch((err: unknown) => {
+      if (!(err instanceof XmodemNoStartError)) throw err;
+    });
     let seq = 1;
     for (let off = 0; off < data.length; off += XMODEM_BLOCK_SIZE) {
       const chunk = data.subarray(off, Math.min(off + XMODEM_BLOCK_SIZE, data.length));
