@@ -49,7 +49,7 @@ import { LN_INSTALL } from "../../../src/web/platforms/ln882x/install.js";
 import { lnUartReceiverEngine } from "../../../src/web/platforms/ln882x/receiver-engine.js";
 import { RTL_AMBZ_INSTALL } from "../../../src/web/platforms/rtl87xx/ambz-install.js";
 import { rtlAmbzReceiverEngine } from "../../../src/web/platforms/rtl87xx/ambz-receiver-engine.js";
-import { RTL_INSTALL } from "../../../src/web/platforms/rtl87xx/ambz2-install.js";
+import { RTL_AMBZ2_INSTALL } from "../../../src/web/platforms/rtl87xx/ambz2-install.js";
 import { rtlAmbz2ReceiverEngine } from "../../../src/web/platforms/rtl87xx/receiver-engine.js";
 
 const localize = (k: string) => k;
@@ -66,7 +66,7 @@ describe.each([
   {
     name: "rtlAmbz2ReceiverEngine",
     engine: rtlAmbz2ReceiverEngine,
-    install: RTL_INSTALL,
+    install: RTL_AMBZ2_INSTALL,
     mocks: rtl,
     keys: "firmware.rtl_",
     logs: RTL87XX_SERIAL_LOGS,
@@ -247,8 +247,8 @@ describe("libretinyReceiverEngine", () => {
   // A family whose board can be left in its downloader and has no line for it.
   const bare = libretinyReceiverEngine(
     {
-      ...RTL_INSTALL,
-      copy: { ...RTL_INSTALL.copy, doneByHand: undefined },
+      ...RTL_AMBZ2_INSTALL,
+      copy: { ...RTL_AMBZ2_INSTALL.copy, doneByHand: undefined },
       load: async () => ({ image }),
       run: async () => ({ rebooted: false }),
     },
@@ -267,8 +267,8 @@ describe("libretinyReceiverEngine", () => {
   it("asks for the reset that is left before it says where the logs are", async () => {
     const elsewhere = libretinyReceiverEngine(
       {
-        ...RTL_INSTALL,
-        copy: { ...RTL_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
+        ...RTL_AMBZ2_INSTALL,
+        copy: { ...RTL_AMBZ2_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
         load: async () => ({ image }),
         run: async () => ({ rebooted: false }),
       },
@@ -285,8 +285,8 @@ describe("libretinyReceiverEngine", () => {
   it("opens the logs on the flashed port when the opener says they are there", async () => {
     const onFlashPort = libretinyReceiverEngine(
       {
-        ...RTL_INSTALL,
-        copy: { ...RTL_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
+        ...RTL_AMBZ2_INSTALL,
+        copy: { ...RTL_AMBZ2_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
         load: async () => ({ image }),
         run: async () => ({ rebooted: true }),
       },
@@ -303,8 +303,8 @@ describe("libretinyReceiverEngine", () => {
   it("opens no logs and points nowhere for a device without serial logs", async () => {
     const off = libretinyReceiverEngine(
       {
-        ...RTL_INSTALL,
-        copy: { ...RTL_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
+        ...RTL_AMBZ2_INSTALL,
+        copy: { ...RTL_AMBZ2_INSTALL.copy, logsElsewhere: "web.bk.logs_elsewhere" },
         load: async () => ({ image }),
         run: async () => ({ rebooted: true }),
       },

@@ -44,7 +44,7 @@ import { lapsedPick } from "../../../_web-serial.js";
 import type { LibreTinyImage } from "../../../../src/platforms/libretiny-uf2.js";
 import { RtlImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
 import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
-import { RTL_INSTALL } from "../../../../src/web/platforms/rtl87xx/ambz2-install.js";
+import { RTL_AMBZ2_INSTALL } from "../../../../src/web/platforms/rtl87xx/ambz2-install.js";
 import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -127,8 +127,8 @@ describe("esphome-web-install-rtl-dialog", () => {
   it("has a line of its own for a family that has none for a reset by hand", async () => {
     class BareDialog extends LibreTinyInstallDialog {
       protected readonly install = {
-        ...RTL_INSTALL,
-        copy: { ...RTL_INSTALL.copy, doneByHand: undefined },
+        ...RTL_AMBZ2_INSTALL,
+        copy: { ...RTL_AMBZ2_INSTALL.copy, doneByHand: undefined },
         load: async () => ({ image: IMAGE as unknown as LibreTinyImage }),
       };
     }

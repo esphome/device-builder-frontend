@@ -8,7 +8,7 @@ import {
 import type { LibreTinyInstall } from "../../install/libretiny-install-dialog.js";
 import { RTL_COPY } from "./copy.js";
 
-export const RTL_INSTALL: LibreTinyInstall = {
+export const RTL_AMBZ2_INSTALL: LibreTinyInstall = {
   copy: {
     ...RTL_COPY,
     connectDetail: "firmware.rtl_connect_desc",
