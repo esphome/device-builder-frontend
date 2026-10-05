@@ -246,6 +246,25 @@ describe("parseLibreTinyImage, the second OTA slot", () => {
       })
     ).toThrow(/BINPATCH/);
   });
+
+  it.each([
+    ["an unknown opcode", [0x01, 4, 0, 0, 0, 0]],
+    ["a DIFF32 without its delta", [0xfe, 2, 0, 0]],
+    ["a length past the tag", [0xfe, 9, 0, 0, 0, 0, 8]],
+    ["a stray trailing byte", [0xfe, 5, 0, 0, 0, 0, 8, 0xfe]],
+  ])("refuses a BINPATCH with %s instead of patching part of the slot", (_, bytes) => {
+    const bad = makeLibreTinyUf2({
+      blocks: [
+        { addr: 0x0, tags: [...OTA_INFO, ltTag(LT_TAG.BINPATCH, new Uint8Array(bytes))] },
+      ],
+    });
+    expect(() =>
+      parseLibreTinyImage(bad, [UF2_FAMILY_AMBZ2], {
+        ...AMBZ2_PARSE,
+        scheme: "flasher-ota2",
+      })
+    ).toThrow(/Invalid UF2: .*BINPATCH/);
+  });
 });
 
 describe("parseLibreTinyBlocks", () => {

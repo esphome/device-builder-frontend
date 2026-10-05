@@ -152,16 +152,25 @@ function partInfoTarget(info: Uint8Array, scheme: LibreTinyScheme): string | nul
   return name;
 }
 
-/** Apply a block's BINPATCH (the OTA1 to OTA2 relocation) to a copy of its data. */
+/**
+ * Apply a block's BINPATCH (the OTA1 to OTA2 relocation) to a copy of its
+ * data. Anything it cannot apply in full is a bad file, never a slot with
+ * only some of its pointers moved.
+ */
 function applyBinpatch(data: Uint8Array, patch: Uint8Array): Uint8Array {
   const out = data.slice();
   const view = new DataView(out.buffer);
-  for (let i = 0; i + 2 <= patch.length;) {
+  for (let i = 0; i < patch.length;) {
+    if (i + 2 > patch.length || i + 2 + patch[i + 1] > patch.length) {
+      throw new Error("Invalid UF2: BINPATCH truncated");
+    }
     const opcode = patch[i];
-    const length = patch[i + 1];
-    const body = patch.subarray(i + 2, i + 2 + length);
-    i += 2 + length;
-    if (opcode !== BINPATCH_DIFF32 || body.length < 4) continue;
+    const body = patch.subarray(i + 2, i + 2 + patch[i + 1]);
+    i += 2 + body.length;
+    if (opcode !== BINPATCH_DIFF32) {
+      throw new Error(`Invalid UF2: unknown BINPATCH opcode 0x${opcode.toString(16)}`);
+    }
+    if (body.length < 4) throw new Error("Invalid UF2: BINPATCH DIFF32 too short");
     const diff = new DataView(body.buffer, body.byteOffset, 4).getInt32(0, true);
     for (const offset of body.subarray(4)) {
       if (offset + 4 > out.length)
