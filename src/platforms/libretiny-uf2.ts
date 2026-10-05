@@ -172,6 +172,9 @@ function applyBinpatch(data: Uint8Array, patch: Uint8Array): Uint8Array {
       throw new Error(`Invalid UF2: unknown BINPATCH opcode 0x${opcode.toString(16)}`);
     }
     if (body.length < 4) throw new Error("Invalid UF2: BINPATCH DIFF32 too short");
+    // ltchiptool always lists an offset; one without would count as patched.
+    if (body.length === 4)
+      throw new Error("Invalid UF2: BINPATCH DIFF32 patches nothing");
     const diff = new DataView(body.buffer, body.byteOffset, 4).getInt32(0, true);
     for (const offset of body.subarray(4)) {
       // uf2tool diffs the blocks in 4-byte chunks, so a real patch is word aligned.

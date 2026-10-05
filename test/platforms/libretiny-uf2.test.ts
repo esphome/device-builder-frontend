@@ -268,6 +268,7 @@ describe("parseLibreTinyImage, the second OTA slot", () => {
   it.each([
     ["an unknown opcode", [0x01, 4, 0, 0, 0, 0]],
     ["a DIFF32 without its delta", [0xfe, 2, 0, 0]],
+    ["a DIFF32 with no offsets", [0xfe, 4, 0, 0, 0, 0]],
     ["a length past the tag", [0xfe, 9, 0, 0, 0, 0, 8]],
     ["a stray trailing byte", [0xfe, 5, 0, 0, 0, 0, 8, 0xfe]],
     ["nothing in it", []],
