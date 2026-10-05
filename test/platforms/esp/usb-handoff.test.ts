@@ -67,7 +67,7 @@ const asHost = (h: ReturnType<typeof makeHost>) =>
 
 beforeEach(() => {
   rtl.loadAmbz2Image.mockResolvedValue({ image: { runs: [], totalBytes: 0 } });
-  rtl.loadAmbzImage.mockResolvedValue({ image: { ota1: {}, ota2: {}, ota2Offset: 0 } });
+  rtl.loadAmbzImage.mockResolvedValue({ image: {} });
   nrf.loadDfuPackage.mockResolvedValue({ pkg: { parts: [] } });
 });
 afterEach(() => vi.clearAllMocks());

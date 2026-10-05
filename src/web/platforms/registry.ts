@@ -19,9 +19,9 @@ export const WEB_PLATFORMS = [
   picoWebMode,
   nrfWebMode,
   rtlWebMode,
+  rtlAmbzWebMode,
   bkWebMode,
   lnWebMode,
-  rtlAmbzWebMode,
 ] as const;
 
 export type WebMode = (typeof WEB_PLATFORMS)[number]["mode"];

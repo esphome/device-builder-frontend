@@ -113,10 +113,7 @@ export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promis
   finishWithLogsPort(host, port, true);
 }
 
-// The same UF2 the in-app flow parses, handed whole to web.esphome.io's
-// rtl-ambz engine when this origin cannot flash. The ROM downloader has no
-// erase; the UF2 is parsed here first, so an RTL8720C build is refused before
-// the hand-off.
+// Parsed first, so an RTL8720C build is refused before the hand-off.
 const RTL_AMBZ_HANDOFF: HandoffSpec = {
   flasher: "rtl-ambz",
   erase: false,

@@ -17,7 +17,7 @@ export const RTL_AMBZ_INSTALL: LibreTinyInstall<AmbzImage> = {
     waiting: "firmware.rtl_wait_title",
     waitDetail: "firmware.rtl_ambz_wait_desc",
     guideLink: "firmware.rtl_ambz_guide_link",
-    done: "web.rtl_ambz.install_done",
+    done: "web.rtl.install_done",
     failed: "firmware.rtl_flash_failed",
     badFile: "firmware.rtl_bad_uf2",
   },

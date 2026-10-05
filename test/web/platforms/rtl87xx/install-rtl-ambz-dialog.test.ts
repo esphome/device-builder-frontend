@@ -65,7 +65,7 @@ describe("esphome-web-install-rtl-ambz-dialog", () => {
     await el.updateComplete;
     expect(mocks.flashAmbz).toHaveBeenCalledWith(PORT, IMAGE, expect.any(Object));
     expect(card(el).state).toBe("success");
-    expect(card(el).statusMessage).toBe("web.rtl_ambz.install_done");
+    expect(card(el).statusMessage).toBe("web.rtl.install_done");
   });
 
   it("shows the TX2 strap guide while the engine waits for download mode", async () => {

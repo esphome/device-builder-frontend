@@ -1,7 +1,6 @@
 /**
  * The flash receiver's RTL8720C engine: the AmebaZ2 ROM downloader, the same
- * the in-app flow and the web RTL dialog use. The RTL8710B's ROM speaks
- * another protocol: its engine is ``ambz-receiver-engine.ts``.
+ * the in-app flow and the web RTL dialog use.
  */
 import { RTL87XX_SERIAL_LOGS } from "../../../platforms/rtl87xx/index.js";
 import { libretinyReceiverEngine } from "../../flash-receiver/libretiny-receiver-engine.js";

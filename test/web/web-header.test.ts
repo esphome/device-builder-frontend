@@ -85,9 +85,9 @@ describe("esphome-web-header mode picker", () => {
       "web.header.mode_pico",
       "web.header.mode_nrf",
       "web.header.mode_rtl",
+      "web.header.mode_ambz",
       "web.header.mode_bk",
       "web.header.mode_ln",
-      "web.header.mode_ambz",
     ]);
     expect(el.shadowRoot!.querySelector(".mode-picker")!.getAttribute("aria-label")).toBe(
       "web.header.mode_picker_label"

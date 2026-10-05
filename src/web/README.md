@@ -49,10 +49,7 @@ hardware classes behave differently:
   reset: the engine pulses RTS in case it drives CEN, otherwise the user
   holds TX2 to GND through a reset while the engine polls. The ROM links at
   1.5 Mbaud and the writes run at 115200. Power the board from a solid
-  3.3 V supply; an adapter's own regulator often browns out mid flash. A
-  running LibreTiny firmware's download reboot is not used: its UART2 RX is
-  off and, once worked around, the ROM it reaches leaves download mode after
-  one transfer.
+  3.3 V supply; an adapter's own regulator often browns out mid flash.
 - **BK72xx modules** (CB3S, T1 and the like, on a plain adapter): installing
   goes over UART1 (TX1, RX1) and the logs come from UART2 unless the
   configuration moves them. There is no strap: a chip that runs ESPHome
