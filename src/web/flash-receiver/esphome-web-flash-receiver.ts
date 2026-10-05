@@ -80,6 +80,9 @@ export class ESPHomeWebFlashReceiver extends LitElement {
   // What the board needs from the user mid-flash (a strap, a reset), shown
   // with the flasher's guide until the engine moves on.
   @state() private _waiting: ReceiverNote | null = null;
+  // The reset still left to do when the boot logs open before it; the logs
+  // dialog covers _waiting, so it heads the log instead.
+  @state() private _logsNotice = "";
   // The image is checked and its engine loaded before the click; see the class.
   private _preparation = new Preparation<
     ReceiverInput | Promise<ReceiverInput>,
@@ -361,6 +364,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     this._bootLogsGen++;
     this._logsOpen = false;
     this._logPort = undefined;
+    this._logsNotice = "";
     this._resetLog();
 
     const result = await this._engine(run);
@@ -383,8 +387,10 @@ export class ESPHomeWebFlashReceiver extends LitElement {
       this._logPort = logs.port;
       return;
     }
-    // The engine already reset + disconnected the device; show its boot logs
-    // in the shared logs dialog (reset / download / stop-start / reconnect).
+    // The engine already reset + disconnected the device, or left the reset to
+    // the user (the note); show its boot logs in the shared logs dialog
+    // (reset / download / stop-start / reconnect).
+    this._logsNotice = result.note?.message ?? "";
     await acquireBootLogs(this, logs.port, logs.knownPorts);
   }
 
@@ -561,11 +567,13 @@ export class ESPHomeWebFlashReceiver extends LitElement {
         .deviceLabel=${this._deviceName ?? this._localize("web.flash.title")}
         .policy=${this._logsPolicy}
         .baudRate=${this._logBaudRate}
+        .notice=${this._logsNotice}
         @port-replaced=${(e: CustomEvent<SerialPort>) => {
           this._logPort = e.detail;
         }}
         @after-hide=${() => {
           this._logsOpen = false;
+          this._logsNotice = "";
         }}
       ></esphome-web-logs-dialog>
     `;

@@ -86,6 +86,9 @@ export class ESPHomeWebLogsDialog extends LitElement {
   /** The baud a reconnect reopens the port at; ESPHome's default unless set. */
   @property({ attribute: false }) baudRate?: number;
 
+  /** Localized line heading a fresh stream, e.g. to reset a board that waits for it. */
+  @property() notice = "";
+
   @consume({ context: localizeContext, subscribe: true })
   @state()
   _localize: LocalizeFunc = (key) => key;
@@ -167,6 +170,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (!source) return; // no (open) port or device yet — legitimately quiet
     this._source = source;
     this._resetLines();
+    if (this.notice) this._lines = [this.notice];
     this._crashKind = null;
     this._paused = false;
     this._streaming = true;
