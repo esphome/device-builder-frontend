@@ -142,7 +142,11 @@ describe("rtlAmbzDoFlash", () => {
     host._showLogsAfterInstall = true;
     await rtlAmbzDoFlash(asHost(host));
     expect(host._logsPort).toBe(port);
-    expect(mocks.dispatchShowLogsAfterInstall).toHaveBeenCalled();
+    // The logs say to reset the board: the dialog's own status is gone by then.
+    expect(mocks.dispatchShowLogsAfterInstall).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ notice: "firmware.rtl_ambz_reset_to_start" })
+    );
   });
 
   it("names a board that was unplugged during the flash", async () => {

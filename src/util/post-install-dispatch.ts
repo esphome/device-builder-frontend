@@ -34,6 +34,9 @@ export interface PostInstallShowLogsDetail {
   // Device.target_platform, so the logs get the same Reset Device wiring as
   // a launch from the card (the platform's own reset where it has one).
   targetPlatform?: string;
+  // Localized text heading the serial logs, e.g. to reset a board that waits
+  // for it; only meaningful on the webSerialPort path.
+  notice?: string;
   reopenInstall: () => void;
 }
 

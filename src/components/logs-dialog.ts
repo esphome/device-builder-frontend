@@ -296,6 +296,7 @@ export class ESPHomeLogsDialog extends LitElement {
     onBackToInstall?: () => void;
     onResetDevice?: SerialResetHook;
     source?: PassiveSource;
+    notice?: string;
   }): () => boolean {
     return openPassive(this, options);
   }

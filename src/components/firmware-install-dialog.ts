@@ -206,6 +206,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _flashImage: unknown = null;
   // The port a browser flash went through; backs "Show logs" on Done.
   _logsPort: SerialPort | null = null;
+  // Shown at the top of those logs, e.g. a board that waits for a reset.
+  _logsNotice: string | undefined = undefined;
   // Blocks a second picker while a browser-flash step's picker is open.
   @state() _flashBusy = false;
   // Aborts an in-flight browser flash on teardown so the device is released.
@@ -320,6 +322,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._flasher = null;
     this._flashImage = null;
     this._logsPort = null;
+    this._logsNotice = undefined;
     this._flashBusy = false;
   }
 
