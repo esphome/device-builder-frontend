@@ -126,15 +126,16 @@ export class ESPHomeWebLogsDialog extends LitElement {
   private _pendingLines: string[] = [];
   private _flushScheduled = 0;
 
+  // A new notice heads the next stream again.
+  protected willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has("notice")) this._noticeShown = false;
+  }
+
   // One (open, source) → streaming reconcile: the device cards open with the
   // port already set, the flash receiver opens first and assigns the port
   // once the rebooted device re-enumerates. _start's guards make the extra
   // calls no-ops, including a port swapped mid-stream or mid-reconnect —
   // the dialog owns its active handle and announces swaps via port-replaced.
-  protected willUpdate(changed: Map<string, unknown>): void {
-    if (changed.has("notice")) this._noticeShown = false;
-  }
-
   protected updated(changed: Map<string, unknown>): void {
     if (!changed.has("open") && !changed.has("port") && !changed.has("bleDevice")) return;
     if (this.open) {
