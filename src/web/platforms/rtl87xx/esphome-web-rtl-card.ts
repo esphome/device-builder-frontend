@@ -17,7 +17,7 @@ const RTL_CARD: LibreTinyCard = {
   logs: RTL87XX_SERIAL_LOGS,
 };
 
-/** RTL8720C (AmebaZ2) card: install through the ROM downloader, and logs. */
+/** RTL87xx card: install through the chip's ROM downloader, and logs. */
 @customElement("esphome-web-rtl-card")
 export class ESPHomeWebRtlCard extends LibreTinyCardElement {
   protected readonly card = RTL_CARD;

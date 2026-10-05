@@ -10,7 +10,6 @@ import { espWebMode } from "./esp/mode.js";
 import { lnWebMode } from "./ln882x/mode.js";
 import { nrfWebMode } from "./nrf52/mode.js";
 import { picoWebMode } from "./rp2/mode.js";
-import { rtlAmbzWebMode } from "./rtl87xx/ambz-mode.js";
 import { rtlWebMode } from "./rtl87xx/mode.js";
 import type { WebPlatform } from "./web-platform.js";
 
@@ -19,7 +18,6 @@ export const WEB_PLATFORMS = [
   picoWebMode,
   nrfWebMode,
   rtlWebMode,
-  rtlAmbzWebMode,
   bkWebMode,
   lnWebMode,
 ] as const;

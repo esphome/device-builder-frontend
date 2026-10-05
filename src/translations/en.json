@@ -1951,10 +1951,9 @@
       "mode_esp": "ESP",
       "mode_pico": "RP2",
       "mode_nrf": "nRF52",
-      "mode_rtl": "RTL8720C",
+      "mode_rtl": "RTL87xx",
       "mode_bk": "BK72xx",
       "mode_ln": "LN882H",
-      "mode_ambz": "RTL8710B",
       "mode_picker_label": "Device family",
       "more_options": "More options",
       "report_issue": "Report an issue"
@@ -2089,10 +2088,9 @@
       "lite": "This page is a lite variant of the ESPHome Device Builder. To create and edit ESPHome projects, install it on your computer or inside Home Assistant (it's free!).",
       "get_esphome": "Get ESPHome",
       "body_nrf": "ESPHome Web lets you update the firmware on your nRF52 device using the Nordic DFU protocol, directly from your browser.",
-      "body_rtl": "ESPHome Web lets you install a LibreTiny build on your RTL8720C (AmebaZ2) board through its USB serial adapter and check the device logs, directly from your browser.",
+      "body_rtl": "ESPHome Web lets you install your ESPHome build on a Realtek RTL87xx board (RTL8720C or RTL8710B) through its USB serial adapter and check the device logs, directly from your browser.",
       "body_bk": "ESPHome Web lets you install your ESPHome build on a Beken BK72xx device through a USB serial adapter and check the device logs, directly from your browser.",
-      "body_ln": "ESPHome Web lets you install your ESPHome build on a Lightning LN882H device through a USB serial adapter and check the device logs, directly from your browser.",
-      "body_ambz": "ESPHome Web lets you install your ESPHome build on a Realtek RTL8710B (AmebaZ) board, such as a BW12 or WR3, through a USB serial adapter and check the device logs, directly from your browser."
+      "body_ln": "ESPHome Web lets you install your ESPHome build on a Lightning LN882H device through a USB serial adapter and check the device logs, directly from your browser."
     },
     "install": {
       "preparing": "Preparing firmware…",
@@ -2137,19 +2135,12 @@
       "logs_elsewhere": "With serial logging on, the logs come out on UART1, TX1 on PB9, by default; read them there. If the logger is set to UART0, they come out on TX0 (PA2), the port used to install."
     },
     "rtl": {
-      "title": "RTL8720C Device",
-      "connect_hint": "Install a LibreTiny UF2 on your RTL8720C (AmebaZ2) board over USB, or read its logs. A development kit with its own USB port (such as the BW15 kit) is switched into flashing mode automatically; with a separate adapter wired only to TX, RX and GND you will be shown how to do it by hand.",
+      "title": "RTL87xx Device",
+      "connect_hint": "Install the UF2 of your ESPHome build on a Realtek RTL8720C or RTL8710B board over USB, or read its logs; the file says which chip it is for. An RTL8720C kit with its own USB port (such as the BW15 kit) is switched into flashing mode automatically. With a separate adapter, wire it to the log port (TX2 and RX2 on an RTL8710B) and power the board from a solid 3.3 V supply; you will be shown how to strap it by hand.",
       "logs": "Serial logs",
-      "install_title": "Install firmware on an RTL8720C",
-      "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8720C yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
-      "install_done": "Installation complete. The board is starting the firmware."
-    },
-    "rtl_ambz": {
-      "title": "RTL8710B Device",
-      "connect_hint": "Install the UF2 of your ESPHome build on your Realtek RTL8710B (AmebaZ) board over USB, or read its logs. Wire the adapter to the log port (TX2 on PA30, RX2 on PA29) and power the board from a solid 3.3 V supply. To install, hold TX2 to GND while you reset the board, unless your adapter's RTS drives its reset; you will be shown how.",
-      "logs": "Serial logs",
-      "install_title": "Install firmware on an RTL8710B",
-      "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8710B yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
+      "install_title": "Install firmware on an RTL87xx",
+      "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8720C or RTL8710B yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
+      "install_done": "Installation complete. The board is starting the firmware.",
       "install_done_reset": "Installation complete. Reset the board (pull CEN to GND briefly, or power-cycle it) to start the firmware."
     },
     "nrf": {

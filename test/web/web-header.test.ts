@@ -39,20 +39,20 @@ async function mount(mode: WebMode, minimal = false): Promise<ESPHomeWebHeader> 
 
 describe("esphome-web-header mode picker", () => {
   it("renders the family picker on the current mode", async () => {
-    const el = await mount("ambz");
+    const el = await mount("rtl");
     const picker = el.shadowRoot!.querySelector("esphome-web-mode-picker");
     expect(picker).not.toBeNull();
-    expect(picker!.mode).toBe("ambz");
+    expect(picker!.mode).toBe("rtl");
   });
 
   it("names every family on a button where they fit, the current one pressed", async () => {
-    const el = await mount("ambz");
+    const el = await mount("rtl");
     const btns = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".mode-btn")];
     expect(btns.map((b) => b.textContent?.trim())).toEqual(
       WEB_PLATFORMS.map((p) => p.labelKey)
     );
     expect(btns.map((b) => b.getAttribute("aria-pressed"))).toEqual(
-      WEB_PLATFORMS.map((p) => String(p.mode === "ambz"))
+      WEB_PLATFORMS.map((p) => String(p.mode === "rtl"))
     );
   });
 

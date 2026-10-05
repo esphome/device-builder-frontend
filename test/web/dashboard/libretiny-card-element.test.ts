@@ -19,10 +19,6 @@ vi.mock(
 );
 vi.mock("../../../src/web/platforms/bk72xx/esphome-web-install-bk-dialog.js", () => ({}));
 vi.mock("../../../src/web/platforms/ln882x/esphome-web-install-ln-dialog.js", () => ({}));
-vi.mock(
-  "../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-ambz-dialog.js",
-  () => ({})
-);
 vi.mock("../../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
@@ -37,7 +33,6 @@ import { RTL87XX_SERIAL_LOGS } from "../../../src/platforms/rtl87xx/serial-logs.
 import type { LibreTinyCardElement } from "../../../src/web/dashboard/libretiny-card-element.js";
 import { ESPHomeWebBkCard } from "../../../src/web/platforms/bk72xx/esphome-web-bk-card.js";
 import { ESPHomeWebLnCard } from "../../../src/web/platforms/ln882x/esphome-web-ln-card.js";
-import { ESPHomeWebRtlAmbzCard } from "../../../src/web/platforms/rtl87xx/esphome-web-rtl-ambz-card.js";
 import { ESPHomeWebRtlCard } from "../../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -81,15 +76,6 @@ describe.each([
     is: { reset: "rts-pulse", releaseLinesAfterOpen: true },
     title: "web.ln.title",
     dialog: "esphome-web-install-ln-dialog",
-  },
-  {
-    name: "esphome-web-rtl-ambz-card",
-    Card: ESPHomeWebRtlAmbzCard,
-    // The same release-and-pulse as the RTL8720C.
-    policy: RTL87XX_SERIAL_LOGS,
-    is: { reset: "rts-pulse", releaseLinesAfterOpen: true },
-    title: "web.rtl_ambz.title",
-    dialog: "esphome-web-install-rtl-ambz-dialog",
   },
 ])("$name", ({ Card, policy, is, title, dialog: installDialog }) => {
   const mountCard = () =>

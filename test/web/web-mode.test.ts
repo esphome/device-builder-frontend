@@ -34,9 +34,10 @@ describe("readMode", () => {
     expect(modeUrl("ln", new URL("https://web.esphome.io/"))).toBe("/?ln");
   });
 
-  it("returns ambz when the ambz param is present", () => {
-    expect(readMode("?ambz")).toBe("ambz");
-    expect(modeUrl("ambz", new URL("https://web.esphome.io/"))).toBe("/?ambz");
+  it("opens the RTL87xx family from the RTL8710B's old ?ambz link", () => {
+    expect(readMode("?ambz")).toBe("rtl");
+    // Switching away drops the old flag rather than keeping both.
+    expect(modeUrl("ln", new URL("https://web.esphome.io/?ambz"))).toBe("/?ln");
   });
 
   it("returns rtl when the rtl param is present", () => {

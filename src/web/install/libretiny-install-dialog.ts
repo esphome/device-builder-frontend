@@ -74,6 +74,11 @@ export interface LibreTinyInstall<Image = LibreTinyImage> {
     image: Image,
     hooks: LibreTinyFlashHooks
   ): Promise<LibreTinyFlashResult>;
+  /**
+   * For a family of several chips: the install a parsed file is written
+   * with, whose copy, guide and engine follow that chip.
+   */
+  forImage?(image: Image): LibreTinyInstall<Image>;
 }
 
 type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" | "error";
@@ -110,6 +115,16 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
 
   private _abort: AbortController | null = null;
+  // The picked file's chip, for a family of several; its copy follows the flash.
+  @state() private _chip: LibreTinyInstall<Image> | null = null;
+
+  private _installFor(image: Image): LibreTinyInstall<Image> {
+    return this.install.forImage?.(image) ?? this.install;
+  }
+
+  private get _active(): LibreTinyInstall<Image> {
+    return this._chip ?? this.install;
+  }
 
   // The UF2 is read and parsed when it is picked, so the click that installs
   // it goes straight to the port picker.
@@ -129,7 +144,9 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
     const parsed = await this.install.load(bytes);
     if ("image" in parsed) {
       // While the user clicks Install and picks the port; the flash names a failure.
-      void this.install.loadEngine().catch(() => {});
+      void this._installFor(parsed.image)
+        .loadEngine()
+        .catch(() => {});
       return { value: parsed.image };
     }
     const { key, retryable } = parseFailureCopy(parsed.key);
@@ -176,6 +193,7 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
     this._logLines = [];
     this._manualReset = false;
     this._pending = false;
+    this._chip = null;
   }
 
   private _fail(title: string, detail = ""): void {
@@ -217,13 +235,14 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
       this._pending = false;
     }
 
+    this._chip = this._installFor(image);
     this._state = "connecting";
     this._progress = 0;
     const abort = new AbortController();
     this._abort = abort;
     // Closing the dialog aborts the run; its late hooks must not repaint it.
     const live = () => !abort.signal.aborted;
-    const result = await this.install.run(port, image, {
+    const result = await this._chip.run(port, image, {
       signal: abort.signal,
       onLog: (line) => {
         if (live()) this._log(line);
@@ -243,7 +262,7 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
     if (!live()) return;
     if ("detail" in result) {
       this._fail(
-        this._localize(result.key ?? this.install.copy.failed),
+        this._localize(result.key ?? this._active.copy.failed),
         connectFailureDetail(result.error, this._localize, () => result.detail)
       );
       return;
@@ -257,7 +276,7 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
   }
 
   private _statusMessage(): string {
-    const { copy } = this.install;
+    const { copy } = this._active;
     switch (this._state) {
       case "connecting":
         return this._localize(copy.connecting);
@@ -284,9 +303,9 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
   private _statusDetail(): string {
     switch (this._state) {
       case "connecting":
-        return this._localize(this.install.copy.connectDetail);
+        return this._localize(this._active.copy.connectDetail);
       case "waiting":
-        return this._localize(this.install.copy.waitDetail);
+        return this._localize(this._active.copy.waitDetail);
       case "error":
         return this._errorMessage;
       default:
@@ -334,8 +353,8 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
       ${
         this._state === "waiting"
           ? html`<p class="guide">
-              <a href=${this.install.guideUrl} target="_blank" rel="noopener noreferrer"
-                >${this._localize(this.install.copy.guideLink)}</a
+              <a href=${this._active.guideUrl} target="_blank" rel="noopener noreferrer"
+                >${this._localize(this._active.copy.guideLink)}</a
               >
             </p>`
           : nothing

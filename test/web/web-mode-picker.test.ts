@@ -37,14 +37,14 @@ async function open(el: ESPHomeWebModePicker) {
 
 describe("esphome-web-mode-picker", () => {
   it("names the current family on the trigger, closed", async () => {
-    const el = await mount("ambz");
-    expect(trigger(el).textContent).toContain("web.header.mode_ambz");
+    const el = await mount("rtl");
+    expect(trigger(el).textContent).toContain("web.header.mode_rtl");
     expect(trigger(el).getAttribute("aria-label")).toBe(
-      "web.header.mode_picker_label: web.header.mode_ambz"
+      "web.header.mode_picker_label: web.header.mode_rtl"
     );
     expect(trigger(el).getAttribute("aria-expanded")).toBe("false");
     expect(trigger(el).querySelector("img")!.getAttribute("src")).toBe(
-      "/static/logo/rtl8710b.svg"
+      "/static/logo/rtl8720c.svg"
     );
     expect(root(el).querySelector(".menu")).toBeNull();
   });

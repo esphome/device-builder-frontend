@@ -220,7 +220,7 @@ describe("rtlAmbzReceiverEngine", () => {
     expect("run" in plan && (await plan.run(hooks()))).toEqual({
       rebooted: false,
       notice: "firmware.rtl_ambz_done_reset",
-      note: { message: "web.rtl_ambz.install_done_reset" },
+      note: { message: "web.rtl.install_done_reset" },
     });
   });
 });

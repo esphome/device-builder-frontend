@@ -38,18 +38,21 @@ hardware classes behave differently:
   same one — test both.
 - **UART bridges** (CP210x, CH34x): no re-enumeration; DTR/RTS reset
   pulses work.
-- **RTL8720C kits** (BW15 and the like, behind a CH340): RTS drives CEN
-  and DTR drives the PA00 download strap, so a plain open (Chromium
-  asserts both lines) holds the chip in reset. Every logs open releases
-  both lines right away (`RTL87XX_SERIAL_LOGS` in `src/platforms/rtl87xx/serial-logs.ts`); the install
-  dialog's engine drives them itself and falls back to the manual strap.
-- **RTL8710B modules** (BW12, WR3 and the like, on a plain adapter):
-  installing and the logs both go over UART2 (TX2 on PA30, RX2 on PA29).
-  The ROM downloader only starts when TX2 is low as the chip comes out of
-  reset: the engine pulses RTS in case it drives CEN, otherwise the user
-  holds TX2 to GND through a reset while the engine polls. The ROM links at
-  1.5 Mbaud and the writes run at 115200. Power the board from a solid
-  3.3 V supply; an adapter's own regulator often browns out mid flash.
+- **RTL87xx boards**: one family; the picked UF2's family says which chip
+  it is for, and so which ROM downloader to speak.
+  - RTL8720C kits (BW15 and the like, behind a CH340): RTS drives CEN and
+    DTR drives the PA00 download strap, so a plain open (Chromium asserts
+    both lines) holds the chip in reset. Every logs open releases both
+    lines right away (`RTL87XX_SERIAL_LOGS` in
+    `src/platforms/rtl87xx/serial-logs.ts`); the install dialog's engine
+    drives them itself and falls back to the manual strap.
+  - RTL8710B modules (BW12, WR3 and the like, on a plain adapter):
+    installing and the logs both go over UART2 (TX2 on PA30, RX2 on PA29).
+    The ROM downloader only starts when TX2 is low as the chip comes out of
+    reset: the engine pulses RTS in case it drives CEN, otherwise the user
+    holds TX2 to GND through a reset while the engine polls. The ROM links
+    at 1.5 Mbaud and the writes run at 115200. Power the board from a solid
+    3.3 V supply; an adapter's own regulator often browns out mid flash.
 - **BK72xx modules** (CB3S, T1 and the like, on a plain adapter): installing
   goes over UART1 (TX1, RX1) and the logs come from UART2 unless the
   configuration moves them. There is no strap: a chip that runs ESPHome

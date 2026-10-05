@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
   parseAmbz2Image: vi.fn(),
   flashAmbz2: vi.fn(),
+  parseAmbzImage: vi.fn(),
+  flashAmbz: vi.fn(),
 }));
 vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -21,6 +23,13 @@ vi.mock("../../../../src/platforms/rtl87xx/ambz2-image.js", async (importOrigina
 }));
 vi.mock("../../../../src/platforms/rtl87xx/ambz2-flasher.js", () => ({
   flashAmbz2: mocks.flashAmbz2,
+}));
+vi.mock("../../../../src/platforms/rtl87xx/ambz-image.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  parseAmbzImage: mocks.parseAmbzImage,
+}));
+vi.mock("../../../../src/platforms/rtl87xx/ambz-flasher.js", () => ({
+  flashAmbz: mocks.flashAmbz,
 }));
 // The real parse, behind a seam a test can make fail as a chunk that did not load.
 const seams = vi.hoisted(() => ({
@@ -45,6 +54,11 @@ import { RTL_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const IMAGE = { runs: [], totalBytes: 0 };
+const AMBZ_IMAGE = { ota1: IMAGE, ota2: IMAGE, ota2Offset: 0x80000 };
+// What the RTL8720C parser says of an RTL8710B build, and of anything else.
+const wrongFamily = (family: string) => () => {
+  throw new RtlImageError("firmware.rtl_wrong_family", new Error(`family ${family}`));
+};
 const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
 
 const uf2 = (name = "firmware.uf2") => new File([new Uint8Array(8)], name);
@@ -80,6 +94,7 @@ beforeEach(() => {
   mocks.parseAmbz2Image.mockReturnValue(IMAGE);
   mocks.requestSerialPort.mockResolvedValue(PORT);
   mocks.flashAmbz2.mockResolvedValue(true);
+  mocks.parseAmbzImage.mockImplementation(wrongFamily("0xe08f7564"));
 });
 
 afterEach(() => {
@@ -98,6 +113,7 @@ describe("esphome-web-install-rtl-dialog", () => {
     await el._flash();
     await el.updateComplete;
     expect(mocks.flashAmbz2).toHaveBeenCalledWith(PORT, IMAGE, expect.any(Object));
+    expect(mocks.flashAmbz).not.toHaveBeenCalled();
     expect(card(el).state).toBe("success");
     expect(card(el).statusMessage).toBe("web.rtl.install_done");
     expect(log(el).lines).toEqual([
@@ -156,20 +172,39 @@ describe("esphome-web-install-rtl-dialog", () => {
     expect(card(el).state).toBe("success");
   });
 
-  it("names an AmebaZ image and a bad file under the picker, when they are picked", async () => {
-    mocks.parseAmbz2Image.mockImplementation(() => {
-      throw new RtlImageError(
-        "firmware.rtl_wrong_family",
-        new Error("family 0x22e0d6fc")
-      );
+  it("flashes an RTL8710B build with its own engine, guide and reset line", async () => {
+    mocks.parseAmbz2Image.mockImplementation(wrongFamily("0x22e0d6fc"));
+    mocks.parseAmbzImage.mockReturnValue(AMBZ_IMAGE);
+    let wait!: () => void;
+    mocks.flashAmbz.mockImplementation(async (_port, _image, hooks) => {
+      hooks.onWaiting?.();
+      await new Promise<void>((resolve) => (wait = resolve));
     });
+    const el = await mountDialog();
+    expect(pickerText(el).error).toBe("");
+    const pending = el._flash();
+    await vi.waitFor(() => expect(mocks.flashAmbz).toHaveBeenCalled());
+    await el.updateComplete;
+    expect(mocks.flashAmbz).toHaveBeenCalledWith(PORT, AMBZ_IMAGE, expect.any(Object));
+    expect(mocks.flashAmbz2).not.toHaveBeenCalled();
+    expect(card(el).statusDetail).toBe("firmware.rtl_ambz_wait_desc");
+    expect(text(el)).toContain("firmware.rtl_ambz_guide_link");
+    wait();
+    await pending;
+    await el.updateComplete;
+    // The engine leaves an RTL8710B for a reset by hand.
+    expect(card(el).statusMessage).toBe("web.rtl.install_done_reset");
+  });
+
+  it("names a build for neither RTL87xx chip and a bad file under the picker, when they are picked", async () => {
+    mocks.parseAmbz2Image.mockImplementation(wrongFamily("0xe08f7564"));
     const el = await mountDialog();
     // Still on the setup step, with the file refused and nothing to install.
     expect(card(el)).toBeNull();
     expect(pickerText(el)).toEqual({
       name: "web.install.uf2_file_placeholder",
       status: "",
-      error: "firmware.rtl_wrong_family: family 0x22e0d6fc",
+      error: "firmware.rtl_wrong_family: family 0xe08f7564",
     });
     expect(installDisabled(el)).toBe(true);
     await el._flash();
