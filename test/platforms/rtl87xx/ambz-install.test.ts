@@ -131,14 +131,14 @@ describe("rtlAmbzDoFlash", () => {
     );
     expect(steps).toEqual(["rtl-ambz-connect", "rtl-ambz-wait", "flashing"]);
     expect(host._step).toBe("done");
-    expect(host._statusMessage).toBe("firmware.status_done");
+    expect(host._statusMessage).toBe("firmware.rtl_ambz_done_reset");
   });
 
-  it("keeps the flashed port for the logs, which come out of the same UART", async () => {
+  it("opens the logs on the flashed port while the board waits for its reset", async () => {
     const host = readyHost();
     const port = {};
     mocks.requestSerialPort.mockResolvedValue(port);
-    mocks.flashAmbz.mockResolvedValue(true);
+    mocks.flashAmbz.mockResolvedValue(false);
     host._showLogsAfterInstall = true;
     await rtlAmbzDoFlash(asHost(host));
     expect(host._logsPort).toBe(port);

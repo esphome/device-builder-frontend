@@ -313,12 +313,10 @@ def record(name: str, case: dict, uf2_path: Path) -> dict:
     for offset, data in parts.items():
         data.seek(0)
         soc.flash_write_raw(offset, len(data.getvalue()), data)
-    amb.ram_boot(address=0x00005405)
-    assert chip.booted, "boot"
 
     return {
         "name": name,
-        "reference": "ltchiptool 4.14.4 AmbZTool / AmebaZFlash, flash_write_uf2's steps with the system data read at the link speed and writes held at 115200",
+        "reference": "ltchiptool 4.14.4 AmbZTool / AmebaZFlash, flash_write_uf2's steps with the system data read at the link speed, writes held at 115200 and no RAM boot",
         "chip": {k: f"0x{v:08X}" for k, v in case.items()},
         "flash_sha256": hashlib.sha256(bytes(chip.flash)).hexdigest(),
         "frames": [summarise(f) for f in merged(chip.frames)],

@@ -20,7 +20,6 @@ import {
 
 export const AMBZ_ROM_BAUD = 1500000;
 export const AMBZ_FLASH_ADDRESS = 0x08000000;
-export const AMBZ_RAM_ADDRESS = 0x10002000;
 /** The ROM's ``SET_BAUD_RATE`` takes an index into this table. */
 const BAUD_TABLE = [
   110, 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, 76800, 115200,
@@ -73,8 +72,6 @@ function baudIndex(baud: number): number {
 export interface MemoryWriteOptions {
   /** After each acknowledged block: data bytes sent so far. */
   onBlock?: (sent: number) => void;
-  /** A RAM write that boots the chip, which then never ACKs the end of the transfer. */
-  boots?: boolean;
 }
 
 export class AmbzLink extends SerialByteSession implements XmodemIo {
@@ -185,7 +182,7 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
   async memoryWrite(
     address: number,
     data: Uint8Array,
-    { onBlock, boots = false }: MemoryWriteOptions = {}
+    { onBlock }: MemoryWriteOptions = {}
   ): Promise<void> {
     await this.loudHandshake();
     await this.write(new Uint8Array([CMD_XMODEM_HANDSHAKE]));
@@ -204,15 +201,12 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
       seq = (seq + 1) & 0xff;
       onBlock?.(off + chunk.length);
     }
-    if (boots) await this.write(EOT_FRAME);
-    else {
-      await sendFrame(
-        this,
-        EOT_FRAME,
-        "the end of the file",
-        XMODEM_RETRIES,
-        XMODEM_REPLY_MS
-      );
-    }
+    await sendFrame(
+      this,
+      EOT_FRAME,
+      "the end of the file",
+      XMODEM_RETRIES,
+      XMODEM_REPLY_MS
+    );
   }
 }

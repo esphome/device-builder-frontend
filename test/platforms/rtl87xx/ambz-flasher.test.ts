@@ -38,13 +38,12 @@ const written = (chip: ReturnType<typeof fakeAmbz>, image = IMAGE.ota1) =>
   image.runs.every((r) => r.data.every((b, i) => chip.flash[r.address + i] === b));
 
 describe("flashAmbz", () => {
-  it("links to a board in download mode, writes at 115200 and boots", async () => {
+  it("links to a board in download mode, writes at 115200 and leaves the reset to the user", async () => {
     const onWaiting = vi.fn();
     const { chip, done } = flash({}, { onWaiting });
-    await expect(driveFakeTimers(done)).resolves.toBe(true);
+    await expect(driveFakeTimers(done)).resolves.toBe(false);
     expect(onWaiting).not.toHaveBeenCalled();
     expect(chip.bauds.slice(0, 2)).toEqual([1500000, 115200]);
-    expect(chip.booted()).toBe(true);
     expect(written(chip)).toBe(true);
     // Released at the end, for the logs to reopen.
     expect(chip.raw.readable).toBeNull();
@@ -62,7 +61,7 @@ describe("flashAmbz", () => {
     const onWaiting = vi.fn(() => chip.strap());
     const run = flash({ start: "firmware" }, { onWaiting });
     chip = run.chip;
-    await expect(driveFakeTimers(run.done)).resolves.toBe(true);
+    await expect(driveFakeTimers(run.done)).resolves.toBe(false);
     expect(onWaiting).toHaveBeenCalledOnce();
     expect(chip.signals).toContainEqual({
       dataTerminalReady: false,
@@ -77,7 +76,7 @@ describe("flashAmbz", () => {
     const onWaiting = vi.fn(() => chip.strap());
     const run = flash({ start: "firmware", noSignals: true }, { onWaiting });
     chip = run.chip;
-    await expect(driveFakeTimers(run.done)).resolves.toBe(true);
+    await expect(driveFakeTimers(run.done)).resolves.toBe(false);
     expect(onWaiting).toHaveBeenCalledOnce();
   });
 
@@ -100,7 +99,7 @@ describe("flashAmbz", () => {
 
   it("resends a block the ROM NAKs", async () => {
     const { chip, done } = flash({ nakFirstBlock: true });
-    await expect(driveFakeTimers(done)).resolves.toBe(true);
+    await expect(driveFakeTimers(done)).resolves.toBe(false);
     expect(written(chip)).toBe(true);
   });
 
@@ -120,7 +119,6 @@ describe("flashAmbz", () => {
     );
     chip = run.chip;
     await expect(driveFakeTimers(run.done)).rejects.toThrow(SerialDeviceLostError);
-    expect(chip.booted()).toBe(false);
   });
 
   it("closes a port that opens only after the reopen gave up", async () => {
@@ -205,7 +203,6 @@ describe("flashAmbz, a garbled system data read", () => {
     );
     // A plain loop over the 2 MiB flash; toEqual is too slow on CI.
     expect(chip.flash.every((b, i) => b === before[i])).toBe(true);
-    expect(chip.booted()).toBe(false);
   });
 });
 
@@ -217,8 +214,7 @@ describe("flashAmbz, a ROM slow to take the first block", () => {
   it("takes the baud change's ACK past an idle NAK", async () => {
     const chip = fakeAmbz({ ota2Address: 0x08000000 | 0x80000, naksBeforeBaudAck: true });
     const done = flashAmbz(chip.port, IMAGE, { onProgress: () => {} });
-    await expect(driveFakeTimers(done)).resolves.toBe(true);
-    expect(chip.booted()).toBe(true);
+    await expect(driveFakeTimers(done)).resolves.toBe(false);
   });
 
   it("lets the ROM finish its xmodem log before asking for the write speed again", async () => {
@@ -227,14 +223,13 @@ describe("flashAmbz, a ROM slow to take the first block", () => {
       chattersAfterWriteMs: 10,
     });
     const done = flashAmbz(chip.port, IMAGE, { onProgress: () => {} });
-    await expect(driveFakeTimers(done)).resolves.toBe(true);
-    expect(chip.booted()).toBe(true);
+    await expect(driveFakeTimers(done)).resolves.toBe(false);
   });
 
   it("waits for the receiver's NAK before the first block", async () => {
     const chip = fakeAmbz({ ota2Address: 0x08000000 | 0x80000, readyAfterMs: 1100 });
     const done = flashAmbz(chip.port, IMAGE, { onProgress: () => {} });
-    await expect(driveFakeTimers(done)).resolves.toBe(true);
+    await expect(driveFakeTimers(done)).resolves.toBe(false);
     expect(
       IMAGE.ota1.runs.every((r) =>
         r.data.every((b, i) => chip.flash[r.address + i] === b)

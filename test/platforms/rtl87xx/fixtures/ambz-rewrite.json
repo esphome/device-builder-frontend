@@ -1,6 +1,6 @@
 {
  "name": "ambz-rewrite",
- "reference": "ltchiptool 4.14.4 AmbZTool / AmebaZFlash, flash_write_uf2's steps with the system data read at the link speed and writes held at 115200",
+ "reference": "ltchiptool 4.14.4 AmbZTool / AmebaZFlash, flash_write_uf2's steps with the system data read at the link speed, writes held at 115200 and no RAM boot",
  "chip": {
   "ota2_address": "0x08100000",
   "ota2_switch": "0xFFFF0000"
@@ -366,42 +366,6 @@
    "dir": "rx",
    "length": 6,
    "hex": "001515151515"
-  },
-  {
-   "dir": "tx",
-   "length": 1,
-   "hex": "21"
-  },
-  {
-   "dir": "rx",
-   "length": 6,
-   "hex": "001515151515"
-  },
-  {
-   "dir": "tx",
-   "length": 1,
-   "hex": "07"
-  },
-  {
-   "dir": "rx",
-   "length": 1,
-   "hex": "06"
-  },
-  {
-   "dir": "tx",
-   "length": 1032,
-   "head": "0201fe00200010055400009b210010ef",
-   "sha256": "776dde4b18f722be796cbce3ab02feaeedb14c8bc5ed986ac6a650c02ecd35e5"
-  },
-  {
-   "dir": "rx",
-   "length": 1,
-   "hex": "06"
-  },
-  {
-   "dir": "tx",
-   "length": 1,
-   "hex": "04"
   }
  ]
 }

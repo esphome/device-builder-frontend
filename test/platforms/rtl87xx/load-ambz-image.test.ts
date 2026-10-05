@@ -88,7 +88,7 @@ describe("runAmbz", () => {
     const failed = await runAmbz({} as SerialPort, image, hooks);
     expect(failed).toMatchObject({ detail: "no answer" });
     expect("key" in failed).toBe(false);
-    flashAmbz.mockResolvedValue(true);
-    expect(await runAmbz({} as SerialPort, image, hooks)).toEqual({ rebooted: true });
+    flashAmbz.mockResolvedValue(false);
+    expect(await runAmbz({} as SerialPort, image, hooks)).toEqual({ rebooted: false });
   });
 });

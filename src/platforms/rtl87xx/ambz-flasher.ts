@@ -2,13 +2,12 @@
  * Flashing a Realtek AmebaZ (RTL8710B) over Web Serial through the ROM's
  * UART download mode, the way ltchiptool does it: link at 1.5 Mbaud, write
  * at 115200, read the system data to find the OTA slot the bootloader runs
- * next, write that slot's image, then boot it from RAM. The board enters
+ * next, then write that slot's image and leave the reset to the user. The board enters
  * download mode by its strap (or an RTS wired to its reset); a running
  * LibreTiny's reboot magic is not used, as its ROM leaves download mode after
  * one transfer. Loaded on demand by the install flow; nothing here touches
  * the DOM.
  */
-import { concat, int32LE } from "../../util/bytes.js";
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import { resetIntoFirmware } from "../../util/serial-control-lines.js";
 import { openSerialPort } from "../../util/serial-open-error.js";
@@ -16,12 +15,7 @@ import { settledWithin, withDeadline } from "../../util/with-deadline.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 import type { AmbzImage } from "./ambz-image.js";
-import {
-  AMBZ_FLASH_ADDRESS,
-  AMBZ_RAM_ADDRESS,
-  AMBZ_ROM_BAUD,
-  AmbzLink,
-} from "./ambz-link.js";
+import { AMBZ_FLASH_ADDRESS, AMBZ_ROM_BAUD, AmbzLink } from "./ambz-link.js";
 
 /**
  * What the writes run at. ltchiptool defaults to 460800; cheap adapters lose
@@ -35,13 +29,6 @@ const LINES_MS = 1000;
 const REOPEN_MS = 3000;
 const TEARDOWN_MS = 2000;
 const SYSTEM_OFFSET = 0x9000;
-/**
- * The boot table ltchiptool writes to RAM to start the firmware: the entry
- * point (the flash bootloader at 0x5405) followed by the ROM's own vectors.
- */
-const RAM_BOOT_TABLE = concat(
-  ...[0x00005405, 0x1000219b, 0x100021ef, 0x100020f5, 0x100021ef, 0x08000541].map(int32LE)
-);
 /** The gaps in the system data, which ltchiptool rewrites as erased flash. */
 const SYSTEM_GAPS: readonly [number, number][] = [
   [0x09, 0x10],
@@ -164,8 +151,8 @@ async function enterDownloadMode(
  * Flash ``image`` onto the chip behind ``port`` (opened and closed here at
  * the speeds the ROM needs). A board already in download mode links at
  * once; otherwise RTS is pulsed in case it drives the reset, then the ROM is
- * polled until the user straps the board or ``signal`` aborts. Resolves true once the chip
- * was booted into the new firmware.
+ * polled until the user straps the board or ``signal`` aborts. Resolves false:
+ * the user resets the board to start the firmware.
  */
 export async function flashAmbz(
   port: SerialPort,
@@ -214,8 +201,9 @@ export async function flashAmbz(
       done += run.data.length;
       link = await session.resume();
     }
-    await link.memoryWrite(AMBZ_RAM_ADDRESS, RAM_BOOT_TABLE, { boots: true });
-    log("Booting the firmware");
+    // No RAM boot as ltchiptool does: the ROM's download state survives into
+    // the firmware, and its next soft reboot (an OTA) lands back in the ROM.
+    log("Written; reset the board to start the firmware");
     hooks.onProgress(100);
   } catch (err) {
     failure = err;
@@ -224,5 +212,5 @@ export async function flashAmbz(
     // A teardown failure must not replace the flash error nor skip the rest.
     await session.close(failure);
   }
-  return true;
+  return false;
 }
