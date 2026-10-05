@@ -191,13 +191,13 @@ export class ESPHomeWebHeader extends LitElement {
       }
 
       /* Every family by name while they fit beside the compact title, the
-         dropdown below that. 880px fits today's seven families and labels;
+         dropdown below that. 766px fits today's six families and labels;
          re-measure it when either changes, as .app-header clips overflow. */
       esphome-web-mode-picker {
         display: none;
       }
 
-      @media (max-width: 880px) {
+      @media (max-width: 766px) {
         .mode-buttons {
           display: none;
         }
@@ -207,9 +207,9 @@ export class ESPHomeWebHeader extends LitElement {
         }
       }
 
-      /* Compact header below 1070px, where the buttons and the full title no
+      /* Compact header below 960px, where the buttons and the full title no
          longer fit together: subtitle drops, logo shrinks. */
-      @media (max-width: 1070px) {
+      @media (max-width: 960px) {
         .app-header {
           gap: var(--wa-space-s);
         }
