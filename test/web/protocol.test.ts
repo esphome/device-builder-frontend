@@ -53,6 +53,7 @@ describe("isHandoffFlasher", () => {
     expect(isHandoffFlasher("nrf-dfu")).toBe(true);
     expect(isHandoffFlasher("bk-uart")).toBe(true);
     expect(isHandoffFlasher("ln-uart")).toBe(true);
+    expect(isHandoffFlasher("rtl-ambz")).toBe(true);
     expect(isHandoffFlasher("rtl-ambz1")).toBe(false);
     expect(isHandoffFlasher("toString")).toBe(false);
     expect(isHandoffFlasher(undefined)).toBe(false);

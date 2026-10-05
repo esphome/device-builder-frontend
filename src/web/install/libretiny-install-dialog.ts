@@ -37,9 +37,10 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 
 /**
  * A chip family whose LibreTiny UF2 is flashed over its serial adapter: how
- * its file is parsed and written, and the copy of each step.
+ * its file is parsed and written, and the copy of each step. ``Image`` is
+ * what its parser hands its engine.
  */
-export interface LibreTinyInstall {
+export interface LibreTinyInstall<Image = LibreTinyImage> {
   readonly copy: {
     readonly title: string;
     readonly intro: string;
@@ -64,13 +65,11 @@ export interface LibreTinyInstall {
   /** Fetches the chunk ``run`` writes with, for one who wants it ahead of the run. */
   loadEngine(): Promise<unknown>;
   /** Never throws: a failure names its copy. */
-  load(
-    bytes: Uint8Array
-  ): Promise<{ image: LibreTinyImage } | { key: string; detail: string }>;
+  load(bytes: Uint8Array): Promise<{ image: Image } | { key: string; detail: string }>;
   /** Never throws. */
   run(
     port: SerialPort,
-    image: LibreTinyImage,
+    image: Image,
     hooks: LibreTinyFlashHooks
   ): Promise<LibreTinyFlashResult>;
 }
@@ -84,10 +83,10 @@ type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" |
  * into it where it can; else the dialog shows the guide while the engine
  * keeps polling. A family's element extends this with its ``install``.
  */
-export abstract class LibreTinyInstallDialog extends LitElement {
+export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends LitElement {
   @property({ type: Boolean }) open = false;
 
-  protected abstract readonly install: LibreTinyInstall;
+  protected abstract readonly install: LibreTinyInstall<Image>;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -112,7 +111,7 @@ export abstract class LibreTinyInstallDialog extends LitElement {
 
   // The UF2 is read and parsed when it is picked, so the click that installs
   // it goes straight to the port picker.
-  private _image = new Preparation<File, LibreTinyImage, FilePickerError>(
+  private _image = new Preparation<File, Image, FilePickerError>(
     this,
     (file) => this._parse(file),
     (failure) => this._onPrepared(failure),
@@ -123,7 +122,7 @@ export abstract class LibreTinyInstallDialog extends LitElement {
     })
   );
 
-  private async _parse(file: File): Promise<Prepared<LibreTinyImage, FilePickerError>> {
+  private async _parse(file: File): Promise<Prepared<Image, FilePickerError>> {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const parsed = await this.install.load(bytes);
     if ("image" in parsed) {

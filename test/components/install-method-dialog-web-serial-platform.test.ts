@@ -91,6 +91,8 @@ const hasRp2Row = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_rp2_uf2");
 const hasRtlRow = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_rtl_ambz2");
+const hasRtlAmbzRow = (d: ESPHomeInstallMethodDialog): boolean =>
+  hasRowTitled(d, "dashboard.install_method_rtl_ambz");
 const hasBkRow = (d: ESPHomeInstallMethodDialog): boolean =>
   hasRowTitled(d, "dashboard.install_method_bk_uart");
 const hasLnRow = (d: ESPHomeInstallMethodDialog): boolean =>
@@ -333,7 +335,7 @@ describe("install-method-dialog platform gating", () => {
 
   // The HA add-on over plain http: Web Serial exists but is blocked here, so
   // the RTL8720C row hands the UF2 to web.esphome.io, as the ESP USB row does.
-  it("offers the RTL8720C, Pico, nRF52, BK72xx and LN882H hand-off on an insecure origin", async () => {
+  it("offers the RTL8720C, RTL8710B, Pico, nRF52, BK72xx and LN882H hand-off on an insecure origin", async () => {
     // The browser hides navigator.serial on an insecure origin.
     setWebSerialEnv({
       serial: false,
@@ -357,9 +359,11 @@ describe("install-method-dialog platform gating", () => {
     expect(hasNrfDfuRow(await mount("nrf52"))).toBe(true);
     expect(hasBkRow(await mount("bk72xx"))).toBe(true);
     expect(hasLnRow(await mount("ln882x", "install", "ln882h"))).toBe(true);
-    // The hand-off row is the same row: not for the RTL8710B, nor for a
-    // BK72xx whose chip is not known.
-    expect(hasRtlRow(await mount("rtl87xx", "install", "rtl8710b"))).toBe(false);
+    // The hand-off row is the chip's own row: the RTL8710B gets its row, not
+    // the RTL8720C one, and a BK72xx whose chip is not known gets none.
+    const ambz = await mount("rtl87xx", "install", "rtl8710b");
+    expect(hasRtlAmbzRow(ambz)).toBe(true);
+    expect(hasRtlRow(ambz)).toBe(false);
     expect(hasBkRow(await mount("bk72xx", "install", null))).toBe(false);
     expect(hasLnRow(await mount("ln882x", "install", null))).toBe(false);
   });

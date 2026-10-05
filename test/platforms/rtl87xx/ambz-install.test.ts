@@ -171,4 +171,24 @@ describe("rtlAmbzInstall", () => {
     rtlAmbzInstall.showFirstStep(asHost(host));
     expect(host._step).toBe("rtl-ambz-ready");
   });
+
+  it("hands its UF2 to web.esphome.io's RTL8710B flasher, checked as the in-app flow checks it", async () => {
+    const handoff = rtlAmbzInstall.handoff!;
+    expect(handoff).toMatchObject({
+      flasher: "rtl-ambz",
+      erase: false,
+      noArtifactKey: "firmware.no_uf2",
+    });
+    expect(
+      handoff.pick([bin("image2_all_ota1.bin"), bin("firmware.uf2", "uf2")], "rtl87xx")
+        ?.file
+    ).toBe("firmware.uf2");
+    expect(await handoff.check!(UF2)).toBeNull();
+    const ambz2 = makeLibreTinyUf2({
+      blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
+    });
+    expect(await handoff.check!(ambz2)).toMatchObject({
+      key: "firmware.rtl_wrong_family",
+    });
+  });
 });

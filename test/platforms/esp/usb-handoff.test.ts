@@ -3,10 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { openFlasher } = vi.hoisted(() => ({ openFlasher: vi.fn() }));
 vi.mock("../../../src/platforms/esp/usb-flasher.js", () => ({ openFlasher }));
-const rtl = vi.hoisted(() => ({ loadAmbz2Image: vi.fn() }));
+const rtl = vi.hoisted(() => ({ loadAmbz2Image: vi.fn(), loadAmbzImage: vi.fn() }));
 vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   loadAmbz2Image: rtl.loadAmbz2Image,
+  loadAmbzImage: rtl.loadAmbzImage,
 }));
 const nrf = vi.hoisted(() => ({ loadDfuPackage: vi.fn() }));
 vi.mock("../../../src/platforms/nrf52/index.js", async (importOriginal) => ({
@@ -66,6 +67,7 @@ const asHost = (h: ReturnType<typeof makeHost>) =>
 
 beforeEach(() => {
   rtl.loadAmbz2Image.mockResolvedValue({ image: { runs: [], totalBytes: 0 } });
+  rtl.loadAmbzImage.mockResolvedValue({ image: { ota1: {}, ota2: {}, ota2Offset: 0 } });
   nrf.loadDfuPackage.mockResolvedValue({ pkg: { parts: [] } });
 });
 afterEach(() => vi.clearAllMocks());
@@ -77,7 +79,7 @@ describe("handOffToFlasher", () => {
   it("opens nothing for a device whose chip cannot be handed off", () => {
     const host = makeHost();
     host._device.target_platform = "rtl87xx";
-    host._device.mcu = "rtl8710b";
+    host._device.mcu = null;
     handOffToFlasher(asHost(host));
     expect(openFlasher).not.toHaveBeenCalled();
     expect(host._step).toBe("download-ready");
@@ -209,6 +211,17 @@ describe("handOffToFlasher", () => {
     expect(host._failureKind).toBe("unsupported-browser");
   });
 
+  it("hands an RTL8710B to its own ROM downloader", () => {
+    const host = makeHost();
+    host._device.target_platform = "rtl87xx";
+    host._device.mcu = "rtl8710b";
+    handOffToFlasher(asHost(host));
+    expect(openFlasher.mock.calls[0][3]).toMatchObject({
+      flasher: "rtl-ambz",
+      erase: false,
+    });
+  });
+
   it("fails with the unsupported-browser message when the hand-off is declined", () => {
     const host = makeHost();
     handOffToFlasher(asHost(host));
@@ -297,6 +310,32 @@ describe("startUsbFlash artifact", () => {
     expect(host._usbFirmware).toBeNull();
   });
 
+  it("sends the UF2 for an RTL8710B through the shared download", async () => {
+    const host = flowHost("rtl87xx", "rtl8710b");
+    const artifact = downloaded("firmware.uf2");
+    steps.downloadBuildArtifact.mockResolvedValue(artifact);
+    await startUsbFlash(asHost(host));
+    const [, , pick, noArtifactKey] = steps.downloadBuildArtifact.mock.calls[0];
+    expect(pick(binaries)?.file).toBe("firmware.uf2");
+    expect(noArtifactKey).toBe("firmware.no_uf2");
+    expect(rtl.loadAmbzImage).toHaveBeenCalledWith(artifact.bytes);
+    expect(host._usbFirmware).toBe(artifact.bytes.buffer);
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("refuses an RTL8720C image for an RTL8710B in the dashboard", async () => {
+    const host = flowHost("rtl87xx", "rtl8710b");
+    steps.downloadBuildArtifact.mockResolvedValue(downloaded("firmware.uf2"));
+    rtl.loadAmbzImage.mockResolvedValueOnce({
+      key: "firmware.rtl_wrong_family",
+      detail: "family 0xe08f7564",
+    });
+    await startUsbFlash(asHost(host));
+    expect(host._step).toBe("error");
+    expect(host._statusMessage).toBe("firmware.rtl_wrong_family");
+    expect(host._usbFirmware).toBeNull();
+  });
+
   it("sends the UF2 for a Pico through the shared download", async () => {
     const host = flowHost("rp2040", "rp2040");
     const bytes = makeUf2Block({ addr: 0x10000000 });
@@ -347,7 +386,6 @@ describe("startUsbFlash artifact", () => {
   });
 
   it.each([
-    ["rtl87xx", "rtl8710b"],
     ["rtl87xx", null],
     ["rp2040", null],
   ])("refuses %s with chip %s before the build", async (platform, mcu) => {

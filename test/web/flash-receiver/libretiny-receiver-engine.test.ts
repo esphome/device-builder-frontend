@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const rtl = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
+const ambz = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
 const bk = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
 const ln = vi.hoisted(() => ({ run: vi.fn(), load: vi.fn() }));
 const port = vi.hoisted(() => ({}) as SerialPort);
@@ -16,6 +17,9 @@ vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
   loadAmbz2Engine: async () => ({}),
   runAmbz2: rtl.run,
   loadAmbz2Image: rtl.load,
+  loadAmbzEngine: async () => ({}),
+  runAmbz: ambz.run,
+  loadAmbzImage: ambz.load,
 }));
 
 vi.mock("../../../src/platforms/bk72xx/index.js", async (importOriginal) => ({
@@ -43,6 +47,8 @@ import { BK_INSTALL } from "../../../src/web/platforms/bk72xx/install.js";
 import { bkUartReceiverEngine } from "../../../src/web/platforms/bk72xx/receiver-engine.js";
 import { LN_INSTALL } from "../../../src/web/platforms/ln882x/install.js";
 import { lnUartReceiverEngine } from "../../../src/web/platforms/ln882x/receiver-engine.js";
+import { RTL_AMBZ_INSTALL } from "../../../src/web/platforms/rtl87xx/ambz-install.js";
+import { rtlAmbzReceiverEngine } from "../../../src/web/platforms/rtl87xx/ambz-receiver-engine.js";
 import { RTL_INSTALL } from "../../../src/web/platforms/rtl87xx/install.js";
 import { rtlAmbz2ReceiverEngine } from "../../../src/web/platforms/rtl87xx/receiver-engine.js";
 
@@ -85,6 +91,16 @@ describe.each([
     logs: LN882X_SERIAL_LOGS,
     // The flash went over UART0; the logs are on UART1.
     result: { logsElsewhere: true, note: { message: "web.ln.logs_elsewhere" } },
+  },
+  {
+    name: "rtlAmbzReceiverEngine",
+    engine: rtlAmbzReceiverEngine,
+    install: RTL_AMBZ_INSTALL,
+    mocks: ambz,
+    keys: "firmware.rtl_",
+    // UART2 is both the flash and the log port.
+    logs: RTL87XX_SERIAL_LOGS,
+    result: { rebooted: true },
   },
 ])("$name", ({ engine, install, mocks, keys, logs, result }) => {
   async function prepared(): Promise<ReceiverRun> {
@@ -136,7 +152,7 @@ describe.each([
 
     expect(mocks.load).toHaveBeenCalledOnce();
     expect(mocks.run).toHaveBeenCalledWith(port, image, expect.anything());
-    expect(h.waits).toEqual([`${keys}wait_desc`]);
+    expect(h.waits).toEqual([install.copy.waitDetail]);
     expect(h.states).toEqual([
       `connecting:${keys}connecting`,
       "installing:firmware.status_flashing",
