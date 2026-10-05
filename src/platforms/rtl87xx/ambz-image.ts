@@ -40,11 +40,21 @@ export function parseAmbzImage(bytes: Uint8Array): AmbzImage {
       });
     const ota2 = file.partitions.find((p) => p.name === "ota2");
     if (!ota2) throw new Error("Invalid UF2: no 'ota2' partition");
-    return {
+    const image = {
       ota1: slot("flasher-ota1"),
       ota2: slot("flasher-ota2"),
       ota2Offset: ota2.offset,
     };
+    // The system data points the bootloader at ``ota2``; the second slot must be what lands there.
+    const end = ota2.offset + ota2.length;
+    if (
+      !image.ota2.runs.every(
+        (r) => r.address >= ota2.offset && r.address + r.data.length <= end
+      )
+    ) {
+      throw new Error("Invalid UF2: the second slot is not in the 'ota2' partition");
+    }
+    return image;
   } catch (err) {
     throw new RtlImageError(
       err instanceof Uf2FamilyError

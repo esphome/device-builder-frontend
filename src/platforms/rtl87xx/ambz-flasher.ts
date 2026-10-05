@@ -56,7 +56,8 @@ export function pickSlot(
   const ota2Address = view.getUint32(0, true);
   const ota2Switch = view.getUint32(4, true);
   if ((ota2Address & 0xffffff) === ota2Offset) {
-    const zeros = 32 - ota2Switch.toString(2).replace(/0/g, "").length;
+    let zeros = 0;
+    for (let v = ~ota2Switch >>> 0; v; v &= v - 1) zeros++;
     return { slot: zeros % 2 === 0 ? 1 : 2, rewrite: null };
   }
   // The bootloader would look for the second image elsewhere: point it at
