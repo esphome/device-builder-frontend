@@ -107,11 +107,21 @@ class Session {
 
   async open(baud: number): Promise<AmbzLink> {
     await this.close();
-    await withDeadline(
-      openSerialPort(this.port, { baudRate: baud }),
-      REOPEN_MS,
-      () => new Error("Reopening the port timed out")
-    );
+    const opening = openSerialPort(this.port, { baudRate: baud });
+    try {
+      await withDeadline(
+        opening,
+        REOPEN_MS,
+        () => new Error("Reopening the port timed out")
+      );
+    } catch (err) {
+      // An open that lands after the deadline would hold the port past this failure.
+      opening.then(
+        () => settledWithin(this.port.close(), TEARDOWN_MS),
+        () => {}
+      );
+      throw err;
+    }
     this.link = new AmbzLink(this.port, this.signal);
     return this.link;
   }

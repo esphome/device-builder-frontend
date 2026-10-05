@@ -126,6 +126,20 @@ describe("flashAmbz", () => {
     expect(chip.booted()).toBe(false);
   });
 
+  it("closes a port that opens only after the reopen gave up", async () => {
+    const { chip, done } = flash({ start: "firmware" });
+    const open = chip.raw.open.getMockImplementation()!;
+    // The reopen at the ROM's speed lands well after its deadline.
+    chip.raw.open.mockImplementationOnce(open).mockImplementationOnce(async (options) => {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await open(options);
+    });
+    await expect(driveFakeTimers(done)).rejects.toThrow("Reopening the port timed out");
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(chip.bauds).toEqual([115200, 1500000]);
+    expect(chip.raw.readable).toBeNull();
+  });
+
   it("reports progress up to 100", async () => {
     const progress: number[] = [];
     const { done } = flash({}, { onProgress: (p) => progress.push(p) });
