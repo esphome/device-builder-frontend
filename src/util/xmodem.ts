@@ -19,7 +19,7 @@ export interface XmodemOptions {
 
 export const XMODEM_BLOCK_SIZE = 1024;
 const SOH = 0x01;
-const STX = 0x02;
+export const STX = 0x02;
 const EOT = 0x04;
 const ACK = 0x06;
 const NAK = 0x15;
@@ -66,18 +66,20 @@ export async function awaitStart(
 }
 
 /**
- * One block: STX for 1024 bytes, SOH for 128, the payload padded with
- * ``pad`` (YMODEM pads its header block with zeros), then the check.
+ * One block: STX for 1024 bytes, SOH for 128 (or ``header``, for a ROM whose
+ * 1k blocks carry more), the payload padded with ``pad`` (YMODEM pads its
+ * header block with zeros), then the check.
  */
 export function buildBlock(
   seq: number,
   payload: Uint8Array,
   crcMode: boolean,
   size = XMODEM_BLOCK_SIZE,
-  pad = PAD
+  pad = PAD,
+  header = size === XMODEM_BLOCK_SIZE ? STX : SOH
 ): Uint8Array {
   const block = new Uint8Array(3 + size + (crcMode ? 2 : 1));
-  block[0] = size === XMODEM_BLOCK_SIZE ? STX : SOH;
+  block[0] = header;
   block[1] = seq;
   block[2] = 0xff - seq;
   block.fill(pad, 3, 3 + size);

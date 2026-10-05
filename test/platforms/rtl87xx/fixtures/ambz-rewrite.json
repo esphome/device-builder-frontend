@@ -1,0 +1,343 @@
+{
+ "name": "ambz-rewrite",
+ "reference": "ltchiptool 4.14.4 AmbZTool / AmebaZFlash, flash_write_uf2's steps with the system data read at the link speed and writes held at 115200",
+ "chip": {
+  "ota2_address": "0x08100000",
+  "ota2_switch": "0xFFFF0000"
+ },
+ "flash_sha256": "fe6cca1184b71c69e381dc50a5d2663d962f2e1b81d7c3976ae6203c135302d6",
+ "frames": [
+  {
+   "dir": "rx",
+   "length": 8,
+   "hex": "1515151515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 7,
+   "hex": "06190090000100"
+  },
+  {
+   "dir": "rx",
+   "length": 1024,
+   "head": "000010080000ffffffffffffffffffff",
+   "sha256": "5257b670d2949dd0e354c962d5f4c6f01a4bd69195573edb777462128a8686bc"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "rx",
+   "length": 1024,
+   "head": "ffffffffffffffffffffffffffffffff",
+   "sha256": "5f4ecdb7b71c3e403983fe405cddcdc2f2576b655fdb3e80d94a6f7c32e58bc2"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "rx",
+   "length": 1024,
+   "head": "ffffffffffffffffffffffffffffffff",
+   "sha256": "5f4ecdb7b71c3e403983fe405cddcdc2f2576b655fdb3e80d94a6f7c32e58bc2"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "rx",
+   "length": 1024,
+   "head": "ffffffffffffffffffffffffffffffff",
+   "sha256": "5f4ecdb7b71c3e403983fe405cddcdc2f2576b655fdb3e80d94a6f7c32e58bc2"
+  },
+  {
+   "dir": "tx",
+   "length": 3,
+   "hex": "060621"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 2,
+   "hex": "050d"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "07"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0201fe0090000800000808ffffffffff",
+   "sha256": "6edc9eec38cb2cb63263e2a3dc1be6d054152a61aabe79e74d4ad95b879be200"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0202fd00940008ffffffffffffffffff",
+   "sha256": "83e195061c7378529d7a55d09904aba1b2f05841f50a1cd99c34e1c41ed58b02"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0203fc00980008ffffffffffffffffff",
+   "sha256": "9587efdc7fd32c88c8b76c351702423a32248c5a9ad17ded9324c8f14e8f87ae"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0204fb009c0008ffffffffffffffffff",
+   "sha256": "2a4206c73a7a9b061cfe8ed5fce792b55b43750c2c173c557f4a32abeb5596aa"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "04"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 2,
+   "hex": "050d"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "07"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0201fe00b0000800b0000883a2c1e002",
+   "sha256": "09d9eb32b3af41f3c6c9af0ed27cf823621ddef08a2e067d35d5124a5f5d1d32"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0202fd00b4000800bc0008fa1c3b5a79",
+   "sha256": "d1743cc5680acbd8757b45a9eb075d104dedcdc8fa58c5246867e7602b10f46a"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0203fc00b8000800c800087493b2d1f0",
+   "sha256": "c898a765d4f320ad939c5c2af6f3863dd203801f803244d47903b6a0aa4110d6"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "04"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 2,
+   "hex": "050d"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "07"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0201fe00200010055400009b210010ef",
+   "sha256": "776dde4b18f722be796cbce3ab02feaeedb14c8bc5ed986ac6a650c02ecd35e5"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "04"
+  }
+ ]
+}

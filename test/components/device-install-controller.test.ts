@@ -66,7 +66,7 @@ describe("DeviceInstallController.platformInstalls", () => {
   });
 
   it("is empty for a chip no flasher writes and with no device loaded", () => {
-    const other = makeConfiguredDevice({ target_platform: "rtl87xx", mcu: "rtl8710b" });
+    const other = makeConfiguredDevice({ target_platform: "rtl87xx", mcu: "rtl8711am" });
     expect(new DeviceInstallController(makeHost(other)).platformInstalls).toEqual([]);
     expect(new DeviceInstallController(makeHost(null)).platformInstalls).toEqual([]);
   });

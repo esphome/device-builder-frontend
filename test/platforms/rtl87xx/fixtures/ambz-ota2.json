@@ -1,0 +1,239 @@
+{
+ "name": "ambz-ota2",
+ "reference": "ltchiptool 4.14.4 AmbZTool / AmebaZFlash, flash_write_uf2's steps with the system data read at the link speed and writes held at 115200",
+ "chip": {
+  "ota2_address": "0x08080000",
+  "ota2_switch": "0xFFFFFFFE"
+ },
+ "flash_sha256": "698ed47914a06c91bfeb5f0c7c8db839c629ab8f8ff2ff23df8412a76fb312da",
+ "frames": [
+  {
+   "dir": "rx",
+   "length": 8,
+   "hex": "1515151515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 7,
+   "hex": "06190090000100"
+  },
+  {
+   "dir": "rx",
+   "length": 1024,
+   "head": "00000808feffffffffffffffffffffff",
+   "sha256": "18acaf6bb6768d6fd378aaefee14bc409315470536859be0af898ee061fc1ead"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "rx",
+   "length": 1024,
+   "head": "ffffffffffffffffffffffffffffffff",
+   "sha256": "5f4ecdb7b71c3e403983fe405cddcdc2f2576b655fdb3e80d94a6f7c32e58bc2"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "rx",
+   "length": 1024,
+   "head": "ffffffffffffffffffffffffffffffff",
+   "sha256": "5f4ecdb7b71c3e403983fe405cddcdc2f2576b655fdb3e80d94a6f7c32e58bc2"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "rx",
+   "length": 1024,
+   "head": "ffffffffffffffffffffffffffffffff",
+   "sha256": "5f4ecdb7b71c3e403983fe405cddcdc2f2576b655fdb3e80d94a6f7c32e58bc2"
+  },
+  {
+   "dir": "tx",
+   "length": 3,
+   "hex": "060621"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 2,
+   "hex": "050d"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "07"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0201fe000008080000080883a2c1e002",
+   "sha256": "b0a98847ecf910e91ae6a9ab21f1d1eed613ae228f39c717dcc5403c151e6844"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0202fd00040808000c0808fa1c3b5a79",
+   "sha256": "4db227a97a2e7662353a6d45b7f37395810b064ef1c73492cf699ac4140d4392"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0203fc00080808001808087493b2d1f0",
+   "sha256": "90be79a7b0dc1e5fdc27f0ec0c688b8b2918532f08de202b0ea63ca315a5c4a7"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "04"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 2,
+   "hex": "050d"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "21"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "001515151515"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "07"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0201fe00200010055400009b210010ef",
+   "sha256": "776dde4b18f722be796cbce3ab02feaeedb14c8bc5ed986ac6a650c02ecd35e5"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "04"
+  }
+ ]
+}

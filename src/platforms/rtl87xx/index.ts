@@ -1,9 +1,11 @@
 /**
- * RTL8720C (AmebaZ2) API shared by the Device Builder and web.esphome.io. The
- * ROM-downloader engine and the LibreTiny UF2 parser are re-exported as types
- * only, and the loaders fetch them on demand.
+ * RTL8720C (AmebaZ2) and RTL8710B (AmebaZ) API shared by the Device Builder
+ * and web.esphome.io. The ROM-downloader engines and the LibreTiny UF2
+ * parsers are re-exported as types only, and the loaders fetch them on demand.
  */
 export type * from "./ambz2-flasher.js";
+export type * from "./ambz-flasher.js";
+export type * from "./ambz-image.js";
 export type * from "../libretiny-uf2.js";
 export type * from "./ambz2-image.js";
 export * from "./rtl87xx-platform.js";
@@ -12,6 +14,8 @@ export * from "./serial-logs.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import type { LibreTinyFlashResult } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
+import type { AmbzFlashHooks } from "./ambz-flasher.js";
+import type { AmbzImage } from "./ambz-image.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
 
 export const loadAmbz2Engine = () => import("./ambz2-flasher.js");
@@ -76,6 +80,54 @@ export async function runAmbz2(
   }
   try {
     return { rebooted: await engine.flashAmbz2(port, image, hooks) };
+  } catch (err) {
+    return { detail: getErrorMessage(err), error: err };
+  }
+}
+
+export const loadAmbzEngine = () => import("./ambz-flasher.js");
+export const loadAmbzParser = () => import("./ambz-image.js");
+
+/** The RTL8710B counterpart of ``loadAmbz2Image``; never throws. */
+export async function loadAmbzImage(
+  bytes: Uint8Array
+): Promise<{ image: AmbzImage } | Ambz2ImageFailure> {
+  let parser: Awaited<ReturnType<typeof loadAmbzParser>>;
+  try {
+    parser = await loadAmbzParser();
+  } catch (err) {
+    console.error("[rtl87xx] Could not load the AmebaZ parser chunk:", err);
+    return { key: "firmware.engine_load_failed", detail: getErrorMessage(err) };
+  }
+  try {
+    return { image: parser.parseAmbzImage(bytes) };
+  } catch (err) {
+    return {
+      key: err instanceof parser.AmbzImageError ? err.key : "firmware.rtl_bad_uf2",
+      detail: getErrorMessage(err),
+    };
+  }
+}
+
+/** The RTL8710B counterpart of ``runAmbz2``; never throws. */
+export async function runAmbz(
+  port: SerialPort,
+  image: AmbzImage,
+  hooks: AmbzFlashHooks
+): Promise<LibreTinyFlashResult> {
+  let engine: Awaited<ReturnType<typeof loadAmbzEngine>>;
+  try {
+    engine = await loadAmbzEngine();
+  } catch (err) {
+    console.error("[rtl87xx] Could not load the AmebaZ engine chunk:", err);
+    return {
+      detail: getErrorMessage(err),
+      error: err,
+      key: "firmware.engine_load_failed",
+    };
+  }
+  try {
+    return { rebooted: await engine.flashAmbz(port, image, hooks) };
   } catch (err) {
     return { detail: getErrorMessage(err), error: err };
   }

@@ -77,6 +77,10 @@ export const DECODER_ORIGIN = new URL(DECODER_URL).origin;
 export const LIBRETINY_BEKEN_GUIDE_URL =
   "https://docs.libretiny.eu/docs/platform/beken-72xx/";
 
+/** LibreTiny's AmebaZ (RTL8710B) flashing guide: the UART2 wiring and the TX2 strap. */
+export const LIBRETINY_AMBZ_GUIDE_URL =
+  "https://docs.libretiny.eu/link/flashing-realtek-ambz";
+
 /** LibreTiny's AmebaZ2 (RTL8720C) page: wiring and the download-mode strap. */
 export const LIBRETINY_AMBZ2_GUIDE_URL =
   "https://docs.libretiny.eu/docs/platform/realtek-ambz2/";

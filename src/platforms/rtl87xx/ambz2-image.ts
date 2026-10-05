@@ -13,7 +13,7 @@ import {
 
 /** Realtek AmebaZ2 (RTL8720C), the family the UART engine can flash. */
 export const UF2_FAMILY_AMBZ2 = 0xe08f7564;
-/** Realtek AmebaZ (RTL8710B): a different ROM protocol, refused up front. */
+/** Realtek AmebaZ (RTL8710B): a different ROM protocol, with its own flasher. */
 export const UF2_FAMILY_AMBZ = 0x22e0d6fc;
 
 /** What the RTL8720C flasher writes, and how. */
@@ -36,7 +36,7 @@ export class Ambz2ImageError extends Error {
 
 /**
  * Parse a LibreTiny UF2 for the RTL8720C flasher. Another Realtek family
- * (AmebaZ) is a real build for a chip the browser cannot flash; anything
+ * (AmebaZ) is a real build for the other Realtek flasher's chip; anything
  * else is a bad file. Fails as ``Ambz2ImageError``.
  */
 export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {

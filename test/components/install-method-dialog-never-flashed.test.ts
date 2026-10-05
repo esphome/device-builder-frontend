@@ -101,8 +101,8 @@ describe("install-method-dialog never-flashed ordering", () => {
   });
 
   it("promotes server-serial when the platform has no browser row", async () => {
-    // The RTL8710B is the rtl87xx platform with no browser flasher.
-    const d = await mount({ neverFlashed: true, platform: "rtl87xx", mcu: "rtl8710b" });
+    // The RTL8711AM is the rtl87xx platform with no browser flasher.
+    const d = await mount({ neverFlashed: true, platform: "rtl87xx", mcu: "rtl8711am" });
     const order = rowIconOrder(d);
     expect(order[0]).toBe("serial-port");
     expect(order[order.length - 1]).toBe("wifi");

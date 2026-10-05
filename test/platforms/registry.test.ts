@@ -50,7 +50,8 @@ const SAMPLE_PLATFORM: Record<string, string> = {
 // where the platform has one.
 const CHIPS: Record<string, { takes: string[]; refuses?: string }> = {
   rp2: { takes: ["rp2040", "rp2350"] },
-  rtl87xx: { takes: ["rtl8720c"], refuses: "rtl8710b" },
+  // One flasher per chip: the two ROM downloaders speak different protocols.
+  rtl87xx: { takes: ["rtl8720c", "rtl8710b"], refuses: "rtl8711am" },
   // Both protocols of the platform are written by the one flasher.
   bk72xx: { takes: ["bk7231", "bk7238", "bk7251"] },
   ln882x: { takes: ["ln882h"] },
@@ -87,7 +88,8 @@ describe("PLATFORMS", () => {
       expect(installOf(platform, "anything")).toBe(install);
       return;
     }
-    for (const chip of chips.takes) expect(installOf(platform, chip)).toBe(install);
+    for (const chip of chips.takes)
+      expect(installOf(platform, chip)?.chips).toContain(chip);
     if (chips.refuses) expect(installOf(platform, chips.refuses)).toBeUndefined();
     // Unknown is not offered: the chip has to be one a flasher writes.
     expect(installOf(platform, null)).toBeUndefined();
@@ -137,10 +139,13 @@ describe("PLATFORMS", () => {
     expect(rp2("rp2040").map((i) => i.id)).toEqual(["rp2-uf2"]);
     expect(rp2("rp2350").map((i) => i.id)).toEqual(["rp2-uf2"]);
     expect(rp2(null)).toEqual([]);
-    const rtl = installsFor(
-      makeConfiguredDevice({ target_platform: "rtl87xx", mcu: "rtl8710b" })
-    );
-    expect(rtl).toEqual([]);
+    const rtl = (mcu: string) =>
+      installsFor(makeConfiguredDevice({ target_platform: "rtl87xx", mcu })).map(
+        (i) => i.id
+      );
+    expect(rtl("rtl8720c")).toEqual(["rtl-ambz2"]);
+    expect(rtl("rtl8710b")).toEqual(["rtl-ambz"]);
+    expect(rtl("rtl8711am")).toEqual([]);
   });
 
   it("offers no flasher to a platform without a descriptor or with no device", () => {

@@ -19,8 +19,12 @@ export const LT_TAG = {
   OTA_FORMAT_2: 0x6c8492,
   OTA_PART_INFO: 0xc0ee0c,
   BOARD: 0xca25c8,
+  BINPATCH: 0xb948de,
   FAL_PTABLE: 0x8288ed,
 } as const;
+
+// BINPATCH opcode: add a signed 32-bit delta to the words at the listed offsets.
+const BINPATCH_DIFF32 = 0xfe;
 
 // FAL partition table entry: magic, name[16], flash name[16], offset, length, pad.
 export const PARTITION_ENTRY_SIZE = 48;
@@ -43,9 +47,9 @@ export interface LibreTinyImage {
 /**
  * The scheme of OTA_PART_INFO a flasher writes, as ltchiptool picks it per
  * family: a chip with one image slot takes the single scheme, one with two
- * takes the first slot.
+ * takes the first slot, or the slot its bootloader will run next.
  */
-export type LibreTinyScheme = "flasher-single" | "flasher-ota1";
+export type LibreTinyScheme = "flasher-single" | "flasher-ota1" | "flasher-ota2";
 
 export interface LibreTinyParseOptions {
   scheme: LibreTinyScheme;
@@ -130,11 +134,36 @@ function partInfoTarget(info: Uint8Array, scheme: LibreTinyScheme): string | nul
   const names = decoder.decode(info.subarray(3)).split("\0").filter(Boolean);
   // One nibble per scheme: device single, device OTA1, device OTA2, flasher
   // single, flasher OTA1, flasher OTA2.
-  const index = scheme === "flasher-single" ? info[1] & 0x0f : info[2] >> 4;
+  const index =
+    scheme === "flasher-single"
+      ? info[1] & 0x0f
+      : scheme === "flasher-ota1"
+        ? info[2] >> 4
+        : info[2] & 0x0f;
   if (index === 0) return null;
   const name = names[index - 1];
   if (!name) throw new Error("Invalid UF2: OTA_PART_INFO names too few partitions");
   return name;
+}
+
+/** Apply a block's BINPATCH (the OTA1 to OTA2 relocation) to a copy of its data. */
+function applyBinpatch(data: Uint8Array, patch: Uint8Array): Uint8Array {
+  const out = data.slice();
+  const view = new DataView(out.buffer);
+  for (let i = 0; i + 2 <= patch.length;) {
+    const opcode = patch[i];
+    const length = patch[i + 1];
+    const body = patch.subarray(i + 2, i + 2 + length);
+    i += 2 + length;
+    if (opcode !== BINPATCH_DIFF32 || body.length < 4) continue;
+    const diff = new DataView(body.buffer, body.byteOffset, 4).getInt32(0, true);
+    for (const offset of body.subarray(4)) {
+      if (offset + 4 > out.length)
+        throw new Error("Invalid UF2: BINPATCH past the block");
+      view.setUint32(offset, (view.getUint32(offset, true) + diff) >>> 0, true);
+    }
+  }
+  return out;
 }
 
 /**
@@ -188,6 +217,8 @@ export function parseLibreTinyImage(
     if (b.data.length === 0) continue;
     if (!grouped) throw new Error("Invalid UF2: data block before OTA_PART_INFO");
     if (!part) continue;
+    const patch = scheme === "flasher-ota2" ? b.tags.get(LT_TAG.BINPATCH) : undefined;
+    const data = patch ? applyBinpatch(b.data, patch) : b.data;
     if (b.address + b.data.length > part.length) {
       throw new Error(
         `Invalid UF2: page at 0x${b.address.toString(16)} past '${part.name}'`
@@ -204,8 +235,8 @@ export function parseLibreTinyImage(
       run = { part, address, bytes: [], cursor: 0 };
       runs.push(run);
     }
-    for (let i = 0; i < b.data.length; i++) run.bytes[run.cursor + i] = b.data[i];
-    run.cursor += b.data.length;
+    for (let i = 0; i < data.length; i++) run.bytes[run.cursor + i] = data[i];
+    run.cursor += data.length;
   }
   if (runs.length === 0) throw new Error("Invalid UF2: nothing to flash");
   // The flasher writes whole blocks, so a run's padding lands in flash too:

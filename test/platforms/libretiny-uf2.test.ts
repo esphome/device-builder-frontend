@@ -196,6 +196,58 @@ describe("parseLibreTinyImage", () => {
   });
 });
 
+describe("parseLibreTinyImage, the second OTA slot", () => {
+  // DIFF32: add the delta (LE32, signed) to the words at the listed offsets.
+  const binpatch = (delta: number, offsets: number[]) => {
+    const body = new Uint8Array(4 + offsets.length);
+    new DataView(body.buffer).setInt32(0, delta, true);
+    body.set(offsets, 4);
+    return ltTag(LT_TAG.BINPATCH, new Uint8Array([0xfe, body.length, ...body]));
+  };
+  const word = (value: number) => {
+    const data = new Uint8Array(256).fill(0x11);
+    new DataView(data.buffer).setUint32(8, value, true);
+    return data;
+  };
+  const uf2 = makeLibreTinyUf2({
+    blocks: [
+      {
+        addr: 0x0,
+        data: word(0x0800c000),
+        tags: [...OTA_INFO, binpatch(0x104000 - 0xc000, [8])],
+      },
+    ],
+  });
+  const parseAs = (scheme: "flasher-ota1" | "flasher-ota2") =>
+    parseLibreTinyImage(uf2, [UF2_FAMILY_AMBZ2], { ...AMBZ2_PARSE, scheme });
+  const word8 = (data: Uint8Array) => new DataView(data.buffer).getUint32(8, true);
+
+  it("writes the first slot as it is", () => {
+    const [run] = parseAs("flasher-ota1").runs;
+    expect(run.address).toBe(0xc000);
+    expect(word8(run.data)).toBe(0x0800c000);
+  });
+
+  it("writes the second slot with the block's BINPATCH applied", () => {
+    const [run] = parseAs("flasher-ota2").runs;
+    expect(run.address).toBe(0x104000);
+    expect(word8(run.data)).toBe(0x08104000);
+    expect(run.data[0]).toBe(0x11);
+  });
+
+  it("refuses a BINPATCH that reaches past its block", () => {
+    const bad = makeLibreTinyUf2({
+      blocks: [{ addr: 0x0, tags: [...OTA_INFO, binpatch(4, [254])] }],
+    });
+    expect(() =>
+      parseLibreTinyImage(bad, [UF2_FAMILY_AMBZ2], {
+        ...AMBZ2_PARSE,
+        scheme: "flasher-ota2",
+      })
+    ).toThrow(/BINPATCH/);
+  });
+});
+
 describe("parseLibreTinyBlocks", () => {
   it("accepts the payload-less header block and reads its tags", () => {
     const uf2 = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: BOOT_INFO }] });
