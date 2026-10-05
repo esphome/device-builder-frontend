@@ -174,6 +174,9 @@ function applyBinpatch(data: Uint8Array, patch: Uint8Array): Uint8Array {
     if (body.length < 4) throw new Error("Invalid UF2: BINPATCH DIFF32 too short");
     const diff = new DataView(body.buffer, body.byteOffset, 4).getInt32(0, true);
     for (const offset of body.subarray(4)) {
+      // uf2tool diffs the blocks in 4-byte chunks, so a real patch is word aligned.
+      if (offset % 4)
+        throw new Error(`Invalid UF2: BINPATCH offset ${offset} not word aligned`);
       if (offset + 4 > out.length)
         throw new Error("Invalid UF2: BINPATCH past the block");
       view.setUint32(offset, (view.getUint32(offset, true) + diff) >>> 0, true);

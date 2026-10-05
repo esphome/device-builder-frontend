@@ -52,6 +52,8 @@ export interface FakeAmbzOptions {
   chattersAfterWriteMs?: number;
   /** NAK once ahead of the first baud change's ACK, as an idle loud handshake can. */
   naksBeforeBaudAck?: boolean;
+  /** Miss SET_BAUD_RATE and keep NAKing in the loud handshake instead of ACKing. */
+  missesBaudChange?: boolean;
 }
 
 export function fakeAmbz(opts: FakeAmbzOptions = {}) {
@@ -162,6 +164,15 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   const argument = () => {
     if (pending[0] === 0x05 && pending.length === 2) {
       pending = [];
+      if (opts.missesBaudChange) {
+        const nakAgain = () => {
+          if (!out) return;
+          reply([NAK]);
+          setTimeout(nakAgain, 50);
+        };
+        nakAgain();
+        return;
+      }
       if (opts.naksBeforeBaudAck && !nakedBaud) {
         nakedBaud = true;
         reply([NAK]);

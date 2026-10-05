@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ltPartInfoTags, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
+import { ltPartInfoTags, ltTag, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
+import { LT_TAG } from "../../../src/platforms/libretiny-uf2.js";
 import { parseAmbzImage } from "../../../src/platforms/rtl87xx/ambz-image.js";
 import { UF2_FAMILY_AMBZ } from "../../../src/platforms/rtl87xx/ambz2-image.js";
 import { fixtureUf2 } from "./_fake-ambz.js";
@@ -34,6 +35,23 @@ describe("parseAmbzImage", () => {
     });
     expect(() => parseAmbzImage(ambz2)).toThrow(
       expect.objectContaining({ key: "firmware.rtl_wrong_family" })
+    );
+  });
+
+  it("refuses a build whose second slot is not the 'ota2' partition", () => {
+    // OTA_PART_INFO sends the flasher's second slot to ota1 as well.
+    const binpatch = ltTag(LT_TAG.BINPATCH, new Uint8Array([0xfe, 5, 0, 0, 0, 0, 8]));
+    const misplaced = makeLibreTinyUf2({
+      family: UF2_FAMILY_AMBZ,
+      blocks: [
+        {
+          addr: 0,
+          tags: [...ltPartInfoTags([0, 1, 2, 0, 1, 1], ["ota1", "ota2"]), binpatch],
+        },
+      ],
+    });
+    expect(() => parseAmbzImage(misplaced)).toThrow(
+      expect.objectContaining({ key: "firmware.rtl_bad_uf2" })
     );
   });
 

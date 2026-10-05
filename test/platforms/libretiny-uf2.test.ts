@@ -245,6 +245,20 @@ describe("parseLibreTinyImage, the second OTA slot", () => {
     expect(() => as("flasher-ota2")).toThrow(/no BINPATCH for the second slot/);
   });
 
+  it("refuses a BINPATCH whose offset is not word aligned", () => {
+    const bad = makeLibreTinyUf2({
+      blocks: [
+        { addr: 0x0, data: word(0x0800c000), tags: [...OTA_INFO, binpatch(4, [9])] },
+      ],
+    });
+    expect(() =>
+      parseLibreTinyImage(bad, [UF2_FAMILY_AMBZ2], {
+        ...AMBZ2_PARSE,
+        scheme: "flasher-ota2",
+      })
+    ).toThrow(/BINPATCH offset 9 not word aligned/);
+  });
+
   it("refuses a BINPATCH that reaches past its block", () => {
     const bad = makeLibreTinyUf2({
       blocks: [{ addr: 0x0, tags: [...OTA_INFO, binpatch(4, [254])] }],

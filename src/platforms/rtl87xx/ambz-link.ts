@@ -48,6 +48,8 @@ const QUIET_MS = 100;
 /** How long the line must stay silent before the ROM is taken to have finished printing. */
 const SETTLE_MS = 50;
 const SETTLE_LIMIT_MS = 1000;
+/** How long idle NAKs may keep coming before a reply that is not there counts as missing. */
+const NAK_SKIP_MS = 2000;
 const QUIET_LIMIT_MS = 10000;
 const LINK_LISTEN_MS = 250;
 const LINK_RETRY_MS = 100;
@@ -79,10 +81,13 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     await this.writeBytes(data);
   }
 
-  /** ``skipNaks``: an idle loud handshake NAK can land ahead of the reply. */
+  /** ``skipNaks``: idle loud handshake NAKs can land ahead of the reply, for a while. */
   private async expectAck(doc: string, skipNaks = false): Promise<void> {
+    const until = Date.now() + NAK_SKIP_MS;
     let reply = await this.readByte(READ_MS);
-    while (skipNaks && reply === NAK) reply = await this.readByte(READ_MS);
+    while (skipNaks && reply === NAK && Date.now() < until) {
+      reply = await this.readByte(READ_MS);
+    }
     if (reply !== ACK) {
       throw new AmbzProtocolError(
         `No ACK after ${doc} (got ${reply === null ? "nothing" : `0x${reply.toString(16)}`})`
@@ -104,7 +109,9 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
   /** Wait until the ROM stops sending (its log, at another speed), then drop it. */
   async settle(): Promise<void> {
     const deadline = Date.now() + SETTLE_LIMIT_MS;
-    while (Date.now() < deadline && (await this.readByte(SETTLE_MS)) !== null);
+    while (Date.now() < deadline) {
+      if ((await this.readByte(SETTLE_MS)) === null) break;
+    }
     this.drain();
   }
 
