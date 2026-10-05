@@ -19,20 +19,19 @@ export function compileFailureDetail(err: unknown): string {
  * A browser flash finished with ``port`` in hand: Done offers its logs, and
  * flips to them at once when asked. Not for a dialog dismissed mid-flash
  * (_cancel closes the UI without interrupting the flash loop, so the logs
- * would pop up on a user who walked away), nor while ``boardUp`` is false
- * (the caller has a notice to show first). ``notice`` heads the logs, for a
- * board that only starts once the user does something.
+ * would pop up on a user who walked away), nor with ``openLogs`` false (the
+ * caller has a notice to show first). ``notice`` heads the logs, for a board
+ * that only starts once the user does something.
  */
 export function finishWithLogsPort(
   host: ESPHomeFirmwareInstallDialog,
   port: SerialPort,
-  boardUp = true,
-  notice?: string
+  { openLogs = true, notice }: { openLogs?: boolean; notice?: string } = {}
 ): void {
   host._logsPort = port;
   host._logsNotice = notice;
   host._step = "done";
-  if (boardUp && host._open && host._showLogsAfterInstall) flipToLogs(host, port);
+  if (openLogs && host._open && host._showLogsAfterInstall) flipToLogs(host, port);
 }
 
 export function flipToLogs(

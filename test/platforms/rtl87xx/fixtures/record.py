@@ -2,10 +2,8 @@
 
 The frontend's RTL8710B engine is tested against these transcripts: run against
 a simulated chip in the same state, it must send the same bytes in the same
-order and leave the same flash, apart from the download magic it sends first
-(ltchiptool's linker does that before flash_connect). Consecutive frames one
-way are merged, so how either side splits its reads and writes is no
-difference.
+order and leave the same flash. Consecutive frames one way are merged, so
+how either side splits its reads and writes is no difference.
 
 Usage: record.py <out dir>, the directory of this file to refresh the fixtures.
 Run with the interpreter of an ltchiptool 4.14.4 install (PlatformIO's
@@ -110,7 +108,6 @@ class Chip:
         self.flash[SYSTEM : SYSTEM + 0x1000] = b"\xff" * 0x1000
         struct.pack_into("<II", self.flash, SYSTEM, case["ota2_address"], case["ota2_switch"])
         self.flash[SYSTEM + 0x100 : SYSTEM + 0x110] = bytes(range(0x10))
-        self.ram = bytearray(0x10000)
         self.out = bytearray()
         self.frames: list[dict] = []
         self.idle_naks = 8
@@ -119,7 +116,6 @@ class Chip:
         self.command = 0
         self.reading = None
         self.xmodem = None
-        self.booted = False
 
     def reply(self, data: bytes) -> None:
         self.frames.append({"dir": "rx", "bytes": bytes(data)})
@@ -184,10 +180,7 @@ class Chip:
         x = self.xmodem
         if not x and byte == EOT:
             self.xmodem = None
-            if self.last_target == "ram":
-                self.booted = True  # boots before it can ACK
-            else:
-                self.reply(bytes([ACK]))
+            self.reply(bytes([ACK]))
             return
         x.append(byte)
         if len(x) < 1032:
@@ -199,13 +192,8 @@ class Chip:
         assert sum(payload) & 0xFF == block[1031], "checksum"
         address = int.from_bytes(payload[:4], "little")
         data = payload[4:]
-        if address >> 24 == 0x08:
-            self.last_target = "flash"
-            self.flash[address & 0xFFFFFF : (address & 0xFFFFFF) + 1024] = data
-        else:
-            self.last_target = "ram"
-            off = address - 0x10002000
-            self.ram[off : off + 1024] = data
+        assert address >> 24 == 0x08, "flash only"
+        self.flash[address & 0xFFFFFF : (address & 0xFFFFFF) + 1024] = data
         self.reply(bytes([ACK]))
 
 

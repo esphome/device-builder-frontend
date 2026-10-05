@@ -3,6 +3,7 @@
  * the Bluetooth and serial transports: frames, image validation, and the
  * upload sequence (chunks, mark for test, reset).
  */
+import { bytesEqual } from "../../util/bytes.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import { sleep } from "../../util/sleep.js";
 import { withDeadline } from "../../util/with-deadline.js";
@@ -391,12 +392,6 @@ const setImageState = (
     { hash, confirm },
     failed
   );
-
-const bytesEqual = (a: Uint8Array | undefined, b: Uint8Array | undefined): boolean =>
-  a !== undefined &&
-  b !== undefined &&
-  a.length === b.length &&
-  a.every((v, i) => v === b[i]);
 
 const kb = (bytes: number): string => (bytes / 1024).toFixed(1);
 

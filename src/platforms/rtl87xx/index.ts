@@ -126,7 +126,8 @@ export async function runAmbz(
     };
   }
   try {
-    return { rebooted: await engine.flashAmbz(port, image, hooks) };
+    await engine.flashAmbz(port, image, hooks);
+    return { rebooted: false };
   } catch (err) {
     return { detail: getErrorMessage(err), error: err };
   }

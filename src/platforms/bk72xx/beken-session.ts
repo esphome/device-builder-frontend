@@ -4,7 +4,7 @@
  * whether a CRC counts the byte at its end in, whether the flash can be
  * unprotected, and whether an erase can be looked at.
  */
-import { concat } from "../../util/bytes.js";
+import { bytesEqual, concat } from "../../util/bytes.js";
 import { crc32 } from "../../util/crc32.js";
 import { formatAddress } from "../../util/flash-log.js";
 import {
@@ -240,7 +240,7 @@ export class BekenSession {
       }
       for (const size of FLASH_SIZES) {
         const again = await this.readSector(size + PROBE_ADDRESS);
-        if (first.every((b, i) => b === again[i])) return size;
+        if (bytesEqual(first, again)) return size;
       }
       throw new BekenResponseError("Could not tell the size of the flash");
     } finally {

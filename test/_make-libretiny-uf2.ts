@@ -16,6 +16,14 @@ export const ltTag = (type: number, data: Uint8Array | string): Uf2Tag => ({
   data: typeof data === "string" ? enc.encode(data) : data,
 });
 
+/** A BINPATCH DIFF32: add ``delta`` (LE32, signed) to the words at ``offsets``. */
+export function ltBinpatchTag(delta: number, offsets: number[]): Uf2Tag {
+  const body = new Uint8Array(4 + offsets.length);
+  new DataView(body.buffer).setInt32(0, delta, true);
+  body.set(offsets, 4);
+  return ltTag(LT_TAG.BINPATCH, new Uint8Array([0xfe, body.length, ...body]));
+}
+
 export interface LtPartitionSpec {
   name: string;
   offset: number;
