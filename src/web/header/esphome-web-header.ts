@@ -40,10 +40,7 @@ export class ESPHomeWebHeader extends LitElement {
         <div class="header-spacer"></div>
         ${
           !this.minimal && isWebSerialSupported()
-            ? html`<esphome-web-mode-picker
-                class="mode-picker"
-                .mode=${this.mode}
-              ></esphome-web-mode-picker>`
+            ? html`<esphome-web-mode-picker .mode=${this.mode}></esphome-web-mode-picker>`
             : nothing
         }
         <esphome-web-header-actions></esphome-web-header-actions>
@@ -115,11 +112,6 @@ export class ESPHomeWebHeader extends LitElement {
 
       .header-spacer {
         flex: 1;
-      }
-
-      .mode-picker {
-        flex-shrink: 1;
-        min-width: 0;
       }
 
       /* Compact header below 870px: subtitle drops, logo shrinks. */

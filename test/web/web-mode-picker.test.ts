@@ -109,8 +109,10 @@ describe("esphome-web-mode-picker", () => {
     const events: string[] = [];
     el.addEventListener("set-mode", (e) => events.push((e as CustomEvent).detail));
     await open(el);
-    const menu = root(el).querySelector<HTMLElement>(".menu")!;
-    menu.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    // A real key press comes from the focused row (the current family) and bubbles to the menu.
+    (root(el).activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true })
+    );
     const last = rows(el).length - 1;
     expect(root(el).activeElement).toBe(rows(el)[last]);
     rows(el)[last].dispatchEvent(

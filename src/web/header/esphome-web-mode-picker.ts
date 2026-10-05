@@ -2,7 +2,6 @@ import { consume } from "@lit/context";
 import { mdiCheck, mdiChevronDown } from "@mdi/js";
 import { css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import { classMap } from "lit/directives/class-map.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { OverflowMenuElement } from "../../components/overflow-menu-element.js";
@@ -33,9 +32,9 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
   @query(".trigger") private _trigger!: HTMLButtonElement;
 
   /** Where the menu opens: under the trigger, right edges aligned. */
-  @state() private _menuPos = { top: 0, right: 0 };
+  private _menuPos = { top: 0, right: 0 };
 
-  protected _openMenu = () => {
+  private _openMenu = () => {
     const rect = this._trigger.getBoundingClientRect();
     this._menuPos = { top: rect.bottom + 4, right: window.innerWidth - rect.right };
     this._toggle();
@@ -43,7 +42,7 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
 
   private _pick(mode: WebMode) {
     this._close();
-    this._trigger?.focus();
+    this._trigger.focus();
     if (mode !== this.mode) this._emit("set-mode", mode);
   }
 
@@ -51,7 +50,7 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     e.preventDefault();
     const rows = [...this.renderRoot.querySelectorAll<HTMLElement>(".menu-item")];
-    const at = rows.indexOf(this.shadowRoot!.activeElement as HTMLElement);
+    const at = rows.indexOf(e.target as HTMLElement);
     const step = e.key === "ArrowDown" ? 1 : -1;
     rows[(at + step + rows.length) % rows.length]?.focus();
   };
@@ -59,7 +58,7 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
   protected updated(changed: Map<string, unknown>) {
     // Open on the current family, so the arrows start from it.
     if (changed.has("_open") && this._open) {
-      this.renderRoot.querySelector<HTMLElement>(".menu-item.active")?.focus();
+      this.renderRoot.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
     }
   }
 
@@ -95,7 +94,7 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
                   const active = mode === this.mode;
                   return html`
                     <div
-                      class=${classMap({ "menu-item": true, active })}
+                      class="menu-item"
                       role="menuitemradio"
                       aria-checked=${active}
                       tabindex="-1"
@@ -162,18 +161,26 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
         min-width: 180px;
       }
 
-      .menu-item.active {
+      .menu-item[aria-checked="true"] {
         font-weight: var(--wa-font-weight-semibold);
       }
 
+      .menu-item-label {
+        flex: 1;
+      }
+
       .menu-item wa-icon {
-        margin-left: auto;
         color: var(--esphome-primary);
       }
 
-      /* The mode logos are drawn for the primary header; give them contrast on the menu. */
+      /* The mode logos are drawn for the primary header; give them contrast on the menu.
+         A fixed-width chip keeps the labels aligned across logos of different widths. */
       .menu .logo {
+        box-sizing: border-box;
+        width: 32px;
+        height: 20px;
         padding: 2px 4px;
+        object-fit: contain;
         border-radius: var(--wa-border-radius-s);
         background: var(--esphome-primary);
       }
