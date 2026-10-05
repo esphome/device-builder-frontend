@@ -74,12 +74,15 @@ export interface LibreTinyInstall<Image = LibreTinyImage> {
     image: Image,
     hooks: LibreTinyFlashHooks
   ): Promise<LibreTinyFlashResult>;
-  /**
-   * For a family of several chips: the install a parsed file is written
-   * with, whose copy, guide and engine follow that chip.
-   */
-  forImage?(image: Image): LibreTinyInstall<Image>;
+  /** For a family of several chips: the parsed file's chip copy, guide and engine. */
+  forImage?(image: Image): LibreTinyChip;
 }
+
+/** What follows a parsed file's chip in a family of several. */
+export type LibreTinyChip = Pick<
+  LibreTinyInstall<unknown>,
+  "copy" | "guideUrl" | "loadEngine"
+>;
 
 type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" | "error";
 
@@ -115,15 +118,13 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
 
   private _abort: AbortController | null = null;
-  // The picked file's chip, for a family of several; its copy follows the flash.
-  @state() private _chip: LibreTinyInstall<Image> | null = null;
-
-  private _installFor(image: Image): LibreTinyInstall<Image> {
-    return this.install.forImage?.(image) ?? this.install;
-  }
-
-  private get _active(): LibreTinyInstall<Image> {
-    return this._chip ?? this.install;
+  // The picked file's chip, for a family of several; else the family's own.
+  private get _active(): LibreTinyChip {
+    const prepared = this._image.state;
+    return (
+      (prepared.kind === "ready" && this.install.forImage?.(prepared.value)) ||
+      this.install
+    );
   }
 
   // The UF2 is read and parsed when it is picked, so the click that installs
@@ -144,7 +145,7 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
     const parsed = await this.install.load(bytes);
     if ("image" in parsed) {
       // While the user clicks Install and picks the port; the flash names a failure.
-      void this._installFor(parsed.image)
+      void (this.install.forImage?.(parsed.image) ?? this.install)
         .loadEngine()
         .catch(() => {});
       return { value: parsed.image };
@@ -193,7 +194,6 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
     this._logLines = [];
     this._manualReset = false;
     this._pending = false;
-    this._chip = null;
   }
 
   private _fail(title: string, detail = ""): void {
@@ -235,14 +235,13 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
       this._pending = false;
     }
 
-    this._chip = this._installFor(image);
     this._state = "connecting";
     this._progress = 0;
     const abort = new AbortController();
     this._abort = abort;
     // Closing the dialog aborts the run; its late hooks must not repaint it.
     const live = () => !abort.signal.aborted;
-    const result = await this._chip.run(port, image, {
+    const result = await this.install.run(port, image, {
       signal: abort.signal,
       onLog: (line) => {
         if (live()) this._log(line);

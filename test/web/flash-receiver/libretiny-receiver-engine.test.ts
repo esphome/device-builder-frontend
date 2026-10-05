@@ -49,7 +49,7 @@ import { LN_INSTALL } from "../../../src/web/platforms/ln882x/install.js";
 import { lnUartReceiverEngine } from "../../../src/web/platforms/ln882x/receiver-engine.js";
 import { RTL_AMBZ_INSTALL } from "../../../src/web/platforms/rtl87xx/ambz-install.js";
 import { rtlAmbzReceiverEngine } from "../../../src/web/platforms/rtl87xx/ambz-receiver-engine.js";
-import { RTL_INSTALL } from "../../../src/web/platforms/rtl87xx/install.js";
+import { RTL_INSTALL } from "../../../src/web/platforms/rtl87xx/ambz2-install.js";
 import { rtlAmbz2ReceiverEngine } from "../../../src/web/platforms/rtl87xx/receiver-engine.js";
 
 const localize = (k: string) => k;

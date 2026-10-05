@@ -4,7 +4,7 @@ import type { WebPlatform } from "../web-platform.js";
 
 import "./esphome-web-rtl-card.js";
 
-/** RTL87xx (RTL8720C, RTL8710B). Its boards sit behind generic UART bridges, so no port claims it. */
+/** RTL87xx (RTL8720C, RTL8710B): behind generic UART bridges, so no port claims it. */
 export const rtlWebMode: WebPlatform<"rtl"> = {
   mode: "rtl",
   logo: "rtl8720c.svg",

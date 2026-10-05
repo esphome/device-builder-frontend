@@ -4,7 +4,7 @@
  */
 import { RTL87XX_SERIAL_LOGS } from "../../../platforms/rtl87xx/index.js";
 import { libretinyReceiverEngine } from "../../flash-receiver/libretiny-receiver-engine.js";
-import { RTL_INSTALL } from "./install.js";
+import { RTL_INSTALL } from "./ambz2-install.js";
 
 export const rtlAmbz2ReceiverEngine = libretinyReceiverEngine(
   RTL_INSTALL,

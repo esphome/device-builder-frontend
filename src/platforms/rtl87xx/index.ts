@@ -14,7 +14,7 @@ export * from "./serial-logs.js";
 import { getErrorMessage } from "../../util/error-message.js";
 import type { LibreTinyFlashHooks, LibreTinyFlashResult } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
-import type { AmbzImage } from "./ambz-image.js";
+import type { AmbzImage, RtlImage } from "./ambz-image.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
 
 export const loadAmbz2Engine = () => import("./ambz2-flasher.js");
@@ -100,6 +100,27 @@ export async function loadAmbzImage(
   }
   try {
     return { image: parser.parseAmbzImage(bytes) };
+  } catch (err) {
+    return {
+      key: err instanceof parser.RtlImageError ? err.key : "firmware.rtl_bad_uf2",
+      detail: getErrorMessage(err),
+    };
+  }
+}
+
+/** Parse an RTL8720C or RTL8710B UF2 in one pass, naming its chip; never throws. */
+export async function loadRtl87xxImage(
+  bytes: Uint8Array
+): Promise<{ image: RtlImage } | RtlImageFailure> {
+  let parser: Awaited<ReturnType<typeof loadAmbzParser>>;
+  try {
+    parser = await loadAmbzParser();
+  } catch (err) {
+    console.error("[rtl87xx] Could not load the RTL87xx parser chunk:", err);
+    return { key: "firmware.engine_load_failed", detail: getErrorMessage(err) };
+  }
+  try {
+    return { image: parser.parseRtl87xxImage(bytes) };
   } catch (err) {
     return {
       key: err instanceof parser.RtlImageError ? err.key : "firmware.rtl_bad_uf2",

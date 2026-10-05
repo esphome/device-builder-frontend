@@ -8,48 +8,44 @@ vi.mock("../../../../src/components/install-details-log.js", () => ({}));
 
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
-  parseAmbz2Image: vi.fn(),
+  parseRtl87xxImage: vi.fn(),
   flashAmbz2: vi.fn(),
-  parseAmbzImage: vi.fn(),
   flashAmbz: vi.fn(),
 }));
 vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
 }));
-vi.mock("../../../../src/platforms/rtl87xx/ambz2-image.js", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  parseAmbz2Image: mocks.parseAmbz2Image,
-}));
 vi.mock("../../../../src/platforms/rtl87xx/ambz2-flasher.js", () => ({
   flashAmbz2: mocks.flashAmbz2,
 }));
 vi.mock("../../../../src/platforms/rtl87xx/ambz-image.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  parseAmbzImage: mocks.parseAmbzImage,
+  parseRtl87xxImage: mocks.parseRtl87xxImage,
 }));
 vi.mock("../../../../src/platforms/rtl87xx/ambz-flasher.js", () => ({
   flashAmbz: mocks.flashAmbz,
 }));
 // The real parse, behind a seam a test can make fail as a chunk that did not load.
 const seams = vi.hoisted(() => ({
-  loadAmbz2Image: vi.fn(),
+  loadRtl87xxImage: vi.fn(),
   real: undefined as undefined | ((bytes: Uint8Array) => Promise<unknown>),
 }));
 vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => {
   const real =
     await importOriginal<typeof import("../../../../src/platforms/rtl87xx/index.js")>();
-  seams.real = real.loadAmbz2Image;
-  return { ...real, loadAmbz2Image: seams.loadAmbz2Image };
+  seams.real = real.loadRtl87xxImage;
+  return { ...real, loadRtl87xxImage: seams.loadRtl87xxImage };
 });
 
 import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
+import type { LibreTinyImage } from "../../../../src/platforms/libretiny-uf2.js";
 import { RtlImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
 import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
+import { RTL_INSTALL } from "../../../../src/web/platforms/rtl87xx/ambz2-install.js";
 import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
-import { RTL_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -90,11 +86,10 @@ const button = (el: any, label: string): HTMLElement =>
   ) as HTMLElement;
 
 beforeEach(() => {
-  seams.loadAmbz2Image.mockImplementation((bytes: Uint8Array) => seams.real!(bytes));
-  mocks.parseAmbz2Image.mockReturnValue(IMAGE);
+  seams.loadRtl87xxImage.mockImplementation((bytes: Uint8Array) => seams.real!(bytes));
+  mocks.parseRtl87xxImage.mockReturnValue({ chip: "ambz2", image: IMAGE });
   mocks.requestSerialPort.mockResolvedValue(PORT);
   mocks.flashAmbz2.mockResolvedValue(true);
-  mocks.parseAmbzImage.mockImplementation(wrongFamily("0xe08f7564"));
 });
 
 afterEach(() => {
@@ -134,6 +129,7 @@ describe("esphome-web-install-rtl-dialog", () => {
       protected readonly install = {
         ...RTL_INSTALL,
         copy: { ...RTL_INSTALL.copy, doneByHand: undefined },
+        load: async () => ({ image: IMAGE as unknown as LibreTinyImage }),
       };
     }
     customElements.define("test-bare-install-dialog", BareDialog);
@@ -173,8 +169,7 @@ describe("esphome-web-install-rtl-dialog", () => {
   });
 
   it("flashes an RTL8710B build with its own engine, guide and reset line", async () => {
-    mocks.parseAmbz2Image.mockImplementation(wrongFamily("0x22e0d6fc"));
-    mocks.parseAmbzImage.mockReturnValue(AMBZ_IMAGE);
+    mocks.parseRtl87xxImage.mockReturnValue({ chip: "ambz", image: AMBZ_IMAGE });
     let wait!: () => void;
     mocks.flashAmbz.mockImplementation(async (_port, _image, hooks) => {
       hooks.onWaiting?.();
@@ -197,7 +192,7 @@ describe("esphome-web-install-rtl-dialog", () => {
   });
 
   it("names a build for neither RTL87xx chip and a bad file under the picker, when they are picked", async () => {
-    mocks.parseAmbz2Image.mockImplementation(wrongFamily("0xe08f7564"));
+    mocks.parseRtl87xxImage.mockImplementation(wrongFamily("0xe08f7564"));
     const el = await mountDialog();
     // Still on the setup step, with the file refused and nothing to install.
     expect(card(el)).toBeNull();
@@ -210,21 +205,21 @@ describe("esphome-web-install-rtl-dialog", () => {
     await el._flash();
     expect(mocks.requestSerialPort).not.toHaveBeenCalled();
 
-    mocks.parseAmbz2Image.mockImplementation(() => {
+    mocks.parseRtl87xxImage.mockImplementation(() => {
       throw new RtlImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
     });
     await pickFile(el, "_image", uf2());
     expect(pickerText(el).error).toBe("firmware.rtl_bad_uf2: not a UF2");
 
     // A good file clears the line and offers the install.
-    mocks.parseAmbz2Image.mockReturnValue(IMAGE);
+    mocks.parseRtl87xxImage.mockReturnValue({ chip: "ambz2", image: IMAGE });
     await pickFile(el, "_image", uf2("good.uf2"));
     expect(pickerText(el)).toEqual({ name: "good.uf2", status: "", error: "" });
     expect(installDisabled(el)).toBe(false);
   });
 
   it("unpicks a refused file, so the same file can be picked again", async () => {
-    mocks.parseAmbz2Image.mockImplementation(() => {
+    mocks.parseRtl87xxImage.mockImplementation(() => {
       throw new RtlImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
     });
     const el = await mountBare();
@@ -270,7 +265,7 @@ describe("esphome-web-install-rtl-dialog", () => {
   });
 
   it("offers Retry for the same file after the parser did not load", async () => {
-    seams.loadAmbz2Image.mockResolvedValueOnce({
+    seams.loadRtl87xxImage.mockResolvedValueOnce({
       key: "firmware.engine_load_failed",
       detail: "Failed to fetch",
     });

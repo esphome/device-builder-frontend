@@ -16,14 +16,14 @@ const FLAGGED_MODES: readonly WebMode[] = WEB_PLATFORMS.map((p) => p.mode).filte
 // Flags of families since folded into another, so their links still land.
 const MODE_ALIASES: Readonly<Record<string, WebMode>> = { ambz: "rtl" };
 
+// Every flag a URL may carry, the families' own first.
+const ALL_FLAGS: readonly string[] = [...FLAGGED_MODES, ...Object.keys(MODE_ALIASES)];
+
 /** Read the current mode from a query string (defaults to the live URL). */
 export function readMode(search: string = window.location.search): WebMode {
   const params = new URLSearchParams(search);
-  const alias = Object.keys(MODE_ALIASES).find((flag) => params.has(flag));
-  return (
-    FLAGGED_MODES.find((mode) => params.has(mode)) ??
-    (alias ? MODE_ALIASES[alias] : DEFAULT_WEB_MODE)
-  );
+  const flag = ALL_FLAGS.find((f) => params.has(f));
+  return flag ? (MODE_ALIASES[flag] ?? (flag as WebMode)) : DEFAULT_WEB_MODE;
 }
 
 /**
@@ -35,9 +35,7 @@ export function modeUrl(mode: WebMode, url: URL = new URL(window.location.href))
   const next = new URL(url.toString());
   // Re-append the flag bare (legacy ``?pico``); building by hand avoids the
   // URLSearchParams ``pico=`` spelling without touching other params' form.
-  for (const flag of [...FLAGGED_MODES, ...Object.keys(MODE_ALIASES)]) {
-    next.searchParams.delete(flag);
-  }
+  for (const flag of ALL_FLAGS) next.searchParams.delete(flag);
   let search = next.search;
   if (mode !== DEFAULT_WEB_MODE) {
     search = search ? `${search}&${mode}` : `?${mode}`;
