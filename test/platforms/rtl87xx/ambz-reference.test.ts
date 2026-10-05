@@ -3,7 +3,7 @@
  * ltchiptool 4.14.4 put on the wire for a whole flash of ``fixtures/ambz.uf2``
  * against a simulated chip (``fixtures/record.py``). Run against the same
  * simulated chip, the engine has to send the same bytes in the same order and
- * leave the same flash, apart from the download magic it sends first.
+ * leave the same flash.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
@@ -22,7 +22,6 @@ interface RecordedFrame {
 }
 
 const UF2 = await fixtureUf2();
-const MAGIC = "55aa22e0d6fc";
 
 const hex = (bytes: Uint8Array) =>
   [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -78,8 +77,7 @@ describe("flashAmbz against ltchiptool's transcripts", () => {
     );
     expect(booted).toBe(true);
     expect(chip.booted()).toBe(true);
-    const sent = chip.frames.filter((f) => !(f.dir === "tx" && hex(f.bytes) === MAGIC));
-    const engine = await Promise.all(merged(sent).map(summarise));
+    const engine = await Promise.all(merged(chip.frames).map(summarise));
     expect(engine).toEqual(reference.frames);
     expect(await sha256(chip.flash)).toBe(reference.flash_sha256);
   });

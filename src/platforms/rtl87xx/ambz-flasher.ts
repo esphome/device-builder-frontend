@@ -2,14 +2,16 @@
  * Flashing a Realtek AmebaZ (RTL8710B) over Web Serial through the ROM's
  * UART download mode, the way ltchiptool does it: link at 1.5 Mbaud, write
  * at 115200, read the system data to find the OTA slot the bootloader runs
- * next, write that slot's image, then boot it from RAM. Loaded on demand by
- * the install flow; nothing here touches the DOM.
+ * next, write that slot's image, then boot it from RAM. The board enters
+ * download mode by its strap (or an RTS wired to its reset); a running
+ * LibreTiny's reboot magic is not used, as its ROM leaves download mode after
+ * one transfer. Loaded on demand by the install flow; nothing here touches
+ * the DOM.
  */
 import { concat, int32LE } from "../../util/bytes.js";
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import { resetIntoFirmware } from "../../util/serial-control-lines.js";
 import { openSerialPort } from "../../util/serial-open-error.js";
-import { sleep } from "../../util/sleep.js";
 import { settledWithin, withDeadline } from "../../util/with-deadline.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
@@ -20,25 +22,12 @@ import {
   AMBZ_ROM_BAUD,
   AmbzLink,
 } from "./ambz-link.js";
-import { UF2_FAMILY_AMBZ } from "./ambz2-image.js";
 
-/** The log UART's speed, where a running LibreTiny listens for the reboot magic. */
-const DIAG_BAUD = 115200;
 /**
  * What the writes run at. ltchiptool defaults to 460800; cheap adapters lose
  * the ROM's ACKs on writes that fast, so this stays at the log speed.
  */
 const WRITE_BAUD = 115200;
-/** LibreTiny reboots into download mode on 55 AA and its family id, big endian. */
-const DOWNLOAD_MAGIC = new Uint8Array([
-  0x55,
-  0xaa,
-  UF2_FAMILY_AMBZ >>> 24,
-  (UF2_FAMILY_AMBZ >> 16) & 0xff,
-  (UF2_FAMILY_AMBZ >> 8) & 0xff,
-  UF2_FAMILY_AMBZ & 0xff,
-]);
-const MAGIC_SETTLE_MS = 500;
 const AUTO_LINK_MS = 2000;
 const STRAP_WAIT_MS = 5 * 60 * 1000;
 const RESET_HOLD_MS = 100;
@@ -152,17 +141,14 @@ class Session {
   }
 }
 
-/** The reboot magic at the log speed, then listen at the ROM's; the link once linked. */
+/** Listen for the ROM, then pulse RTS, then wait for the strap; the link once linked. */
 async function enterDownloadMode(
   session: Session,
   port: SerialPort,
   hooks: LibreTinyFlashHooks,
   log: (line: string) => void
 ): Promise<AmbzLink | null> {
-  log("Asking a running LibreTiny firmware to reboot into download mode");
-  const diag = await session.open(DIAG_BAUD);
-  await diag.write(DOWNLOAD_MAGIC);
-  await sleep(MAGIC_SETTLE_MS);
+  log("Looking for the ROM downloader");
   const link = await session.open(AMBZ_ROM_BAUD);
   if (await link.link(AUTO_LINK_MS)) return link;
   if (await resetIntoFirmware(port, RESET_HOLD_MS, LINES_MS)) {
@@ -176,9 +162,9 @@ async function enterDownloadMode(
 
 /**
  * Flash ``image`` onto the chip behind ``port`` (opened and closed here at
- * the speeds the ROM needs). Download mode is asked of a running LibreTiny
- * first, then of the reset line; failing both the ROM is polled until the
- * user straps the board or ``signal`` aborts. Resolves true once the chip
+ * the speeds the ROM needs). A board already in download mode links at
+ * once; otherwise RTS is pulsed in case it drives the reset, then the ROM is
+ * polled until the user straps the board or ``signal`` aborts. Resolves true once the chip
  * was booted into the new firmware.
  */
 export async function flashAmbz(

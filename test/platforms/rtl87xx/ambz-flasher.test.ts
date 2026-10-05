@@ -38,12 +38,12 @@ const written = (chip: ReturnType<typeof fakeAmbz>, image = IMAGE.ota1) =>
   image.runs.every((r) => r.data.every((b, i) => chip.flash[r.address + i] === b));
 
 describe("flashAmbz", () => {
-  it("reboots a running LibreTiny into download mode, writes at 115200 and boots", async () => {
+  it("links to a board in download mode, writes at 115200 and boots", async () => {
     const onWaiting = vi.fn();
-    const { chip, done } = flash({ start: "firmware" }, { onWaiting });
+    const { chip, done } = flash({}, { onWaiting });
     await expect(driveFakeTimers(done)).resolves.toBe(true);
     expect(onWaiting).not.toHaveBeenCalled();
-    expect(chip.bauds.slice(0, 3)).toEqual([115200, 1500000, 115200]);
+    expect(chip.bauds.slice(0, 2)).toEqual([1500000, 115200]);
     expect(chip.booted()).toBe(true);
     expect(written(chip)).toBe(true);
     // Released at the end, for the logs to reopen.
@@ -57,10 +57,10 @@ describe("flashAmbz", () => {
     expect(written(chip, IMAGE.ota1)).toBe(false);
   });
 
-  it("pulses RTS, then waits for the strap, when the firmware does not answer the magic", async () => {
+  it("pulses RTS, then waits for the strap, when no ROM answers", async () => {
     let chip!: ReturnType<typeof fakeAmbz>;
     const onWaiting = vi.fn(() => chip.strap());
-    const run = flash({ start: "firmware", ignoresMagic: true }, { onWaiting });
+    const run = flash({ start: "firmware" }, { onWaiting });
     chip = run.chip;
     await expect(driveFakeTimers(run.done)).resolves.toBe(true);
     expect(onWaiting).toHaveBeenCalledOnce();
@@ -75,17 +75,14 @@ describe("flashAmbz", () => {
   it("reaches the strap guide on an adapter without control lines", async () => {
     let chip!: ReturnType<typeof fakeAmbz>;
     const onWaiting = vi.fn(() => chip.strap());
-    const run = flash(
-      { start: "firmware", ignoresMagic: true, noSignals: true },
-      { onWaiting }
-    );
+    const run = flash({ start: "firmware", noSignals: true }, { onWaiting });
     chip = run.chip;
     await expect(driveFakeTimers(run.done)).resolves.toBe(true);
     expect(onWaiting).toHaveBeenCalledOnce();
   });
 
   it("gives up when no ROM answers while the guide is shown, and releases the port", async () => {
-    const { chip, done } = flash({ start: "firmware", ignoresMagic: true });
+    const { chip, done } = flash({ start: "firmware" });
     await expect(driveFakeTimers(done)).rejects.toBeInstanceOf(AmbzLinkError);
     expect(chip.raw.readable).toBeNull();
     expect(chip.flash[0xb000]).not.toBe(IMAGE.ota1.runs[0].data[0]);
@@ -94,7 +91,7 @@ describe("flashAmbz", () => {
   it("stops on abort while it waits for the strap", async () => {
     const abort = new AbortController();
     const { chip, done } = flash(
-      { start: "firmware", ignoresMagic: true },
+      { start: "firmware" },
       { signal: abort.signal, onWaiting: () => abort.abort() }
     );
     await expect(driveFakeTimers(done)).rejects.toMatchObject({ name: "AbortError" });
@@ -127,16 +124,16 @@ describe("flashAmbz", () => {
   });
 
   it("closes a port that opens only after the reopen gave up", async () => {
-    const { chip, done } = flash({ start: "firmware" });
+    const { chip, done } = flash({});
     const open = chip.raw.open.getMockImplementation()!;
-    // The reopen at the ROM's speed lands well after its deadline.
+    // The reopen at the write speed lands well after its deadline.
     chip.raw.open.mockImplementationOnce(open).mockImplementationOnce(async (options) => {
       await new Promise((resolve) => setTimeout(resolve, 5000));
       await open(options);
     });
     await expect(driveFakeTimers(done)).rejects.toThrow("Reopening the port timed out");
     await vi.advanceTimersByTimeAsync(5000);
-    expect(chip.bauds).toEqual([115200, 1500000]);
+    expect(chip.bauds).toEqual([1500000, 115200]);
     expect(chip.raw.readable).toBeNull();
   });
 

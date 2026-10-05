@@ -3,8 +3,7 @@
  * ``fixtures/record.py``: the ROM downloader NAKs while it idles in its loud
  * handshake, answers FLASH_GET_STATUS, SET_BAUD_RATE and FLASH_READ, and takes
  * address-prefixed XModem-1k blocks into flash (ACKing the end) or RAM
- * (booting instead). A running LibreTiny firmware reboots into it on the
- * download magic at 115200.
+ * (booting instead). A running firmware ignores everything until strapped.
  */
 import { vi } from "vitest";
 import { disconnectEvents } from "../../_web-serial.js";
@@ -18,7 +17,6 @@ const EOT = 0x04;
 const CAN = 0x18;
 const ROM_BAUD = 1500000;
 const IDLE_NAKS = 8;
-const MAGIC = [0x55, 0xaa, 0x22, 0xe0, 0xd6, 0xfc];
 
 /** What the flash holds before the flash: never FF, so an erase shows. */
 const oldByte = (i: number) => (i * 7 + 3) % 251;
@@ -34,8 +32,6 @@ export interface FakeAmbzOptions {
   /** The system data's ota2 address and switch (record.py's cases). */
   ota2Address?: number;
   ota2Switch?: number;
-  /** A firmware that does not reboot on the magic (the strap is needed). */
-  ignoresMagic?: boolean;
   /** NAK the first block of every flash transfer once. */
   nakFirstBlock?: boolean;
   /** Fail setSignals as an adapter without control lines would. */
@@ -77,7 +73,6 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   let lastTarget: "flash" | "ram" = "flash";
   let naked = false;
   let readyAt = 0;
-  let magic = 0;
   let reads = 0;
   let deafUntil = 0;
   let nakedBaud = false;
@@ -190,20 +185,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   const feed = (chunk: Uint8Array) => {
     frames.push({ dir: "tx", bytes: new Uint8Array(chunk) });
     for (const byte of chunk) {
-      if (mode === "firmware") {
-        // LibreTiny's UART2 matches the magic only at the log speed.
-        magic =
-          baud === 115200 && byte === MAGIC[magic]
-            ? magic + 1
-            : byte === MAGIC[0]
-              ? 1
-              : 0;
-        if (magic === MAGIC.length && !opts.ignoresMagic) {
-          mode = "rom";
-          loud = true;
-          magic = 0;
-        }
-      } else if (mode === "rom") {
+      if (mode === "rom") {
         if (Date.now() < deafUntil) continue;
         if (xmodem) xmodemByte(byte);
         else if (pending.length) {
