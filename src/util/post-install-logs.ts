@@ -28,7 +28,7 @@ import { requestSerialPort } from "./web-serial.js";
 export function openNetworkLogsFallback(
   logsDialog: ESPHomeLogsDialog,
   localize: LocalizeFunc,
-  options: { onBackToInstall?: () => void; message?: string } = {}
+  options: { onBackToInstall?: () => void; message?: string; notice?: string } = {}
 ): void {
   const { message, ...openOptions } = options;
   notifyInfo(message ?? localize("dashboard.logs_serial_disabled_fallback"));
@@ -328,7 +328,10 @@ export async function handlePostInstallShowLogs(
   if (webSerialPort) {
     const baudRate = resolveLogBaudRate(loggerBaudRate);
     if (baudRate === null) {
-      openNetworkLogsFallback(logsDialog, localize, { onBackToInstall: reopenInstall });
+      openNetworkLogsFallback(logsDialog, localize, {
+        onBackToInstall: reopenInstall,
+        notice,
+      });
       return;
     }
     const mismatch = serialConsoleMismatch(loggerInterface, webSerialPort, localize);
@@ -336,6 +339,7 @@ export async function handlePostInstallShowLogs(
       openNetworkLogsFallback(logsDialog, localize, {
         onBackToInstall: reopenInstall,
         message: mismatch.message,
+        notice,
       });
       return;
     }

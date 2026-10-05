@@ -169,6 +169,13 @@ describe("logs-dialog header source chip", () => {
     expect(chipText(el)).toBe("dashboard.logs_source_ble_nus"); // streaming
   });
 
+  it("heads a network session's log with its notice", async () => {
+    const el = mount();
+    el.open("OTA", { notice: "Reset the board" });
+    await el.updateComplete;
+    expect((el as any)._log.lines[0]).toBe("Reset the board");
+  });
+
   it("heads a passive session's log with its notice", async () => {
     const el = mount();
     el.openPassive({ onReconnect: () => Promise.resolve(), notice: "Reset the board" });
