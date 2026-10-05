@@ -244,6 +244,7 @@ export function libreTinyImageFor(
   }[] = [];
   let part: LibreTinyPartition | null = null;
   let grouped = false;
+  let patched = false;
   for (const b of blocks) {
     if (b.notMainFlash) continue;
     const info = b.tags.get(LT_TAG.OTA_PART_INFO);
@@ -258,6 +259,7 @@ export function libreTinyImageFor(
     if (!part) continue;
     const patch = binpatch ? b.tags.get(LT_TAG.BINPATCH) : undefined;
     const data = patch ? applyBinpatch(b.data, patch) : b.data;
+    patched ||= patch !== undefined;
     if (b.address + b.data.length > part.length) {
       throw new Error(
         `Invalid UF2: page at 0x${b.address.toString(16)} past '${part.name}'`
@@ -278,6 +280,9 @@ export function libreTinyImageFor(
     run.cursor += data.length;
   }
   if (runs.length === 0) throw new Error("Invalid UF2: nothing to flash");
+  // Unrelocated, the first slot's image would run with pointers into it.
+  if (binpatch && !patched)
+    throw new Error("Invalid UF2: no BINPATCH for the second slot");
   // The flasher writes whole blocks, so a run's padding lands in flash too:
   // it must not reach into another partition, nor into another run of the
   // same partition (that run would be overwritten, or erased).

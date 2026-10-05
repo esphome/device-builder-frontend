@@ -235,6 +235,16 @@ describe("parseLibreTinyImage, the second OTA slot", () => {
     expect(run.data[0]).toBe(0x11);
   });
 
+  it("refuses the second slot of a file that carries no BINPATCH", () => {
+    const plain = makeLibreTinyUf2({
+      blocks: [{ addr: 0x0, data: word(0x0800c000), tags: OTA_INFO }],
+    });
+    const as = (scheme: "flasher-ota1" | "flasher-ota2") =>
+      parseLibreTinyImage(plain, [UF2_FAMILY_AMBZ2], { ...AMBZ2_PARSE, scheme });
+    expect(as("flasher-ota1").runs).toHaveLength(1);
+    expect(() => as("flasher-ota2")).toThrow(/no BINPATCH for the second slot/);
+  });
+
   it("refuses a BINPATCH that reaches past its block", () => {
     const bad = makeLibreTinyUf2({
       blocks: [{ addr: 0x0, tags: [...OTA_INFO, binpatch(4, [254])] }],
