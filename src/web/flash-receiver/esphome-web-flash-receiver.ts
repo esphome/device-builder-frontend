@@ -381,7 +381,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     );
     const { logs } = result;
     if (!logs) return;
-    if (!logs.rebooted && !logs.resetPending) {
+    if (!logs.rebooted && !logs.notice) {
       // No reboot to follow: park the port so Logs opens it once the user
       // has reset the board.
       this._logPort = logs.port;
@@ -391,7 +391,7 @@ export class ESPHomeWebFlashReceiver extends LitElement {
     // the user that the logs should show; open its boot logs in the shared
     // logs dialog (reset / download / stop-start / reconnect), headed by
     // that reset's note.
-    this._logsNotice = logs.resetPending ? (result.note?.message ?? "") : "";
+    this._logsNotice = logs.notice ?? "";
     await acquireBootLogs(this, logs.port, logs.knownPorts);
   }
 

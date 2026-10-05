@@ -57,13 +57,13 @@ export interface LibreTinyInstall<Image = LibreTinyImage> {
      * this says which; the flash receiver opens no logs then.
      */
     readonly logsElsewhere?: string;
+    /** The board waits for a reset by hand, but the receiver opens its logs at once, headed by this. */
+    readonly logsNotice?: string;
     readonly failed: string;
     readonly badFile: string;
   };
   /** Where to read on when the chip does not get into its downloader. */
   readonly guideUrl: string;
-  /** The receiver opens the logs even when the reset is left to the user; they show the boot then. */
-  readonly logsBeforeReset?: boolean;
   /** Fetches the chunk ``run`` writes with, for one who wants it ahead of the run. */
   loadEngine(): Promise<unknown>;
   /** Never throws: a failure names its copy. */

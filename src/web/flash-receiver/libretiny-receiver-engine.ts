@@ -74,7 +74,8 @@ export function libretinyReceiverEngine<Image>(
           }
           return {
             rebooted: result.rebooted,
-            ...(!result.rebooted && install.logsBeforeReset && { resetPending: true }),
+            ...(!result.rebooted &&
+              copy.logsNotice && { notice: localize(copy.logsNotice) }),
             note: byHand ? { message: localize(byHand) } : undefined,
           };
         }),

@@ -241,8 +241,8 @@ describe("esphome-web-flash-receiver reset note in the boot logs", () => {
     const port = makePort();
     openLiveLogPort.mockResolvedValue({ port, error: null });
     (el as any)._engine = async () => ({
-      note: { message: "Reset the board" },
-      logs: { port, knownPorts: [], rebooted: false, resetPending: true },
+      note: { message: "Installation complete" },
+      logs: { port, knownPorts: [], rebooted: false, notice: "Reset the board" },
     });
     await (el as any)._runInstall(vi.fn());
     expect((el as any)._logsNotice).toBe("Reset the board");

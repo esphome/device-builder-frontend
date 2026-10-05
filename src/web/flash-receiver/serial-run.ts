@@ -14,7 +14,7 @@ export type SerialReceiverRun = (
   hooks: ReceiverRunHooks
 ) => Promise<
   | ({ note?: ReceiverNote } & (
-      { rebooted: boolean; resetPending?: boolean } | { logsElsewhere: true }
+      { rebooted: boolean; notice?: string } | { logsElsewhere: true }
     ))
   | null
 >;
@@ -64,7 +64,7 @@ export function serialRun(localize: LocalizeFunc, run: SerialReceiverRun): Recei
         port,
         knownPorts,
         rebooted: result.rebooted,
-        resetPending: result.resetPending,
+        notice: result.notice,
       },
     };
   };

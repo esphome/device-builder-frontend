@@ -1,7 +1,7 @@
 /** The RTL8710B (AmebaZ) as web.esphome.io installs it: through the ROM downloader. */
 import { LIBRETINY_AMBZ_GUIDE_URL } from "../../../common/docs.js";
-import type { AmbzImage } from "../../../platforms/rtl87xx/index.js";
 import {
+  type AmbzImage,
   loadAmbzEngine,
   loadAmbzImage,
   runAmbz,
@@ -19,12 +19,12 @@ export const RTL_AMBZ_INSTALL: LibreTinyInstall<AmbzImage> = {
     guideLink: "firmware.rtl_ambz_guide_link",
     done: "web.rtl.install_done",
     doneByHand: "web.rtl_ambz.install_done_reset",
+    // Never booted by the engine, and its log is on the flash port.
+    logsNotice: "firmware.rtl_ambz_done_reset",
     failed: "firmware.rtl_flash_failed",
     badFile: "firmware.rtl_bad_uf2",
   },
   guideUrl: LIBRETINY_AMBZ_GUIDE_URL,
-  // Never booted by the engine, and its log is on the flash port.
-  logsBeforeReset: true,
   loadEngine: loadAmbzEngine,
   load: loadAmbzImage,
   run: runAmbz,

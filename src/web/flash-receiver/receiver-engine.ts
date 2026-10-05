@@ -37,8 +37,8 @@ export interface ReceiverLogs {
   knownPorts: SerialPort[];
   /** Whether the board is booting; if not, the logs wait for a reset by hand. */
   rebooted: boolean;
-  /** Not booting, but open the logs now: the note says how to reset it, and they show the boot. */
-  resetPending?: boolean;
+  /** Not booting, but open the logs now, headed by this: how to reset it, and they show the boot. */
+  notice?: string;
 }
 
 /**
