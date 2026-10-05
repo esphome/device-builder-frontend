@@ -26,6 +26,17 @@ export const LT_TAG = {
 // BINPATCH opcode: add a signed 32-bit delta to the words at the listed offsets.
 const BINPATCH_DIFF32 = 0xfe;
 
+/**
+ * Where each scheme's partition index sits in OTA_PART_INFO, one nibble per
+ * scheme (device single, OTA1, OTA2, flasher single, OTA1, OTA2), and
+ * whether its blocks take the BINPATCH that relocates OTA1 to OTA2.
+ */
+const SCHEMES: Record<LibreTinyScheme, { nibble: number; binpatch: boolean }> = {
+  "flasher-single": { nibble: 3, binpatch: false },
+  "flasher-ota1": { nibble: 4, binpatch: false },
+  "flasher-ota2": { nibble: 5, binpatch: true },
+};
+
 // FAL partition table entry: magic, name[16], flash name[16], offset, length, pad.
 export const PARTITION_ENTRY_SIZE = 48;
 export const PARTITION_MAGIC = 0x45503130;
@@ -132,14 +143,9 @@ export function parsePartitionTable(table: Uint8Array): LibreTinyPartition[] {
 function partInfoTarget(info: Uint8Array, scheme: LibreTinyScheme): string | null {
   if (info.length < 3) throw new Error("Invalid UF2: OTA_PART_INFO too short");
   const names = decoder.decode(info.subarray(3)).split("\0").filter(Boolean);
-  // One nibble per scheme: device single, device OTA1, device OTA2, flasher
-  // single, flasher OTA1, flasher OTA2.
-  const index =
-    scheme === "flasher-single"
-      ? info[1] & 0x0f
-      : scheme === "flasher-ota1"
-        ? info[2] >> 4
-        : info[2] & 0x0f;
+  const { nibble } = SCHEMES[scheme];
+  const byte = info[nibble >> 1];
+  const index = nibble & 1 ? byte & 0x0f : byte >> 4;
   if (index === 0) return null;
   const name = names[index - 1];
   if (!name) throw new Error("Invalid UF2: OTA_PART_INFO names too few partitions");
@@ -174,8 +180,24 @@ function applyBinpatch(data: Uint8Array, patch: Uint8Array): Uint8Array {
 export function parseLibreTinyImage(
   bytes: Uint8Array,
   allowedFamilies: readonly number[],
-  { scheme, blockSize, blocksFrom }: LibreTinyParseOptions
+  options: LibreTinyParseOptions
 ): LibreTinyImage {
+  return libreTinyImageFor(parseLibreTinyFile(bytes, allowedFamilies), options);
+}
+
+/** A LibreTiny UF2 read once, for resolving one or more schemes from it. */
+export interface LibreTinyFile {
+  familyId: number;
+  board: string;
+  partitions: LibreTinyPartition[];
+  blocks: LibreTinyBlock[];
+}
+
+/** The blocks, header tags and partition table, checked as ``parseLibreTinyImage`` does. */
+export function parseLibreTinyFile(
+  bytes: Uint8Array,
+  allowedFamilies: readonly number[]
+): LibreTinyFile {
   const blocks = parseLibreTinyBlocks(bytes);
   const familyId = requireUf2Family(blocks, allowedFamilies);
   // File-level tags live on the header and any other non-flash blocks.
@@ -192,7 +214,15 @@ export function parseLibreTinyImage(
   if (!board) throw new Error("Invalid UF2: no board name");
   const table = fileTags.get(LT_TAG.FAL_PTABLE);
   if (!table) throw new Error("Invalid UF2: no partition table");
-  const partitions = parsePartitionTable(table);
+  return { familyId, board, partitions: parsePartitionTable(table), blocks };
+}
+
+/** One scheme's flash runs from a parsed file. */
+export function libreTinyImageFor(
+  { familyId, board, partitions, blocks }: LibreTinyFile,
+  { scheme, blockSize, blocksFrom }: LibreTinyParseOptions
+): LibreTinyImage {
+  const { binpatch } = SCHEMES[scheme];
 
   // A run grows at its cursor; LibreTiny writes an image's header as a
   // later group that lands back on the partition start, which rewinds the
@@ -217,7 +247,7 @@ export function parseLibreTinyImage(
     if (b.data.length === 0) continue;
     if (!grouped) throw new Error("Invalid UF2: data block before OTA_PART_INFO");
     if (!part) continue;
-    const patch = scheme === "flasher-ota2" ? b.tags.get(LT_TAG.BINPATCH) : undefined;
+    const patch = binpatch ? b.tags.get(LT_TAG.BINPATCH) : undefined;
     const data = patch ? applyBinpatch(b.data, patch) : b.data;
     if (b.address + b.data.length > part.length) {
       throw new Error(

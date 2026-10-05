@@ -5,13 +5,14 @@
  * 1 KiB pieces, and memory writes over XModem-1k whose blocks carry their
  * target address in front of the data.
  */
+import { int32LE } from "../../util/bytes.js";
 import { SerialByteSession } from "../../util/serial-byte-session.js";
 import { sleep } from "../../util/sleep.js";
 import {
+  awaitStart,
   buildBlock,
   EOT_FRAME,
   sendFrame,
-  STX,
   XMODEM_BLOCK_SIZE,
   type XmodemIo,
 } from "../../util/xmodem.js";
@@ -52,25 +53,25 @@ const XMODEM_START_MS = 3000;
 const XMODEM_REPLY_MS = 3000;
 const XMODEM_RETRIES = 16;
 
-export class AmbzProtocolError extends Error {
+class AmbzProtocolError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "AmbzProtocolError";
   }
 }
 
-export function baudIndex(baud: number): number {
+function baudIndex(baud: number): number {
   const index = BAUD_TABLE.indexOf(baud);
   if (index < 0) throw new Error(`The AmebaZ ROM has no ${baud} baud rate`);
   return index;
 }
 
-const le32 = (value: number): number[] => [
-  value & 0xff,
-  (value >> 8) & 0xff,
-  (value >> 16) & 0xff,
-  (value >>> 24) & 0xff,
-];
+export interface MemoryWriteOptions {
+  /** After each acknowledged block: data bytes sent so far. */
+  onBlock?: (sent: number) => void;
+  /** A RAM write that boots the chip, which then never ACKs the end of the transfer. */
+  boots?: boolean;
+}
 
 export class AmbzLink extends SerialByteSession implements XmodemIo {
   async write(data: Uint8Array): Promise<void> {
@@ -90,9 +91,9 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
   async loudHandshake(): Promise<void> {
     this.drain();
     await this.write(new Uint8Array([CMD_FLASH_GET_STATUS]));
-    await this.readBytes(1, READ_MS); // the flash status byte
-    const reply = await this.readBytes(5, READ_MS);
-    if (reply[4] !== NAK) {
+    // The flash status byte, then the NAKs the handshake goes on with.
+    const reply = await this.readBytes(6, READ_MS);
+    if (reply[5] !== NAK) {
       throw new AmbzProtocolError("The ROM did not NAK after the loud handshake");
     }
   }
@@ -142,14 +143,13 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
   async flashRead(offset: number, blocks: number): Promise<Uint8Array> {
     await this.loudHandshake();
     await this.quietHandshake();
+    // The offset in 3 bytes, the count of 4 KiB blocks in 2, both little endian.
     await this.write(
       new Uint8Array([
         CMD_FLASH_READ,
-        offset & 0xff,
-        (offset >> 8) & 0xff,
-        (offset >> 16) & 0xff,
+        ...int32LE(offset).subarray(0, 3),
         blocks & 0xff,
-        (blocks >> 8) & 0xff,
+        blocks >> 8,
       ])
     );
     const out = new Uint8Array(blocks * READ_BLOCK);
@@ -165,39 +165,31 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
   /**
    * Write ``data`` to ``address`` over XModem-1k, plain checksum. The ROM's
    * receiver NAKs once it is ready, which can be a second after the
-   * handshake's ACK; a block sent before that is lost. ``fakeAck`` skips the
-   * wait after EOT, for a RAM write that boots the chip before the ACK.
+   * handshake's ACK; a block sent before that is lost. ltchiptool sends at
+   * once: the same bytes, here once the ROM asks (or after a while, if not).
    */
   async memoryWrite(
     address: number,
     data: Uint8Array,
-    onBlock?: (sent: number) => void,
-    fakeAck = false
+    { onBlock, boots = false }: MemoryWriteOptions = {}
   ): Promise<void> {
     await this.loudHandshake();
     await this.write(new Uint8Array([CMD_XMODEM_HANDSHAKE]));
     await this.expectAck("the XModem handshake");
-    // ltchiptool sends at once; the same bytes, once the ROM asks (or after a while, if it never does).
-    const ready = Date.now() + XMODEM_START_MS;
-    while (Date.now() < ready && (await this.readByte(ready - Date.now())) !== NAK);
+    await awaitStart(this, 0, XMODEM_START_MS).catch(() => false);
     let seq = 1;
     for (let off = 0; off < data.length; off += XMODEM_BLOCK_SIZE) {
       const chunk = data.subarray(off, Math.min(off + XMODEM_BLOCK_SIZE, data.length));
       const payload = new Uint8Array(BLOCK_PAYLOAD).fill(0xff);
-      payload.set(le32(address + off), 0);
+      payload.set(int32LE(address + off), 0);
       payload.set(chunk, 4);
-      await sendFrame(
-        this,
-        buildBlock(seq, payload, false, BLOCK_PAYLOAD, 0xff, STX),
-        `block ${seq}`,
-        XMODEM_RETRIES,
-        XMODEM_REPLY_MS
-      );
+      const frame = buildBlock(seq, payload, false, BLOCK_PAYLOAD, 0xff);
+      await sendFrame(this, frame, `block ${seq}`, XMODEM_RETRIES, XMODEM_REPLY_MS);
       seq = (seq + 1) & 0xff;
       onBlock?.(off + chunk.length);
     }
-    if (fakeAck) await this.write(EOT_FRAME);
-    else
+    if (boots) await this.write(EOT_FRAME);
+    else {
       await sendFrame(
         this,
         EOT_FRAME,
@@ -205,5 +197,6 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
         XMODEM_RETRIES,
         XMODEM_REPLY_MS
       );
+    }
   }
 }

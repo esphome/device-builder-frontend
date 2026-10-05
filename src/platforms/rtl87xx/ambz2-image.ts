@@ -23,27 +23,27 @@ export const AMBZ2_PARSE: LibreTinyParseOptions = {
   blocksFrom: "run",
 };
 
-/** Why an AmebaZ2 image was refused; ``key`` is the install dialogs' title copy. */
-export class Ambz2ImageError extends Error {
+/** Why a Realtek image was refused (either family); ``key`` is the install dialogs' title copy. */
+export class RtlImageError extends Error {
   constructor(
     readonly key: "firmware.rtl_wrong_family" | "firmware.rtl_bad_uf2",
     readonly cause: unknown
   ) {
     super(cause instanceof Error ? cause.message : String(cause));
-    this.name = "Ambz2ImageError";
+    this.name = "RtlImageError";
   }
 }
 
 /**
  * Parse a LibreTiny UF2 for the RTL8720C flasher. Another Realtek family
  * (AmebaZ) is a real build for the other Realtek flasher's chip; anything
- * else is a bad file. Fails as ``Ambz2ImageError``.
+ * else is a bad file. Fails as ``RtlImageError``.
  */
 export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
   try {
     return parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2], AMBZ2_PARSE);
   } catch (err) {
-    throw new Ambz2ImageError(
+    throw new RtlImageError(
       err instanceof Uf2FamilyError
         ? "firmware.rtl_wrong_family"
         : "firmware.rtl_bad_uf2",

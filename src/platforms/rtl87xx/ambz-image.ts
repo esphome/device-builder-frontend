@@ -8,23 +8,13 @@ import { Uf2FamilyError } from "../../util/uf2.js";
 import { XMODEM_BLOCK_SIZE } from "../../util/xmodem.js";
 import {
   type LibreTinyImage,
-  type LibreTinyParseOptions,
-  LT_TAG,
-  parseLibreTinyBlocks,
-  parseLibreTinyImage,
-  parsePartitionTable,
+  libreTinyImageFor,
+  type LibreTinyScheme,
+  parseLibreTinyFile,
 } from "../libretiny-uf2.js";
-import { UF2_FAMILY_AMBZ } from "./ambz2-image.js";
+import { RtlImageError, UF2_FAMILY_AMBZ } from "./ambz2-image.js";
 
-const AMBZ_PARSE = { blockSize: XMODEM_BLOCK_SIZE, blocksFrom: "run" } as const;
-export const AMBZ_PARSE_OTA1: LibreTinyParseOptions = {
-  scheme: "flasher-ota1",
-  ...AMBZ_PARSE,
-};
-export const AMBZ_PARSE_OTA2: LibreTinyParseOptions = {
-  scheme: "flasher-ota2",
-  ...AMBZ_PARSE,
-};
+export { RtlImageError };
 
 /** An RTL8710B build: the image for each OTA slot and where the second slot lives. */
 export interface AmbzImage {
@@ -34,41 +24,29 @@ export interface AmbzImage {
   ota2Offset: number;
 }
 
-/** Why an AmebaZ image was refused; ``key`` is the install dialogs' title copy. */
-export class AmbzImageError extends Error {
-  constructor(
-    readonly key: "firmware.rtl_wrong_family" | "firmware.rtl_bad_uf2",
-    readonly cause: unknown
-  ) {
-    super(cause instanceof Error ? cause.message : String(cause));
-    this.name = "AmbzImageError";
-  }
-}
-
-function ota2Offset(bytes: Uint8Array): number {
-  for (const block of parseLibreTinyBlocks(bytes)) {
-    const table = block.tags.get(LT_TAG.FAL_PTABLE);
-    if (!table) continue;
-    const part = parsePartitionTable(table).find((p) => p.name === "ota2");
-    if (part) return part.offset;
-  }
-  throw new Error("Invalid UF2: no 'ota2' partition");
-}
-
 /**
  * Parse a LibreTiny UF2 for the RTL8710B flasher. Another Realtek family
- * (AmebaZ2) is a real build for a different chip; anything else is a bad
- * file. Fails as ``AmbzImageError``.
+ * (AmebaZ2) is a real build for the other Realtek flasher's chip; anything
+ * else is a bad file. Fails as ``RtlImageError``.
  */
 export function parseAmbzImage(bytes: Uint8Array): AmbzImage {
   try {
+    const file = parseLibreTinyFile(bytes, [UF2_FAMILY_AMBZ]);
+    const slot = (scheme: LibreTinyScheme) =>
+      libreTinyImageFor(file, {
+        scheme,
+        blockSize: XMODEM_BLOCK_SIZE,
+        blocksFrom: "run",
+      });
+    const ota2 = file.partitions.find((p) => p.name === "ota2");
+    if (!ota2) throw new Error("Invalid UF2: no 'ota2' partition");
     return {
-      ota1: parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ], AMBZ_PARSE_OTA1),
-      ota2: parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ], AMBZ_PARSE_OTA2),
-      ota2Offset: ota2Offset(bytes),
+      ota1: slot("flasher-ota1"),
+      ota2: slot("flasher-ota2"),
+      ota2Offset: ota2.offset,
     };
   } catch (err) {
-    throw new AmbzImageError(
+    throw new RtlImageError(
       err instanceof Uf2FamilyError
         ? "firmware.rtl_wrong_family"
         : "firmware.rtl_bad_uf2",

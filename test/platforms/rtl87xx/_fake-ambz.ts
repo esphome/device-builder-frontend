@@ -58,10 +58,9 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   sys.setUint32(0, opts.ota2Address ?? 0x08080000, true);
   sys.setUint32(4, opts.ota2Switch ?? 0xffffffff, true);
   for (let i = 0; i < 0x10; i++) flash[SYSTEM + 0x100 + i] = i;
-  const ram = new Uint8Array(0x10000);
   let mode: "rom" | "firmware" | "booted" = opts.start ?? "rom";
   let baud = 0;
-  let idleNaks = mode === "rom" ? IDLE_NAKS : 0;
+  let loud = mode === "rom";
   let prev = 0;
   let pending: number[] = [];
   let reading: { at: number; left: number } | null = null;
@@ -79,9 +78,9 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
 
   /** The loud handshake NAKs on its own while the ROM idles at its speed. */
   const idle = () => {
-    if (mode !== "rom" || baud !== ROM_BAUD || !idleNaks) return;
-    reply(new Array(idleNaks).fill(NAK));
-    idleNaks = 0;
+    if (mode !== "rom" || baud !== ROM_BAUD || !loud) return;
+    reply(new Array(IDLE_NAKS).fill(NAK));
+    loud = false;
   };
 
   const sendChunk = () => {
@@ -124,14 +123,13 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
       flash.set(payload.slice(4), address & 0xffffff);
     } else {
       lastTarget = "ram";
-      ram.set(payload.slice(4), address - 0x10002000);
     }
     reply([ACK]);
   };
 
   const start = (byte: number) => {
     if (byte === CAN) {
-      idleNaks = IDLE_NAKS;
+      loud = true;
       idle();
     } else if (byte === 0x07 && prev === CAN) {
       // the middle of the disconnect sequence
@@ -177,7 +175,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
               : 0;
         if (magic === MAGIC.length && !opts.ignoresMagic) {
           mode = "rom";
-          idleNaks = IDLE_NAKS;
+          loud = true;
           magic = 0;
         }
       } else if (mode === "rom") {
@@ -226,12 +224,11 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
     bauds,
     signals,
     flash,
-    ram,
     booted: () => mode === "booted",
     /** The user's strap: the next open at the ROM's speed finds it in download mode. */
     strap: () => {
       mode = "rom";
-      idleNaks = IDLE_NAKS;
+      loud = true;
       idle();
     },
     dropLink: () => out?.close(),

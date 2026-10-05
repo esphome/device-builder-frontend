@@ -37,7 +37,7 @@ vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => 
 import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
-import { Ambz2ImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
+import { RtlImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
 import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
 import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
 import { RTL_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
@@ -158,7 +158,7 @@ describe("esphome-web-install-rtl-dialog", () => {
 
   it("names an AmebaZ image and a bad file under the picker, when they are picked", async () => {
     mocks.parseAmbz2Image.mockImplementation(() => {
-      throw new Ambz2ImageError(
+      throw new RtlImageError(
         "firmware.rtl_wrong_family",
         new Error("family 0x22e0d6fc")
       );
@@ -176,7 +176,7 @@ describe("esphome-web-install-rtl-dialog", () => {
     expect(mocks.requestSerialPort).not.toHaveBeenCalled();
 
     mocks.parseAmbz2Image.mockImplementation(() => {
-      throw new Ambz2ImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
+      throw new RtlImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
     });
     await pickFile(el, "_image", uf2());
     expect(pickerText(el).error).toBe("firmware.rtl_bad_uf2: not a UF2");
@@ -190,7 +190,7 @@ describe("esphome-web-install-rtl-dialog", () => {
 
   it("unpicks a refused file, so the same file can be picked again", async () => {
     mocks.parseAmbz2Image.mockImplementation(() => {
-      throw new Ambz2ImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
+      throw new RtlImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
     });
     const el = await mountBare();
     const cleared = watchFileInput(el);

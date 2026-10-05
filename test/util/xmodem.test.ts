@@ -25,15 +25,15 @@ describe("crc16Xmodem", () => {
 });
 
 describe("buildBlock", () => {
-  it("keeps STX for a 1k block that carries more, when asked", () => {
-    const block = buildBlock(1, bytes(1028), false, 1028, 0xff, STX);
+  it("sends a 1k block that carries more as STX", () => {
+    const block = buildBlock(1, bytes(1028), false, 1028, 0xff);
     expect(block.length).toBe(3 + 1028 + 1);
     expect([block[0], block[1], block[2]]).toEqual([STX, 1, 0xfe]);
     expect(block[1031]).toBe((1028 * 0x5a) & 0xff);
   });
 
-  it("picks SOH for any size but 1024 otherwise", () => {
-    expect(buildBlock(1, bytes(1028), false, 1028)[0]).toBe(0x01);
+  it("keeps SOH for 128-byte blocks", () => {
+    expect(buildBlock(1, bytes(128), false, 128)[0]).toBe(0x01);
   });
 });
 

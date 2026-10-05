@@ -12,9 +12,8 @@ export * from "./rtl87xx-platform.js";
 export * from "./serial-logs.js";
 
 import { getErrorMessage } from "../../util/error-message.js";
-import type { LibreTinyFlashResult } from "../libretiny-flash.js";
+import type { LibreTinyFlashHooks, LibreTinyFlashResult } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
-import type { AmbzFlashHooks } from "./ambz-flasher.js";
 import type { AmbzImage } from "./ambz-image.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
 
@@ -22,7 +21,7 @@ export const loadAmbz2Engine = () => import("./ambz2-flasher.js");
 export const loadAmbz2Parser = () => import("./ambz2-image.js");
 
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */
-export interface Ambz2ImageFailure {
+export interface RtlImageFailure {
   key:
     "firmware.engine_load_failed" | "firmware.rtl_wrong_family" | "firmware.rtl_bad_uf2";
   detail: string;
@@ -36,7 +35,7 @@ export interface Ambz2ImageFailure {
  */
 export async function loadAmbz2Image(
   bytes: Uint8Array
-): Promise<{ image: LibreTinyImage } | Ambz2ImageFailure> {
+): Promise<{ image: LibreTinyImage } | RtlImageFailure> {
   let parser: Awaited<ReturnType<typeof loadAmbz2Parser>>;
   try {
     parser = await loadAmbz2Parser();
@@ -48,7 +47,7 @@ export async function loadAmbz2Image(
     return { image: parser.parseAmbz2Image(bytes) };
   } catch (err) {
     return {
-      key: err instanceof parser.Ambz2ImageError ? err.key : "firmware.rtl_bad_uf2",
+      key: err instanceof parser.RtlImageError ? err.key : "firmware.rtl_bad_uf2",
       detail: getErrorMessage(err),
     };
   }
@@ -85,13 +84,13 @@ export async function runAmbz2(
   }
 }
 
-export const loadAmbzEngine = () => import("./ambz-flasher.js");
-export const loadAmbzParser = () => import("./ambz-image.js");
+const loadAmbzEngine = () => import("./ambz-flasher.js");
+const loadAmbzParser = () => import("./ambz-image.js");
 
 /** The RTL8710B counterpart of ``loadAmbz2Image``; never throws. */
 export async function loadAmbzImage(
   bytes: Uint8Array
-): Promise<{ image: AmbzImage } | Ambz2ImageFailure> {
+): Promise<{ image: AmbzImage } | RtlImageFailure> {
   let parser: Awaited<ReturnType<typeof loadAmbzParser>>;
   try {
     parser = await loadAmbzParser();
@@ -103,7 +102,7 @@ export async function loadAmbzImage(
     return { image: parser.parseAmbzImage(bytes) };
   } catch (err) {
     return {
-      key: err instanceof parser.AmbzImageError ? err.key : "firmware.rtl_bad_uf2",
+      key: err instanceof parser.RtlImageError ? err.key : "firmware.rtl_bad_uf2",
       detail: getErrorMessage(err),
     };
   }
@@ -113,7 +112,7 @@ export async function loadAmbzImage(
 export async function runAmbz(
   port: SerialPort,
   image: AmbzImage,
-  hooks: AmbzFlashHooks
+  hooks: LibreTinyFlashHooks
 ): Promise<LibreTinyFlashResult> {
   let engine: Awaited<ReturnType<typeof loadAmbzEngine>>;
   try {

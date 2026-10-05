@@ -5,7 +5,10 @@
  * next, write that slot's image, then boot it from RAM. Loaded on demand by
  * the install flow; nothing here touches the DOM.
  */
+import { concat, int32LE } from "../../util/bytes.js";
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
+import { resetIntoFirmware } from "../../util/serial-control-lines.js";
+import { openSerialPort } from "../../util/serial-open-error.js";
 import { sleep } from "../../util/sleep.js";
 import { settledWithin, withDeadline } from "../../util/with-deadline.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
@@ -22,9 +25,8 @@ import { UF2_FAMILY_AMBZ } from "./ambz2-image.js";
 /** The log UART's speed, where a running LibreTiny listens for the reboot magic. */
 const DIAG_BAUD = 115200;
 /**
- * What the reads and writes run at once linked. ltchiptool defaults to
- * 460800; cheap adapters drop the ROM's ACKs on writes that fast, so this
- * stays at the log speed.
+ * What the writes run at. ltchiptool defaults to 460800; cheap adapters lose
+ * the ROM's ACKs on writes that fast, so this stays at the log speed.
  */
 const WRITE_BAUD = 115200;
 /** LibreTiny reboots into download mode on 55 AA and its family id, big endian. */
@@ -48,9 +50,9 @@ const SYSTEM_OFFSET = 0x9000;
  * The boot table ltchiptool writes to RAM to start the firmware: the entry
  * point (the flash bootloader at 0x5405) followed by the ROM's own vectors.
  */
-const RAM_BOOT_TABLE = [
-  0x00005405, 0x1000219b, 0x100021ef, 0x100020f5, 0x100021ef, 0x08000541,
-];
+const RAM_BOOT_TABLE = concat(
+  ...[0x00005405, 0x1000219b, 0x100021ef, 0x100020f5, 0x100021ef, 0x08000541].map(int32LE)
+);
 /** The gaps in the system data, which ltchiptool rewrites as erased flash. */
 const SYSTEM_GAPS: readonly [number, number][] = [
   [0x09, 0x10],
@@ -60,8 +62,6 @@ const SYSTEM_GAPS: readonly [number, number][] = [
   [0x58, 0xfe0],
   [0xfe4, 0xff0],
 ];
-
-export type AmbzFlashHooks = LibreTinyFlashHooks;
 
 /** No ROM answered while the user had the chance to enter download mode. */
 export class AmbzLinkError extends Error {
@@ -93,18 +93,6 @@ export function pickSlot(
   return { slot: 1, rewrite };
 }
 
-async function setLines(port: SerialPort, signals: SerialOutputSignals): Promise<void> {
-  try {
-    await withDeadline(
-      port.setSignals(signals),
-      LINES_MS,
-      () => new Error("Setting the control lines timed out")
-    );
-  } catch {
-    // An adapter without control lines: the strap guide covers it.
-  }
-}
-
 /** Opens and closes the port at each speed the ROM moves between. */
 class Session {
   link: AmbzLink | null = null;
@@ -117,7 +105,7 @@ class Session {
   async open(baud: number): Promise<AmbzLink> {
     await this.close();
     await withDeadline(
-      this.port.open({ baudRate: baud }),
+      openSerialPort(this.port, { baudRate: baud }),
       REOPEN_MS,
       () => new Error("Reopening the port timed out")
     );
@@ -150,28 +138,26 @@ class Session {
   }
 }
 
-/** The reboot magic at the log speed, then listen at the ROM's; true once linked. */
+/** The reboot magic at the log speed, then listen at the ROM's; the link once linked. */
 async function enterDownloadMode(
   session: Session,
   port: SerialPort,
-  hooks: AmbzFlashHooks,
+  hooks: LibreTinyFlashHooks,
   log: (line: string) => void
-): Promise<boolean> {
+): Promise<AmbzLink | null> {
   log("Asking a running LibreTiny firmware to reboot into download mode");
   const diag = await session.open(DIAG_BAUD);
   await diag.write(DOWNLOAD_MAGIC);
   await sleep(MAGIC_SETTLE_MS);
-  let link = await session.open(AMBZ_ROM_BAUD);
-  if (await link.link(AUTO_LINK_MS)) return true;
-  log("No answer from the ROM; resetting the board over RTS");
-  await setLines(port, { dataTerminalReady: false, requestToSend: true });
-  await sleep(RESET_HOLD_MS);
-  await setLines(port, { requestToSend: false });
-  link = session.link!;
-  if (await link.link(AUTO_LINK_MS)) return true;
+  const link = await session.open(AMBZ_ROM_BAUD);
+  if (await link.link(AUTO_LINK_MS)) return link;
+  if (await resetIntoFirmware(port, RESET_HOLD_MS, LINES_MS)) {
+    log("No answer from the ROM; reset the board over RTS");
+    if (await link.link(AUTO_LINK_MS)) return link;
+  }
   log("No answer from the ROM; waiting for download mode (TX2 to GND, then reset)");
   hooks.onWaiting?.();
-  return link.link(STRAP_WAIT_MS);
+  return (await link.link(STRAP_WAIT_MS)) ? link : null;
 }
 
 /**
@@ -184,16 +170,17 @@ async function enterDownloadMode(
 export async function flashAmbz(
   port: SerialPort,
   image: AmbzImage,
-  hooks: AmbzFlashHooks
+  hooks: LibreTinyFlashHooks
 ): Promise<boolean> {
   const log = hooks.onLog ?? (() => {});
   const session = new Session(port, hooks.signal);
   let failure: unknown;
   try {
-    if (!(await enterDownloadMode(session, port, hooks, log))) throw new AmbzLinkError();
+    const rom = await enterDownloadMode(session, port, hooks, log);
+    if (!rom) throw new AmbzLinkError();
     hooks.onLinked?.();
     // Read at the link speed: the ROM does not answer FLASH_READ at 115200.
-    const system = await session.link!.flashRead(SYSTEM_OFFSET, 1);
+    const system = await rom.flashRead(SYSTEM_OFFSET, 1);
     let link = await session.moveTo(WRITE_BAUD);
     const { slot, rewrite } = pickSlot(system, image.ota2Offset);
     if (rewrite) {
@@ -211,20 +198,18 @@ export async function flashAmbz(
     for (const run of target.runs) {
       log(`Writing ${formatAddress(run.address)} (${run.data.length} bytes)`);
       const tenth = tenthLogger(log, `Writing ${formatAddress(run.address)}`);
-      await link.memoryWrite(AMBZ_FLASH_ADDRESS | run.address, run.data, (sent) => {
-        hooks.onProgress(
-          Math.min(99, Math.floor(((done + sent) / target.totalBytes) * 100))
-        );
-        tenth(Math.floor((sent / run.data.length) * 100));
+      await link.memoryWrite(AMBZ_FLASH_ADDRESS | run.address, run.data, {
+        onBlock: (sent) => {
+          hooks.onProgress(
+            Math.min(99, Math.floor(((done + sent) / target.totalBytes) * 100))
+          );
+          tenth(Math.floor((sent / run.data.length) * 100));
+        },
       });
       done += run.data.length;
       link = await session.resume();
     }
-    const table = new Uint8Array(RAM_BOOT_TABLE.length * 4);
-    const view = new DataView(table.buffer);
-    RAM_BOOT_TABLE.forEach((word, i) => view.setUint32(i * 4, word, true));
-    // The chip boots before it can ACK the end of the transfer.
-    await link.memoryWrite(AMBZ_RAM_ADDRESS, table, undefined, true);
+    await link.memoryWrite(AMBZ_RAM_ADDRESS, RAM_BOOT_TABLE, { boots: true });
     log("Booting the firmware");
     hooks.onProgress(100);
   } catch (err) {
