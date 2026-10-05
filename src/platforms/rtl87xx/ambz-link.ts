@@ -82,8 +82,10 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     await this.writeBytes(data);
   }
 
-  private async expectAck(doc: string): Promise<void> {
-    const reply = await this.readByte(READ_MS);
+  /** ``skipNaks``: an idle loud handshake NAK can land ahead of the reply. */
+  private async expectAck(doc: string, skipNaks = false): Promise<void> {
+    let reply = await this.readByte(READ_MS);
+    while (skipNaks && reply === NAK) reply = await this.readByte(READ_MS);
     if (reply !== ACK) {
       throw new AmbzProtocolError(
         `No ACK after ${doc} (got ${reply === null ? "nothing" : `0x${reply.toString(16)}`})`
@@ -148,7 +150,7 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
   async requestBaud(baud: number): Promise<void> {
     this.drain();
     await this.write(new Uint8Array([CMD_SET_BAUD_RATE, baudIndex(baud)]));
-    await this.expectAck("the baud rate change");
+    await this.expectAck("the baud rate change", true);
   }
 
   /** Read ``blocks`` 4 KiB blocks of flash from ``offset`` (ROM FLASH_READ, no verify). */

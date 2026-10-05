@@ -217,6 +217,13 @@ describe("flashAmbz, a ROM slow to take the first block", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
   });
 
+  it("takes the baud change's ACK past an idle NAK", async () => {
+    const chip = fakeAmbz({ ota2Address: 0x08000000 | 0x80000, naksBeforeBaudAck: true });
+    const done = flashAmbz(chip.port, IMAGE, { onProgress: () => {} });
+    await expect(driveFakeTimers(done)).resolves.toBe(true);
+    expect(chip.booted()).toBe(true);
+  });
+
   it("lets the ROM finish its xmodem log before asking for the write speed again", async () => {
     const chip = fakeAmbz({
       ota2Address: 0x08000000 | 0x80000,

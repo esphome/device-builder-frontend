@@ -52,6 +52,8 @@ export interface FakeAmbzOptions {
    * for this long, deaf to commands, which reads as noise at 1.5M.
    */
   chattersAfterWriteMs?: number;
+  /** NAK once ahead of the first baud change's ACK, as an idle loud handshake can. */
+  naksBeforeBaudAck?: boolean;
 }
 
 export function fakeAmbz(opts: FakeAmbzOptions = {}) {
@@ -78,6 +80,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   let magic = 0;
   let reads = 0;
   let deafUntil = 0;
+  let nakedBaud = false;
 
   const reply = (data: number[] | Uint8Array) => {
     const bytes = new Uint8Array(data);
@@ -169,6 +172,10 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   const argument = () => {
     if (pending[0] === 0x05 && pending.length === 2) {
       pending = [];
+      if (opts.naksBeforeBaudAck && !nakedBaud) {
+        nakedBaud = true;
+        reply([NAK]);
+      }
       reply([ACK]);
     } else if (pending[0] === 0x19 && pending.length === 6) {
       const offset = pending[1] | (pending[2] << 8) | (pending[3] << 16);
