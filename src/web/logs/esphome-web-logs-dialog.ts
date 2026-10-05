@@ -87,7 +87,7 @@ export class ESPHomeWebLogsDialog extends LitElement {
   @property({ attribute: false }) baudRate?: number;
 
   /** Localized line heading a fresh stream, e.g. to reset a board that waits for it. */
-  @property() notice = "";
+  @property({ attribute: false }) notice = "";
 
   @consume({ context: localizeContext, subscribe: true })
   @state()

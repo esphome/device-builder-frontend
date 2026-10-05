@@ -224,13 +224,25 @@ describe("esphome-web-flash-receiver boot logs hand-off", () => {
 });
 
 describe("esphome-web-flash-receiver reset note in the boot logs", () => {
+  it("leaves the note off the logs of a board that rebooted itself", async () => {
+    const el = await mount();
+    const port = makePort();
+    openLiveLogPort.mockResolvedValue({ port, error: null });
+    (el as any)._engine = async () => ({
+      note: { message: "Release PA00" },
+      logs: { port, knownPorts: [], rebooted: true },
+    });
+    await (el as any)._runInstall(vi.fn());
+    expect((el as any)._logsNotice).toBe("");
+  });
+
   it("heads the logs with the reset left to the user, and drops it with the dialog", async () => {
     const el = await mount();
     const port = makePort();
     openLiveLogPort.mockResolvedValue({ port, error: null });
     (el as any)._engine = async () => ({
       note: { message: "Reset the board" },
-      logs: { port, knownPorts: [], rebooted: true },
+      logs: { port, knownPorts: [], rebooted: false, resetPending: true },
     });
     await (el as any)._runInstall(vi.fn());
     expect((el as any)._logsNotice).toBe("Reset the board");

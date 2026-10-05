@@ -218,7 +218,8 @@ describe("rtlAmbzReceiverEngine", () => {
     ambz.run.mockResolvedValue({ rebooted: false });
 
     expect("run" in plan && (await plan.run(hooks()))).toEqual({
-      rebooted: true,
+      rebooted: false,
+      resetPending: true,
       note: { message: "firmware.rtl_ambz_done_reset" },
     });
   });
