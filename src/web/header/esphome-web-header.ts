@@ -1,16 +1,16 @@
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { classMap } from "lit/directives/class-map.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
-import { DEFAULT_WEB_MODE, WEB_PLATFORMS } from "../platforms/registry.js";
+import { DEFAULT_WEB_MODE } from "../platforms/registry.js";
 import { modeUrl, type WebMode } from "../web-mode.js";
 
 import "./esphome-web-header-actions.js";
+import "./esphome-web-mode-picker.js";
 
 /**
  * ESPHome Web top bar. The device-family picker on the right is hidden
@@ -27,12 +27,6 @@ export class ESPHomeWebHeader extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  private _setMode(mode: WebMode): void {
-    this.dispatchEvent(
-      new CustomEvent("set-mode", { detail: mode, bubbles: true, composed: true })
-    );
-  }
-
   protected render() {
     return html`
       <div class="app-header">
@@ -46,29 +40,10 @@ export class ESPHomeWebHeader extends LitElement {
         <div class="header-spacer"></div>
         ${
           !this.minimal && isWebSerialSupported()
-            ? html`
-                <div
-                  class="mode-picker"
-                  role="group"
-                  aria-label=${this._localize("web.header.mode_picker_label")}
-                >
-                  ${WEB_PLATFORMS.map(({ mode, logo, labelKey }) => {
-                    const label = this._localize(labelKey);
-                    // Below 870px the label is display:none, so the button needs its own name.
-                    return html`
-                      <button
-                        class=${classMap({ "mode-btn": true, active: this.mode === mode })}
-                        aria-pressed=${this.mode === mode}
-                        aria-label=${label}
-                        @click=${() => this._setMode(mode)}
-                      >
-                        <img class="mode-logo" src="/static/logo/${logo}" alt="" />
-                        <span class="mode-label">${label}</span>
-                      </button>
-                    `;
-                  })}
-                </div>
-              `
+            ? html`<esphome-web-mode-picker
+                class="mode-picker"
+                .mode=${this.mode}
+              ></esphome-web-mode-picker>`
             : nothing
         }
         <esphome-web-header-actions></esphome-web-header-actions>
@@ -143,55 +118,11 @@ export class ESPHomeWebHeader extends LitElement {
       }
 
       .mode-picker {
-        display: inline-flex;
-        flex-shrink: 0;
-        border-radius: var(--wa-border-radius-m);
-        border: 1px solid color-mix(in srgb, var(--esphome-on-primary), transparent 55%);
-        overflow: hidden;
+        flex-shrink: 1;
+        min-width: 0;
       }
 
-      .mode-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 10px;
-        background: none;
-        border: none;
-        border-right: 1px solid
-          color-mix(in srgb, var(--esphome-on-primary), transparent 55%);
-        color: var(--esphome-on-primary);
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-semibold);
-        font-family: inherit;
-        cursor: pointer;
-        opacity: 0.6;
-        transition:
-          background 0.1s,
-          opacity 0.1s;
-        white-space: nowrap;
-      }
-
-      .mode-btn:last-child {
-        border-right: none;
-      }
-
-      .mode-btn:hover {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-        opacity: 1;
-      }
-
-      .mode-btn.active {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 75%);
-        opacity: 1;
-        cursor: default;
-      }
-
-      .mode-logo {
-        height: 16px;
-        flex-shrink: 0;
-      }
-
-      /* Compact header below 870px: subtitle drops, logo shrinks, mode labels hide. */
+      /* Compact header below 870px: subtitle drops, logo shrinks. */
       @media (max-width: 870px) {
         .app-header {
           gap: var(--wa-space-s);
@@ -206,14 +137,6 @@ export class ESPHomeWebHeader extends LitElement {
           height: 32px;
           padding: 3px 0;
           box-sizing: border-box;
-        }
-
-        .mode-label {
-          display: none;
-        }
-
-        .mode-btn {
-          padding: 4px 8px;
         }
       }
     `,

@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  *
  * A new web.esphome.io family needs no edits in the shared shell: with a
- * test-only family added to the registry, the header offers it, the mode URL
+ * test-only family added to the registry, the header picker offers it, the mode URL
  * carries its flag, and the dashboard shows its card and intro.
  */
 import { html } from "lit";
@@ -75,12 +75,22 @@ describe("a family added only to the web registry", () => {
     expect(modeUrl(TEST_ONLY, new URL("https://web.esphome.io/"))).toBe("/?testonly");
   });
 
-  it("gets a header button with its logo and label, pressed when active", async () => {
+  it("gets a header picker row with its logo and label, checked when active", async () => {
     const header = await mount(new ESPHomeWebHeader());
-    const buttons = [...header.shadowRoot!.querySelectorAll("button.mode-btn")];
-    const last = buttons[buttons.length - 1];
-    expect(last.getAttribute("aria-label")).toBe("test.mode_label");
-    expect(last.getAttribute("aria-pressed")).toBe("true");
+    const picker = header.shadowRoot!.querySelector("esphome-web-mode-picker")!;
+    Object.assign(picker, { _localize: (k: string) => k });
+    await picker.updateComplete;
+    const trigger = picker.shadowRoot!.querySelector<HTMLButtonElement>(".trigger")!;
+    expect(trigger.textContent).toContain("test.mode_label");
+    expect(trigger.querySelector("img")?.getAttribute("src")).toBe(
+      "/static/logo/testonly.svg"
+    );
+    trigger.click();
+    await picker.updateComplete;
+    const rows = [...picker.shadowRoot!.querySelectorAll(".menu-item")];
+    const last = rows[rows.length - 1];
+    expect(last.textContent).toContain("test.mode_label");
+    expect(last.getAttribute("aria-checked")).toBe("true");
     expect(last.querySelector("img")?.getAttribute("src")).toBe(
       "/static/logo/testonly.svg"
     );
