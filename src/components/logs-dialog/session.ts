@@ -30,7 +30,7 @@ export interface SerialResetHook {
 export function openOta(
   host: ESPHomeLogsDialog,
   port: string,
-  options: { onBackToInstall?: () => void } = {}
+  options: { onBackToInstall?: () => void; notice?: string } = {}
 ): void {
   beginSession(host, options.onBackToInstall);
   host._reconnect = null;
@@ -38,6 +38,7 @@ export function openOta(
   host._session = { kind: "ota", port, streamId: null };
   host._open = true;
   host._resetAnsiLogScroll();
+  if (options.notice) host._log.append([options.notice]);
   // Not awaiting the teardown in beginSession (unlike toggleShowStates):
   // openOta is only reached after a close, so any prior session is already
   // idle and the teardown is a no-op — there's no live stream to overlap.

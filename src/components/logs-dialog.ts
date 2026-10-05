@@ -286,7 +286,10 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  public open(port = OTA_PORT, options: { onBackToInstall?: () => void } = {}) {
+  public open(
+    port = OTA_PORT,
+    options: { onBackToInstall?: () => void; notice?: string } = {}
+  ) {
     openOta(this, port, options);
   }
 
