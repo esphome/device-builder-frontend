@@ -118,6 +118,19 @@ describe("esphome-web-logs-dialog", () => {
     expect((el as any)._lines).toEqual(["Reset the board"]);
   });
 
+  it("does not repeat the notice when the stream restarts", async () => {
+    const el = await mount(ESP_SERIAL_LOGS);
+    el.notice = "Reset the board";
+    el.port = makeWebSerialPort();
+    el.open = true;
+    await el.updateComplete;
+    el.open = false;
+    await el.updateComplete;
+    el.open = true;
+    await el.updateComplete;
+    expect((el as any)._lines).toEqual([]);
+  });
+
   it("offers the nRF52 Reset only on ESPHome's own CDC, never over Bluetooth", async () => {
     const el = await mount(NRF52_SERIAL_LOGS);
     const port = (usbVendorId: number, usbProductId: number) =>

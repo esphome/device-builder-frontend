@@ -86,8 +86,11 @@ export class ESPHomeWebLogsDialog extends LitElement {
   /** The baud a reconnect reopens the port at; ESPHome's default unless set. */
   @property({ attribute: false }) baudRate?: number;
 
-  /** Localized line heading a fresh stream, e.g. to reset a board that waits for it. */
+  /** Localized line heading the next stream, e.g. to reset a board that waits for it. */
   @property({ attribute: false }) notice = "";
+
+  // The notice heads one stream, not every reconnect after it.
+  private _noticeShown = false;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -128,6 +131,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
   // once the rebooted device re-enumerates. _start's guards make the extra
   // calls no-ops, including a port swapped mid-stream or mid-reconnect —
   // the dialog owns its active handle and announces swaps via port-replaced.
+  protected willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has("notice")) this._noticeShown = false;
+  }
+
   protected updated(changed: Map<string, unknown>): void {
     if (!changed.has("open") && !changed.has("port") && !changed.has("bleDevice")) return;
     if (this.open) {
@@ -170,7 +177,10 @@ export class ESPHomeWebLogsDialog extends LitElement {
     if (!source) return; // no (open) port or device yet — legitimately quiet
     this._source = source;
     this._resetLines();
-    if (this.notice) this._lines = [this.notice];
+    if (this.notice && !this._noticeShown) {
+      this._lines = [this.notice];
+      this._noticeShown = true;
+    }
     this._crashKind = null;
     this._paused = false;
     this._streaming = true;

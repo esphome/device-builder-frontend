@@ -1,6 +1,6 @@
 import { customElement } from "lit/decorators.js";
 
-import type { AmbzImage } from "../../../platforms/rtl87xx/ambz-image.js";
+import type { AmbzImage } from "../../../platforms/rtl87xx/index.js";
 import { LibreTinyInstallDialog } from "../../install/libretiny-install-dialog.js";
 import { RTL_AMBZ_INSTALL } from "./ambz-install.js";
 

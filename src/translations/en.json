@@ -2150,7 +2150,8 @@
       "connect_hint": "Install the UF2 of your ESPHome build on your Realtek RTL8710B (AmebaZ) board over USB, or read its logs. Wire the adapter to the log port (TX2 on PA30, RX2 on PA29) and power the board from a solid 3.3 V supply. To install, hold TX2 to GND while you reset the board, unless your adapter's RTS drives its reset; you will be shown how.",
       "logs": "Serial logs",
       "install_title": "Install firmware on an RTL8710B",
-      "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8710B yet. Build your device in the ESPHome Device Builder and install its UF2 from here."
+      "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8710B yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
+      "install_done_reset": "Installation complete. Reset the board (pull CEN to GND briefly, or power-cycle it) to start the firmware."
     },
     "nrf": {
       "title": "nRF52 Device",
