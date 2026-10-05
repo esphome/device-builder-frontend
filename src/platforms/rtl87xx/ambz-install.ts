@@ -104,7 +104,12 @@ export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promis
   }
   // Not booted (see flashAmbz); the logs open now and show the boot once reset.
   host._statusMessage = host._localize("firmware.rtl_ambz_done_reset");
-  finishWithLogsPort(host, port, true);
+  finishWithLogsPort(
+    host,
+    port,
+    true,
+    host._localize("firmware.rtl_ambz_reset_to_start")
+  );
 }
 
 export const rtlAmbzInstall: BrowserInstall<"rtl-ambz"> = {

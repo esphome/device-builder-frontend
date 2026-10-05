@@ -578,6 +578,7 @@
     "rtl_ambz_ready_desc": "Connect the board's log port (TX2 and RX2) to a USB serial adapter, click Flash and pick its port. Unless the adapter's RTS is wired to the board's reset, you will be shown how to put it into download mode by hand.",
     "rtl_ambz_connect_desc": "Switching the board into download mode and waiting for its ROM to answer.",
     "rtl_ambz_wait_desc": "The board did not answer. Hold TX2 (PA30) to GND, pull CEN to GND briefly (or power-cycle the board), then release TX2. Flashing starts as soon as the ROM answers. Power the board from a solid 3.3 V supply; a USB adapter's own regulator is often too weak.",
+    "rtl_ambz_reset_to_start": "Reset the board (pull CEN to GND briefly, or power-cycle it) to start the new firmware; its log appears here.",
     "rtl_ambz_guide_link": "LibreTiny flashing guide for the RTL8710B",
     "rtl_ambz_done_reset": "Installation complete. Reset the board (pull CEN to GND briefly, or power-cycle it) to start the firmware; its log follows here.",
     "bk_ready_title": "Ready to flash over USB",

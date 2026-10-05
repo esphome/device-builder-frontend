@@ -785,6 +785,18 @@ describe("handlePostInstallShowLogs serial baud", () => {
     expect(dialog.openPassive).toHaveBeenCalledTimes(1);
   });
 
+  it("heads the serial logs with the install's notice", async () => {
+    const dialog = logsDialog();
+    const event = new CustomEvent("request-show-logs-after-install", {
+      cancelable: true,
+      detail: { ...detail(115200), notice: "Reset the board" },
+    });
+    await handlePostInstallShowLogs(event, dialog as never, defaultLocalize);
+    expect(dialog.openPassive).toHaveBeenCalledWith(
+      expect.objectContaining({ notice: "Reset the board" })
+    );
+  });
+
   it.each([
     ["rp2", "object"],
     ["esp32", "undefined"],

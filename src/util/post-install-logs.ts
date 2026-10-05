@@ -320,6 +320,7 @@ export async function handlePostInstallShowLogs(
     loggerBaudRate,
     loggerInterface,
     targetPlatform,
+    notice,
     reopenInstall,
   } = e.detail;
   logsDialog.configuration = configuration;
@@ -353,6 +354,7 @@ export async function handlePostInstallShowLogs(
           targetPlatform ?? ""
         ),
       onResetDevice: sessionResetHook(logsDialog, localize, targetPlatform, baudRate),
+      notice,
     });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly

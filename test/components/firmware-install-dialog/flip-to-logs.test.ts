@@ -10,7 +10,11 @@ const { dispatchShowLogsAfterInstall } = vi.hoisted(() => ({
   dispatchShowLogsAfterInstall: vi.fn(
     (
       _source: HTMLElement,
-      _detail: { loggerBaudRate?: number | null; loggerInterface?: string | null }
+      _detail: {
+        loggerBaudRate?: number | null;
+        loggerInterface?: string | null;
+        notice?: string;
+      }
     ) => true
   ),
 }));
@@ -20,7 +24,10 @@ vi.mock("../../../src/util/post-install-dispatch.js", () => ({
 
 import { identityLocalize } from "../../_dom.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmware-install-dialog.js";
-import { flipToLogs } from "../../../src/components/firmware-install-dialog/install-flow.js";
+import {
+  finishWithLogsPort,
+  flipToLogs,
+} from "../../../src/components/firmware-install-dialog/install-flow.js";
 
 function makeHost(
   loggerBaudRate: number | null,
@@ -55,5 +62,21 @@ describe("flipToLogs", () => {
     flipToLogs(makeHost(115200, iface), port);
     expect(dispatchShowLogsAfterInstall).toHaveBeenCalledTimes(1);
     expect(dispatchShowLogsAfterInstall.mock.calls[0][1].loggerInterface).toBe(iface);
+  });
+
+  it("carries the install's notice to the logs, also from the Done step's button", () => {
+    const host = makeHost(115200);
+    Object.assign(host, { _showLogsAfterInstall: true });
+    finishWithLogsPort(host, port, true, "Reset the board");
+    flipToLogs(host, port);
+    expect(dispatchShowLogsAfterInstall).toHaveBeenCalledTimes(2);
+    for (const [, detail] of dispatchShowLogsAfterInstall.mock.calls) {
+      expect(detail.notice).toBe("Reset the board");
+    }
+  });
+
+  it("sends no notice by default", () => {
+    flipToLogs(makeHost(115200), port);
+    expect(dispatchShowLogsAfterInstall.mock.calls[0][1].notice).toBeUndefined();
   });
 });

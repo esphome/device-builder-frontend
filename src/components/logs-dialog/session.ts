@@ -55,6 +55,8 @@ export function openPassive(
     onResetDevice?: SerialResetHook;
     /** What the attach will bring: drives the source chip in every phase. */
     source?: PassiveSource;
+    /** Localized line heading the log, e.g. to reset a board that waits for it. */
+    notice?: string;
   }
 ): () => boolean {
   beginSession(host, options.onBackToInstall);
@@ -70,6 +72,7 @@ export function openPassive(
   if (host._passiveSource === "ble") {
     host._log.append([host._localize("dashboard.logs_ble_nus_connecting")]);
   }
+  if (options.notice) host._log.append([options.notice]);
   // For that attach: it may still be settling when this session is gone.
   return sessionMovedOn(host);
 }
