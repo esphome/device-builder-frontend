@@ -84,8 +84,8 @@ export async function runAmbz2(
   }
 }
 
-const loadAmbzEngine = () => import("./ambz-flasher.js");
-const loadAmbzParser = () => import("./ambz-image.js");
+export const loadAmbzEngine = () => import("./ambz-flasher.js");
+export const loadAmbzParser = () => import("./ambz-image.js");
 
 /** The RTL8710B counterpart of ``loadAmbz2Image``; never throws. */
 export async function loadAmbzImage(
