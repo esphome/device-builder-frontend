@@ -190,8 +190,9 @@ export class ESPHomeWebHeader extends LitElement {
         flex-shrink: 0;
       }
 
-      /* Every family by name while they fit beside the compact title (about
-         870px with today's seven); the dropdown below that. */
+      /* Every family by name while they fit beside the compact title, the
+         dropdown below that. 880px fits today's seven families and labels;
+         re-measure it when either changes, as .app-header clips overflow. */
       esphome-web-mode-picker {
         display: none;
       }

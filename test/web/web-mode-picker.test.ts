@@ -104,6 +104,38 @@ describe("esphome-web-mode-picker", () => {
     expect(events).toEqual([]);
   });
 
+  it("closes when the window resizes", async () => {
+    const el = await mount("esp");
+    await open(el);
+    window.dispatchEvent(new Event("resize"));
+    await el.updateComplete;
+    expect(root(el).querySelector(".menu")).toBeNull();
+  });
+
+  it("hands focus back to the trigger however the menu closes", async () => {
+    const el = await mount("esp");
+    const trigger = () => root(el).querySelector<HTMLElement>(".trigger");
+    const press = (key: string) =>
+      (root(el).activeElement as HTMLElement).dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true })
+      );
+    await open(el);
+    root(el).querySelector<HTMLElement>(".backdrop")!.click();
+    await el.updateComplete;
+    expect(root(el).activeElement).toBe(trigger());
+    await open(el);
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+    );
+    await el.updateComplete;
+    expect(root(el).activeElement).toBe(trigger());
+    await open(el);
+    press("Tab");
+    await el.updateComplete;
+    expect(root(el).querySelector(".menu")).toBeNull();
+    expect(root(el).activeElement).toBe(trigger());
+  });
+
   it("moves between families with the arrow keys and picks with Enter", async () => {
     const el = await mount("esp");
     const events: string[] = [];

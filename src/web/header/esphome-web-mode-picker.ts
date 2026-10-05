@@ -34,6 +34,19 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
   /** Where the menu opens: under the trigger, right edges aligned. */
   private _menuPos = { top: 0, right: 0 };
 
+  override connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener("resize", this._onResize);
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener("resize", this._onResize);
+  }
+
+  // The menu is placed at open time, and a resize can hide this picker; close it.
+  private _onResize = () => this._close();
+
   private _openMenu = () => {
     const rect = this._trigger.getBoundingClientRect();
     this._menuPos = { top: rect.bottom + 4, right: window.innerWidth - rect.right };
@@ -42,11 +55,16 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
 
   private _pick(mode: WebMode) {
     this._close();
-    this._trigger.focus();
     if (mode !== this.mode) this._emit("set-mode", mode);
   }
 
   private _onMenuKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Tab") {
+      // Like Escape: leave the menu back on its trigger rather than past an open menu.
+      e.preventDefault();
+      this._close();
+      return;
+    }
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     e.preventDefault();
     const rows = [...this.renderRoot.querySelectorAll<HTMLElement>(".menu-item")];
@@ -56,9 +74,12 @@ export class ESPHomeWebModePicker extends OverflowMenuElement {
   };
 
   protected updated(changed: Map<string, unknown>) {
-    // Open on the current family, so the arrows start from it.
-    if (changed.has("_open") && this._open) {
+    // Open on the current family, so the arrows start from it; close back on the trigger.
+    if (!changed.has("_open")) return;
+    if (this._open) {
       this.renderRoot.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+    } else if (changed.get("_open") === true) {
+      this._trigger.focus();
     }
   }
 
