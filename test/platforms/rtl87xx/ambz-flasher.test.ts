@@ -206,7 +206,8 @@ describe("flashAmbz, a garbled system data read", () => {
     await expect(driveFakeTimers(done)).rejects.toThrow(
       /system data read back differently/
     );
-    expect(chip.flash).toEqual(before);
+    // A plain loop over the 2 MiB flash; toEqual is too slow on CI.
+    expect(chip.flash.every((b, i) => b === before[i])).toBe(true);
     expect(chip.booted()).toBe(false);
   });
 });
