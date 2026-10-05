@@ -243,7 +243,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
 
 /** The recorded fixture's UF2 (record.py builds it), read from the repo root as the tests run. */
 export async function fixtureUf2(): Promise<Uint8Array> {
-  // @ts-expect-error — node-only module (see gen-language-manifest.test.ts)
+  // @ts-expect-error - node-only module (see gen-language-manifest.test.ts)
   const { readFileSync } = await import("node:fs");
   return new Uint8Array(readFileSync("test/platforms/rtl87xx/fixtures/ambz.uf2"));
 }

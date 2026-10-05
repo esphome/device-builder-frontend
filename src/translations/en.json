@@ -608,7 +608,7 @@
     "ln_ramcode_unavailable": "Could not download the LN882H loader the chip needs for flashing. Check the internet connection and try again.",
     "ln_ramcode_mismatch": "The LN882H loader that was downloaded is not the expected file, so it was not sent to the chip.",
     "engine_load_failed": "Could not load the flashing tools. Reload the page and try again.",
-    "rtl_wrong_family": "This firmware is built for a different Realtek chip than this device's.",
+    "rtl_wrong_family": "This firmware is built for a different chip than this device's.",
     "nrf_no_dfu_package": "This build did not produce a DFU package (firmware.zip). Browser DFU needs the Adafruit nRF52 bootloader build.",
     "nrf_bad_package": "Invalid DFU package",
     "nrf_no_mcuboot_bin": "This build did not produce an MCUboot update image (zephyr/app_update.bin). An update over mcumgr needs an MCUboot build.",
