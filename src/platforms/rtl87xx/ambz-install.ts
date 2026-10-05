@@ -65,9 +65,8 @@ function showReadyStep(host: ESPHomeFirmwareInstallDialog): void {
 }
 
 /**
- * Pick the port and flash. A running LibreTiny reboots into download mode
- * when asked; otherwise the dialog moves to the strap guide while the
- * engine keeps polling for the ROM.
+ * Pick the port and flash. Unless RTS resets the board into the ROM, the
+ * dialog moves to the strap guide while the engine keeps polling for it.
  */
 export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const image = rtlAmbzImage.get(host);
