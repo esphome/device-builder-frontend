@@ -1949,7 +1949,7 @@
       "title": "ESPHome Web",
       "subtitle": "Install and manage your devices from the browser",
       "mode_esp": "ESP",
-      "mode_pico": "Raspberry Pi",
+      "mode_pico": "RP2",
       "mode_nrf": "nRF52",
       "mode_rtl": "RTL8720C",
       "mode_bk": "BK72xx",

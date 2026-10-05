@@ -1,12 +1,13 @@
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { isWebSerialSupported } from "../../util/web-serial.js";
-import { DEFAULT_WEB_MODE } from "../platforms/registry.js";
+import { DEFAULT_WEB_MODE, WEB_PLATFORMS } from "../platforms/registry.js";
 import { modeUrl, type WebMode } from "../web-mode.js";
 
 import "./esphome-web-header-actions.js";
@@ -27,6 +28,12 @@ export class ESPHomeWebHeader extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  private _setMode(mode: WebMode): void {
+    this.dispatchEvent(
+      new CustomEvent("set-mode", { detail: mode, bubbles: true, composed: true })
+    );
+  }
+
   protected render() {
     return html`
       <div class="app-header">
@@ -40,7 +47,27 @@ export class ESPHomeWebHeader extends LitElement {
         <div class="header-spacer"></div>
         ${
           !this.minimal && isWebSerialSupported()
-            ? html`<esphome-web-mode-picker .mode=${this.mode}></esphome-web-mode-picker>`
+            ? html`
+                <div
+                  class="mode-buttons"
+                  role="group"
+                  aria-label=${this._localize("web.header.mode_picker_label")}
+                >
+                  ${WEB_PLATFORMS.map(
+                    ({ mode, logo, labelKey }) => html`
+                      <button
+                        class=${classMap({ "mode-btn": true, active: this.mode === mode })}
+                        aria-pressed=${this.mode === mode}
+                        @click=${() => this._setMode(mode)}
+                      >
+                        <img class="mode-logo" src="/static/logo/${logo}" alt="" />
+                        <span>${this._localize(labelKey)}</span>
+                      </button>
+                    `
+                  )}
+                </div>
+                <esphome-web-mode-picker .mode=${this.mode}></esphome-web-mode-picker>
+              `
             : nothing
         }
         <esphome-web-header-actions></esphome-web-header-actions>
@@ -114,8 +141,74 @@ export class ESPHomeWebHeader extends LitElement {
         flex: 1;
       }
 
-      /* Compact header below 870px: subtitle drops, logo shrinks. */
-      @media (max-width: 870px) {
+      .mode-buttons {
+        display: inline-flex;
+        flex-shrink: 0;
+        border-radius: var(--wa-border-radius-m);
+        border: 1px solid color-mix(in srgb, var(--esphome-on-primary), transparent 55%);
+        overflow: hidden;
+      }
+
+      .mode-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: none;
+        border: none;
+        border-right: 1px solid
+          color-mix(in srgb, var(--esphome-on-primary), transparent 55%);
+        color: var(--esphome-on-primary);
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        font-family: inherit;
+        cursor: pointer;
+        opacity: 0.6;
+        transition:
+          background 0.1s,
+          opacity 0.1s;
+        white-space: nowrap;
+      }
+
+      .mode-btn:last-child {
+        border-right: none;
+      }
+
+      .mode-btn:hover {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+        opacity: 1;
+      }
+
+      .mode-btn.active {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 75%);
+        opacity: 1;
+        cursor: default;
+      }
+
+      .mode-logo {
+        height: 16px;
+        flex-shrink: 0;
+      }
+
+      /* Every family by name while they fit beside the compact title (about
+         870px with today's seven); the dropdown below that. */
+      esphome-web-mode-picker {
+        display: none;
+      }
+
+      @media (max-width: 880px) {
+        .mode-buttons {
+          display: none;
+        }
+
+        esphome-web-mode-picker {
+          display: block;
+        }
+      }
+
+      /* Compact header below 1070px, where the buttons and the full title no
+         longer fit together: subtitle drops, logo shrinks. */
+      @media (max-width: 1070px) {
         .app-header {
           gap: var(--wa-space-s);
         }

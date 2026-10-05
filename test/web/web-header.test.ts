@@ -5,6 +5,7 @@ vi.mock("../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeWebHeader } from "../../src/web/header/esphome-web-header.js";
+import { WEB_PLATFORMS } from "../../src/web/platforms/registry.js";
 import type { WebMode } from "../../src/web/web-mode.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -44,9 +45,31 @@ describe("esphome-web-header mode picker", () => {
     expect(picker!.mode).toBe("ambz");
   });
 
-  it("hides the picker in minimal (flash-receiver) mode", async () => {
+  it("names every family on a button where they fit, the current one pressed", async () => {
+    const el = await mount("ambz");
+    const btns = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".mode-btn")];
+    expect(btns.map((b) => b.textContent?.trim())).toEqual(
+      WEB_PLATFORMS.map((p) => p.labelKey)
+    );
+    expect(btns.map((b) => b.getAttribute("aria-pressed"))).toEqual(
+      WEB_PLATFORMS.map((p) => String(p.mode === "ambz"))
+    );
+  });
+
+  it("switches family from a button", async () => {
+    const el = await mount("esp");
+    const picked: string[] = [];
+    el.addEventListener("set-mode", (e) => picked.push((e as CustomEvent).detail));
+    const last = WEB_PLATFORMS[WEB_PLATFORMS.length - 1];
+    const btns = el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".mode-btn");
+    btns[btns.length - 1].click();
+    expect(picked).toEqual([last.mode]);
+  });
+
+  it("hides the buttons and the picker in minimal (flash-receiver) mode", async () => {
     const el = await mount("esp", true);
     expect(el.shadowRoot!.querySelector("esphome-web-mode-picker")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".mode-buttons")).toBeNull();
   });
 
   it("keeps the kebab in minimal (flash-receiver) mode", async () => {
