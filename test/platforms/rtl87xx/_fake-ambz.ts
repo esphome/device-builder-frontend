@@ -41,6 +41,8 @@ export interface FakeAmbzOptions {
    * NAKs for the first block (as an RTL8710BX does); a block before is lost.
    */
   readyAfterMs?: number;
+  /** Ask for CRC blocks ("C") instead of NAKing for the first block. */
+  asksForCrc?: boolean;
   /** Garble one byte of the first FLASH_READ, as a noisy line would. */
   garblesFirstRead?: boolean;
   /**
@@ -143,7 +145,8 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
     } else if (byte === 0x07) {
       reply([ACK]);
       xmodem = [];
-      if (opts.readyAfterMs !== undefined) {
+      if (opts.asksForCrc) reply([0x43]);
+      else if (opts.readyAfterMs !== undefined) {
         readyAt = Date.now() + opts.readyAfterMs;
         setTimeout(() => reply([NAK]), opts.readyAfterMs);
       }

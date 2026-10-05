@@ -158,6 +158,7 @@ function partInfoTarget(info: Uint8Array, scheme: LibreTinyScheme): string | nul
  * only some of its pointers moved.
  */
 function applyBinpatch(data: Uint8Array, patch: Uint8Array): Uint8Array {
+  if (patch.length === 0) throw new Error("Invalid UF2: BINPATCH empty");
   const out = data.slice();
   const view = new DataView(out.buffer);
   for (let i = 0; i < patch.length;) {
