@@ -72,11 +72,10 @@ describe("flashAmbz against ltchiptool's transcripts", () => {
       ota2Address: parseInt(reference.chip.ota2_address, 16),
       ota2Switch: parseInt(reference.chip.ota2_switch, 16),
     });
-    const booted = await driveFakeTimers(
+    const rebooted = await driveFakeTimers(
       flashAmbz(chip.port, parseAmbzImage(UF2), { onProgress: () => {} })
     );
-    expect(booted).toBe(true);
-    expect(chip.booted()).toBe(true);
+    expect(rebooted).toBe(false);
     const engine = await Promise.all(merged(chip.frames).map(summarise));
     expect(engine).toEqual(reference.frames);
     expect(await sha256(chip.flash)).toBe(reference.flash_sha256);

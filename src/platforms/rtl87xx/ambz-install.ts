@@ -67,6 +67,7 @@ function showReadyStep(host: ESPHomeFirmwareInstallDialog): void {
 /**
  * Pick the port and flash. Unless RTS resets the board into the ROM, the
  * dialog moves to the strap guide while the engine keeps polling for it.
+ * The board then needs a reset by hand; its log follows on the same port.
  */
 export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const image = rtlAmbzImage.get(host);
@@ -107,8 +108,8 @@ export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promis
     );
     return;
   }
-  // The ROM boots the firmware itself, so its log follows on the same port.
-  host._statusMessage = host._localize("firmware.status_done");
+  // Not booted (see flashAmbz); the logs open now and show the boot once reset.
+  host._statusMessage = host._localize("firmware.rtl_ambz_done_reset");
   finishWithLogsPort(host, port, true);
 }
 

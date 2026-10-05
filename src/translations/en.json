@@ -579,6 +579,7 @@
     "rtl_ambz_connect_desc": "Switching the board into download mode and waiting for its ROM to answer.",
     "rtl_ambz_wait_desc": "The board did not answer. Hold TX2 (PA30) to GND, pull CEN to GND briefly (or power-cycle the board), then release TX2. Flashing starts as soon as the ROM answers. Power the board from a solid 3.3 V supply; a USB adapter's own regulator is often too weak.",
     "rtl_ambz_guide_link": "LibreTiny flashing guide for the RTL8710B",
+    "rtl_ambz_done_reset": "Installation complete. Reset the board (pull CEN to GND briefly, or power-cycle it) to start the firmware; its log follows here.",
     "bk_ready_title": "Ready to flash over USB",
     "bk_ready_desc": "Connect a USB serial adapter to the pads marked TX1 and RX1 (adapter RX to TX1 on P11, adapter TX to RX1 on P10, and GND), click Flash and pick its port. A device that already runs ESPHome switches into flashing mode by itself. Otherwise you will be shown how to do it by hand.",
     "bk_connecting": "Connecting to the chip…",

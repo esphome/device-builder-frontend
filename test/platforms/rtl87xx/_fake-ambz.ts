@@ -2,8 +2,8 @@
  * A simulated RTL8710B behind a fake Web Serial port, the same model as
  * ``fixtures/record.py``: the ROM downloader NAKs while it idles in its loud
  * handshake, answers FLASH_GET_STATUS, SET_BAUD_RATE and FLASH_READ, and takes
- * address-prefixed XModem-1k blocks into flash (ACKing the end) or RAM
- * (booting instead). A running firmware ignores everything until strapped.
+ * address-prefixed XModem-1k blocks into flash, ACKing the end. A running
+ * firmware ignores everything until strapped.
  */
 import { vi } from "vitest";
 import { disconnectEvents } from "../../_web-serial.js";
@@ -63,14 +63,13 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   sys.setUint32(0, opts.ota2Address ?? 0x08080000, true);
   sys.setUint32(4, opts.ota2Switch ?? 0xffffffff, true);
   for (let i = 0; i < 0x10; i++) flash[SYSTEM + 0x100 + i] = i;
-  let mode: "rom" | "firmware" | "booted" = opts.start ?? "rom";
+  let mode: "rom" | "firmware" = opts.start ?? "rom";
   let baud = 0;
   let loud = mode === "rom";
   let prev = 0;
   let pending: number[] = [];
   let reading: { at: number; left: number } | null = null;
   let xmodem: number[] | null = null;
-  let lastTarget: "flash" | "ram" = "flash";
   let naked = false;
   let readyAt = 0;
   let reads = 0;
@@ -108,13 +107,10 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
     const x = xmodem!;
     if (x.length === 0 && byte === EOT) {
       xmodem = null;
-      if (lastTarget === "ram") mode = "booted";
-      else {
-        reply([ACK]);
-        if (opts.chattersAfterWriteMs) {
-          deafUntil = Date.now() + opts.chattersAfterWriteMs;
-          setTimeout(() => reply([0xc1, 0x4a, 0x18]), 1);
-        }
+      reply([ACK]);
+      if (opts.chattersAfterWriteMs) {
+        deafUntil = Date.now() + opts.chattersAfterWriteMs;
+        setTimeout(() => reply([0xc1, 0x4a, 0x18]), 1);
       }
       return;
     }
@@ -128,17 +124,13 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
     }
     const address =
       (payload[0] | (payload[1] << 8) | (payload[2] << 16) | (payload[3] << 24)) >>> 0;
-    if (address >>> 24 === 0x08) {
-      if (opts.nakFirstBlock && !naked) {
-        naked = true;
-        reply([NAK]);
-        return;
-      }
-      lastTarget = "flash";
-      flash.set(payload.slice(4), address & 0xffffff);
-    } else {
-      lastTarget = "ram";
+    if (address >>> 24 !== 0x08) throw new Error("write outside flash");
+    if (opts.nakFirstBlock && !naked) {
+      naked = true;
+      reply([NAK]);
+      return;
     }
+    flash.set(payload.slice(4), address & 0xffffff);
     reply([ACK]);
   };
 
@@ -232,7 +224,6 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
     bauds,
     signals,
     flash,
-    booted: () => mode === "booted",
     /** The user's strap: the next open at the ROM's speed finds it in download mode. */
     strap: () => {
       mode = "rom";
