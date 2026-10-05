@@ -4,7 +4,10 @@ import type { WebPlatform } from "../web-platform.js";
 
 import "./esphome-web-rtl-card.js";
 
-/** RTL8720C (AmebaZ2). Its kits sit behind generic UART bridges, so no port claims it. */
+/**
+ * RTL8720C (AmebaZ2). Its kits sit behind generic UART bridges, so no port
+ * claims it. The RTL8710B is a mode of its own (``ambz-mode.ts``).
+ */
 export const rtlWebMode: WebPlatform<"rtl"> = {
   mode: "rtl",
   logo: "rtl8720c.svg",
