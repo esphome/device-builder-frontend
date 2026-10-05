@@ -143,7 +143,8 @@ class Session {
 
   /** After a flash write the ROM is back at 1.5 Mbaud; take it up again. */
   async resume(): Promise<AmbzLink> {
-    await this.open(AMBZ_ROM_BAUD);
+    // It prints "close xModem Transfer" at the write speed first.
+    await (await this.open(AMBZ_ROM_BAUD)).settle();
     const link = await this.moveTo(WRITE_BAUD);
     // Still in download mode: ltchiptool checks the handshake once more here.
     await link.loudHandshake();

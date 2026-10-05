@@ -46,6 +46,9 @@ const BLOCK_PAYLOAD = 4 + XMODEM_BLOCK_SIZE;
 /** A reply, waited on with the timeout restarting at every byte (as ltchiptool reads). */
 const READ_MS = 500;
 const QUIET_MS = 100;
+/** How long the line must stay silent before the ROM is taken to have finished printing. */
+const SETTLE_MS = 50;
+const SETTLE_LIMIT_MS = 1000;
 const QUIET_LIMIT_MS = 10000;
 const LINK_LISTEN_MS = 250;
 const LINK_RETRY_MS = 100;
@@ -97,6 +100,13 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     if (reply[5] !== NAK) {
       throw new AmbzProtocolError("The ROM did not NAK after the loud handshake");
     }
+  }
+
+  /** Wait until the ROM stops sending (its log, at another speed), then drop it. */
+  async settle(): Promise<void> {
+    const deadline = Date.now() + SETTLE_LIMIT_MS;
+    while (Date.now() < deadline && (await this.readByte(SETTLE_MS)) !== null);
+    this.drain();
   }
 
   /** ACK until the ROM falls quiet, so nothing it sends is taken for flash data. */

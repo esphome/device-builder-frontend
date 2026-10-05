@@ -47,6 +47,11 @@ export interface FakeAmbzOptions {
   readyAfterMs?: number;
   /** Garble one byte of the first FLASH_READ, as a noisy line would. */
   garblesFirstRead?: boolean;
+  /**
+   * After a flash write's EOT the ROM prints its xmodem log at the old speed
+   * for this long, deaf to commands, which reads as noise at 1.5M.
+   */
+  chattersAfterWriteMs?: number;
 }
 
 export function fakeAmbz(opts: FakeAmbzOptions = {}) {
@@ -72,6 +77,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   let readyAt = 0;
   let magic = 0;
   let reads = 0;
+  let deafUntil = 0;
 
   const reply = (data: number[] | Uint8Array) => {
     const bytes = new Uint8Array(data);
@@ -105,7 +111,13 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
     if (x.length === 0 && byte === EOT) {
       xmodem = null;
       if (lastTarget === "ram") mode = "booted";
-      else reply([ACK]);
+      else {
+        reply([ACK]);
+        if (opts.chattersAfterWriteMs) {
+          deafUntil = Date.now() + opts.chattersAfterWriteMs;
+          setTimeout(() => reply([0xc1, 0x4a, 0x18]), 1);
+        }
+      }
       return;
     }
     x.push(byte);
@@ -185,6 +197,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
           magic = 0;
         }
       } else if (mode === "rom") {
+        if (Date.now() < deafUntil) continue;
         if (xmodem) xmodemByte(byte);
         else if (pending.length) {
           pending.push(byte);
