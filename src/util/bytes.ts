@@ -12,3 +12,16 @@ export function concat(...arrays: Uint8Array[]): Uint8Array<ArrayBuffer> {
   }
   return out;
 }
+
+/** Same length and bytes; false when either is missing. */
+export function bytesEqual(
+  a: Uint8Array | undefined,
+  b: Uint8Array | undefined
+): boolean {
+  return (
+    a !== undefined &&
+    b !== undefined &&
+    a.length === b.length &&
+    a.every((v, i) => v === b[i])
+  );
+}

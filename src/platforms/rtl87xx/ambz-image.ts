@@ -4,7 +4,6 @@
  * linked), and XModem blocks. The parser itself is shared with the other
  * LibreTiny families.
  */
-import { Uf2FamilyError } from "../../util/uf2.js";
 import { XMODEM_BLOCK_SIZE } from "../../util/xmodem.js";
 import {
   type LibreTinyImage,
@@ -12,7 +11,7 @@ import {
   type LibreTinyScheme,
   parseLibreTinyFile,
 } from "../libretiny-uf2.js";
-import { RtlImageError, UF2_FAMILY_AMBZ } from "./ambz2-image.js";
+import { RtlImageError, toRtlImageError, UF2_FAMILY_AMBZ } from "./ambz2-image.js";
 
 export { RtlImageError };
 
@@ -56,11 +55,6 @@ export function parseAmbzImage(bytes: Uint8Array): AmbzImage {
     }
     return image;
   } catch (err) {
-    throw new RtlImageError(
-      err instanceof Uf2FamilyError
-        ? "firmware.rtl_wrong_family"
-        : "firmware.rtl_bad_uf2",
-      err
-    );
+    throw toRtlImageError(err);
   }
 }

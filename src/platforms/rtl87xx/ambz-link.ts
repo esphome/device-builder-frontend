@@ -71,11 +71,6 @@ function baudIndex(baud: number): number {
   return index;
 }
 
-export interface MemoryWriteOptions {
-  /** After each acknowledged block: data bytes sent so far. */
-  onBlock?: (sent: number) => void;
-}
-
 export class AmbzLink extends SerialByteSession implements XmodemIo {
   async write(data: Uint8Array): Promise<void> {
     await this.writeBytes(data);
@@ -180,16 +175,11 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     return out;
   }
 
-  /**
-   * Write ``data`` to ``address`` over XModem-1k, plain checksum. The ROM's
-   * receiver NAKs once it is ready, which can be a second after the
-   * handshake's ACK; a block sent before that is lost. ltchiptool sends at
-   * once: the same bytes, here once the ROM asks (or after a while, if not).
-   */
+  /** XModem-1k with an address in each block, sent once the ROM NAKs ready (ltchiptool sends at once). */
   async memoryWrite(
     address: number,
     data: Uint8Array,
-    { onBlock }: MemoryWriteOptions = {}
+    { onBlock }: { onBlock?: (sent: number) => void } = {}
   ): Promise<void> {
     await this.loudHandshake();
     await this.write(new Uint8Array([CMD_XMODEM_HANDSHAKE]));

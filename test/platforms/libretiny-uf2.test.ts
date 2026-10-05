@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BW15_PARTITIONS,
+  ltBinpatchTag,
   ltHeaderTags,
   ltPartInfoTags,
   ltPartitionTable,
@@ -197,13 +198,6 @@ describe("parseLibreTinyImage", () => {
 });
 
 describe("parseLibreTinyImage, the second OTA slot", () => {
-  // DIFF32: add the delta (LE32, signed) to the words at the listed offsets.
-  const binpatch = (delta: number, offsets: number[]) => {
-    const body = new Uint8Array(4 + offsets.length);
-    new DataView(body.buffer).setInt32(0, delta, true);
-    body.set(offsets, 4);
-    return ltTag(LT_TAG.BINPATCH, new Uint8Array([0xfe, body.length, ...body]));
-  };
   const word = (value: number) => {
     const data = new Uint8Array(256).fill(0x11);
     new DataView(data.buffer).setUint32(8, value, true);
@@ -214,7 +208,7 @@ describe("parseLibreTinyImage, the second OTA slot", () => {
       {
         addr: 0x0,
         data: word(0x0800c000),
-        tags: [...OTA_INFO, binpatch(0x104000 - 0xc000, [8])],
+        tags: [...OTA_INFO, ltBinpatchTag(0x104000 - 0xc000, [8])],
       },
     ],
   });
@@ -248,7 +242,7 @@ describe("parseLibreTinyImage, the second OTA slot", () => {
   it("refuses a BINPATCH whose offset is not word aligned", () => {
     const bad = makeLibreTinyUf2({
       blocks: [
-        { addr: 0x0, data: word(0x0800c000), tags: [...OTA_INFO, binpatch(4, [9])] },
+        { addr: 0x0, data: word(0x0800c000), tags: [...OTA_INFO, ltBinpatchTag(4, [9])] },
       ],
     });
     expect(() =>
@@ -261,7 +255,7 @@ describe("parseLibreTinyImage, the second OTA slot", () => {
 
   it("refuses a BINPATCH that reaches past its block", () => {
     const bad = makeLibreTinyUf2({
-      blocks: [{ addr: 0x0, tags: [...OTA_INFO, binpatch(4, [254])] }],
+      blocks: [{ addr: 0x0, tags: [...OTA_INFO, ltBinpatchTag(4, [254])] }],
     });
     expect(() =>
       parseLibreTinyImage(bad, [UF2_FAMILY_AMBZ2], {

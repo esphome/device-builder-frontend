@@ -2,18 +2,16 @@
  * Flashing a Realtek AmebaZ (RTL8710B) over Web Serial through the ROM's
  * UART download mode, the way ltchiptool does it: link at 1.5 Mbaud, write
  * at 115200, read the system data to find the OTA slot the bootloader runs
- * next, then write that slot's image and leave the reset to the user. The board enters
- * download mode by its strap (or an RTS wired to its reset); a running
- * LibreTiny's reboot magic is not used, as its ROM leaves download mode after
- * one transfer. Loaded on demand by the install flow; nothing here touches
- * the DOM.
+ * next, then write that slot's image and leave the reset to the user. The
+ * board enters download mode by its strap (or an RTS wired to its reset).
+ * Loaded on demand by the install flow; nothing here touches the DOM.
  */
+import { bytesEqual } from "../../util/bytes.js";
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import { resetIntoFirmware } from "../../util/serial-control-lines.js";
-import { openSerialPort } from "../../util/serial-open-error.js";
+import { openSerialPort, SerialOpenTimeoutError } from "../../util/serial-open-error.js";
 import { settledWithin, withDeadline } from "../../util/with-deadline.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
-import type { LibreTinyImage } from "../libretiny-uf2.js";
 import type { AmbzImage } from "./ambz-image.js";
 import { AMBZ_FLASH_ADDRESS, AMBZ_ROM_BAUD, AmbzLink } from "./ambz-link.js";
 
@@ -41,8 +39,8 @@ const SYSTEM_GAPS: readonly [number, number][] = [
 
 /** No ROM answered while the user had the chance to enter download mode. */
 export class AmbzLinkError extends Error {
-  constructor(message = "The chip did not enter download mode") {
-    super(message);
+  constructor() {
+    super("The chip did not enter download mode");
     this.name = "AmbzLinkError";
   }
 }
@@ -70,12 +68,9 @@ export function pickSlot(
   return { slot: 1, rewrite };
 }
 
-const sameBytes = (a: Uint8Array, b: Uint8Array) =>
-  a.length === b.length && a.every((byte, i) => byte === b[i]);
-
 /** Opens and closes the port at each speed the ROM moves between. */
 class Session {
-  link: AmbzLink | null = null;
+  private link: AmbzLink | null = null;
 
   constructor(
     private readonly port: SerialPort,
@@ -86,11 +81,7 @@ class Session {
     await this.close();
     const opening = openSerialPort(this.port, { baudRate: baud });
     try {
-      await withDeadline(
-        opening,
-        REOPEN_MS,
-        () => new Error("Reopening the port timed out")
-      );
+      await withDeadline(opening, REOPEN_MS, () => new SerialOpenTimeoutError(REOPEN_MS));
     } catch (err) {
       // An open that lands after the deadline would hold the port past this failure.
       opening.then(
@@ -152,14 +143,14 @@ async function enterDownloadMode(
  * Flash ``image`` onto the chip behind ``port`` (opened and closed here at
  * the speeds the ROM needs). A board already in download mode links at
  * once; otherwise RTS is pulsed in case it drives the reset, then the ROM is
- * polled until the user straps the board or ``signal`` aborts. Resolves false:
- * the user resets the board to start the firmware.
+ * polled until the user straps the board or ``signal`` aborts. The user then
+ * resets the board to start the firmware.
  */
 export async function flashAmbz(
   port: SerialPort,
   image: AmbzImage,
   hooks: LibreTinyFlashHooks
-): Promise<boolean> {
+): Promise<void> {
   const log = hooks.onLog ?? (() => {});
   const session = new Session(port, hooks.signal);
   let failure: unknown;
@@ -171,7 +162,7 @@ export async function flashAmbz(
     // The read has no checksum, and a garbled one would pick the slot the
     // bootloader skips (or be written back): read it twice and compare.
     const system = await rom.flashRead(SYSTEM_OFFSET, 1);
-    if (!sameBytes(await rom.flashRead(SYSTEM_OFFSET, 1), system)) {
+    if (!bytesEqual(await rom.flashRead(SYSTEM_OFFSET, 1), system)) {
       throw new Error("The system data read back differently; wrote nothing");
     }
     const { slot, rewrite } = pickSlot(system, image.ota2Offset);
@@ -183,7 +174,7 @@ export async function flashAmbz(
       await link.memoryWrite(AMBZ_FLASH_ADDRESS | SYSTEM_OFFSET, rewrite);
       link = await session.resume();
     }
-    const target: LibreTinyImage = slot === 1 ? image.ota1 : image.ota2;
+    const target = slot === 1 ? image.ota1 : image.ota2;
     log(
       `Linked to the ROM downloader; writing OTA slot ${slot} in ${target.runs.length} runs`
     );
@@ -202,8 +193,7 @@ export async function flashAmbz(
       done += run.data.length;
       link = await session.resume();
     }
-    // No RAM boot as ltchiptool does: the ROM's download state survives into
-    // the firmware, and its next soft reboot (an OTA) lands back in the ROM.
+    // No RAM boot: the ROM's download state would survive into the firmware's next reboot.
     log("Written; reset the board to start the firmware");
     hooks.onProgress(100);
   } catch (err) {
@@ -213,5 +203,4 @@ export async function flashAmbz(
     // A teardown failure must not replace the flash error nor skip the rest.
     await session.close(failure);
   }
-  return false;
 }

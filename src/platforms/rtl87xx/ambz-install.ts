@@ -109,13 +109,9 @@ export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promis
     return;
   }
   // Not booted (see flashAmbz); the logs open now and show the boot once reset.
-  host._statusMessage = host._localize("firmware.rtl_ambz_done_reset");
-  finishWithLogsPort(
-    host,
-    port,
-    true,
-    host._localize("firmware.rtl_ambz_reset_to_start")
-  );
+  const reset = host._localize("firmware.rtl_ambz_done_reset");
+  host._statusMessage = reset;
+  finishWithLogsPort(host, port, { notice: reset });
 }
 
 // Parsed first, so an RTL8720C build is refused before the hand-off.

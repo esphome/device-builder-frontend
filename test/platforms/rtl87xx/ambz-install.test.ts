@@ -4,15 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
   dispatchShowLogsAfterInstall: vi.fn(() => true),
-  flashAmbz: vi.fn<(p: unknown, i: unknown, hooks: FlashHooks) => Promise<boolean>>(),
+  flashAmbz:
+    vi.fn<(p: unknown, i: unknown, hooks: LibreTinyFlashHooks) => Promise<void>>(),
 }));
-type FlashHooks = {
-  onProgress: (p: number) => void;
-  onLog?: (line: string) => void;
-  onLinked?: () => void;
-  onWaiting?: () => void;
-  signal?: AbortSignal;
-};
 vi.mock("../../../src/util/web-serial.js", () => ({
   requestSerialPort: mocks.requestSerialPort,
 }));
@@ -26,6 +20,7 @@ vi.mock("../../../src/platforms/rtl87xx/ambz-flasher.js", () => ({
 import { ltPartInfoTags, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
+import type { LibreTinyFlashHooks } from "../../../src/platforms/libretiny-flash.js";
 import { parseAmbzImage } from "../../../src/platforms/rtl87xx/ambz-image.js";
 import {
   rtlAmbzDoFlash,
@@ -121,7 +116,6 @@ describe("rtlAmbzDoFlash", () => {
       hooks.onLinked?.();
       steps.push(host._step);
       hooks.onProgress(100);
-      return true;
     });
     await rtlAmbzDoFlash(asHost(host));
     expect(mocks.flashAmbz).toHaveBeenCalledWith(
@@ -138,14 +132,14 @@ describe("rtlAmbzDoFlash", () => {
     const host = readyHost();
     const port = {};
     mocks.requestSerialPort.mockResolvedValue(port);
-    mocks.flashAmbz.mockResolvedValue(false);
+    mocks.flashAmbz.mockResolvedValue();
     host._showLogsAfterInstall = true;
     await rtlAmbzDoFlash(asHost(host));
     expect(host._logsPort).toBe(port);
     // The logs say to reset the board: the dialog's own status is gone by then.
     expect(mocks.dispatchShowLogsAfterInstall).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ notice: "firmware.rtl_ambz_reset_to_start" })
+      expect.objectContaining({ notice: "firmware.rtl_ambz_done_reset" })
     );
   });
 

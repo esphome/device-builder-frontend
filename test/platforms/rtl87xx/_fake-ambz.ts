@@ -18,8 +18,8 @@ const CAN = 0x18;
 const ROM_BAUD = 1500000;
 const IDLE_NAKS = 8;
 
-/** What the flash holds before the flash: never FF, so an erase shows. */
-const oldByte = (i: number) => (i * 7 + 3) % 251;
+/** What the flash holds before the flash: never FF, so an erase shows; built once, copied per chip. */
+const OLD_FLASH = Uint8Array.from({ length: FLASH_SIZE }, (_, i) => (i * 7 + 3) % 251);
 
 export interface Frame {
   dir: "tx" | "rx";
@@ -27,8 +27,8 @@ export interface Frame {
 }
 
 export interface FakeAmbzOptions {
-  /** In the ROM already (strapped by hand), or running a LibreTiny firmware. */
-  start?: "rom" | "firmware";
+  /** In the ROM already (the default), or deaf until ``strap()``. */
+  strapped?: boolean;
   /** The system data's ota2 address and switch (record.py's cases). */
   ota2Address?: number;
   ota2Switch?: number;
@@ -61,15 +61,15 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   const frames: Frame[] = [];
   const bauds: number[] = [];
   const signals: SerialOutputSignals[] = [];
-  const flash = Uint8Array.from({ length: FLASH_SIZE }, (_, i) => oldByte(i));
+  const flash = OLD_FLASH.slice();
   flash.fill(0xff, SYSTEM, SYSTEM + 0x1000);
   const sys = new DataView(flash.buffer, SYSTEM, 8);
   sys.setUint32(0, opts.ota2Address ?? 0x08080000, true);
   sys.setUint32(4, opts.ota2Switch ?? 0xffffffff, true);
   for (let i = 0; i < 0x10; i++) flash[SYSTEM + 0x100 + i] = i;
-  let mode: "rom" | "firmware" = opts.start ?? "rom";
+  let rom = opts.strapped ?? true;
   let baud = 0;
-  let loud = mode === "rom";
+  let loud = rom;
   let prev = 0;
   let pending: number[] = [];
   let reading: { at: number; left: number } | null = null;
@@ -88,7 +88,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
 
   /** The loud handshake NAKs on its own while the ROM idles at its speed. */
   const idle = () => {
-    if (mode !== "rom" || baud !== ROM_BAUD || !loud) return;
+    if (!rom || baud !== ROM_BAUD || !loud) return;
     reply(new Array(IDLE_NAKS).fill(NAK));
     loud = false;
   };
@@ -191,7 +191,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   const feed = (chunk: Uint8Array) => {
     frames.push({ dir: "tx", bytes: new Uint8Array(chunk) });
     for (const byte of chunk) {
-      if (mode === "rom") {
+      if (rom) {
         if (Date.now() < deafUntil) continue;
         if (xmodem) xmodemByte(byte);
         else if (pending.length) {
@@ -240,7 +240,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
     flash,
     /** The user's strap: the next open at the ROM's speed finds it in download mode. */
     strap: () => {
-      mode = "rom";
+      rom = true;
       loud = true;
       idle();
     },

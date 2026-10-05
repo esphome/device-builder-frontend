@@ -67,7 +67,7 @@ describe("flipToLogs", () => {
   it("carries the install's notice to the logs, also from the Done step's button", () => {
     const host = makeHost(115200);
     Object.assign(host, { _showLogsAfterInstall: true });
-    finishWithLogsPort(host, port, true, "Reset the board");
+    finishWithLogsPort(host, port, { notice: "Reset the board" });
     flipToLogs(host, port);
     expect(dispatchShowLogsAfterInstall).toHaveBeenCalledTimes(2);
     for (const [, detail] of dispatchShowLogsAfterInstall.mock.calls) {

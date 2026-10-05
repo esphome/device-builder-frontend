@@ -115,7 +115,7 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   );
   // The logs reopen the port with both lines released, so the boot log
   // follows; not while the manual-reset instruction is showing.
-  finishWithLogsPort(host, port, rebooted);
+  finishWithLogsPort(host, port, { openLogs: rebooted });
 }
 
 // The same UF2 the in-app flow parses, handed whole to web.esphome.io's

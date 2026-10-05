@@ -34,6 +34,14 @@ export class RtlImageError extends Error {
   }
 }
 
+/** Another family is a build for some other chip; anything else is a bad file. */
+export function toRtlImageError(err: unknown): RtlImageError {
+  return new RtlImageError(
+    err instanceof Uf2FamilyError ? "firmware.rtl_wrong_family" : "firmware.rtl_bad_uf2",
+    err
+  );
+}
+
 /**
  * Parse a LibreTiny UF2 for the RTL8720C flasher. Another Realtek family
  * (AmebaZ) is a real build for the other Realtek flasher's chip; anything
@@ -43,11 +51,6 @@ export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
   try {
     return parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2], AMBZ2_PARSE);
   } catch (err) {
-    throw new RtlImageError(
-      err instanceof Uf2FamilyError
-        ? "firmware.rtl_wrong_family"
-        : "firmware.rtl_bad_uf2",
-      err
-    );
+    throw toRtlImageError(err);
   }
 }

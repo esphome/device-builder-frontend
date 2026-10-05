@@ -119,7 +119,7 @@ export async function lnDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<voi
     // The chip may still sit in its downloader: the port is kept for Show
     // logs after the reset, but the logs do not open by themselves.
     host._statusMessage = host._localize("firmware.ln_done_manual_reset");
-    if (logs === "flash-port") finishWithLogsPort(host, port, false);
+    if (logs === "flash-port") finishWithLogsPort(host, port, { openLogs: false });
     else host._step = "done";
     return;
   }
