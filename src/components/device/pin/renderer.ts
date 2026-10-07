@@ -16,7 +16,6 @@ import {
   isPrimitiveOrNullish,
 } from "../../../util/nested-values.js";
 import {
-  expanderHubAddress,
   expanderHubRef,
   formatPinValue,
   isExpanderPinValue,
@@ -39,6 +38,7 @@ import {
   renderSubstitutionHint,
   tooltipAnchorId,
 } from "../config-entry-renderers-shared.js";
+import { renderExpanderPin } from "./expander-pin.js";
 import { renderPinWiring } from "./wiring.js";
 
 // `parsePinGpio` / `formatPinValue` moved to `util/pin/gpio.ts` so the YAML
@@ -592,52 +592,6 @@ function renderSubstitutionPin(
         ctx,
         rawValue,
         boardPin,
-        guarded,
-      })}
-    </div>
-  `;
-}
-
-/**
- * Render an I/O-expander pin: the `provider:hub:channel` channel shown read-only
- * (an expander channel isn't a board GPIO, so the board-pin picker can't
- * represent it) plus the Advanced mode-flag disclosure — the channel's mode is
- * still editable, scoped to the provider.
- */
-function renderExpanderPin(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-  identity: string,
-  rawValue: unknown,
-  boardPreset: boolean
-): TemplateResult {
-  const [provider, hub, channel] = identity.split(":");
-  const address = expanderHubAddress(hub);
-  const guarded = boardPreset && !effectiveDisabled(entry, ctx);
-  return html`
-    <div class="field" data-field-key=${fieldKeyAttr(path)}>
-      ${renderLabel(entry, ctx, { path })}
-      <input
-        type="text"
-        readonly
-        .value=${
-          address === null
-            ? ctx.localize("device.pin_on_expander", { provider, hub, channel })
-            : ctx.localize("device.pin_on_expander_address", {
-                provider,
-                address,
-                channel,
-              })
-        }
-      />
-      ${renderFieldError(path, ctx)}
-      ${renderPinWiring({
-        entry,
-        path,
-        ctx,
-        rawValue,
-        boardPin: null,
         guarded,
       })}
     </div>

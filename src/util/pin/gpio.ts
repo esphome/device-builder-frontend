@@ -81,9 +81,8 @@ const PORT_B_PIN_RE = /^\s*PB(\d+)\s*$/i;
  * is occupied + inverted + needs the internal pull-up, all baked into
  * the preset). A pin on an I/O expander
  * (`{ pcf8574: 'hub_id', number: 0, ... }`) returns the namespaced token
- * `'pcf8574:hub_id:0'` so its channel never aliases board GPIO 0; an
- * address-selected hub (`{ pcf8574: { address: 0x20 }, ... }`) yields
- * `'pcf8574:@0x20:0'`. Returns
+ * `'pcf8574:hub_id:0'` (`'pcf8574:@0x20:0'` for an address-selected hub) so
+ * its channel never aliases board GPIO 0. Returns
  * `null` for anything we can't parse — the caller drops those entries rather
  * than letting a typo blank the dropdown.
  */
@@ -139,7 +138,7 @@ export function pinIdentityToken(provider: string, hub: string, channel: number)
   return `${provider}:${hub}:${channel}`;
 }
 
-/** Normalise an expander hub value: a hub id passes through, an address selector becomes '@0x44'; null when unresolvable. */
+/** An expander hub value's ref: the hub id, '@0x44' for an address selector, else null. */
 export function expanderHubRef(hub: unknown): string | null {
   if (typeof hub === "string") return hub === "" ? null : hub;
   if (!isPlainObject(hub) || Object.keys(hub).length !== 1) return null;
