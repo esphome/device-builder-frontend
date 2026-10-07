@@ -7,42 +7,17 @@
  * between steps and the ``flash_info`` the engine asks for.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hex, type RecordedFrame, sha256, summarise } from "../_reference-frames.js";
 import { driveFakeTimers } from "../../_fake-timers.js";
 import { flashLn882x } from "../../../src/platforms/ln882x/ln882x-flasher.js";
 import { UF2_FAMILY_LN882H } from "../../../src/platforms/ln882x/ln882x-image.js";
-import { fakeLn882h, type Frame, RAMCODE, referenceRuns } from "./_fake-ln882h.js";
+import { fakeLn882h, RAMCODE, referenceRuns } from "./_fake-ln882h.js";
 import ln882h from "./fixtures/ln882h.json";
 
 vi.mock("../../../src/platforms/ln882x/ln882x-ramcode.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   loadRamcode: async () => RAMCODE,
 }));
-
-interface RecordedFrame {
-  dir: string;
-  length: number;
-  hex?: string;
-  head?: string;
-  sha256?: string;
-}
-
-const hex = (bytes: Uint8Array) =>
-  [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-const sha256 = async (bytes: Uint8Array) =>
-  hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes))));
-
-/** As the recorder writes a frame down: whole up to 48 bytes, else by head and hash. */
-async function summarise(frame: Frame): Promise<RecordedFrame> {
-  const { bytes } = frame;
-  return bytes.length <= 48
-    ? { dir: frame.dir, length: bytes.length, hex: hex(bytes) }
-    : {
-        dir: frame.dir,
-        length: bytes.length,
-        head: hex(bytes.subarray(0, 16)),
-        sha256: await sha256(bytes),
-      };
-}
 
 const LINK = hex(new TextEncoder().encode("version\r\n"));
 const FLASH_INFO = hex(new TextEncoder().encode("flash_info\r\n"));

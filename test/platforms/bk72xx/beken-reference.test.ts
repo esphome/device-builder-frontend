@@ -6,24 +6,17 @@
  * same order and leave the same flash.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type RecordedFrame, sha256, summarise } from "../_reference-frames.js";
 import { driveFakeTimers } from "../../_fake-timers.js";
 import { SR_PROTECT_MASK } from "../../../src/platforms/bk72xx/beken-chips.js";
 import { flashBeken } from "../../../src/platforms/bk72xx/beken-flasher.js";
-import { type ChipSpec, fakeBeken, type Frame, referenceImage } from "./_fake-beken.js";
+import { type ChipSpec, fakeBeken, referenceImage } from "./_fake-beken.js";
 import basicUnknown from "./fixtures/basic-unknown-bootloader.json";
 import bk7231nUnknown from "./fixtures/bk7231n-unknown-bootloader.json";
 import bk7231n from "./fixtures/bk7231n.json";
 import bk7231t from "./fixtures/bk7231t.json";
 import bk7238 from "./fixtures/bk7238.json";
 import bk7252 from "./fixtures/bk7252.json";
-
-interface RecordedFrame {
-  dir: string;
-  length: number;
-  hex?: string;
-  head?: string;
-  sha256?: string;
-}
 
 interface Transcript {
   name: string;
@@ -40,11 +33,6 @@ const transcripts: Transcript[] = [
   bk7231nUnknown,
   basicUnknown,
 ];
-
-const hex = (bytes: Uint8Array) =>
-  [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-const sha256 = async (bytes: Uint8Array<ArrayBuffer>) =>
-  hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
 
 /** A byte of the frame; a long one is written down by its head alone. */
 const byteAt = (frame: RecordedFrame, at: number): number | undefined => {
@@ -127,17 +115,6 @@ function withoutBlankChecks(frames: RecordedFrame[]): RecordedFrame[] {
   }
   return kept;
 }
-
-/** A frame as the recorder writes it down. */
-const summarise = async ({ dir, bytes }: Frame): Promise<RecordedFrame> =>
-  bytes.length <= 48
-    ? { dir, length: bytes.length, hex: hex(bytes) }
-    : {
-        dir,
-        length: bytes.length,
-        head: hex(bytes.subarray(0, 16)),
-        sha256: await sha256(new Uint8Array(bytes)),
-      };
 
 // The image is the same for every chip; the family is not looked at by a
 // chip whose family is another, which the mismatch has tests of its own for.

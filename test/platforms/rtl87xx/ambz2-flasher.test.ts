@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
-import { disconnectEvents } from "../../_web-serial.js";
+import { fakeSerialPort } from "../../_web-serial.js";
 import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 
 import type { LibreTinyImage } from "../../../src/platforms/libretiny-uf2.js";
@@ -37,16 +37,14 @@ interface RomOptions {
  * XModem receiver that ACKs every block and stores the bytes per offset.
  */
 function fakeRom(opts: RomOptions = {}) {
-  let out!: ReadableStreamDefaultController<Uint8Array>;
   const commands: string[] = [];
-  const signals: SerialOutputSignals[] = [];
   const written = new Map<number, number[]>();
   let pings = 0;
   let resets = 0;
   let xmodem: { offset: number; buf: number[] } | null = null;
   let text = "";
   const reply = (s: string | Uint8Array) =>
-    out.enqueue(typeof s === "string" ? enc.encode(s) : s);
+    link.enqueue(typeof s === "string" ? enc.encode(s) : s);
 
   const onLine = async (line: string) => {
     commands.push(line);
@@ -72,7 +70,7 @@ function fakeRom(opts: RomOptions = {}) {
       const hash = opts.badHash
         ? new Uint8Array(32)
         : new Uint8Array(await crypto.subtle.digest("SHA-256", data));
-      out.enqueue(new Uint8Array([...enc.encode("hashs "), ...hash]));
+      link.enqueue(new Uint8Array([...enc.encode("hashs "), ...hash]));
     }
   };
 
@@ -103,31 +101,15 @@ function fakeRom(opts: RomOptions = {}) {
     }
   };
 
-  // Like a freshly picked port: no streams until open().
-  const port = {
-    ...disconnectEvents(),
-    readable: null as ReadableStream<Uint8Array> | null,
-    writable: null as WritableStream<Uint8Array> | null,
-    open: vi.fn(async () => {
-      port.readable = new ReadableStream<Uint8Array>({ start: (c) => (out = c) });
-      port.writable = new WritableStream<Uint8Array>({ write: feed });
-    }),
-    close: vi.fn(async () => {}),
-    setSignals: vi.fn(async (s: SerialOutputSignals) => {
-      if (opts.noSignals) throw new DOMException("no lines", "NetworkError");
-      signals.push(s);
-      // The reset lands when RTS drops with the strap held.
+  const link = fakeSerialPort({
+    feed,
+    noSignals: opts.noSignals,
+    // The reset lands when RTS drops with the strap held.
+    onSignals: (s) => {
       if (s.requestToSend === false && s.dataTerminalReady === undefined) resets++;
-    }),
-  };
-  return {
-    port: port as unknown as SerialPort,
-    raw: port,
-    commands,
-    signals,
-    written,
-    dropLink: () => out.close(),
-  };
+    },
+  });
+  return { ...link, commands, written };
 }
 
 const run = (address: number, length: number, fill: number) => ({

@@ -5,8 +5,8 @@
  * address-prefixed XModem-1k blocks into flash, ACKing the end. A running
  * firmware ignores everything until strapped.
  */
-import { vi } from "vitest";
-import { disconnectEvents } from "../../_web-serial.js";
+import type { WireFrame } from "../_reference-frames.js";
+import { fakeSerialPort } from "../../_web-serial.js";
 
 const FLASH_SIZE = 0x200000;
 const SYSTEM = 0x9000;
@@ -20,11 +20,6 @@ const IDLE_NAKS = 8;
 
 /** What the flash holds before the flash: never FF, so an erase shows; built once, copied per chip. */
 const OLD_FLASH = Uint8Array.from({ length: FLASH_SIZE }, (_, i) => (i * 7 + 3) % 251);
-
-export interface Frame {
-  dir: "tx" | "rx";
-  bytes: Uint8Array;
-}
 
 export interface FakeAmbzOptions {
   /** In the ROM already (the default), or deaf until ``strap()``. */
@@ -57,10 +52,8 @@ export interface FakeAmbzOptions {
 }
 
 export function fakeAmbz(opts: FakeAmbzOptions = {}) {
-  let out: ReadableStreamDefaultController<Uint8Array> | null = null;
-  const frames: Frame[] = [];
+  const frames: WireFrame[] = [];
   const bauds: number[] = [];
-  const signals: SerialOutputSignals[] = [];
   const flash = OLD_FLASH.slice();
   flash.fill(0xff, SYSTEM, SYSTEM + 0x1000);
   const sys = new DataView(flash.buffer, SYSTEM, 8);
@@ -83,7 +76,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   const reply = (data: number[] | Uint8Array) => {
     const bytes = new Uint8Array(data);
     frames.push({ dir: "rx", bytes });
-    out?.enqueue(bytes);
+    link.enqueue(bytes);
   };
 
   /** The loud handshake NAKs on its own while the ROM idles at its speed. */
@@ -166,7 +159,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
       pending = [];
       if (opts.missesBaudChange) {
         const nakAgain = () => {
-          if (!out) return;
+          if (!link.raw.readable) return;
           reply([NAK]);
           setTimeout(nakAgain, 50);
         };
@@ -203,40 +196,19 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
     }
   };
 
-  // Like a freshly picked port: no streams until open(), none after close().
-  const port = {
-    ...disconnectEvents(),
-    readable: null as ReadableStream<Uint8Array> | null,
-    writable: null as WritableStream<Uint8Array> | null,
-    open: vi.fn(async ({ baudRate }: SerialOptions) => {
-      if (port.readable) throw new DOMException("already open", "InvalidStateError");
+  const link = fakeSerialPort({
+    feed,
+    noSignals: opts.noSignals,
+    onOpen: ({ baudRate }) => {
       baud = baudRate;
       bauds.push(baudRate);
-      port.readable = new ReadableStream<Uint8Array>({ start: (c) => (out = c) });
-      port.writable = new WritableStream<Uint8Array>({ write: feed });
       idle();
-    }),
-    close: vi.fn(async () => {
-      try {
-        out?.close();
-      } catch {
-        // already closed by the reader's cancel
-      }
-      out = null;
-      port.readable = null;
-      port.writable = null;
-    }),
-    setSignals: vi.fn(async (s: SerialOutputSignals) => {
-      if (opts.noSignals) throw new DOMException("no lines", "NetworkError");
-      signals.push(s);
-    }),
-  };
+    },
+  });
   return {
-    port: port as unknown as SerialPort,
-    raw: port,
+    ...link,
     frames,
     bauds,
-    signals,
     flash,
     /** The user's strap: the next open at the ROM's speed finds it in download mode. */
     strap: () => {
@@ -244,7 +216,6 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
       loud = true;
       idle();
     },
-    dropLink: () => out?.close(),
   };
 }
 
