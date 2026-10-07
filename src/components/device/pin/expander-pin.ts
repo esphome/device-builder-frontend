@@ -1,6 +1,8 @@
 import { html, type TemplateResult } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
-import { expanderHubAddress } from "../../../util/pin/gpio.js";
+import { isPlainObject } from "../../../util/nested-values.js";
+import { expanderHubAddress, providerKeyOf } from "../../../util/pin/gpio.js";
+import { resolveSubstitutions } from "../../../util/substitutions.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -20,11 +22,12 @@ export function renderExpanderPin(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx,
-  identity: string,
+  identity: string | null,
   rawValue: unknown,
   boardPreset: boolean
 ): TemplateResult {
-  const [provider, hub, channel] = identity.split(":");
+  const [provider, hub, channel] =
+    identity?.split(":") ?? rawExpanderParts(rawValue as Record<string, unknown>);
   const address = expanderHubAddress(hub);
   const guarded = boardPreset && !effectiveDisabled(entry, ctx);
   return html`
@@ -54,4 +57,34 @@ export function renderExpanderPin(
       })}
     </div>
   `;
+}
+
+/** *rawValue* with substitutions resolved in its expander hub value (id or address). */
+export function resolveExpanderHub(
+  rawValue: unknown,
+  subs: Map<string, string> | undefined
+): unknown {
+  const provider = providerKeyOf(rawValue);
+  if (provider === undefined || !isPlainObject(rawValue)) return rawValue;
+  const hub = rawValue[provider];
+  if (typeof hub === "string") {
+    return { ...rawValue, [provider]: resolveSubstitutions(hub, subs) };
+  }
+  if (isPlainObject(hub) && typeof hub.address === "string") {
+    return {
+      ...rawValue,
+      [provider]: { ...hub, address: resolveSubstitutions(hub.address, subs) },
+    };
+  }
+  return rawValue;
+}
+
+/** Display parts of an unresolvable expander pin, an address selector shown as '@<raw>'. */
+function rawExpanderParts(rawValue: Record<string, unknown>): string[] {
+  const provider = providerKeyOf(rawValue) ?? "";
+  const hub = rawValue[provider];
+  const hubText = isPlainObject(hub)
+    ? `@${String(hub.address ?? "")}`
+    : String(hub ?? "");
+  return [provider, hubText, String(rawValue.number ?? "")];
 }

@@ -915,6 +915,31 @@ describe("renderPinField on an I/O-expander pin", () => {
     expect(input[".value"]).toBe(expected);
   });
 
+  it.each([
+    ["substitutions:\n  hub_addr: '0x44'\n", "pi4ioe5v6408 at address 0x44 · channel 4"],
+    ["", "pi4ioe5v6408 at address ${hub_addr} · channel 4"],
+  ])("keeps a substitution hub address read-only (yaml %j)", (yaml, expected) => {
+    const ctx = makeRenderCtx(
+      { pin: { pi4ioe5v6408: { address: "${hub_addr}" }, number: 4 } },
+      {
+        overrides: {
+          yaml,
+          localize: (k, params) =>
+            k === "device.pin_on_expander_address"
+              ? `${params?.provider} at address ${params?.address} · channel ${params?.channel}`
+              : k,
+        },
+      }
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(0);
+    expect(findElementBindings(result, "input")[0][".value"]).toBe(expected);
+  });
+
   it("renders no board-GPIO picker for an editable expander pin (no channel clobber)", () => {
     // Not locked: without the unconditional expander guard this would fall
     // through to the board <wa-select>, where picking a GPIO writes pin.number
