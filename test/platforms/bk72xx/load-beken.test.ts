@@ -72,10 +72,9 @@ describe("runBeken", () => {
     }));
     const { runBeken } = await import("../../../src/platforms/bk72xx/index.js");
 
-    expect(await runBeken(PORT, IMAGE, HOOKS)).toMatchObject({
-      key: undefined,
-      detail: "no answer",
-    });
+    const failed = await runBeken(PORT, IMAGE, HOOKS);
+    expect(failed).toMatchObject({ detail: "no answer" });
+    expect(failed).not.toHaveProperty("key");
   });
 
   it("names a chip without a bootloader by its own copy", async () => {
