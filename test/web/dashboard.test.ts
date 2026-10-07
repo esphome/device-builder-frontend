@@ -73,7 +73,7 @@ describe.each([
 ] as const)("esphome-web-dashboard %s mode", (_name, mode) => {
   it("renders the family's card and its intro", async () => {
     const el = await mount(mode);
-    const card = el.shadowRoot!.querySelector("esphome-web-libretiny-card") as any;
+    const card = el.shadowRoot!.querySelector("esphome-web-libretiny-card")!;
     expect(card.card.copy.title).toBe(`web.${mode}.title`);
     expect(el.shadowRoot!.textContent).toContain(`web.intro.body_${mode}`);
   });

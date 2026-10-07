@@ -94,11 +94,11 @@ type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" |
  * keeps polling. The family is the ``install`` it is given.
  */
 @customElement("esphome-web-libretiny-install-dialog")
-export class LibreTinyInstallDialog<Image = LibreTinyImage> extends LitElement {
+export class LibreTinyInstallDialog extends LitElement {
   @property({ type: Boolean }) open = false;
 
-  /** The family whose UF2 this installs; set before the first render. */
-  @property({ attribute: false }) install!: LibreTinyInstall<Image>;
+  /** The family whose UF2 this installs. */
+  @property({ attribute: false }) install!: LibreTinyInstall<unknown>;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -131,7 +131,7 @@ export class LibreTinyInstallDialog<Image = LibreTinyImage> extends LitElement {
 
   // The UF2 is read and parsed when it is picked, so the click that installs
   // it goes straight to the port picker.
-  private _image = new Preparation<File, Image, FilePickerError>(
+  private _image = new Preparation<File, unknown, FilePickerError>(
     this,
     (file) => this._parse(file),
     (failure) => this._onPrepared(failure),
@@ -142,7 +142,7 @@ export class LibreTinyInstallDialog<Image = LibreTinyImage> extends LitElement {
     })
   );
 
-  private async _parse(file: File): Promise<Prepared<Image, FilePickerError>> {
+  private async _parse(file: File): Promise<Prepared<unknown, FilePickerError>> {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const parsed = await this.install.load(bytes);
     if ("image" in parsed) {

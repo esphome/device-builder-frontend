@@ -1,4 +1,8 @@
-/** An LN882H as web.esphome.io installs it: through the chip's UART downloader. */
+/**
+ * An LN882H as web.esphome.io installs it: through the chip's UART
+ * downloader. The engine resets a board whose adapter's lines reach CEN and
+ * BOOT; else the dialog shows the BOOT guide while the engine keeps polling.
+ */
 import { LIBRETINY_LN882H_FLASHING_URL } from "../../../common/docs.js";
 import {
   loadLn882xImage,

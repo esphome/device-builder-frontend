@@ -1,4 +1,9 @@
-/** A Beken BK72xx as web.esphome.io installs it: through the chip's UART downloader. */
+/**
+ * A Beken BK72xx as web.esphome.io installs it: through the chip's UART
+ * downloader. A chip that runs ESPHome enters it by itself, and the engine
+ * resets one whose adapter's lines reach it; else the dialog shows the reset
+ * guide while the engine keeps polling.
+ */
 import { LIBRETINY_BEKEN_GUIDE_URL } from "../../../common/docs.js";
 import {
   loadBekenEngine,

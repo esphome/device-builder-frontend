@@ -43,7 +43,6 @@ import { identityLocalize, mount } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
 import type { LibreTinyImage } from "../../../../src/platforms/libretiny-uf2.js";
 import { RtlImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
-import type { RtlImage } from "../../../../src/platforms/rtl87xx/index.js";
 import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
 import { RTL_AMBZ2_INSTALL } from "../../../../src/web/platforms/rtl87xx/ambz2-install.js";
 import { RTL87XX_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
@@ -61,11 +60,11 @@ const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
 const uf2 = (name = "firmware.uf2") => new File([new Uint8Array(8)], name);
 
 async function mountBare(): Promise<any> {
-  return (await mount(new LibreTinyInstallDialog<RtlImage>(), {
+  return (await mount(new LibreTinyInstallDialog(), {
     _localize: identityLocalize,
     open: true,
     install: RTL87XX_INSTALL,
-  } as Partial<LibreTinyInstallDialog<RtlImage>>)) as any;
+  } as Partial<LibreTinyInstallDialog>)) as any;
 }
 
 // A dialog with a UF2 picked, read and checked.

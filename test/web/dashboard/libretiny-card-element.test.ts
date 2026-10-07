@@ -107,8 +107,8 @@ describe.each([
 
   it("opens the install dialog for its family", async () => {
     const el = await mountCard();
-    const install = () => el.shadowRoot!.querySelector(installDialog) as HTMLElement;
-    expect((install() as any).install).toBe(card.install);
+    const install = () => el.shadowRoot!.querySelector(installDialog)!;
+    expect(install().install).toBe(card.install);
     expect(install().hasAttribute("open")).toBe(false);
 
     (el.shadowRoot!.querySelector(".action-btn--primary") as HTMLElement).click();

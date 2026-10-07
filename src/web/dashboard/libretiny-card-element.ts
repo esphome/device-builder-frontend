@@ -40,7 +40,7 @@ export interface LibreTinyCard {
  */
 @customElement("esphome-web-libretiny-card")
 export class LibreTinyCardElement extends LitElement {
-  /** The family this card is for; set before the first render. */
+  /** The family this card is for. */
   @property({ attribute: false }) card!: LibreTinyCard;
 
   @consume({ context: localizeContext, subscribe: true })
