@@ -14,10 +14,7 @@ vi.mock("../../../src/platforms/nrf52/index.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   loadDfuPackage: nrf.loadDfuPackage,
 }));
-const steps = vi.hoisted(() => ({
-  downloadBuildArtifact: vi.fn(),
-  pickUf2: (binaries: Array<{ type?: string }>) => binaries.find((b) => b.type === "uf2"),
-}));
+const steps = vi.hoisted(() => ({ downloadBuildArtifact: vi.fn() }));
 vi.mock(
   "../../../src/components/firmware-install-dialog/browser-flash-steps.js",
   () => steps

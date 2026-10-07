@@ -54,6 +54,28 @@ export function isHandoffFlasher(value: unknown): value is HandoffFlasher {
   return (HANDOFF_FLASHERS as readonly unknown[]).includes(value);
 }
 
+/** Why a hand-off's artifact is refused: the copy for the user and the detail. */
+export interface HandoffRefusal {
+  key: string;
+  detail: string;
+}
+
+/** Whether the downloaded artifact is this flasher's image: its refusal, or null. */
+export type HandoffCheck = (bytes: Uint8Array) => Promise<HandoffRefusal | null>;
+
+/** What a never-throws parse comes to: a refusal marked by ``key``, or its value. */
+type Parsed = HandoffRefusal | { key?: never; [field: string]: unknown };
+
+/** ``check`` from a parse that never throws: the refusal it named, or null for an image. */
+export function refusalOf(
+  load: (bytes: Uint8Array) => Parsed | Promise<Parsed>
+): HandoffCheck {
+  return async (bytes) => {
+    const parsed = await load(bytes);
+    return parsed.key === undefined ? null : parsed;
+  };
+}
+
 /**
  * How the dashboard hands a platform's firmware over when it cannot flash
  * itself (an insecure origin): the flasher that takes it, whether that
@@ -74,7 +96,7 @@ export interface HandoffSpec {
    * backstop for a build that disagrees with it. Checked before the flasher
    * tab is offered.
    */
-  check?: (bytes: Uint8Array) => Promise<{ key: string; detail: string } | null>;
+  check?: HandoffCheck;
   /** Where the device's serial logs are, for the receiver; absent when not known. */
   logs?: (device: ConfiguredDevice | null) => HandoffLogs | undefined;
 }

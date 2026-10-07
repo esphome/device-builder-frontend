@@ -10,7 +10,7 @@ import {
   pickSerialPortOrFail,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import type { HandoffSpec } from "../handoff.js";
+import { type HandoffSpec, refusalOf } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
@@ -41,10 +41,7 @@ const NRF_DFU_HANDOFF: HandoffSpec = {
   erase: false,
   pick: pickDfuPackage,
   noArtifactKey: NO_DFU_PACKAGE_KEY,
-  check: async (bytes) => {
-    const parsed = await loadDfuPackage(bytes);
-    return "key" in parsed ? parsed : null;
-  },
+  check: refusalOf(loadDfuPackage),
 };
 
 /** The parsed DFU package, kept for Retry. */

@@ -12,16 +12,16 @@ import {
   downloadBuildArtifact,
   installLog,
   pickSerialPortOrFail,
-  pickUf2,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
-import type { HandoffSpec } from "../handoff.js";
+import { refusalOf } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
+import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
 import type { AmbzImage } from "./ambz-image.js";
 import { loadAmbzImage, runAmbz } from "./index.js";
 
@@ -40,12 +40,7 @@ export async function startRtlAmbzInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const artifact = await downloadBuildArtifact(
-    host,
-    device,
-    pickUf2,
-    RTL_AMBZ_HANDOFF.noArtifactKey
-  );
+  const artifact = await downloadBuildArtifact(host, device, pickUf2, NO_UF2_KEY);
   if (!artifact) return;
   const parsed = await loadAmbzImage(artifact.bytes);
   // Not for a dialog that moved to another device meanwhile.
@@ -114,17 +109,7 @@ export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promis
   finishWithLogsPort(host, port, { notice: reset });
 }
 
-// Parsed first, so an RTL8720C build is refused before the hand-off.
-const RTL_AMBZ_HANDOFF: HandoffSpec = {
-  flasher: "rtl-ambz",
-  erase: false,
-  pick: pickUf2,
-  noArtifactKey: "firmware.no_uf2",
-  check: async (bytes) => {
-    const parsed = await loadAmbzImage(bytes);
-    return "key" in parsed ? parsed : null;
-  },
-};
+const RTL_AMBZ_HANDOFF = uf2Handoff("rtl-ambz", refusalOf(loadAmbzImage));
 
 export const rtlAmbzInstall: BrowserInstall<"rtl-ambz"> = {
   id: "rtl-ambz",

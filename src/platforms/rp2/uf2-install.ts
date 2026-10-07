@@ -7,7 +7,6 @@ import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-ins
 import {
   downloadBuildArtifact,
   installLog,
-  pickUf2,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import {
@@ -15,7 +14,7 @@ import {
   finishWithLogsPort,
 } from "../../components/firmware-install-dialog/install-flow.js";
 import type { Uf2Image } from "../../util/uf2.js";
-import type { HandoffSpec } from "../handoff.js";
+import { refusalOf } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
@@ -23,6 +22,7 @@ import {
   FlashImageSlot,
   RESET_ACTION_KEY,
 } from "../platform-support.js";
+import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
 import { pickRp2CdcPort } from "./pick-cdc-port.js";
 import { parsePicoUf2, PICO_CHIPS } from "./pico-uf2.js";
 import { flashPico, picoFlashFailureCopy } from "./rp2-flash.js";
@@ -33,8 +33,6 @@ declare module "../platform-support.js" {
     "rp2-uf2": "rp2-bootsel" | "rp2-wait";
   }
 }
-
-const NO_UF2_KEY = "firmware.no_uf2";
 
 /** The parsed UF2, kept for Retry. */
 export const rp2Image = new FlashImageSlot<Uf2Image>();
@@ -149,18 +147,7 @@ function bootselFooter(): FlasherFooter {
 const withoutWebUsb = (key: string) => () =>
   isWebUsbSupported() ? key : `${key}_download`;
 
-// Handed whole to web.esphome.io's rp2-picoboot engine; parsed first so a bad
-// file is refused before a tab opens. PICOBOOT erases what it writes.
-const RP2_PICOBOOT_HANDOFF: HandoffSpec = {
-  flasher: "rp2-picoboot",
-  erase: false,
-  pick: pickUf2,
-  noArtifactKey: NO_UF2_KEY,
-  check: async (bytes) => {
-    const parsed = parsePicoUf2(bytes);
-    return "key" in parsed ? parsed : null;
-  },
-};
+const RP2_PICOBOOT_HANDOFF = uf2Handoff("rp2-picoboot", refusalOf(parsePicoUf2));
 
 export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   id: "rp2-uf2",

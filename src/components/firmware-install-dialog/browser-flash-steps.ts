@@ -14,10 +14,6 @@ import { PortNotAcceptedError, requestSerialPort } from "../../util/web-serial.j
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { compileOrFail, failNoBinaries, fetchBinaries } from "./install-flow.js";
 
-/** The build's UF2, the artifact the Pico and LibreTiny flows take. */
-export const pickUf2 = (binaries: FirmwareBinary[]): FirmwareBinary | undefined =>
-  binaries.find((b) => b.type === "uf2");
-
 export interface BuildArtifact {
   binary: FirmwareBinary;
   bytes: Uint8Array<ArrayBuffer>;

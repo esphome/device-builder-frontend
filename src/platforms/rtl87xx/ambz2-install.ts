@@ -12,17 +12,17 @@ import {
   downloadBuildArtifact,
   installLog,
   pickSerialPortOrFail,
-  pickUf2,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
-import type { HandoffSpec } from "../handoff.js";
+import { refusalOf } from "../handoff.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
+import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
 import { loadAmbz2Image, runAmbz2 } from "./index.js";
 
 declare module "../platform-support.js" {
@@ -40,12 +40,7 @@ export async function startRtlAmbz2Install(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const artifact = await downloadBuildArtifact(
-    host,
-    device,
-    pickUf2,
-    RTL_AMBZ2_HANDOFF.noArtifactKey
-  );
+  const artifact = await downloadBuildArtifact(host, device, pickUf2, NO_UF2_KEY);
   if (!artifact) return;
   const parsed = await loadAmbz2Image(artifact.bytes);
   // Not for a dialog that moved to another device meanwhile.
@@ -118,20 +113,8 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   finishWithLogsPort(host, port, { openLogs: rebooted });
 }
 
-// The same UF2 the in-app flow parses, handed whole to web.esphome.io's
-// rtl-ambz2 engine when this origin cannot flash. The ROM downloader has no
-// erase. The platform is also the RTL8710B, whose image this flasher cannot
-// write, so the UF2 is parsed here first, as the in-app flow does.
-const RTL_AMBZ2_HANDOFF: HandoffSpec = {
-  flasher: "rtl-ambz2",
-  erase: false,
-  pick: pickUf2,
-  noArtifactKey: "firmware.no_uf2",
-  check: async (bytes) => {
-    const parsed = await loadAmbz2Image(bytes);
-    return "key" in parsed ? parsed : null;
-  },
-};
+// The platform is also the RTL8710B, whose image this flasher cannot write.
+const RTL_AMBZ2_HANDOFF = uf2Handoff("rtl-ambz2", refusalOf(loadAmbz2Image));
 
 export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {
   id: "rtl-ambz2",
