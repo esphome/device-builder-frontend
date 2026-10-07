@@ -179,6 +179,38 @@ describe("adopt-then-rename (#2412)", () => {
     expect(adopted.mock.calls[0][0].detail.renameTo).toBe("kitchen-sensor");
   });
 
+  it("keeps the factory hostname for a signed device", async () => {
+    const { priv, importDevice } = await makeDialog([]);
+    const adopted = vi.fn();
+    (priv as EventTarget).addEventListener("adopted", adopted);
+    await openSettled(priv, { ...ethernetDevice(), ota_signed: true });
+    const inputs = await deviceNameInputsOf(priv);
+    const friendly = inputs.shadowRoot!.querySelector<HTMLInputElement>(
+      "#device-friendly-name"
+    )!;
+    friendly.value = "Kitchen Sensor";
+    friendly.dispatchEvent(new Event("input"));
+    await inputs.updateComplete;
+    await priv.updateComplete;
+
+    await priv._submit();
+
+    // The rename's OTA tail would be rejected; the friendly name rides the import.
+    expect(importDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "foo-1234", friendly_name: "Kitchen Sensor" })
+    );
+    expect(adopted.mock.calls[0][0].detail.renameTo).toBe(null);
+    expect(inputs.shadowRoot!.textContent).toContain("dashboard.adopt_ota_signed_hint");
+    const toggle =
+      inputs.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!;
+    toggle.click();
+    await inputs.updateComplete;
+    const hostname =
+      inputs.shadowRoot!.querySelector<HTMLInputElement>("#device-hostname")!;
+    expect(hostname.readOnly).toBe(true);
+    expect(inputs.shadowRoot!.textContent).not.toContain("naming.hostname_helper");
+  });
+
   it("returns the hostname to the factory broadcast when the friendly name is cleared", async () => {
     const { priv, importDevice } = await makeDialog([]);
     const adopted = vi.fn();

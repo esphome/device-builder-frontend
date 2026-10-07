@@ -2,6 +2,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { followActiveJob } from "../../util/firmware-job-display.js";
 import { launchLogs } from "../../util/logs-launch.js";
+import { otaNeedsUsb } from "../../util/ota-signed.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType } from "../command-dialog.js";
 import { openLogsWithMethod } from "./actions-ui.js";
@@ -14,6 +15,12 @@ export function openInstallMethod(
   host._installMethodDevice = device;
   host._installMethodMode = "install";
   host._installMethodOpen = true;
+}
+
+/** One-click Update: a direct install, or the picker when only USB can take it. */
+export function updateDevice(host: ESPHomePageDashboard, device: ConfiguredDevice): void {
+  if (otaNeedsUsb(device)) host._openInstallMethod(device);
+  else host._openCommand(device, "install");
 }
 
 export function onInstallMethodSelect(

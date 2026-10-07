@@ -12,6 +12,7 @@ import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
 import { launchLogsWithMethod } from "../../util/logs-launch.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
+import { otaNeedsUsb } from "../../util/ota-signed.js";
 
 export async function executeFriendlyName(
   host: ESPHomePageDashboard,
@@ -89,8 +90,9 @@ export async function executeRename(
   // The default rename compiles + OTA-installs, which only works against a
   // reachable device. Route offline/unknown devices to a confirm before a
   // config-only rename (renames the YAML now; the device keeps its old name
-  // until reflashed, which the prompt spells out).
-  if (device.runtime_state.state !== DeviceState.ONLINE) {
+  // until reflashed, which the prompt spells out). A device that rejects
+  // unsigned OTA images takes the same route.
+  if (device.runtime_state.state !== DeviceState.ONLINE || otaNeedsUsb(device)) {
     host._openConfirm({ kind: "rename-config-only", device, newName });
     return;
   }

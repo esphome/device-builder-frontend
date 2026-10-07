@@ -162,3 +162,18 @@ describe("DeviceInstallController busy seam guard", () => {
     expect(openForDevice).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("DeviceInstallController.onUpdate", () => {
+  it("opens the picker for a device only USB can take", () => {
+    const commandDialog = { openForDevice: vi.fn(), followJob: vi.fn() };
+    const ctrl = new DeviceInstallController(
+      makeHost(makeConfiguredDevice({ runtime_state: { ota_signed: true } }), null, {
+        commandDialog:
+          commandDialog as unknown as DeviceInstallControllerHost["commandDialog"],
+      })
+    );
+    ctrl.onUpdate();
+    expect(ctrl.installMethodOpen).toBe(true);
+    expect(commandDialog.openForDevice).not.toHaveBeenCalled();
+  });
+});

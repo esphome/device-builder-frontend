@@ -13,6 +13,7 @@ import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { getActiveTourConfiguration } from "../guided-tour/tour-session.js";
 import { downloadYaml, editDevice, editDeviceSection } from "./actions.js";
+import { updateDevice } from "./install.js";
 import { renderFacets } from "./render-facets.js";
 import {
   renderAddDeviceCard,
@@ -157,7 +158,7 @@ export function renderCardGrid(
             @open-config-migration=${() => editDevice(device, { reveal: true })}
             @open-encryption-settings=${() => editDeviceSection(device, "api", { reveal: true })}
             @install-device=${() => host._openInstallMethod(device)}
-            @update-device=${() => host._openCommand(device, "install")}
+            @update-device=${() => updateDevice(host, device)}
             @open-logs=${() => host._openLogs(device)}
             @show-progress=${() => host._showJobProgress(device)}
             @card-click=${() => host._toggleDrawerForDevice(device)}
@@ -216,8 +217,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         editDevice(e.detail, { reveal: true })}
       @open-encryption-settings=${(e: CustomEvent<ConfiguredDevice>) =>
         editDeviceSection(e.detail, "api", { reveal: true })}
-      @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._openCommand(e.detail, "install")}
+      @update-device=${(e: CustomEvent<ConfiguredDevice>) => updateDevice(host, e.detail)}
       @open-logs=${(e: CustomEvent<ConfiguredDevice>) => host._openLogs(e.detail)}
       @validate-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "validate")}
@@ -295,7 +295,7 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
       }}
       @update-device=${(e: CustomEvent<ConfiguredDevice>) => {
         host._drawerOpen = false;
-        host._openCommand(e.detail, "install");
+        updateDevice(host, e.detail);
       }}
       @install-device=${(e: CustomEvent<ConfiguredDevice>) => {
         host._drawerOpen = false;
@@ -333,8 +333,7 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
         host._cardContextPosition = null;
       }}
       @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
-      @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._openCommand(e.detail, "install")}
+      @update-device=${(e: CustomEvent<ConfiguredDevice>) => updateDevice(host, e.detail)}
       @open-logs=${(e: CustomEvent<ConfiguredDevice>) => host._openLogs(e.detail)}
       @validate-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "validate")}

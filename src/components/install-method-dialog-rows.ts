@@ -20,6 +20,7 @@ export interface MethodRowContext {
   mode: "install" | "logs";
   deviceState: DeviceState;
   neverFlashed: boolean;
+  otaNeedsUsb: boolean;
   onSelect: (method: string) => void;
 }
 
@@ -48,15 +49,24 @@ export function renderMethodRow(opts: {
 }
 
 /**
- * Dialog-top callout ahead of the method list, install mode only: a
- * first-install USB notice for a never-flashed device (it can't receive
- * an OTA by itself), else the compile-now-install-on-wake notice for an
- * offline device.
+ * Dialog-top callout ahead of the method list, install mode only: a USB
+ * notice for a device that rejects unsigned OTA images, a first-install
+ * USB notice for a never-flashed device (it can't receive an OTA by
+ * itself), else the compile-now-install-on-wake notice for an offline
+ * device.
  */
 export function renderInstallNotice(
   ctx: MethodRowContext
 ): TemplateResult | typeof nothing {
   if (ctx.mode !== "install") return nothing;
+  if (ctx.otaNeedsUsb) {
+    return html`
+      <wa-callout class="method-notice" variant="brand">
+        <wa-icon slot="icon" library="mdi" name="usb"></wa-icon>
+        ${ctx.localize("dashboard.install_method_ota_signed_notice")}
+      </wa-callout>
+    `;
+  }
   if (ctx.neverFlashed) {
     return html`
       <wa-callout class="method-notice" variant="brand">
@@ -80,8 +90,10 @@ export function renderOtaOption(ctx: MethodRowContext): TemplateResult {
   // Install mode keeps the row clickable when not online; the
   // compile runs even if the upload fails. Logs mode has no
   // compile-equivalent so it stays gated on isOnline.
+  // A device that rejects unsigned images can't take this install.
   const isOnline = ctx.deviceState === DeviceState.ONLINE;
-  const enabled = isOnline || ctx.mode === "install";
+  const otaBlocked = ctx.mode === "install" && ctx.otaNeedsUsb;
+  const enabled = !otaBlocked && (isOnline || ctx.mode === "install");
   const titleKey =
     ctx.mode === "logs"
       ? "dashboard.logs_method_wireless"
@@ -89,6 +101,8 @@ export function renderOtaOption(ctx: MethodRowContext): TemplateResult {
   let descKey: string;
   if (ctx.mode === "logs") {
     descKey = "dashboard.logs_method_wireless_desc";
+  } else if (otaBlocked) {
+    descKey = "dashboard.install_method_network_desc_ota_signed";
   } else if (ctx.neverFlashed) {
     // Before the OFFLINE branch: never-flashed devices usually sit in
     // UNKNOWN, so the offline copy alone would not fire for them.

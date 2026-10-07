@@ -71,6 +71,11 @@ export class ESPHomeDeviceNameInputs extends LitElement {
   @property({ attribute: false })
   forbiddenErrorKey = "";
 
+  /** Keep the seeded hostname: friendly-name edits don't re-derive it and
+   *  the field is read-only. */
+  @property({ attribute: false })
+  hostnameLocked = false;
+
   /** Hostnames already in use; a collision blocks submit. */
   @property({ attribute: false })
   takenHostnames: ReadonlySet<string> = new Set();
@@ -292,8 +297,15 @@ export class ESPHomeDeviceNameInputs extends LitElement {
               id: "device-hostname",
               placeholder: this.hostnamePlaceholder,
               autofocus: false,
+              readonly: this.hostnameLocked,
             })}
-            <span class="helper">${this._localize("naming.hostname_helper")}</span>
+            ${
+              this.hostnameLocked
+                ? nothing
+                : html`<span class="helper"
+                    >${this._localize("naming.hostname_helper")}</span
+                  >`
+            }
           `,
         })}
         <button
@@ -313,7 +325,7 @@ export class ESPHomeDeviceNameInputs extends LitElement {
 
   private _onFriendlyInput = (e: Event) => {
     this._friendly = (e.target as HTMLInputElement).value;
-    if (!this._hostnameEdited) {
+    if (!this._hostnameEdited && !this.hostnameLocked) {
       this._hostname = slugifyHostname(this._friendly) || this._hostnameFallback;
     }
     this._autoOpenOnWarning();

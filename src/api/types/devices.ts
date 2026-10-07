@@ -81,6 +81,9 @@ export interface DeviceRuntimeState {
    *  clears it; the announce lifecycle vouches from there, which is
    *  the other half of ``deployedIdentityTrusted``'s gate. */
   deployed_identity_live: boolean;
+  /** Running firmware announces ``ota_signed=1``: it rejects OTA images
+   *  not signed by a key it trusts. Clears once an unsigned build runs. */
+  ota_signed: boolean;
 }
 
 /** A configured ESPHome device. */
@@ -150,6 +153,9 @@ export interface ConfiguredDevice {
    *  the YAML half of the OTA bootloader-update gate (see
    *  `util/bootloader-flash.ts` for the deployed-firmware half). */
   ota_partition_access?: boolean;
+  /** esp32 `signed_ota_verification` sets `signing_key`: this config's
+   *  builds are signed. */
+  ota_signing_key: boolean;
   /**
    * 8-char hex hash of the YAML as last successfully compiled,
    * persisted in the device-builder metadata sidecar. Matches the
@@ -289,6 +295,9 @@ export interface AdoptableDevice {
    *  ``_http._tcp.local.`` mDNS service. Empty string hides the
    *  Visit-web-UI link on the discovered card. */
   web_url: string;
+  /** Runs vendor-signed firmware; the first install after adoption must go
+   *  over USB. */
+  ota_signed: boolean;
 }
 
 /** Response from devices/list. */

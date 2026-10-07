@@ -8,6 +8,7 @@ import { installsFor } from "../../platforms/registry.js";
 import { canFlashBootloader } from "../../util/bootloader-flash.js";
 import { computeLabelUsage } from "../../util/label-usage.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
+import { otaNeedsUsb } from "../../util/ota-signed.js";
 import { takenHostnameSet } from "../../util/taken-hostnames.js";
 import { performRename } from "./actions-ui.js";
 import {
@@ -96,9 +97,19 @@ export function confirmDialogCopy(
     }
     case "rename-config-only": {
       const name = pending.device.friendly_name || pending.device.name;
+      const signed = otaNeedsUsb(pending.device);
       return {
-        heading: t("dashboard.action_rename_offline_title"),
-        message: t("dashboard.action_rename_offline_desc", { name }),
+        heading: t(
+          signed
+            ? "dashboard.action_rename_ota_signed_title"
+            : "dashboard.action_rename_offline_title"
+        ),
+        message: t(
+          signed
+            ? "dashboard.action_rename_ota_signed_desc"
+            : "dashboard.action_rename_offline_desc",
+          { name }
+        ),
         confirm: t("dashboard.action_rename_offline_confirm"),
         // Mark destructive so a stray Enter can't confirm an offline rename
         // (renames the file + drops into divergence until reflash).
@@ -268,6 +279,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       }
       .canFlashBootloader=${canFlashBootloader(host._installMethodDevice)}
       .neverFlashed=${isNeverFlashed(host._installMethodDevice)}
+      .otaNeedsUsb=${otaNeedsUsb(host._installMethodDevice)}
       .mode=${host._installMethodMode}
       @close=${() => {
         host._installMethodOpen = false;

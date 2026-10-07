@@ -11,6 +11,7 @@ import {
   type LogsLaunchHost,
 } from "../../util/logs-launch.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
+import { otaNeedsUsb } from "../../util/ota-signed.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -71,6 +72,10 @@ export class DeviceInstallController implements ReactiveController {
     return isNeverFlashed(this._host.device);
   }
 
+  get otaNeedsUsb(): boolean {
+    return otaNeedsUsb(this._host.device);
+  }
+
   /** "Install" entry point — opens the install-method picker. */
   onInstall = () => {
     if (!this._host.device) return;
@@ -96,6 +101,11 @@ export class DeviceInstallController implements ReactiveController {
   onUpdate = () => {
     const device = this._host.device;
     if (!device) return;
+    // Only USB can take this install; the picker says so.
+    if (otaNeedsUsb(device)) {
+      this.onInstall();
+      return;
+    }
     this._openCommand(device, "install");
   };
 
