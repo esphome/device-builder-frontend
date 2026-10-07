@@ -43,7 +43,7 @@ import { identityLocalize, mount } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
 import type { LibreTinyImage } from "../../../../src/platforms/libretiny-uf2.js";
 import { RtlImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
-import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
+import { LibreTinyInstallDialog } from "../../../../src/web/install/esphome-web-libretiny-install-dialog.js";
 import { RTL_AMBZ2_INSTALL } from "../../../../src/web/platforms/rtl87xx/ambz2-install.js";
 import { RTL87XX_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
 

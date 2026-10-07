@@ -108,10 +108,10 @@ logs dialog's `policy`; the dialog's default is no reset.
 
 A family that is flashed from a LibreTiny UF2 over a USB serial adapter needs no
 element of its own: its `mode.ts` renders the shared `esphome-web-libretiny-card`
-(`dashboard/libretiny-card-element.ts`) with a `LibreTinyCard` (its copy, its
+(`dashboard/esphome-web-libretiny-card.ts`) with a `LibreTinyCard` (its copy, its
 `SerialLogsPolicy` and its `LibreTinyInstall`, which says how its file is parsed and
 written; see `platforms/rtl87xx/card.ts` and `install.ts`), and the card opens the
-shared `esphome-web-libretiny-install-dialog` (`install/libretiny-install-dialog.ts`)
+shared `esphome-web-libretiny-install-dialog` (`install/esphome-web-libretiny-install-dialog.ts`)
 with that install.
 
 New copy goes in `src/translations/en.json` under the `web.*`

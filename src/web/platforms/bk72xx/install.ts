@@ -10,7 +10,7 @@ import {
   loadBekenImage,
   runBeken,
 } from "../../../platforms/bk72xx/index.js";
-import type { LibreTinyInstall } from "../../install/libretiny-install-dialog.js";
+import type { LibreTinyInstall } from "../../install/esphome-web-libretiny-install-dialog.js";
 
 export const BK_INSTALL: LibreTinyInstall = {
   copy: {

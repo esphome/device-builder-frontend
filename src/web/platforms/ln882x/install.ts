@@ -9,7 +9,7 @@ import {
   runLn882x,
   warmLn882x,
 } from "../../../platforms/ln882x/index.js";
-import type { LibreTinyInstall } from "../../install/libretiny-install-dialog.js";
+import type { LibreTinyInstall } from "../../install/esphome-web-libretiny-install-dialog.js";
 
 export const LN_INSTALL: LibreTinyInstall = {
   copy: {

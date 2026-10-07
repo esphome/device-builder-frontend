@@ -2,7 +2,7 @@ import { html } from "lit";
 
 import type { WebPlatform } from "../web-platform.js";
 
-import "../../dashboard/libretiny-card-element.js";
+import "../../dashboard/esphome-web-libretiny-card.js";
 import { BK_CARD } from "./card.js";
 
 /** Beken BK72xx. Its modules sit behind generic UART adapters, so no port claims it. */

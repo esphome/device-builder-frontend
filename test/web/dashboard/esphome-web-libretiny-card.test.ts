@@ -13,7 +13,7 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
 }));
-vi.mock("../../../src/web/install/libretiny-install-dialog.js", () => ({}));
+vi.mock("../../../src/web/install/esphome-web-libretiny-install-dialog.js", () => ({}));
 vi.mock("../../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
@@ -25,7 +25,7 @@ import { expectTooltipsAnchored } from "../../_tooltip-anchors.js";
 import { BK72XX_SERIAL_LOGS } from "../../../src/platforms/bk72xx/serial-logs.js";
 import { LN882X_SERIAL_LOGS } from "../../../src/platforms/ln882x/serial-logs.js";
 import { RTL87XX_SERIAL_LOGS } from "../../../src/platforms/rtl87xx/serial-logs.js";
-import { LibreTinyCardElement } from "../../../src/web/dashboard/libretiny-card-element.js";
+import { LibreTinyCardElement } from "../../../src/web/dashboard/esphome-web-libretiny-card.js";
 import { BK_CARD } from "../../../src/web/platforms/bk72xx/card.js";
 import { LN_CARD } from "../../../src/web/platforms/ln882x/card.js";
 import { RTL_CARD } from "../../../src/web/platforms/rtl87xx/card.js";

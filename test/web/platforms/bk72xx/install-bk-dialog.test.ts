@@ -23,7 +23,7 @@ vi.mock("../../../../src/platforms/bk72xx/index.js", () => ({
 
 import { pickerText, pickFile } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
-import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
+import { LibreTinyInstallDialog } from "../../../../src/web/install/esphome-web-libretiny-install-dialog.js";
 import { BK_INSTALL } from "../../../../src/web/platforms/bk72xx/install.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

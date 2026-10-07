@@ -26,7 +26,7 @@ vi.mock("../../../../src/platforms/ln882x/index.js", () => ({
 import { pickerText, pickFile } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { UF2_FAMILY_LN882H } from "../../../../src/platforms/ln882x/ln882x-image.js";
-import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
+import { LibreTinyInstallDialog } from "../../../../src/web/install/esphome-web-libretiny-install-dialog.js";
 import { LN_INSTALL } from "../../../../src/web/platforms/ln882x/install.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

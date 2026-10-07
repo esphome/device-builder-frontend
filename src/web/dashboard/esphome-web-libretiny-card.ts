@@ -9,8 +9,8 @@ import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import type { LibreTinyInstall } from "../install/libretiny-install-dialog.js";
-import "../install/libretiny-install-dialog.js";
+import type { LibreTinyInstall } from "../install/esphome-web-libretiny-install-dialog.js";
+import "../install/esphome-web-libretiny-install-dialog.js";
 import "../logs/esphome-web-logs-dialog.js";
 import { pickPortForLogs } from "../util/pick-port-for-logs.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
@@ -29,6 +29,7 @@ export interface LibreTinyCard {
     readonly logs: string;
   };
   readonly logs: SerialLogsPolicy;
+  /** Any family's install fits: its methods take the image, so TypeScript checks them bivariantly. */
   readonly install: LibreTinyInstall<unknown>;
 }
 

@@ -1,5 +1,5 @@
 import { BK72XX_SERIAL_LOGS } from "../../../platforms/bk72xx/index.js";
-import type { LibreTinyCard } from "../../dashboard/libretiny-card-element.js";
+import type { LibreTinyCard } from "../../dashboard/esphome-web-libretiny-card.js";
 import { BK_INSTALL } from "./install.js";
 
 /** Beken BK72xx: install through the chip's UART downloader, and logs. */

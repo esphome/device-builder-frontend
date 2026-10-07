@@ -5,7 +5,7 @@
  */
 import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
-import type { LibreTinyInstall } from "../install/libretiny-install-dialog.js";
+import type { LibreTinyInstall } from "../install/esphome-web-libretiny-install-dialog.js";
 import { parseFailureCopy } from "../install/preparation.js";
 import { type ReceiverEngine, singleWholePart } from "./receiver-engine.js";
 import { serialRun } from "./serial-run.js";

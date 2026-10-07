@@ -2,7 +2,7 @@ import { html } from "lit";
 
 import type { WebPlatform } from "../web-platform.js";
 
-import "../../dashboard/libretiny-card-element.js";
+import "../../dashboard/esphome-web-libretiny-card.js";
 import { RTL_CARD } from "./card.js";
 
 /** RTL87xx (RTL8720C, RTL8710B): behind generic UART bridges, so no port claims it. */
