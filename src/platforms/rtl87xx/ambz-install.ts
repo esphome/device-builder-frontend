@@ -15,12 +15,13 @@ import {
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
+import { refusalOf } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
-import { NO_UF2_KEY, pickUf2, refusalOf, uf2Handoff } from "../uf2-handoff.js";
+import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
 import type { AmbzImage } from "./ambz-image.js";
 import { loadAmbzImage, runAmbz } from "./index.js";
 

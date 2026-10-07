@@ -63,6 +63,19 @@ export interface HandoffRefusal {
 /** Whether the downloaded artifact is this flasher's image: its refusal, or null. */
 export type HandoffCheck = (bytes: Uint8Array) => Promise<HandoffRefusal | null>;
 
+/** What a never-throws parse comes to: a refusal marked by ``key``, or its value. */
+type Parsed = HandoffRefusal | { key?: never; [field: string]: unknown };
+
+/** ``check`` from a parse that never throws: the refusal it named, or null for an image. */
+export function refusalOf(
+  load: (bytes: Uint8Array) => Parsed | Promise<Parsed>
+): HandoffCheck {
+  return async (bytes) => {
+    const parsed = await load(bytes);
+    return parsed.key === undefined ? null : parsed;
+  };
+}
+
 /**
  * How the dashboard hands a platform's firmware over when it cannot flash
  * itself (an insecure origin): the flasher that takes it, whether that

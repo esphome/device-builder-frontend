@@ -14,6 +14,7 @@ import {
   finishWithLogsPort,
 } from "../../components/firmware-install-dialog/install-flow.js";
 import type { Uf2Image } from "../../util/uf2.js";
+import { refusalOf } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
@@ -21,7 +22,7 @@ import {
   FlashImageSlot,
   RESET_ACTION_KEY,
 } from "../platform-support.js";
-import { NO_UF2_KEY, pickUf2, refusalOf, uf2Handoff } from "../uf2-handoff.js";
+import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
 import { pickRp2CdcPort } from "./pick-cdc-port.js";
 import { parsePicoUf2, PICO_CHIPS } from "./pico-uf2.js";
 import { flashPico, picoFlashFailureCopy } from "./rp2-flash.js";

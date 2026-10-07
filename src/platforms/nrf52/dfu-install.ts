@@ -10,14 +10,13 @@ import {
   pickSerialPortOrFail,
   touchIntoBootloaderStep,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
-import type { HandoffSpec } from "../handoff.js";
+import { type HandoffSpec, refusalOf } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
   FlashImageSlot,
   RESET_ACTION_KEY,
 } from "../platform-support.js";
-import { refusalOf } from "../uf2-handoff.js";
 import { type DfuPackage, loadDfuEngine, loadDfuPackage } from "./index.js";
 import {
   touchFailureDetail,
