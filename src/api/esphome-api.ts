@@ -13,8 +13,8 @@ import { APIError, CommandTimeoutError } from "./api-error.js";
 import { LivenessMonitor } from "./liveness.js";
 import type {
   AutomationAction,
+  AutomationBodyRef,
   AutomationCatalogBody,
-  AutomationCatalogBodyType,
   AutomationCondition,
   AutomationLocation,
   AutomationTree,
@@ -1786,8 +1786,8 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Hydrate full automation bodies (config_entries trees) in one
-   * round trip. Each ref is ``{type, id}`` where ``type`` is one of
+   * Hydrate full automation bodies (config_entries trees), following
+   * the backend's ``remaining`` pages until done. Each ref is ``{type, id}`` where ``type`` is one of
    * ``triggers`` / ``actions`` / ``conditions`` / ``light_effects``
    * / ``filters``. The response is keyed by ``"<type>/<id>"`` and
    * carries the full body. Missing / unknown refs are absent.
@@ -1796,19 +1796,17 @@ export class ESPHomeAPI {
    * concurrent fetches into one batched call.
    */
   async getAutomationBodies(
-    refs: { type: AutomationCatalogBodyType; id: string }[]
+    refs: AutomationBodyRef[]
   ): Promise<Record<string, AutomationCatalogBody>> {
     const bodies: Record<string, AutomationCatalogBody> = {};
-    // The backend pages large batches under a byte budget so no reply
-    // trips a proxy's WebSocket message size cap.
-    while (refs.length > 0) {
+    for (let todo = refs; todo.length > 0;) {
       const page = await this.sendCommand<GetAutomationBodiesResponse>(
         "automations/get_bodies",
-        { refs }
+        { refs: todo }
       );
       Object.assign(bodies, page.bodies);
-      if (page.remaining.length >= refs.length) break;
-      refs = page.remaining;
+      if (page.remaining.length >= todo.length) break;
+      todo = page.remaining;
     }
     for (const body of Object.values(bodies)) body.config_entries ??= [];
     return bodies;

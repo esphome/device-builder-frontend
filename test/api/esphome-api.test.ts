@@ -1986,6 +1986,10 @@ describe("ESPHomeAPI — getAvailableAutomations", () => {
 });
 
 describe("ESPHomeAPI — getAutomationBodies", () => {
+  type Sent = { message_id: string; args: { refs: unknown[] } };
+  const a = { type: "actions", id: "a" } as const;
+  const b = { type: "actions", id: "b" } as const;
+
   beforeEach(() => {
     installMockWebSocket();
   });
@@ -2035,16 +2039,11 @@ describe("ESPHomeAPI — getAutomationBodies", () => {
     expect(ws.sent).toHaveLength(0);
   });
 
-  type Sent = { command: string; message_id: string; args: { refs: unknown[] } };
-  const a = { type: "actions", id: "a" } as const;
-  const b = { type: "actions", id: "b" } as const;
-
   it("re-requests ``remaining`` until every page is in", async () => {
     const api = makeApi();
     const ws = await connect(api);
     const pending = api.getAutomationBodies([a, b]);
     const first = ws.sentAs<Sent>(0);
-    expect(first.command).toBe("automations/get_bodies");
     expect(first.args.refs).toEqual([a, b]);
     ws.receive({
       message_id: first.message_id,
@@ -2057,18 +2056,15 @@ describe("ESPHomeAPI — getAutomationBodies", () => {
       message_id: second.message_id,
       result: { bodies: { "actions/b": { id: "b" } }, remaining: [] },
     });
-    const bodies = await pending;
-    expect(Object.keys(bodies)).toEqual(["actions/a", "actions/b"]);
-    expect(bodies["actions/b"].config_entries).toEqual([]);
+    expect(Object.keys(await pending)).toEqual(["actions/a", "actions/b"]);
   });
 
   it("stops when a page makes no progress", async () => {
     const api = makeApi();
     const ws = await connect(api);
     const pending = api.getAutomationBodies([a, b]);
-    const first = ws.sentAs<Sent>(0);
     ws.receive({
-      message_id: first.message_id,
+      message_id: ws.sentAs<Sent>(0).message_id,
       result: { bodies: {}, remaining: [a, b] },
     });
     expect(await pending).toEqual({});

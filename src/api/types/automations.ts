@@ -162,12 +162,18 @@ export type AutomationCatalogBody =
  *  refs that didn't fit this reply's byte budget. */
 export interface GetAutomationBodiesResponse {
   bodies: Record<string, AutomationCatalogBody>;
-  remaining: { type: AutomationCatalogBodyType; id: string }[];
+  remaining: AutomationBodyRef[];
 }
 
 /** Wire ``type`` field on an ``automations/get_bodies`` ref. */
 export type AutomationCatalogBodyType =
   "triggers" | "actions" | "conditions" | "light_effects" | "filters";
+
+/** One ``{type, id}`` ref on an ``automations/get_bodies`` request. */
+export interface AutomationBodyRef {
+  type: AutomationCatalogBodyType;
+  id: string;
+}
 
 /** Tagged-union locator for an automation inside a device YAML.
  *  Mirrors the backend's ``AutomationLocation`` Python dataclass.
