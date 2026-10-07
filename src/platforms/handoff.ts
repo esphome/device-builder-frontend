@@ -60,6 +60,12 @@ export function isHandoffFlasher(value: unknown): value is HandoffFlasher {
  * flasher erases first, which built artifact to send (as one part at address
  * 0), the copy for a build without one, and a check of the artifact.
  */
+/** Why a hand-off's artifact is refused: the copy for the user and the detail. */
+export interface HandoffRefusal {
+  key: string;
+  detail: string;
+}
+
 export interface HandoffSpec {
   flasher: HandoffFlasher;
   erase: boolean;
@@ -74,7 +80,7 @@ export interface HandoffSpec {
    * backstop for a build that disagrees with it. Checked before the flasher
    * tab is offered.
    */
-  check?: (bytes: Uint8Array) => Promise<{ key: string; detail: string } | null>;
+  check?: (bytes: Uint8Array) => Promise<HandoffRefusal | null>;
   /** Where the device's serial logs are, for the receiver; absent when not known. */
   logs?: (device: ConfiguredDevice | null) => HandoffLogs | undefined;
 }

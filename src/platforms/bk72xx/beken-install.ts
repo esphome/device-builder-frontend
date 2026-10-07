@@ -12,17 +12,16 @@ import {
   downloadBuildArtifact,
   installLog,
   pickSerialPortOrFail,
-  pickUf2,
 } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { finishWithLogsPort } from "../../components/firmware-install-dialog/install-flow.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
-import type { HandoffSpec } from "../handoff.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
   FlashImageSlot,
 } from "../platform-support.js";
+import { NO_UF2_KEY, pickUf2, refusalOf, uf2Handoff } from "../uf2-handoff.js";
 import { loadBekenImage, runBeken } from "./index.js";
 import {
   BK_LOGS_ON_FLASH_PORT_SETTING,
@@ -45,12 +44,7 @@ export async function startBekenInstall(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const artifact = await downloadBuildArtifact(
-    host,
-    device,
-    pickUf2,
-    BK_UART_HANDOFF.noArtifactKey
-  );
+  const artifact = await downloadBuildArtifact(host, device, pickUf2, NO_UF2_KEY);
   if (!artifact) return;
   const parsed = await loadBekenImage(artifact.bytes);
   // Not for a dialog that moved to another device meanwhile.
@@ -132,19 +126,8 @@ export async function bekenDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<
 
 // The same UF2 the in-app flow parses, handed whole to web.esphome.io's
 // bk-uart engine when this origin cannot flash. The downloader erases sector
-// by sector as it writes. The UF2 is parsed here first, as the in-app flow
-// does, so that a build that is not Beken's is named before the tab opens.
-const BK_UART_HANDOFF: HandoffSpec = {
-  flasher: "bk-uart",
-  erase: false,
-  pick: pickUf2,
-  noArtifactKey: "firmware.no_uf2",
-  check: async (bytes) => {
-    const parsed = await loadBekenImage(bytes);
-    return "key" in parsed ? parsed : null;
-  },
-  logs: bkHandoffLogs,
-};
+// by sector as it writes.
+const BK_UART_HANDOFF = uf2Handoff("bk-uart", refusalOf(loadBekenImage), bkHandoffLogs);
 
 export const bekenInstall: BrowserInstall<"bk-uart"> = {
   id: "bk-uart",

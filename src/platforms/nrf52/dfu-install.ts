@@ -17,6 +17,7 @@ import {
   FlashImageSlot,
   RESET_ACTION_KEY,
 } from "../platform-support.js";
+import { refusalOf } from "../uf2-handoff.js";
 import { type DfuPackage, loadDfuEngine, loadDfuPackage } from "./index.js";
 import {
   touchFailureDetail,
@@ -41,10 +42,7 @@ const NRF_DFU_HANDOFF: HandoffSpec = {
   erase: false,
   pick: pickDfuPackage,
   noArtifactKey: NO_DFU_PACKAGE_KEY,
-  check: async (bytes) => {
-    const parsed = await loadDfuPackage(bytes);
-    return "key" in parsed ? parsed : null;
-  },
+  check: refusalOf(loadDfuPackage),
 };
 
 /** The parsed DFU package, kept for Retry. */
