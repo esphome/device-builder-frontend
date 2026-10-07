@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { mdiTextBoxOutline, mdiUpload } from "@mdi/js";
-import { html, LitElement, type TemplateResult } from "lit";
-import { state } from "lit/decorators.js";
+import { html, LitElement } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
@@ -9,6 +9,8 @@ import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import type { LibreTinyInstall } from "../install/libretiny-install-dialog.js";
+import "../install/libretiny-install-dialog.js";
 import "../logs/esphome-web-logs-dialog.js";
 import { pickPortForLogs } from "../util/pick-port-for-logs.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
@@ -19,7 +21,7 @@ import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({ upload: mdiUpload, "text-box-outline": mdiTextBoxOutline });
 
-/** A family's card: its copy and its logs. */
+/** A family's card: its copy, its logs and its install. */
 export interface LibreTinyCard {
   readonly copy: {
     readonly title: string;
@@ -27,18 +29,19 @@ export interface LibreTinyCard {
     readonly logs: string;
   };
   readonly logs: SerialLogsPolicy;
+  readonly install: LibreTinyInstall<unknown>;
 }
 
 /**
  * The card of a chip that sits behind a serial adapter: no connected state;
  * each install picks its own port and flashes through the chip's downloader,
- * and each logs session picks its own port. A family's element extends this
- * with its ``card`` and its install dialog.
+ * and each logs session picks its own port. The family is the ``card`` it is
+ * given.
  */
-export abstract class LibreTinyCardElement extends LitElement {
-  protected abstract readonly card: LibreTinyCard;
-
-  protected abstract renderInstall(open: boolean, onHide: () => void): TemplateResult;
+@customElement("esphome-web-libretiny-card")
+export class LibreTinyCardElement extends LitElement {
+  /** The family this card is for; set before the first render. */
+  @property({ attribute: false }) card!: LibreTinyCard;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -84,7 +87,7 @@ export abstract class LibreTinyCardElement extends LitElement {
   }
 
   protected render() {
-    const { copy, logs } = this.card;
+    const { copy, logs, install } = this.card;
     return html`
       <esphome-web-card
         status=${this._localize("web.status.not_connected")}
@@ -108,7 +111,11 @@ export abstract class LibreTinyCardElement extends LitElement {
           <wa-tooltip for="btn-logs">${this._localize(copy.logs)}</wa-tooltip>
         </div>
       </esphome-web-card>
-      ${this.renderInstall(this._installOpen, () => void this._onInstallHidden())}
+      <esphome-web-libretiny-install-dialog
+        .install=${install}
+        ?open=${this._installOpen}
+        @after-hide=${this._onInstallHidden}
+      ></esphome-web-libretiny-install-dialog>
       <esphome-web-logs-dialog
         .port=${this._logsPort}
         ?open=${this._logsPort !== undefined}
@@ -120,4 +127,10 @@ export abstract class LibreTinyCardElement extends LitElement {
   }
 
   static styles = [espHomeStyles, actionBtnStyles, cardActionsRowStyles];
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "esphome-web-libretiny-card": LibreTinyCardElement;
+  }
 }

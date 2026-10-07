@@ -2,7 +2,8 @@ import { html } from "lit";
 
 import type { WebPlatform } from "../web-platform.js";
 
-import "./esphome-web-ln-card.js";
+import "../../dashboard/libretiny-card-element.js";
+import { LN_CARD } from "./card.js";
 
 /** Lightning LN882H. Its modules sit behind generic UART adapters, so no port claims it. */
 export const lnWebMode: WebPlatform<"ln"> = {
@@ -10,5 +11,6 @@ export const lnWebMode: WebPlatform<"ln"> = {
   logo: "ln882x.svg",
   labelKey: "web.header.mode_ln",
   introKey: "web.intro.body_ln",
-  renderCard: () => html`<esphome-web-ln-card></esphome-web-ln-card>`,
+  renderCard: () =>
+    html`<esphome-web-libretiny-card .card=${LN_CARD}></esphome-web-libretiny-card>`,
 };

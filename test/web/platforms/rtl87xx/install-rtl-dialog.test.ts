@@ -43,9 +43,10 @@ import { identityLocalize, mount } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
 import type { LibreTinyImage } from "../../../../src/platforms/libretiny-uf2.js";
 import { RtlImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
+import type { RtlImage } from "../../../../src/platforms/rtl87xx/index.js";
 import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
 import { RTL_AMBZ2_INSTALL } from "../../../../src/web/platforms/rtl87xx/ambz2-install.js";
-import { ESPHomeWebInstallRtlDialog } from "../../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js";
+import { RTL87XX_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -60,10 +61,11 @@ const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
 const uf2 = (name = "firmware.uf2") => new File([new Uint8Array(8)], name);
 
 async function mountBare(): Promise<any> {
-  return (await mount(new ESPHomeWebInstallRtlDialog(), {
+  return (await mount(new LibreTinyInstallDialog<RtlImage>(), {
     _localize: identityLocalize,
     open: true,
-  } as Partial<ESPHomeWebInstallRtlDialog>)) as any;
+    install: RTL87XX_INSTALL,
+  } as Partial<LibreTinyInstallDialog<RtlImage>>)) as any;
 }
 
 // A dialog with a UF2 picked, read and checked.
@@ -96,7 +98,7 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-describe("esphome-web-install-rtl-dialog", () => {
+describe("esphome-web-libretiny-install-dialog for the RTL87xx", () => {
   it("flashes the parsed UF2 on the picked port, logging each step, and reports the reboot", async () => {
     mocks.flashAmbz2.mockImplementation(async (_port, _image, hooks) => {
       hooks.onLog?.("Resetting the board into download mode over DTR/RTS");
@@ -125,19 +127,16 @@ describe("esphome-web-install-rtl-dialog", () => {
   });
 
   it("has a line of its own for a family that has none for a reset by hand", async () => {
-    class BareDialog extends LibreTinyInstallDialog {
-      protected readonly install = {
+    mocks.flashAmbz2.mockResolvedValue(false);
+    const el = (await mount(new LibreTinyInstallDialog(), {
+      _localize: identityLocalize,
+      open: true,
+      install: {
         ...RTL_AMBZ2_INSTALL,
         copy: { ...RTL_AMBZ2_INSTALL.copy, doneByHand: undefined },
         load: async () => ({ image: IMAGE as unknown as LibreTinyImage }),
-      };
-    }
-    customElements.define("test-bare-install-dialog", BareDialog);
-    mocks.flashAmbz2.mockResolvedValue(false);
-    const el = (await mount(new BareDialog(), {
-      _localize: identityLocalize,
-      open: true,
-    } as Partial<BareDialog>)) as any;
+      },
+    } as Partial<LibreTinyInstallDialog>)) as any;
     await pickFile(el, "_image", uf2());
 
     await el._flash();

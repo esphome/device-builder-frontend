@@ -13,12 +13,7 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
 }));
-vi.mock(
-  "../../../src/web/platforms/rtl87xx/esphome-web-install-rtl-dialog.js",
-  () => ({})
-);
-vi.mock("../../../src/web/platforms/bk72xx/esphome-web-install-bk-dialog.js", () => ({}));
-vi.mock("../../../src/web/platforms/ln882x/esphome-web-install-ln-dialog.js", () => ({}));
+vi.mock("../../../src/web/install/libretiny-install-dialog.js", () => ({}));
 vi.mock("../../../src/web/dashboard/esphome-web-card.js", () => ({}));
 vi.mock("../../../src/util/register-icons.js", () => ({ registerMdiIcons: vi.fn() }));
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
@@ -30,10 +25,10 @@ import { expectTooltipsAnchored } from "../../_tooltip-anchors.js";
 import { BK72XX_SERIAL_LOGS } from "../../../src/platforms/bk72xx/serial-logs.js";
 import { LN882X_SERIAL_LOGS } from "../../../src/platforms/ln882x/serial-logs.js";
 import { RTL87XX_SERIAL_LOGS } from "../../../src/platforms/rtl87xx/serial-logs.js";
-import type { LibreTinyCardElement } from "../../../src/web/dashboard/libretiny-card-element.js";
-import { ESPHomeWebBkCard } from "../../../src/web/platforms/bk72xx/esphome-web-bk-card.js";
-import { ESPHomeWebLnCard } from "../../../src/web/platforms/ln882x/esphome-web-ln-card.js";
-import { ESPHomeWebRtlCard } from "../../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js";
+import { LibreTinyCardElement } from "../../../src/web/dashboard/libretiny-card-element.js";
+import { BK_CARD } from "../../../src/web/platforms/bk72xx/card.js";
+import { LN_CARD } from "../../../src/web/platforms/ln882x/card.js";
+import { RTL_CARD } from "../../../src/web/platforms/rtl87xx/card.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -48,38 +43,40 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-// What a family's card is: its element, its logs policy, its copy and its dialog.
+const installDialog = "esphome-web-libretiny-install-dialog";
+
+// What a family's card is: its data, its logs policy and its copy.
 describe.each([
   {
-    name: "esphome-web-rtl-card",
-    Card: ESPHomeWebRtlCard,
+    name: "rtl87xx",
+    card: RTL_CARD,
     // Release the lines, reset over RTS.
     policy: RTL87XX_SERIAL_LOGS,
     is: { reset: "rts-pulse", releaseLinesAfterOpen: true },
     title: "web.rtl.title",
-    dialog: "esphome-web-install-rtl-dialog",
   },
   {
-    name: "esphome-web-bk-card",
-    Card: ESPHomeWebBkCard,
+    name: "bk72xx",
+    card: BK_CARD,
     // Release the lines, reset over RTS.
     policy: BK72XX_SERIAL_LOGS,
     is: { reset: "rts-pulse", releaseLinesAfterOpen: true },
     title: "web.bk.title",
-    dialog: "esphome-web-install-bk-dialog",
   },
   {
-    name: "esphome-web-ln-card",
-    Card: ESPHomeWebLnCard,
+    name: "ln882x",
+    card: LN_CARD,
     // Release the lines, reset over RTS.
     policy: LN882X_SERIAL_LOGS,
     is: { reset: "rts-pulse", releaseLinesAfterOpen: true },
     title: "web.ln.title",
-    dialog: "esphome-web-install-ln-dialog",
   },
-])("$name", ({ Card, policy, is, title, dialog: installDialog }) => {
+])("esphome-web-libretiny-card for $name", ({ card, policy, is, title }) => {
   const mountCard = () =>
-    mount(new Card(), { _localize: identityLocalize } as Partial<LibreTinyCardElement>);
+    mount(new LibreTinyCardElement(), {
+      _localize: identityLocalize,
+      card,
+    } as Partial<LibreTinyCardElement>);
 
   it("anchors every action tooltip to a real button id", async () => {
     expectTooltipsAnchored(await mountCard(), 1);
@@ -108,9 +105,10 @@ describe.each([
     expect(dialog.deviceLabel).toBe(title);
   });
 
-  it("opens its own install dialog", async () => {
+  it("opens the install dialog for its family", async () => {
     const el = await mountCard();
     const install = () => el.shadowRoot!.querySelector(installDialog) as HTMLElement;
+    expect((install() as any).install).toBe(card.install);
     expect(install().hasAttribute("open")).toBe(false);
 
     (el.shadowRoot!.querySelector(".action-btn--primary") as HTMLElement).click();

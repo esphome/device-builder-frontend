@@ -26,7 +26,8 @@ vi.mock("../../../../src/platforms/ln882x/index.js", () => ({
 import { pickerText, pickFile } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { UF2_FAMILY_LN882H } from "../../../../src/platforms/ln882x/ln882x-image.js";
-import { ESPHomeWebInstallLnDialog } from "../../../../src/web/platforms/ln882x/esphome-web-install-ln-dialog.js";
+import { LibreTinyInstallDialog } from "../../../../src/web/install/libretiny-install-dialog.js";
+import { LN_INSTALL } from "../../../../src/web/platforms/ln882x/install.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -35,10 +36,11 @@ const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
 const uf2 = () => new File([new Uint8Array(8)], "firmware.uf2");
 
 async function mountBare(): Promise<any> {
-  return (await mount(new ESPHomeWebInstallLnDialog(), {
+  return (await mount(new LibreTinyInstallDialog(), {
     _localize: identityLocalize,
     open: true,
-  } as Partial<ESPHomeWebInstallLnDialog>)) as any;
+    install: LN_INSTALL,
+  } as Partial<LibreTinyInstallDialog>)) as any;
 }
 
 async function mountDialog(): Promise<any> {
@@ -61,7 +63,7 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-describe("esphome-web-install-ln-dialog", () => {
+describe("esphome-web-libretiny-install-dialog for the LN882H", () => {
   it("is titled and worded for the LN882H", async () => {
     const el = await mountDialog();
 
