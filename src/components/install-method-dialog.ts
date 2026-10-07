@@ -138,8 +138,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * Running firmware rejects unsigned OTA images and this config doesn't
    * sign (``otaNeedsUsb``). Disables the network install and leads with USB.
    */
-  @property({ type: Boolean, attribute: "ota-signed" })
-  otaSigned = false;
+  @property({ type: Boolean, attribute: "ota-needs-usb" })
+  otaNeedsUsb = false;
 
   @state() private _view: DialogView = "method";
 
@@ -290,7 +290,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // (install) ordering. An updater needs firmware that already runs, as an
     // OTA does, so it goes last with it; it stays offered, since a board
     // flashed outside the dashboard reads as never flashed too.
-    const usbFirst = !isLogs && (this.neverFlashed || this.otaSigned);
+    const usbFirst = !isLogs && (this.neverFlashed || this.otaNeedsUsb);
     const rows = usbFirst
       ? [usbRow, flasherRows, logsWebRow, serverRow, updaterRows, otaRow]
       : [otaRow, usbRow, flasherRows, updaterRows, logsWebRow, bleNusRow, serverRow];
@@ -308,7 +308,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       mode: this.mode,
       deviceState: this.deviceState,
       neverFlashed: this.neverFlashed,
-      otaSigned: this.otaSigned,
+      otaNeedsUsb: this.otaNeedsUsb,
       onSelect: (method) => this._selectMethod(method),
     };
   }
@@ -494,7 +494,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       body: () => html`
         <div class="advanced-panel-content">
           ${
-            ctx.mode === "install" && ctx.otaSigned
+            ctx.mode === "install" && ctx.otaNeedsUsb
               ? nothing
               : renderOtaAddressCard({
                   localize: this._localize,

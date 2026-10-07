@@ -20,7 +20,7 @@ export interface MethodRowContext {
   mode: "install" | "logs";
   deviceState: DeviceState;
   neverFlashed: boolean;
-  otaSigned: boolean;
+  otaNeedsUsb: boolean;
   onSelect: (method: string) => void;
 }
 
@@ -59,7 +59,7 @@ export function renderInstallNotice(
   ctx: MethodRowContext
 ): TemplateResult | typeof nothing {
   if (ctx.mode !== "install") return nothing;
-  if (ctx.otaSigned) {
+  if (ctx.otaNeedsUsb) {
     return html`
       <wa-callout class="method-notice" variant="brand">
         <wa-icon slot="icon" library="mdi" name="usb"></wa-icon>
@@ -92,7 +92,7 @@ export function renderOtaOption(ctx: MethodRowContext): TemplateResult {
   // compile-equivalent so it stays gated on isOnline.
   // A device that rejects unsigned images can't take this install.
   const isOnline = ctx.deviceState === DeviceState.ONLINE;
-  const otaBlocked = ctx.mode === "install" && ctx.otaSigned;
+  const otaBlocked = ctx.mode === "install" && ctx.otaNeedsUsb;
   const enabled = !otaBlocked && (isOnline || ctx.mode === "install");
   const titleKey =
     ctx.mode === "logs"

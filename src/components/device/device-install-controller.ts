@@ -72,7 +72,7 @@ export class DeviceInstallController implements ReactiveController {
     return isNeverFlashed(this._host.device);
   }
 
-  get otaSigned(): boolean {
+  get otaNeedsUsb(): boolean {
     return otaNeedsUsb(this._host.device);
   }
 
@@ -101,6 +101,11 @@ export class DeviceInstallController implements ReactiveController {
   onUpdate = () => {
     const device = this._host.device;
     if (!device) return;
+    // Only USB can take this install; the picker says so.
+    if (otaNeedsUsb(device)) {
+      this.onInstall();
+      return;
+    }
     this._openCommand(device, "install");
   };
 

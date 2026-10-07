@@ -26,7 +26,7 @@ async function mount(
   const dialog = new ESPHomeInstallMethodDialog();
   (dialog as any)._localize = (key: string) => key;
   (dialog as any)._api = {};
-  dialog.otaSigned = true;
+  dialog.otaNeedsUsb = true;
   dialog.deviceState = DeviceState.ONLINE;
   dialog.deviceTargetPlatform = "esp32";
   dialog.platformInstalls = installsFor(

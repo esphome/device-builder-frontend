@@ -43,7 +43,7 @@ export interface DeviceNameFieldOptions {
   placeholder?: string;
   /** Focus this input on open (default true); pass false when another field leads. */
   autofocus?: boolean;
-  disabled?: boolean;
+  readonly?: boolean;
 }
 
 /** The labelled device-name input plus its inline error / warning slot
@@ -57,7 +57,7 @@ export function renderDeviceNameField(o: DeviceNameFieldOptions): TemplateResult
         id=${o.id ?? nothing}
         type="text"
         ?autofocus=${o.autofocus ?? true}
-        ?disabled=${o.disabled ?? false}
+        ?readonly=${o.readonly ?? false}
         class=${err ? "invalid" : ""}
         .value=${live(o.value)}
         placeholder=${o.placeholder ?? nothing}

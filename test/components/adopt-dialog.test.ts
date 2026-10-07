@@ -201,6 +201,14 @@ describe("adopt-then-rename (#2412)", () => {
     );
     expect(adopted.mock.calls[0][0].detail.renameTo).toBe(null);
     expect(inputs.shadowRoot!.textContent).toContain("dashboard.adopt_ota_signed_hint");
+    const toggle =
+      inputs.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!;
+    toggle.click();
+    await inputs.updateComplete;
+    const hostname =
+      inputs.shadowRoot!.querySelector<HTMLInputElement>("#device-hostname")!;
+    expect(hostname.readOnly).toBe(true);
+    expect(inputs.shadowRoot!.textContent).not.toContain("naming.hostname_helper");
   });
 
   it("returns the hostname to the factory broadcast when the friendly name is cleared", async () => {

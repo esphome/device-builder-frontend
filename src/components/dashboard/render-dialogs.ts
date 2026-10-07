@@ -279,7 +279,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       }
       .canFlashBootloader=${canFlashBootloader(host._installMethodDevice)}
       .neverFlashed=${isNeverFlashed(host._installMethodDevice)}
-      .otaSigned=${otaNeedsUsb(host._installMethodDevice)}
+      .otaNeedsUsb=${otaNeedsUsb(host._installMethodDevice)}
       .mode=${host._installMethodMode}
       @close=${() => {
         host._installMethodOpen = false;

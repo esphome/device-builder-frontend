@@ -297,9 +297,15 @@ export class ESPHomeDeviceNameInputs extends LitElement {
               id: "device-hostname",
               placeholder: this.hostnamePlaceholder,
               autofocus: false,
-              disabled: this.hostnameLocked,
+              readonly: this.hostnameLocked,
             })}
-            <span class="helper">${this._localize("naming.hostname_helper")}</span>
+            ${
+              this.hostnameLocked
+                ? nothing
+                : html`<span class="helper"
+                    >${this._localize("naming.hostname_helper")}</span
+                  >`
+            }
           `,
         })}
         <button
