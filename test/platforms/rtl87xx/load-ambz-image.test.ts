@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ltBinpatchTag,
+  ltHeaderTags,
   ltPartInfoTags,
+  ltPartitionTable,
   makeLibreTinyUf2,
 } from "../../_make-libretiny-uf2.js";
 import { parseAmbzImage } from "../../../src/platforms/rtl87xx/ambz-image.js";
@@ -10,7 +12,30 @@ import { fixtureUf2 } from "./_fake-ambz.js";
 
 const UF2 = await fixtureUf2();
 
+// OTA_PART_INFO sends the flasher's second slot to ota1 as well.
+const MISPLACED = makeLibreTinyUf2({
+  family: UF2_FAMILY_AMBZ,
+  blocks: [
+    {
+      addr: 0,
+      tags: [
+        ...ltPartInfoTags([0, 1, 2, 0, 1, 1], ["ota1", "ota2"]),
+        ltBinpatchTag(0, [8]),
+      ],
+    },
+  ],
+});
+// A partition table with no second slot at all.
+const NO_OTA2 = makeLibreTinyUf2({
+  family: UF2_FAMILY_AMBZ,
+  headerTags: ltHeaderTags({
+    FAL_PTABLE: ltPartitionTable([{ name: "ota1", offset: 0xb000, length: 0x75000 }]),
+  }),
+  blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 0, 0, 1, 0], ["ota1"]) }],
+});
+
 afterEach(() => {
+  vi.doUnmock("../../../src/platforms/libretiny-uf2.js");
   vi.doUnmock("../../../src/platforms/rtl87xx/ambz-image.js");
   vi.doUnmock("../../../src/platforms/rtl87xx/ambz-flasher.js");
   vi.resetModules();
@@ -42,18 +67,7 @@ describe("parseAmbzImage", () => {
   });
 
   it("refuses a build whose second slot is not the 'ota2' partition", () => {
-    // OTA_PART_INFO sends the flasher's second slot to ota1 as well.
-    const binpatch = ltBinpatchTag(0, [8]);
-    const misplaced = makeLibreTinyUf2({
-      family: UF2_FAMILY_AMBZ,
-      blocks: [
-        {
-          addr: 0,
-          tags: [...ltPartInfoTags([0, 1, 2, 0, 1, 1], ["ota1", "ota2"]), binpatch],
-        },
-      ],
-    });
-    expect(() => parseAmbzImage(misplaced)).toThrow(
+    expect(() => parseAmbzImage(MISPLACED)).toThrow(
       expect.objectContaining({ key: "firmware.rtl_bad_uf2" })
     );
   });
@@ -82,6 +96,69 @@ describe("loadAmbzImage", () => {
     expect(await loadAmbzImage(UF2)).toHaveProperty("image.ota2Offset", 0x80000);
     expect(await loadAmbzImage(new Uint8Array(512))).toMatchObject({
       key: "firmware.rtl_bad_uf2",
+    });
+  });
+});
+
+describe("checkAmbzImage", () => {
+  const load = () => import("../../../src/platforms/rtl87xx/index.js");
+
+  it("reads the header of a build, or names what is wrong with it", async () => {
+    const { checkAmbzImage } = await load();
+    expect(await checkAmbzImage(UF2)).toMatchObject({
+      file: { familyId: UF2_FAMILY_AMBZ, board: "bw12" },
+    });
+    expect(await checkAmbzImage(makeLibreTinyUf2({ blocks: [] }))).toMatchObject({
+      key: "firmware.rtl_wrong_family",
+    });
+    expect(await checkAmbzImage(new Uint8Array(512))).toMatchObject({
+      key: "firmware.rtl_bad_uf2",
+    });
+  });
+
+  it("refuses a build whose table has no 'ota2' partition", async () => {
+    const { checkAmbzImage } = await load();
+    expect(await checkAmbzImage(NO_OTA2)).toMatchObject({
+      key: "firmware.rtl_bad_uf2",
+      detail: expect.stringContaining("ota2"),
+    });
+  });
+
+  it("leaves a misplaced second slot to the full parse", async () => {
+    const { checkAmbzImage } = await load();
+    expect(await checkAmbzImage(MISPLACED)).toMatchObject({
+      file: { familyId: UF2_FAMILY_AMBZ },
+    });
+  });
+
+  it("builds neither slot, where the full parse builds both", async () => {
+    const builds = vi.fn();
+    vi.doMock("../../../src/platforms/libretiny-uf2.js", async (importOriginal) => {
+      const real =
+        await importOriginal<typeof import("../../../src/platforms/libretiny-uf2.js")>();
+      return {
+        ...real,
+        libreTinyImageFor: (...args: Parameters<typeof real.libreTinyImageFor>) => {
+          builds();
+          return real.libreTinyImageFor(...args);
+        },
+      };
+    });
+    const { checkAmbzImage, loadAmbzImage } = await load();
+    expect(await checkAmbzImage(UF2)).toMatchObject({ file: { board: "bw12" } });
+    expect(builds).not.toHaveBeenCalled();
+    await loadAmbzImage(UF2);
+    expect(builds).toHaveBeenCalledTimes(2);
+  });
+
+  it("names a parser chunk that did not load, instead of throwing", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.doMock("../../../src/platforms/rtl87xx/ambz-image.js", () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const { checkAmbzImage } = await load();
+    expect(await checkAmbzImage(UF2)).toMatchObject({
+      key: "firmware.engine_load_failed",
     });
   });
 });

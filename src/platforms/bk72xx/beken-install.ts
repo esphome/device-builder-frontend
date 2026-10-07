@@ -23,7 +23,7 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
-import { loadBekenImage, runBeken } from "./index.js";
+import { checkBekenImage, loadBekenImage, runBeken } from "./index.js";
 import {
   BK_LOGS_ON_FLASH_PORT_SETTING,
   bkHandoffLogs,
@@ -125,7 +125,7 @@ export async function bekenDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<
   host._step = "done";
 }
 
-const BK_UART_HANDOFF = uf2Handoff("bk-uart", refusalOf(loadBekenImage), bkHandoffLogs);
+const BK_UART_HANDOFF = uf2Handoff("bk-uart", refusalOf(checkBekenImage), bkHandoffLogs);
 
 export const bekenInstall: BrowserInstall<"bk-uart"> = {
   id: "bk-uart",

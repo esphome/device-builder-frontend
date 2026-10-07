@@ -6,6 +6,7 @@ import {
   makeLibreTinyUf2,
 } from "../../_make-libretiny-uf2.js";
 import {
+  checkLn882xUf2,
   Ln882xImageError,
   parseLn882xImage,
   UF2_FAMILY_LN882H,
@@ -73,5 +74,26 @@ describe("parseLn882xImage", () => {
       expect(err).toBeInstanceOf(Ln882xImageError);
       expect((err as Ln882xImageError).key).toBe("firmware.ln_bad_uf2");
     }
+  });
+});
+
+describe("checkLn882xUf2", () => {
+  it("reads the header of a build without its flash runs", () => {
+    expect(checkLn882xUf2(file())).toMatchObject({
+      familyId: UF2_FAMILY_LN882H,
+      board: "generic-ln882h",
+    });
+  });
+
+  it("names a build for another chip", () => {
+    expect(() => checkLn882xUf2(file(0xe08f7564))).toThrow(
+      expect.objectContaining({ key: "firmware.ln_wrong_family" })
+    );
+  });
+
+  it("names a file that is not a LibreTiny UF2", () => {
+    expect(() => checkLn882xUf2(new Uint8Array(512))).toThrow(
+      expect.objectContaining({ key: "firmware.ln_bad_uf2" })
+    );
   });
 });

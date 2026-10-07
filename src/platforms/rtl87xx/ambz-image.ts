@@ -9,6 +9,7 @@ import {
   type LibreTinyFile,
   type LibreTinyImage,
   libreTinyImageFor,
+  type LibreTinyPartition,
   type LibreTinyScheme,
   parseLibreTinyFile,
 } from "../libretiny-uf2.js";
@@ -47,6 +48,20 @@ export function parseAmbzImage(bytes: Uint8Array): AmbzImage {
   }
 }
 
+/**
+ * ``parseAmbzImage`` without either slot's runs: the family and the ``ota2``
+ * partition the chip's system data must point at. Fails as ``RtlImageError``.
+ */
+export function checkAmbzUf2(bytes: Uint8Array): LibreTinyFile {
+  try {
+    const file = parseLibreTinyFile(bytes, [UF2_FAMILY_AMBZ]);
+    ota2PartitionOf(file);
+    return file;
+  } catch (err) {
+    throw toRtlImageError(err);
+  }
+}
+
 /** Parse an RTL8720C or RTL8710B UF2 in one pass; its family names the chip. Fails as ``RtlImageError``. */
 export function parseRtl87xxImage(bytes: Uint8Array): RtlImage {
   try {
@@ -66,8 +81,7 @@ function ambzImageOf(file: LibreTinyFile): AmbzImage {
       blockSize: XMODEM_BLOCK_SIZE,
       blocksFrom: "run",
     });
-  const ota2 = file.partitions.find((p) => p.name === "ota2");
-  if (!ota2) throw new Error("Invalid UF2: no 'ota2' partition");
+  const ota2 = ota2PartitionOf(file);
   const image = {
     ota1: slot("flasher-ota1"),
     ota2: slot("flasher-ota2"),
@@ -83,4 +97,11 @@ function ambzImageOf(file: LibreTinyFile): AmbzImage {
     throw new Error("Invalid UF2: the second slot is not in the 'ota2' partition");
   }
   return image;
+}
+
+/** The ``ota2`` partition the chip's system data must point at. */
+function ota2PartitionOf(file: LibreTinyFile): LibreTinyPartition {
+  const ota2 = file.partitions.find((p) => p.name === "ota2");
+  if (!ota2) throw new Error("Invalid UF2: no 'ota2' partition");
+  return ota2;
 }

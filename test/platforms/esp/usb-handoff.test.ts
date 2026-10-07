@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { openFlasher } = vi.hoisted(() => ({ openFlasher: vi.fn() }));
 vi.mock("../../../src/platforms/esp/usb-flasher.js", () => ({ openFlasher }));
-const rtl = vi.hoisted(() => ({ loadAmbz2Image: vi.fn(), loadAmbzImage: vi.fn() }));
+const rtl = vi.hoisted(() => ({ checkAmbz2Image: vi.fn(), checkAmbzImage: vi.fn() }));
 vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  loadAmbz2Image: rtl.loadAmbz2Image,
-  loadAmbzImage: rtl.loadAmbzImage,
+  checkAmbz2Image: rtl.checkAmbz2Image,
+  checkAmbzImage: rtl.checkAmbzImage,
 }));
 const nrf = vi.hoisted(() => ({ loadDfuPackage: vi.fn() }));
 vi.mock("../../../src/platforms/nrf52/index.js", async (importOriginal) => ({
@@ -63,8 +63,8 @@ const asHost = (h: ReturnType<typeof makeHost>) =>
   h as unknown as ESPHomeFirmwareInstallDialog;
 
 beforeEach(() => {
-  rtl.loadAmbz2Image.mockResolvedValue({ image: { runs: [], totalBytes: 0 } });
-  rtl.loadAmbzImage.mockResolvedValue({ image: {} });
+  rtl.checkAmbz2Image.mockResolvedValue({ file: {} });
+  rtl.checkAmbzImage.mockResolvedValue({ file: {} });
   nrf.loadDfuPackage.mockResolvedValue({ pkg: { parts: [] } });
 });
 afterEach(() => vi.clearAllMocks());
@@ -296,7 +296,7 @@ describe("startUsbFlash artifact", () => {
   it("refuses an RTL8710B image in the dashboard, before any flasher tab is offered", async () => {
     const host = flowHost("rtl87xx", "rtl8720c");
     steps.downloadBuildArtifact.mockResolvedValue(downloaded("firmware.uf2"));
-    rtl.loadAmbz2Image.mockResolvedValueOnce({
+    rtl.checkAmbz2Image.mockResolvedValueOnce({
       key: "firmware.rtl_wrong_family",
       detail: "family 0x22e0d6fc",
     });
@@ -315,7 +315,7 @@ describe("startUsbFlash artifact", () => {
     const [, , pick, noArtifactKey] = steps.downloadBuildArtifact.mock.calls[0];
     expect(pick(binaries)?.file).toBe("firmware.uf2");
     expect(noArtifactKey).toBe("firmware.no_uf2");
-    expect(rtl.loadAmbzImage).toHaveBeenCalledWith(artifact.bytes);
+    expect(rtl.checkAmbzImage).toHaveBeenCalledWith(artifact.bytes);
     expect(host._usbFirmware).toBe(artifact.bytes.buffer);
     expect(host._step).toBe("download-ready");
   });
@@ -323,7 +323,7 @@ describe("startUsbFlash artifact", () => {
   it("refuses an RTL8720C image for an RTL8710B in the dashboard", async () => {
     const host = flowHost("rtl87xx", "rtl8710b");
     steps.downloadBuildArtifact.mockResolvedValue(downloaded("firmware.uf2"));
-    rtl.loadAmbzImage.mockResolvedValueOnce({
+    rtl.checkAmbzImage.mockResolvedValueOnce({
       key: "firmware.rtl_wrong_family",
       detail: "family 0xe08f7564",
     });

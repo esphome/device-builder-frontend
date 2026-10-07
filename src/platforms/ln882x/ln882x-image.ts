@@ -7,8 +7,10 @@
  */
 import { Uf2FamilyError } from "../../util/uf2.js";
 import {
+  type LibreTinyFile,
   type LibreTinyImage,
   type LibreTinyParseOptions,
+  parseLibreTinyFile,
   parseLibreTinyImage,
 } from "../libretiny-uf2.js";
 
@@ -35,14 +37,28 @@ export class Ln882xImageError extends Error {
   }
 }
 
+/** Another family is a real build for a chip this flasher cannot write; anything else is a bad file. */
+export function toLn882xImageError(err: unknown): Ln882xImageError {
+  return new Ln882xImageError(
+    err instanceof Uf2FamilyError ? "firmware.ln_wrong_family" : "firmware.ln_bad_uf2",
+    err
+  );
+}
+
 /** Parse a LibreTiny UF2 for the LN882H flasher. Fails as ``Ln882xImageError``. */
 export function parseLn882xImage(bytes: Uint8Array): LibreTinyImage {
   try {
     return parseLibreTinyImage(bytes, [UF2_FAMILY_LN882H], LN882X_PARSE);
   } catch (err) {
-    throw new Ln882xImageError(
-      err instanceof Uf2FamilyError ? "firmware.ln_wrong_family" : "firmware.ln_bad_uf2",
-      err
-    );
+    throw toLn882xImageError(err);
+  }
+}
+
+/** ``parseLn882xImage`` as far as the file's header goes, without its flash runs. Fails as ``Ln882xImageError``. */
+export function checkLn882xUf2(bytes: Uint8Array): LibreTinyFile {
+  try {
+    return parseLibreTinyFile(bytes, [UF2_FAMILY_LN882H]);
+  } catch (err) {
+    throw toLn882xImageError(err);
   }
 }

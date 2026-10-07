@@ -23,7 +23,7 @@ import {
 } from "../platform-support.js";
 import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
 import type { AmbzImage } from "./ambz-image.js";
-import { loadAmbzImage, runAmbz } from "./index.js";
+import { checkAmbzImage, loadAmbzImage, runAmbz } from "./index.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -109,7 +109,7 @@ export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promis
   finishWithLogsPort(host, port, { notice: reset });
 }
 
-const RTL_AMBZ_HANDOFF = uf2Handoff("rtl-ambz", refusalOf(loadAmbzImage));
+const RTL_AMBZ_HANDOFF = uf2Handoff("rtl-ambz", refusalOf(checkAmbzImage));
 
 export const rtlAmbzInstall: BrowserInstall<"rtl-ambz"> = {
   id: "rtl-ambz",

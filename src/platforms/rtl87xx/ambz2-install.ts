@@ -23,7 +23,7 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
-import { loadAmbz2Image, runAmbz2 } from "./index.js";
+import { checkAmbz2Image, loadAmbz2Image, runAmbz2 } from "./index.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -114,7 +114,7 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
 }
 
 // The platform is also the RTL8710B, whose image this flasher cannot write.
-const RTL_AMBZ2_HANDOFF = uf2Handoff("rtl-ambz2", refusalOf(loadAmbz2Image));
+const RTL_AMBZ2_HANDOFF = uf2Handoff("rtl-ambz2", refusalOf(checkAmbz2Image));
 
 export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {
   id: "rtl-ambz2",

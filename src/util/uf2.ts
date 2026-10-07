@@ -144,9 +144,24 @@ export function parseUf2Image(
   bytes: Uint8Array,
   allowedFamilies: readonly number[]
 ): Uf2Image {
-  const blocks = parseUf2Blocks(bytes);
-  if (blocks.length === 0) throw new Error("Invalid UF2: no flash blocks");
-  const familyId = requireUf2Family(blocks, allowedFamilies);
+  const { blocks, familyId } = uf2ImageBlocks(bytes, allowedFamilies);
   const ranges = blocksToRanges(blocks);
   return { familyId, ranges, totalBytes: ranges.reduce((n, r) => n + r.data.length, 0) };
+}
+
+/** ``parseUf2Image`` without its ranges: the container checked, and the one family every block carries. */
+export function checkUf2Image(
+  bytes: Uint8Array,
+  allowedFamilies: readonly number[]
+): number {
+  return uf2ImageBlocks(bytes, allowedFamilies).familyId;
+}
+
+function uf2ImageBlocks(
+  bytes: Uint8Array,
+  allowedFamilies: readonly number[]
+): { blocks: Uf2Block[]; familyId: number } {
+  const blocks = parseUf2Blocks(bytes);
+  if (blocks.length === 0) throw new Error("Invalid UF2: no flash blocks");
+  return { blocks, familyId: requireUf2Family(blocks, allowedFamilies) };
 }

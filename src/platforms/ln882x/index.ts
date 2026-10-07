@@ -11,7 +11,7 @@ export * from "./serial-logs.js";
 
 import { type ChunkParseFailure, flashWith, parseWith } from "../lazy-chunk.js";
 import type { LibreTinyFlashResult } from "../libretiny-flash.js";
-import type { LibreTinyImage } from "../libretiny-uf2.js";
+import type { LibreTinyFile, LibreTinyImage } from "../libretiny-uf2.js";
 import type { Ln882xFlashHooks } from "./ln882x-flasher.js";
 
 export const loadLn882xEngine = () => import("./ln882x-flasher.js");
@@ -30,10 +30,17 @@ export async function warmLn882x(): Promise<unknown> {
   return engine;
 }
 
+type Ln882xImageKey = "firmware.ln_wrong_family" | "firmware.ln_bad_uf2";
+
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */
-export type Ln882xImageFailure = ChunkParseFailure<
-  "firmware.ln_wrong_family" | "firmware.ln_bad_uf2"
->;
+export type Ln882xImageFailure = ChunkParseFailure<Ln882xImageKey>;
+
+/** The parser refuses a file as ``Ln882xImageError``; anything else is a bad file. */
+const ln882xImageKey = (
+  parser: Pick<Awaited<ReturnType<typeof loadLn882xParser>>, "Ln882xImageError">,
+  err: unknown
+): Ln882xImageKey =>
+  err instanceof parser.Ln882xImageError ? err.key : "firmware.ln_bad_uf2";
 
 /** Parse a LibreTiny UF2 with the on-demand parser; never throws. */
 export const loadLn882xImage = (
@@ -43,7 +50,18 @@ export const loadLn882xImage = (
     "[ln882x]",
     loadLn882xParser,
     (p) => ({ image: p.parseLn882xImage(bytes) }),
-    (p, err) => (err instanceof p.Ln882xImageError ? err.key : "firmware.ln_bad_uf2")
+    ln882xImageKey
+  );
+
+/** ``loadLn882xImage`` without the flash runs, for a check of the file alone; never throws. */
+export const checkLn882xImage = (
+  bytes: Uint8Array
+): Promise<{ file: LibreTinyFile } | Ln882xImageFailure> =>
+  parseWith(
+    "[ln882x]",
+    loadLn882xParser,
+    (p) => ({ file: p.checkLn882xUf2(bytes) }),
+    ln882xImageKey
   );
 
 /**
