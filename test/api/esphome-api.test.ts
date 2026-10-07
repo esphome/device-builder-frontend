@@ -2059,7 +2059,8 @@ describe("ESPHomeAPI — getAutomationBodies", () => {
     expect(Object.keys(await pending)).toEqual(["actions/a", "actions/b"]);
   });
 
-  it("stops when a page makes no progress", async () => {
+  it("stops and warns when a page makes no progress", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const api = makeApi();
     const ws = await connect(api);
     const pending = api.getAutomationBodies([a, b]);
@@ -2069,6 +2070,8 @@ describe("ESPHomeAPI — getAutomationBodies", () => {
     });
     expect(await pending).toEqual({});
     expect(ws.sent).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("no progress"), [a, b]);
+    warn.mockRestore();
   });
 });
 
