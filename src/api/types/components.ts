@@ -48,6 +48,7 @@ export enum ComponentCategory {
   // script. Listed so frontend code can reference them by enum.
   AUDIO_ADC = "audio_adc",
   AUDIO_DAC = "audio_dac",
+  BRIDGE = "bridge",
   CANBUS = "canbus",
   IMAGE = "image",
   INFRARED = "infrared",
