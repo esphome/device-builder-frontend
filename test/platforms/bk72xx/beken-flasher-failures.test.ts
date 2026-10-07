@@ -103,7 +103,7 @@ describe("flashBeken, when it cannot go on", () => {
 
   it("refuses a write inside the bootloader even past the run check", async () => {
     const chip = fakeBeken(BK7231N);
-    await chip.raw.open();
+    await chip.raw.open({ baudRate: 115200 });
     const session = new BekenSession(new BekenLink(chip.port), () => {});
 
     await expect(

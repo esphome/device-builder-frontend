@@ -19,8 +19,6 @@ export interface FakeSerialPortOptions {
   noSignals?: boolean;
   /** Never settle a line change, as on a board unplugged mid change. */
   hangSignals?: boolean;
-  /** Forget the streams on close() and refuse a second open(), as a real port does. */
-  closes?: boolean;
   onOpen?: (options: SerialOptions) => void;
   /** A line change the adapter took; ``signals`` already holds it. */
   onSignals?: (signals: SerialOutputSignals) => void;
@@ -28,8 +26,9 @@ export interface FakeSerialPortOptions {
 
 /**
  * A fake Web Serial port like a freshly picked one: no streams until
- * ``open()``, the host's writes fed to the simulated device, its answers
- * put on the readable with ``enqueue``, and the signal changes kept.
+ * ``open()`` and none after ``close()``, the host's writes fed to the
+ * simulated device, its answers put on the readable with ``enqueue``, and
+ * the signal changes kept.
  */
 export function fakeSerialPort(opts: FakeSerialPortOptions) {
   let out: ReadableStreamDefaultController<Uint8Array> | null = null;
@@ -39,15 +38,12 @@ export function fakeSerialPort(opts: FakeSerialPortOptions) {
     readable: null as ReadableStream<Uint8Array> | null,
     writable: null as WritableStream<Uint8Array> | null,
     open: vi.fn(async (options: SerialOptions) => {
-      if (opts.closes && port.readable) {
-        throw new DOMException("already open", "InvalidStateError");
-      }
+      if (port.readable) throw new DOMException("already open", "InvalidStateError");
       port.readable = new ReadableStream<Uint8Array>({ start: (c) => (out = c) });
       port.writable = new WritableStream<Uint8Array>({ write: opts.feed });
       opts.onOpen?.(options);
     }),
     close: vi.fn(async () => {
-      if (!opts.closes) return;
       try {
         out?.close();
       } catch {
@@ -68,9 +64,7 @@ export function fakeSerialPort(opts: FakeSerialPortOptions) {
     port: port as unknown as SerialPort,
     raw: port,
     signals,
-    /** Bytes the device puts on the line. */
     enqueue: (bytes: Uint8Array) => out?.enqueue(bytes),
-    isOpen: () => out !== null,
     /** The adapter goes away: the readable ends. */
     dropLink: () => out?.close(),
   };

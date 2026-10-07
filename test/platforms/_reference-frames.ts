@@ -3,8 +3,8 @@
  * tests that hold an engine to a recorded transcript. ``summarise`` and
  * ``merged`` have to match the recorders' rules byte for byte.
  */
+import { concat } from "../../src/util/bytes.js";
 
-/** A frame on the wire: who sent it and what. */
 export interface WireFrame {
   dir: "tx" | "rx";
   bytes: Uint8Array;
@@ -43,10 +43,7 @@ export function merged(frames: readonly WireFrame[]): WireFrame[] {
   for (const frame of frames) {
     const last = out[out.length - 1];
     if (last?.dir === frame.dir) {
-      const bytes = new Uint8Array(last.bytes.length + frame.bytes.length);
-      bytes.set(last.bytes);
-      bytes.set(frame.bytes, last.bytes.length);
-      out[out.length - 1] = { dir: frame.dir, bytes };
+      out[out.length - 1] = { dir: frame.dir, bytes: concat(last.bytes, frame.bytes) };
     } else out.push(frame);
   }
   return out;

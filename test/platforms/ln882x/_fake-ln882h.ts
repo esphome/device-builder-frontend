@@ -1,4 +1,3 @@
-import type { WireFrame } from "../_reference-frames.js";
 /**
  * A simulated LN882H behind a fake Web Serial port, the same model as
  * ``fixtures/record.py``: the BootROM answers ``version`` and takes the RAM
@@ -6,6 +5,7 @@ import type { WireFrame } from "../_reference-frames.js";
  * ``version``, ``flash_info``, ``startaddr``, ``upgrade`` (YMODEM into the
  * flash) and ``reboot``, as the SDK's ramcode_dl sources do.
  */
+import type { WireFrame } from "../_reference-frames.js";
 import { fakeSerialPort } from "../../_web-serial.js";
 import { crc16Xmodem } from "../../../src/util/xmodem.js";
 
@@ -28,8 +28,6 @@ const newByte = (i: number) => (i * 31 + 7) % 253;
 const ramcodeByte = (i: number) => (i * 13 + 5) % 256;
 
 export const RAMCODE = Uint8Array.from({ length: 1000 }, (_, i) => ramcodeByte(i));
-
-export type Frame = WireFrame;
 
 export interface FakeOptions {
   /**
@@ -77,7 +75,7 @@ interface Ymodem {
 }
 
 export function fakeLn882h(opts: FakeOptions = {}) {
-  const frames: Frame[] = [];
+  const frames: WireFrame[] = [];
   const flash = Uint8Array.from({ length: FLASH_SIZE }, (_, i) => oldByte(i));
   let mode: "rom" | "firmware" | "ramcode" = opts.start ?? "rom";
   let ymodem: Ymodem | null = null;

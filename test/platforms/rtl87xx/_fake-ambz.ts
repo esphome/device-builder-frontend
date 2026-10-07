@@ -1,4 +1,3 @@
-import type { WireFrame } from "../_reference-frames.js";
 /**
  * A simulated RTL8710B behind a fake Web Serial port, the same model as
  * ``fixtures/record.py``: the ROM downloader NAKs while it idles in its loud
@@ -6,6 +5,7 @@ import type { WireFrame } from "../_reference-frames.js";
  * address-prefixed XModem-1k blocks into flash, ACKing the end. A running
  * firmware ignores everything until strapped.
  */
+import type { WireFrame } from "../_reference-frames.js";
 import { fakeSerialPort } from "../../_web-serial.js";
 
 const FLASH_SIZE = 0x200000;
@@ -20,8 +20,6 @@ const IDLE_NAKS = 8;
 
 /** What the flash holds before the flash: never FF, so an erase shows; built once, copied per chip. */
 const OLD_FLASH = Uint8Array.from({ length: FLASH_SIZE }, (_, i) => (i * 7 + 3) % 251);
-
-export type Frame = WireFrame;
 
 export interface FakeAmbzOptions {
   /** In the ROM already (the default), or deaf until ``strap()``. */
@@ -54,7 +52,7 @@ export interface FakeAmbzOptions {
 }
 
 export function fakeAmbz(opts: FakeAmbzOptions = {}) {
-  const frames: Frame[] = [];
+  const frames: WireFrame[] = [];
   const bauds: number[] = [];
   const flash = OLD_FLASH.slice();
   flash.fill(0xff, SYSTEM, SYSTEM + 0x1000);
@@ -161,7 +159,7 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
       pending = [];
       if (opts.missesBaudChange) {
         const nakAgain = () => {
-          if (!link.isOpen()) return;
+          if (!link.raw.readable) return;
           reply([NAK]);
           setTimeout(nakAgain, 50);
         };
@@ -201,7 +199,6 @@ export function fakeAmbz(opts: FakeAmbzOptions = {}) {
   const link = fakeSerialPort({
     feed,
     noSignals: opts.noSignals,
-    closes: true,
     onOpen: ({ baudRate }) => {
       baud = baudRate;
       bauds.push(baudRate);

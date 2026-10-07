@@ -1,4 +1,3 @@
-import type { WireFrame } from "../_reference-frames.js";
 /**
  * A simulated Beken chip behind a fake Web Serial port: commands in the
  * writable are answered on the readable, against a flash it keeps. The
@@ -8,6 +7,7 @@ import type { WireFrame } from "../_reference-frames.js";
  * It is built from what bk7231tools expects to read back, not from a real
  * chip.
  */
+import type { WireFrame } from "../_reference-frames.js";
 import { fakeSerialPort } from "../../_web-serial.js";
 import type { LibreTinyImage } from "../../../src/platforms/libretiny-uf2.js";
 import { concat } from "../../../src/util/bytes.js";
@@ -93,7 +93,7 @@ export interface FakeOptions {
   ignoredErases?: { address: number; times: number };
 }
 
-export interface Frame extends WireFrame {
+interface Frame extends WireFrame {
   /** ``Date.now()`` when the frame was whole. */
   at: number;
 }

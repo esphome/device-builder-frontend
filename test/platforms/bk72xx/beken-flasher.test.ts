@@ -437,7 +437,7 @@ describe("flashBeken", () => {
 
   it("uses a port that is open already", async () => {
     const chip = fakeBeken(BK7231N);
-    await chip.raw.open();
+    await chip.raw.open({ baudRate: 115200 });
     chip.raw.open.mockClear();
 
     await driveFakeTimers(
