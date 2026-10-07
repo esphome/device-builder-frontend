@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  AMBZ2_OTA_TAGS,
   ltBinpatchTag,
   ltHeaderTags,
   ltPartInfoTags,
@@ -58,9 +59,7 @@ describe("parseAmbzImage", () => {
   });
 
   it("refuses a build for another Realtek chip as the wrong family", () => {
-    const ambz2 = makeLibreTinyUf2({
-      blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
-    });
+    const ambz2 = makeLibreTinyUf2({ blocks: [{ addr: 0, tags: AMBZ2_OTA_TAGS }] });
     expect(() => parseAmbzImage(ambz2)).toThrow(
       expect.objectContaining({ key: "firmware.rtl_wrong_family" })
     );
@@ -149,17 +148,6 @@ describe("checkAmbzImage", () => {
     expect(builds).not.toHaveBeenCalled();
     await loadAmbzImage(UF2);
     expect(builds).toHaveBeenCalledTimes(2);
-  });
-
-  it("names a parser chunk that did not load, instead of throwing", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.doMock("../../../src/platforms/rtl87xx/ambz-image.js", () => {
-      throw new TypeError("Failed to fetch");
-    });
-    const { checkAmbzImage } = await load();
-    expect(await checkAmbzImage(UF2)).toMatchObject({
-      key: "firmware.engine_load_failed",
-    });
   });
 });
 

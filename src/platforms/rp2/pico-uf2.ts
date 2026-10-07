@@ -1,7 +1,8 @@
 import { getErrorMessage } from "../../util/error-message.js";
 import {
-  checkUf2Image,
+  parseUf2Blocks,
   parseUf2Image,
+  requireUf2Family,
   UF2_FAMILY_RP2040,
   UF2_FAMILY_RP2350_ARM_S,
   type Uf2Image,
@@ -31,7 +32,7 @@ export function parsePicoUf2(bytes: Uint8Array): { image: Uf2Image } | PicoUf2Fa
 /** ``parsePicoUf2`` without its ranges, for a check of the file alone; never throws. */
 export function checkPicoUf2(bytes: Uint8Array): { familyId: number } | PicoUf2Failure {
   try {
-    return { familyId: checkUf2Image(bytes, PICO_FAMILIES) };
+    return { familyId: requireUf2Family(parseUf2Blocks(bytes), PICO_FAMILIES) };
   } catch (err) {
     return { key: "firmware.rp2_bad_uf2", detail: getErrorMessage(err) };
   }

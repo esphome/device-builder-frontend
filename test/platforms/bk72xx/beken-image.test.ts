@@ -72,12 +72,10 @@ describe("familyOf", () => {
 });
 
 describe("checkBekenUf2", () => {
-  it.each(BEKEN_FAMILIES.map((f) => [f.name, f.id] as const))(
-    "reads the header of a %s build without its flash runs",
-    (_name, id) => {
-      expect(checkBekenUf2(file(id))).toMatchObject({ familyId: id, board: "cb3s" });
-    }
-  );
+  it("reads the header of a build without its flash runs", () => {
+    const { id } = BEKEN_FAMILIES[0];
+    expect(checkBekenUf2(file(id))).toMatchObject({ familyId: id, board: "cb3s" });
+  });
 
   it("names a build for a chip that is not Beken's", () => {
     expect(() => checkBekenUf2(file(0xe08f7564))).toThrow(

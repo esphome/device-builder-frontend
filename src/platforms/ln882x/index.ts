@@ -37,7 +37,7 @@ export type Ln882xImageFailure = ChunkParseFailure<Ln882xImageKey>;
 
 /** The parser refuses a file as ``Ln882xImageError``; anything else is a bad file. */
 const ln882xImageKey = (
-  parser: Pick<Awaited<ReturnType<typeof loadLn882xParser>>, "Ln882xImageError">,
+  parser: Awaited<ReturnType<typeof loadLn882xParser>>,
   err: unknown
 ): Ln882xImageKey =>
   err instanceof parser.Ln882xImageError ? err.key : "firmware.ln_bad_uf2";

@@ -57,7 +57,7 @@ export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
   }
 }
 
-/** ``parseAmbz2Image`` as far as the file's header goes, without its flash runs. Fails as ``RtlImageError``. */
+/** ``parseAmbz2Image`` without the flash runs. Fails as ``RtlImageError``. */
 export function checkAmbz2Uf2(bytes: Uint8Array): LibreTinyFile {
   try {
     return parseLibreTinyFile(bytes, [UF2_FAMILY_AMBZ2]);

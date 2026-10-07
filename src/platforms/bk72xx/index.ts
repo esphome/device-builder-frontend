@@ -28,7 +28,7 @@ export type BekenImageFailure = ChunkParseFailure<BekenImageKey>;
 
 /** The parser refuses a file as ``BekenImageError``; anything else is a bad file. */
 const bekenImageKey = (
-  parser: Pick<Awaited<ReturnType<typeof loadBekenParser>>, "BekenImageError">,
+  parser: Awaited<ReturnType<typeof loadBekenParser>>,
   err: unknown
 ): BekenImageKey =>
   err instanceof parser.BekenImageError ? err.key : "firmware.bk_bad_uf2";

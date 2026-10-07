@@ -32,8 +32,8 @@ export class BekenImageError extends Error {
   }
 }
 
-/** Another family is a real build for a chip this flasher cannot write; anything else is a bad file. */
-export function toBekenImageError(err: unknown): BekenImageError {
+/** Another family is a build for another chip; anything else is a bad file. */
+function toBekenImageError(err: unknown): BekenImageError {
   return new BekenImageError(
     err instanceof Uf2FamilyError ? "firmware.bk_wrong_family" : "firmware.bk_bad_uf2",
     err
@@ -51,7 +51,7 @@ export function parseBekenImage(bytes: Uint8Array): LibreTinyImage {
   }
 }
 
-/** ``parseBekenImage`` as far as the file's header goes, without its flash runs. Fails as ``BekenImageError``. */
+/** ``parseBekenImage`` without the flash runs. Fails as ``BekenImageError``. */
 export function checkBekenUf2(bytes: Uint8Array): LibreTinyFile {
   try {
     return parseLibreTinyFile(bytes, BEKEN_FAMILY_IDS);

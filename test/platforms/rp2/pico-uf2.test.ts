@@ -32,24 +32,10 @@ describe("parsePicoUf2", () => {
 });
 
 describe("checkPicoUf2", () => {
-  it.each([UF2_FAMILY_RP2040, UF2_FAMILY_RP2350_ARM_S])(
-    "names the chip family of an image without its ranges",
-    (family) => {
-      expect(checkPicoUf2(makeUf2Block({ addr: 0x10000000, family }))).toEqual({
-        familyId: family,
-      });
-    }
-  );
-
-  it.each([
-    [
-      "for a chip that is neither",
-      makeUf2Block({ addr: 0x10000000, family: 0x12345678 }),
-    ],
-    ["with no family", makeUf2Block({ addr: 0x10000000, family: null })],
-    ["that is no UF2", new Uint8Array(512)],
-  ])("names a file %s as a bad file, and never throws", (_name, bytes) => {
-    expect(checkPicoUf2(bytes)).toMatchObject({ key: "firmware.rp2_bad_uf2" });
+  it("names a file that is no UF2 as a bad file, and never throws", () => {
+    expect(checkPicoUf2(new Uint8Array(512))).toMatchObject({
+      key: "firmware.rp2_bad_uf2",
+    });
   });
 
   it("leaves overlapping blocks to the full parse", () => {

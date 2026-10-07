@@ -48,10 +48,7 @@ export function parseAmbzImage(bytes: Uint8Array): AmbzImage {
   }
 }
 
-/**
- * ``parseAmbzImage`` without either slot's runs: the family and the ``ota2``
- * partition the chip's system data must point at. Fails as ``RtlImageError``.
- */
+/** ``parseAmbzImage`` without either slot's runs. Fails as ``RtlImageError``. */
 export function checkAmbzUf2(bytes: Uint8Array): LibreTinyFile {
   try {
     const file = parseLibreTinyFile(bytes, [UF2_FAMILY_AMBZ]);
