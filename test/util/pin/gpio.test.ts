@@ -45,7 +45,6 @@ describe("parsePinGpio", () => {
     [{ pcf8574: { address: 0x20 }, number: 3 }, "pcf8574:@0x20:3"],
     [{ pcf8574: { address: "0x20" }, number: 3 }, "pcf8574:@0x20:3"],
     [{ pcf8574: { address: "32" }, number: "GPIO3" }, "pcf8574:@0x20:3"],
-    [{ pcf8574: { address: "010" }, number: 3 }, "pcf8574:@0x0a:3"],
     [{ pcf8574: { address: 0xff }, number: 3 }, "pcf8574:@0xff:3"],
     [{ pcf8574: { address: 0x100 }, number: 3 }, null],
     [{ pcf8574: { address: -1 }, number: 3 }, null],

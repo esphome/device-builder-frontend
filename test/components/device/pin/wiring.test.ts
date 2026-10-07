@@ -898,6 +898,37 @@ describe("pin wiring board-preset guard", () => {
     expect(cardById(result, "ground_switch")?.["aria-disabled"]).toBe("true");
   });
 
+  it.each([
+    [{ address: 0x44 }, 4, true],
+    [{ address: "0x44" }, "${ch}", true],
+    [{ address: 0x45 }, "${ch}", false],
+  ])(
+    "guards an address-selected expander preset (hub %j, channel %j): %s",
+    (presetHub, presetChannel, guarded) => {
+      const result = renderPinField(
+        wiringPinEntry(PinMode.INPUT),
+        ["pin"],
+        openCtx(
+          { pi4ioe5v6408: { address: 0x44 }, number: 4 },
+          {},
+          makeTestBoard({
+            overrides: {
+              featured_components: [
+                {
+                  component_id: "binary_sensor.gpio",
+                  fields: {
+                    pin: { value: { pi4ioe5v6408: presetHub, number: presetChannel } },
+                  },
+                },
+              ],
+            } as never,
+          })
+        )
+      );
+      expect(findTemplatesByAnchor(result, "pin-wiring-guard").length > 0).toBe(guarded);
+    }
+  );
+
   it("guards a field preset spelled by board alias", () => {
     const board = makeTestBoard({
       pins: [makeBoardPin(2, { aliases: ["D9"] })],
