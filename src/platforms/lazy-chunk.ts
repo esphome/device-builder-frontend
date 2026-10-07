@@ -12,15 +12,18 @@ export interface ChunkParseFailure<Key extends string> {
   detail: string;
 }
 
-/** What ended a flash: its detail, the error, and the ``key`` a family adds where it has copy of its own. */
-export type ChunkFlashFailure<Keyed extends { key?: string }> =
-  | ({ detail: string; error: unknown } & Keyed)
-  | { detail: string; error: unknown; key: "firmware.engine_load_failed" };
+/** What ended a flash: its detail, the error, and the copy of its own where it has one. */
+export interface ChunkFlashFailure<Key extends string = never> {
+  detail: string;
+  error: unknown;
+  key?: Key | "firmware.engine_load_failed";
+}
 
 /**
  * ``parse`` with the parser chunk, sync or async; what it threw is named by
  * ``keyOf``, which gets the loaded chunk so it can test the chunk's own
- * error classes. Never throws.
+ * error classes. ``tag`` opens the log line and names the chunk where a
+ * family has more than one (``[rtl87xx AmebaZ]``). Never throws.
  */
 export async function parseWith<Chunk, Done, Key extends string>(
   tag: string,
@@ -44,15 +47,15 @@ export async function parseWith<Chunk, Done, Key extends string>(
 
 /**
  * ``flash`` with the engine chunk; what it threw comes back as its detail
- * and the error, plus whatever ``keyed`` returns for it: a family with copy
- * of its own names it there, one without returns nothing. Never throws.
+ * and the error, named by ``keyOf`` where the family has copy of its own.
+ * Never throws.
  */
-export async function flashWith<Chunk, Done, Keyed extends { key?: string }>(
+export async function flashWith<Chunk, Done, Key extends string = never>(
   tag: string,
   loadChunk: () => Promise<Chunk>,
   flash: (chunk: Chunk) => Done,
-  keyed: (chunk: Chunk, err: unknown) => Keyed
-): Promise<Awaited<Done> | ChunkFlashFailure<Keyed>> {
+  keyOf?: (chunk: Chunk, err: unknown) => Key | undefined
+): Promise<Awaited<Done> | ChunkFlashFailure<Key>> {
   let chunk: Chunk;
   try {
     chunk = await loadChunk();
@@ -67,6 +70,11 @@ export async function flashWith<Chunk, Done, Keyed extends { key?: string }>(
   try {
     return await flash(chunk);
   } catch (err) {
-    return { detail: getErrorMessage(err), error: err, ...keyed(chunk, err) };
+    const key = keyOf?.(chunk, err);
+    return {
+      detail: getErrorMessage(err),
+      error: err,
+      ...(key !== undefined && { key }),
+    };
   }
 }

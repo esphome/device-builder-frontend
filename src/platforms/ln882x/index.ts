@@ -9,7 +9,7 @@ export type * from "./ln882x-image.js";
 export * from "./ln882x-platform.js";
 export * from "./serial-logs.js";
 
-import { flashWith, parseWith } from "../lazy-chunk.js";
+import { type ChunkParseFailure, flashWith, parseWith } from "../lazy-chunk.js";
 import type { LibreTinyFlashResult } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
 import type { Ln882xFlashHooks } from "./ln882x-flasher.js";
@@ -31,10 +31,9 @@ export async function warmLn882x(): Promise<unknown> {
 }
 
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */
-export interface Ln882xImageFailure {
-  key: "firmware.engine_load_failed" | "firmware.ln_wrong_family" | "firmware.ln_bad_uf2";
-  detail: string;
-}
+export type Ln882xImageFailure = ChunkParseFailure<
+  "firmware.ln_wrong_family" | "firmware.ln_bad_uf2"
+>;
 
 /** Parse a LibreTiny UF2 with the on-demand parser; never throws. */
 export const loadLn882xImage = (
@@ -61,5 +60,5 @@ export const runLn882x = (
     "[ln882x]",
     loadLn882xEngine,
     async (e) => ({ rebooted: await e.flashLn882x(port, image, hooks) }),
-    (e, err) => (err instanceof e.Ln882xRamcodeError ? { key: err.key } : {})
+    (e, err) => (err instanceof e.Ln882xRamcodeError ? err.key : undefined)
   );

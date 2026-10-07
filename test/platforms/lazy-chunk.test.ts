@@ -61,11 +61,9 @@ describe("parseWith", () => {
 });
 
 describe("flashWith", () => {
-  const none = () => ({});
-
   it("names a chunk that could not be fetched and logs it", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const result = await flashWith("[fam]", fails, () => ({ rebooted: true }), none);
+    const result = await flashWith("[fam]", fails, () => ({ rebooted: true }));
     expect(result).toEqual({
       detail: "Failed to fetch",
       error: expect.any(TypeError),
@@ -77,30 +75,27 @@ describe("flashWith", () => {
     );
   });
 
-  it("comes back as the detail and the error, with the keyed fields", async () => {
+  it("comes back as the detail and the error, named by keyOf", async () => {
     const boom = new Error("no answer");
-    const keyed = vi.fn(() => ({ key: "fam.x" }));
+    const keyOf = vi.fn(() => "fam.x" as const);
     const flash = () => Promise.reject(boom);
-    const result = await flashWith("[fam]", loads, flash, keyed);
+    const result = await flashWith("[fam]", loads, flash, keyOf);
     expect(result).toEqual({ detail: "no answer", error: boom, key: "fam.x" });
-    expect(keyed).toHaveBeenCalledWith(chunk, boom);
+    expect(keyOf).toHaveBeenCalledWith(chunk, boom);
   });
 
-  it("adds no key when the family names none", async () => {
+  it.each([
+    ["without keyOf", undefined],
+    ["when keyOf names none", () => undefined],
+  ])("adds no key %s", async (_label, keyOf) => {
     const flash = () => Promise.reject(new Error("no answer"));
-    const result = await flashWith("[fam]", loads, flash, none);
+    const result = await flashWith("[fam]", loads, flash, keyOf);
     expect(result).toMatchObject({ detail: "no answer" });
     expect("key" in result).toBe(false);
   });
 
-  it("keeps a key the family left undefined", async () => {
-    const flash = () => Promise.reject(new Error("no answer"));
-    const result = await flashWith("[fam]", loads, flash, () => ({ key: undefined }));
-    expect(result).toHaveProperty("key", undefined);
-  });
-
   it("returns the flash result as is", async () => {
     const flash = async () => ({ rebooted: false });
-    expect(await flashWith("[fam]", loads, flash, none)).toEqual({ rebooted: false });
+    expect(await flashWith("[fam]", loads, flash)).toEqual({ rebooted: false });
   });
 });
