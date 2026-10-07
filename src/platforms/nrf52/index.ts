@@ -14,7 +14,7 @@ export * from "./serial-logs.js";
 export * from "./smp-ble-service.js";
 export type * from "./smp-engine.js";
 
-import { getErrorMessage } from "../../util/error-message.js";
+import { parseWith } from "../lazy-chunk.js";
 import type { DfuPackage } from "./nrf-dfu.js";
 import type { McubootImage } from "./smp-engine.js";
 
@@ -27,27 +27,16 @@ export interface DfuPackageFailure {
   detail: string;
 }
 
-/**
- * Parse a DFU package with the on-demand engine, for the in-app install and
- * the web dialog. A failed chunk fetch and a bad package each name their
- * own copy; never throws.
- */
-export async function loadDfuPackage(
+/** Parse a DFU package with the on-demand engine, for the in-app install and the web dialog; never throws. */
+export const loadDfuPackage = (
   bytes: Uint8Array
-): Promise<{ pkg: DfuPackage } | DfuPackageFailure> {
-  let engine: Awaited<ReturnType<typeof loadDfuEngine>>;
-  try {
-    engine = await loadDfuEngine();
-  } catch (err) {
-    console.error("[nrf52] Could not load the parser chunk:", err);
-    return { key: "firmware.engine_load_failed", detail: getErrorMessage(err) };
-  }
-  try {
-    return { pkg: engine.parseDfuPackage(bytes) };
-  } catch (err) {
-    return { key: "firmware.nrf_bad_package", detail: getErrorMessage(err) };
-  }
-}
+): Promise<{ pkg: DfuPackage } | DfuPackageFailure> =>
+  parseWith(
+    "[nrf52]",
+    loadDfuEngine,
+    (e) => ({ pkg: e.parseDfuPackage(bytes) }),
+    () => "firmware.nrf_bad_package"
+  );
 
 /** Why an MCUboot image could not be parsed: the copy for the user and the detail. */
 export interface McubootImageFailure {
@@ -56,19 +45,12 @@ export interface McubootImageFailure {
 }
 
 /** ``loadDfuPackage`` for an MCUboot update image; never throws. */
-export async function loadMcubootImage(
+export const loadMcubootImage = (
   bytes: Uint8Array
-): Promise<{ image: McubootImage } | McubootImageFailure> {
-  let engine: Awaited<ReturnType<typeof loadSmpEngine>>;
-  try {
-    engine = await loadSmpEngine();
-  } catch (err) {
-    console.error("[nrf52] Could not load the MCUboot chunk:", err);
-    return { key: "firmware.engine_load_failed", detail: getErrorMessage(err) };
-  }
-  try {
-    return { image: await engine.parseMcubootImage(bytes) };
-  } catch (err) {
-    return { key: "firmware.nrf_bad_mcuboot_image", detail: getErrorMessage(err) };
-  }
-}
+): Promise<{ image: McubootImage } | McubootImageFailure> =>
+  parseWith(
+    "[nrf52]",
+    loadSmpEngine,
+    async (e) => ({ image: await e.parseMcubootImage(bytes) }),
+    () => "firmware.nrf_bad_mcuboot_image"
+  );
