@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
 import type { LibreTinyImage } from "../../../src/platforms/libretiny-uf2.js";
+import { UF2_FAMILY_LN882H } from "../../../src/platforms/ln882x/ln882x-image.js";
 
 const IMAGE: LibreTinyImage = { familyId: 0, board: "b", runs: [], totalBytes: 0 };
 const PORT = {} as SerialPort;
@@ -45,6 +47,26 @@ describe("loadLn882xImage", () => {
     expect(await loadLn882xImage(new Uint8Array(512))).toEqual({
       key: "firmware.ln_bad_uf2",
       detail: "out of memory",
+    });
+  });
+});
+
+describe("checkLn882xImage", () => {
+  it("reads the header of a build, or names what is wrong with it", async () => {
+    const { checkLn882xImage } = await import("../../../src/platforms/ln882x/index.js");
+
+    expect(
+      await checkLn882xImage(
+        makeLibreTinyUf2({ family: UF2_FAMILY_LN882H, blocks: [{ addr: 0 }] })
+      )
+    ).toMatchObject({ file: { familyId: UF2_FAMILY_LN882H, board: "bw15" } });
+    expect(
+      await checkLn882xImage(makeLibreTinyUf2({ blocks: [{ addr: 0 }] }))
+    ).toMatchObject({
+      key: "firmware.ln_wrong_family",
+    });
+    expect(await checkLn882xImage(new Uint8Array(512))).toMatchObject({
+      key: "firmware.ln_bad_uf2",
     });
   });
 });
