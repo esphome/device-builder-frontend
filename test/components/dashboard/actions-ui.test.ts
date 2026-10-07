@@ -55,7 +55,8 @@ const localize = ((key: string, params?: Record<string, string>) =>
 
 function makeHost(
   renameDevice: ESPHomeAPI["renameDevice"],
-  state: DeviceState = DeviceState.ONLINE
+  state: DeviceState = DeviceState.ONLINE,
+  otaSigned = false
 ): { host: ESPHomePageDashboard; openConfirm: ReturnType<typeof vi.fn> } {
   const openConfirm = vi.fn();
   const host = makeDashboardHost({
@@ -63,7 +64,7 @@ function makeHost(
       name: "rename_test",
       friendly_name: "Rename_Test",
       configuration: "rename_test.yaml",
-      runtime_state: { state },
+      runtime_state: { state, ota_signed: otaSigned },
     }),
     _api: { renameDevice } as unknown as ESPHomeAPI,
     _localize: localize,
@@ -259,6 +260,21 @@ describe("executeRename", () => {
     expect(pending).toMatchObject({ kind: "rename-config-only", newName: "rename-test" });
   });
 
+  it("confirms for an online device that rejects unsigned OTA images", async () => {
+    const renameDevice = vi.fn();
+    const { host, openConfirm } = makeHost(
+      renameDevice as unknown as ESPHomeAPI["renameDevice"],
+      DeviceState.ONLINE,
+      true
+    );
+
+    await executeRename(host, renameEvent("rename-test"));
+
+    expect(renameDevice).not.toHaveBeenCalled();
+    const pending = openConfirm.mock.calls[0][0] as PendingConfirm;
+    expect(pending).toMatchObject({ kind: "rename-config-only", newName: "rename-test" });
+  });
+
   it("confirms for an unknown-state device too (only online skips the prompt)", async () => {
     const renameDevice = vi.fn();
     const { host, openConfirm } = makeHost(
@@ -383,11 +399,11 @@ describe("executeConfirm rename-config-only", () => {
   });
 
   it("is destructive so a stray Enter can't confirm the offline rename", () => {
-    const device = {
+    const device = makeConfiguredDevice({
       name: "rename_test",
       friendly_name: "Rename_Test",
       configuration: "rename_test.yaml",
-    } as ConfiguredDevice;
+    });
     const copy = confirmDialogCopy(
       { kind: "rename-config-only", device, newName: "rename-test" },
       localize,
@@ -396,6 +412,19 @@ describe("executeConfirm rename-config-only", () => {
     );
 
     expect(copy.destructive).toBe(true);
+  });
+
+  it("explains the USB install for a device that rejects unsigned OTA images", () => {
+    const device = makeConfiguredDevice({ runtime_state: { ota_signed: true } });
+    const copy = confirmDialogCopy(
+      { kind: "rename-config-only", device, newName: "rename-test" },
+      localize,
+      0,
+      () => ({})
+    );
+
+    expect(copy.heading).toBe("dashboard.action_rename_ota_signed_title");
+    expect(copy.message).toContain("dashboard.action_rename_ota_signed_desc");
   });
 });
 

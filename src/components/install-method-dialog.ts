@@ -134,6 +134,13 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   @property({ type: Boolean, attribute: "never-flashed" })
   neverFlashed = false;
 
+  /**
+   * Running firmware rejects unsigned OTA images and this config doesn't
+   * sign (``otaNeedsUsb``). Disables the network install and leads with USB.
+   */
+  @property({ type: Boolean, attribute: "ota-signed" })
+  otaSigned = false;
+
   @state() private _view: DialogView = "method";
 
   private _portsPoll = new SerialPortsPollController(this, () => this._api);
@@ -283,7 +290,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // (install) ordering. An updater needs firmware that already runs, as an
     // OTA does, so it goes last with it; it stays offered, since a board
     // flashed outside the dashboard reads as never flashed too.
-    const usbFirst = !isLogs && this.neverFlashed;
+    const usbFirst = !isLogs && (this.neverFlashed || this.otaSigned);
     const rows = usbFirst
       ? [usbRow, flasherRows, logsWebRow, serverRow, updaterRows, otaRow]
       : [otaRow, usbRow, flasherRows, updaterRows, logsWebRow, bleNusRow, serverRow];
@@ -301,6 +308,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       mode: this.mode,
       deviceState: this.deviceState,
       neverFlashed: this.neverFlashed,
+      otaSigned: this.otaSigned,
       onSelect: (method) => this._selectMethod(method),
     };
   }
@@ -485,17 +493,21 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       panelId: "advanced-panel",
       body: () => html`
         <div class="advanced-panel-content">
-          ${renderOtaAddressCard({
-            localize: this._localize,
-            mode: this.mode,
-            expanded: this._otaAddressCardExpanded,
-            value: this._otaAddressValue,
-            onToggle: this._onToggleOtaAddressCard,
-            onInput: (value) => {
-              this._otaAddressValue = value;
-            },
-            onSubmit: this._submitOtaAddress,
-          })}
+          ${
+            ctx.mode === "install" && ctx.otaSigned
+              ? nothing
+              : renderOtaAddressCard({
+                  localize: this._localize,
+                  mode: this.mode,
+                  expanded: this._otaAddressCardExpanded,
+                  value: this._otaAddressValue,
+                  onToggle: this._onToggleOtaAddressCard,
+                  onInput: (value) => {
+                    this._otaAddressValue = value;
+                  },
+                  onSubmit: this._submitOtaAddress,
+                })
+          }
           ${this._renderPlatformFlashRows(ctx, () => true, true)}
           ${
             this.mode === "install" &&

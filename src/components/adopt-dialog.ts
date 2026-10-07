@@ -386,6 +386,8 @@ export class ESPHomeAdoptDialog extends LitElement {
                     autofocus
                     .friendlyLabelKey=${"dashboard.adopt_field_friendly_name"}
                     .takenHostnames=${this._takenMinusFactory}
+                    .hostnameLocked=${device.ota_signed}
+                    .friendlyHelperKey=${device.ota_signed ? "dashboard.adopt_ota_signed_hint" : ""}
                     @device-name-changed=${() => this.requestUpdate()}
                   ></esphome-device-name-inputs>
                   ${

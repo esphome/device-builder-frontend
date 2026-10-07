@@ -57,6 +57,7 @@ const _BASE = {
     // kinds); tests covering the identity-went-dark behaviour override
     // this to false.
     deployed_identity_live: true,
+    ota_signed: false,
   },
   expected_config_hash: "",
   has_pending_changes: false,
@@ -65,6 +66,7 @@ const _BASE = {
   api_enabled: false,
   api_encrypted: false,
   ota_encryption_required: false,
+  ota_signing_key: false,
   name_add_mac_suffix: false,
   mdns_disabled: false,
   uses_mqtt: false,

@@ -11,6 +11,7 @@ import {
   type LogsLaunchHost,
 } from "../../util/logs-launch.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
+import { otaNeedsUsb } from "../../util/ota-signed.js";
 import { applyInstallMethod } from "../apply-install-method.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -69,6 +70,10 @@ export class DeviceInstallController implements ReactiveController {
 
   get neverFlashed(): boolean {
     return isNeverFlashed(this._host.device);
+  }
+
+  get otaSigned(): boolean {
+    return otaNeedsUsb(this._host.device);
   }
 
   /** "Install" entry point — opens the install-method picker. */

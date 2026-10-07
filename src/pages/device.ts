@@ -1394,6 +1394,7 @@ export class ESPHomePageDevice extends LitElement {
           .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
           .canFlashBootloader=${this._installCtrl.canFlashBootloader}
           .neverFlashed=${this._installCtrl.neverFlashed}
+          .otaSigned=${this._installCtrl.otaSigned}
           .mode=${this._installCtrl.methodMode}
           @close=${this._installCtrl.onInstallMethodClose}
           @select-method=${this._installCtrl.onInstallMethodSelect}
