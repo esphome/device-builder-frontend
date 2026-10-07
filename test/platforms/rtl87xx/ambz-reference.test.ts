@@ -6,55 +6,15 @@
  * leave the same flash.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { merged, sha256, summarise } from "../_reference-frames.js";
 import { driveFakeTimers } from "../../_fake-timers.js";
 import { flashAmbz } from "../../../src/platforms/rtl87xx/ambz-flasher.js";
 import { parseAmbzImage } from "../../../src/platforms/rtl87xx/ambz-image.js";
-import { fakeAmbz, fixtureUf2, type Frame } from "./_fake-ambz.js";
+import { fakeAmbz, fixtureUf2 } from "./_fake-ambz.js";
 import ota2 from "./fixtures/ambz-ota2.json";
 import rewrite from "./fixtures/ambz-rewrite.json";
 
-interface RecordedFrame {
-  dir: string;
-  length: number;
-  hex?: string;
-  head?: string;
-  sha256?: string;
-}
-
 const UF2 = await fixtureUf2();
-
-const hex = (bytes: Uint8Array) =>
-  [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-const sha256 = async (bytes: Uint8Array) =>
-  hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes))));
-
-/** Consecutive frames one way as one, as the recorder writes them down. */
-function merged(frames: Frame[]): Frame[] {
-  const out: Frame[] = [];
-  for (const frame of frames) {
-    const last = out[out.length - 1];
-    if (last?.dir === frame.dir) {
-      const bytes = new Uint8Array(last.bytes.length + frame.bytes.length);
-      bytes.set(last.bytes);
-      bytes.set(frame.bytes, last.bytes.length);
-      out[out.length - 1] = { dir: frame.dir, bytes };
-    } else out.push(frame);
-  }
-  return out;
-}
-
-/** As the recorder writes a frame down: whole up to 48 bytes, else by head and hash. */
-async function summarise(frame: Frame): Promise<RecordedFrame> {
-  const { bytes } = frame;
-  return bytes.length <= 48
-    ? { dir: frame.dir, length: bytes.length, hex: hex(bytes) }
-    : {
-        dir: frame.dir,
-        length: bytes.length,
-        head: hex(bytes.subarray(0, 16)),
-        sha256: await sha256(bytes),
-      };
-}
 
 describe("flashAmbz against ltchiptool's transcripts", () => {
   beforeEach(() => {

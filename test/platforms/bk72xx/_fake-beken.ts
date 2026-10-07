@@ -1,3 +1,4 @@
+import type { WireFrame } from "../_reference-frames.js";
 /**
  * A simulated Beken chip behind a fake Web Serial port: commands in the
  * writable are answered on the readable, against a flash it keeps. The
@@ -7,8 +8,7 @@
  * It is built from what bk7231tools expects to read back, not from a real
  * chip.
  */
-import { vi } from "vitest";
-import { disconnectEvents } from "../../_web-serial.js";
+import { fakeSerialPort } from "../../_web-serial.js";
 import type { LibreTinyImage } from "../../../src/platforms/libretiny-uf2.js";
 import { concat } from "../../../src/util/bytes.js";
 import { crc32 } from "../../../src/util/crc32.js";
@@ -93,9 +93,7 @@ export interface FakeOptions {
   ignoredErases?: { address: number; times: number };
 }
 
-export interface Frame {
-  dir: "tx" | "rx";
-  bytes: Uint8Array;
+export interface Frame extends WireFrame {
   /** ``Date.now()`` when the frame was whole. */
   at: number;
 }
@@ -109,11 +107,9 @@ const le32 = (v: number) => {
 };
 
 export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
-  let out!: ReadableStreamDefaultController<Uint8Array>;
   const full = spec.protocol === "FULL";
   const flash = bytesOf(FLASH_SIZE, oldByte);
   const frames: Frame[] = [];
-  const signals: SerialOutputSignals[] = [];
   let sr = spec.sr ?? 0;
   // A bootloader protects the flash after a CRC until a LinkCheck.
   let locked = false;
@@ -141,7 +137,7 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
     const tail = long ? [size & 0xff, size >> 8, code] : [];
     const frame = concat(new Uint8Array([...head, ...tail]), payload);
     frames.push({ dir: "rx", bytes: frame, at: Date.now() });
-    out.enqueue(opts.noise ? concat(opts.noise, frame) : frame);
+    link.enqueue(opts.noise ? concat(opts.noise, frame) : frame);
   };
 
   const writable = () => (full ? !(sr & 0x7c) : !locked);
@@ -286,40 +282,28 @@ export function fakeBeken(spec: ChipSpec, opts: FakeOptions = {}) {
     while (take());
   };
 
-  // Like a freshly picked port: no streams until open().
-  const port = {
-    ...disconnectEvents(),
-    readable: null as ReadableStream<Uint8Array> | null,
-    writable: null as WritableStream<Uint8Array> | null,
-    open: vi.fn(async () => {
-      port.readable = new ReadableStream<Uint8Array>({ start: (c) => (out = c) });
-      port.writable = new WritableStream<Uint8Array>({ write: feed });
-    }),
-    close: vi.fn(async () => {}),
-    setSignals: vi.fn(async (s: SerialOutputSignals) => {
-      if (opts.noSignals) throw new DOMException("no lines", "NetworkError");
-      signals.push(s);
+  const link = fakeSerialPort({
+    feed,
+    noSignals: opts.noSignals,
+    onSignals: (s) => {
       // The chip comes out of reset when RTS is released after being held.
-      const held = signals.some((x) => x.requestToSend === true);
+      const held = link.signals.some((x) => x.requestToSend === true);
       if (s.requestToSend === false && s.dataTerminalReady === undefined && held) {
         resets++;
         rx = [];
       }
-    }),
-  };
+    },
+  });
   return {
-    port: port as unknown as SerialPort,
-    raw: port,
+    ...link,
     flash,
     frames,
-    signals,
     sent: () => frames.filter((f) => f.dir === "tx").map((f) => f.bytes),
     statusRegister: () => sr,
     /** The user resets the chip by hand. */
     reset: () => {
       resets = Number.MAX_SAFE_INTEGER;
     },
-    dropLink: () => out.close(),
   };
 }
 

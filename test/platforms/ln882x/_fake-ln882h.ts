@@ -1,3 +1,4 @@
+import type { WireFrame } from "../_reference-frames.js";
 /**
  * A simulated LN882H behind a fake Web Serial port, the same model as
  * ``fixtures/record.py``: the BootROM answers ``version`` and takes the RAM
@@ -5,8 +6,7 @@
  * ``version``, ``flash_info``, ``startaddr``, ``upgrade`` (YMODEM into the
  * flash) and ``reboot``, as the SDK's ramcode_dl sources do.
  */
-import { vi } from "vitest";
-import { disconnectEvents } from "../../_web-serial.js";
+import { fakeSerialPort } from "../../_web-serial.js";
 import { crc16Xmodem } from "../../../src/util/xmodem.js";
 
 const FLASH_SIZE = 0x200000;
@@ -29,10 +29,7 @@ const ramcodeByte = (i: number) => (i * 13 + 5) % 256;
 
 export const RAMCODE = Uint8Array.from({ length: 1000 }, (_, i) => ramcodeByte(i));
 
-export interface Frame {
-  dir: "tx" | "rx";
-  bytes: Uint8Array;
-}
+export type Frame = WireFrame;
 
 export interface FakeOptions {
   /**
@@ -80,9 +77,7 @@ interface Ymodem {
 }
 
 export function fakeLn882h(opts: FakeOptions = {}) {
-  let out!: ReadableStreamDefaultController<Uint8Array>;
   const frames: Frame[] = [];
-  const signals: SerialOutputSignals[] = [];
   const flash = Uint8Array.from({ length: FLASH_SIZE }, (_, i) => oldByte(i));
   let mode: "rom" | "firmware" | "ramcode" = opts.start ?? "rom";
   let ymodem: Ymodem | null = null;
@@ -104,7 +99,7 @@ export function fakeLn882h(opts: FakeOptions = {}) {
           ? data
           : new Uint8Array(data);
     frames.push({ dir: "rx", bytes });
-    out.enqueue(bytes);
+    link.enqueue(bytes);
   };
 
   const startYmodem = (target: Ymodem["target"]) => {
@@ -223,22 +218,15 @@ export function fakeLn882h(opts: FakeOptions = {}) {
     }
   };
 
-  // Like a freshly picked port: no streams until open().
-  const port = {
-    ...disconnectEvents(),
-    readable: null as ReadableStream<Uint8Array> | null,
-    writable: null as WritableStream<Uint8Array> | null,
-    open: vi.fn(async () => {
-      port.readable = new ReadableStream<Uint8Array>({ start: (c) => (out = c) });
-      port.writable = new WritableStream<Uint8Array>({ write: feed });
-      // Chromium asserts both lines on open.
+  const link = fakeSerialPort({
+    feed,
+    noSignals: opts.noSignals,
+    hangSignals: opts.hangSignals,
+    // Chromium asserts both lines on open.
+    onOpen: () => {
       dtr = rts = true;
-    }),
-    close: vi.fn(async () => {}),
-    setSignals: vi.fn(async (s: SerialOutputSignals) => {
-      if (opts.hangSignals) await new Promise(() => {});
-      if (opts.noSignals) throw new DOMException("no lines", "NetworkError");
-      signals.push(s);
+    },
+    onSignals: (s) => {
       if (!opts.wired) return;
       const wasInReset = rts;
       if (s.dataTerminalReady !== undefined) dtr = s.dataTerminalReady;
@@ -249,18 +237,9 @@ export function fakeLn882h(opts: FakeOptions = {}) {
         ymodem = null;
         line = "";
       }
-    }),
-  };
-  return {
-    port: port as unknown as SerialPort,
-    raw: port,
-    frames,
-    signals,
-    flash,
-    ram: () => ram,
-    rebooted: () => rebooted,
-    dropLink: () => out.close(),
-  };
+    },
+  });
+  return { ...link, frames, flash, ram: () => ram, rebooted: () => rebooted };
 }
 
 /** One run from 0 as a build's starts, and a short second one: the fixture's image. */
