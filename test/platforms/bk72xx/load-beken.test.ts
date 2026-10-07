@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
+import { BEKEN_FAMILIES } from "../../../src/platforms/bk72xx/beken-chips.js";
 import type { LibreTinyImage } from "../../../src/platforms/libretiny-uf2.js";
 
 const IMAGE: LibreTinyImage = { familyId: 0, board: "b", runs: [], totalBytes: 0 };
@@ -45,6 +47,27 @@ describe("loadBekenImage", () => {
     expect(await loadBekenImage(new Uint8Array(512))).toEqual({
       key: "firmware.bk_bad_uf2",
       detail: "out of memory",
+    });
+  });
+});
+
+describe("checkBekenImage", () => {
+  it("reads the header of a build, or names what is wrong with it", async () => {
+    const { checkBekenImage } = await import("../../../src/platforms/bk72xx/index.js");
+    const { id } = BEKEN_FAMILIES[0];
+
+    expect(
+      await checkBekenImage(makeLibreTinyUf2({ family: id, blocks: [{ addr: 0 }] }))
+    ).toMatchObject({
+      file: { familyId: id, board: "bw15" },
+    });
+    expect(
+      await checkBekenImage(makeLibreTinyUf2({ blocks: [{ addr: 0 }] }))
+    ).toMatchObject({
+      key: "firmware.bk_wrong_family",
+    });
+    expect(await checkBekenImage(new Uint8Array(512))).toMatchObject({
+      key: "firmware.bk_bad_uf2",
     });
   });
 });

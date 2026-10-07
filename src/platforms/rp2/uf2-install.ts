@@ -24,7 +24,7 @@ import {
 } from "../platform-support.js";
 import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
 import { pickRp2CdcPort } from "./pick-cdc-port.js";
-import { parsePicoUf2, PICO_CHIPS } from "./pico-uf2.js";
+import { checkPicoUf2, parsePicoUf2, PICO_CHIPS } from "./pico-uf2.js";
 import { flashPico, picoFlashFailureCopy } from "./rp2-flash.js";
 import { isWebUsbSupported, RP2_SERIAL_PICK } from "./web-usb.js";
 
@@ -147,7 +147,7 @@ function bootselFooter(): FlasherFooter {
 const withoutWebUsb = (key: string) => () =>
   isWebUsbSupported() ? key : `${key}_download`;
 
-const RP2_PICOBOOT_HANDOFF = uf2Handoff("rp2-picoboot", refusalOf(parsePicoUf2));
+const RP2_PICOBOOT_HANDOFF = uf2Handoff("rp2-picoboot", refusalOf(checkPicoUf2));
 
 export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
   id: "rp2-uf2",

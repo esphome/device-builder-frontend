@@ -6,8 +6,10 @@
 import { Uf2FamilyError } from "../../util/uf2.js";
 import { XMODEM_BLOCK_SIZE } from "../../util/xmodem.js";
 import {
+  type LibreTinyFile,
   type LibreTinyImage,
   type LibreTinyParseOptions,
+  parseLibreTinyFile,
   parseLibreTinyImage,
 } from "../libretiny-uf2.js";
 
@@ -50,6 +52,15 @@ export function toRtlImageError(err: unknown): RtlImageError {
 export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
   try {
     return parseLibreTinyImage(bytes, [UF2_FAMILY_AMBZ2], AMBZ2_PARSE);
+  } catch (err) {
+    throw toRtlImageError(err);
+  }
+}
+
+/** ``parseAmbz2Image`` without the flash runs. Fails as ``RtlImageError``. */
+export function checkAmbz2Uf2(bytes: Uint8Array): LibreTinyFile {
+  try {
+    return parseLibreTinyFile(bytes, [UF2_FAMILY_AMBZ2]);
   } catch (err) {
     throw toRtlImageError(err);
   }

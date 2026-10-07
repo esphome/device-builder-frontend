@@ -13,7 +13,7 @@ export * from "./serial-logs.js";
 
 import { type ChunkParseFailure, flashWith, parseWith } from "../lazy-chunk.js";
 import type { LibreTinyFlashHooks, LibreTinyFlashResult } from "../libretiny-flash.js";
-import type { LibreTinyImage } from "../libretiny-uf2.js";
+import type { LibreTinyFile, LibreTinyImage } from "../libretiny-uf2.js";
 import type { AmbzImage, RtlImage } from "./ambz-image.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
 
@@ -46,6 +46,17 @@ export const loadAmbz2Image = (
     rtlKey
   );
 
+/** ``loadAmbz2Image`` without the flash runs, for a check of the file alone; never throws. */
+export const checkAmbz2Image = (
+  bytes: Uint8Array
+): Promise<{ file: LibreTinyFile } | RtlImageFailure> =>
+  parseWith(
+    "[rtl87xx]",
+    loadAmbz2Parser,
+    (p) => ({ file: p.checkAmbz2Uf2(bytes) }),
+    rtlKey
+  );
+
 /**
  * Flash a parsed image through the on-demand ROM downloader engine, for the
  * same three flows. ``rebooted`` is false when the adapter has no control
@@ -71,6 +82,17 @@ export const loadAmbzImage = (
     "[rtl87xx AmebaZ]",
     loadAmbzParser,
     (p) => ({ image: p.parseAmbzImage(bytes) }),
+    rtlKey
+  );
+
+/** ``loadAmbzImage`` without either slot's runs, for a check of the file alone; never throws. */
+export const checkAmbzImage = (
+  bytes: Uint8Array
+): Promise<{ file: LibreTinyFile } | RtlImageFailure> =>
+  parseWith(
+    "[rtl87xx AmebaZ]",
+    loadAmbzParser,
+    (p) => ({ file: p.checkAmbzUf2(bytes) }),
     rtlKey
   );
 

@@ -1,4 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AMBZ2_OTA_TAGS, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
+import { UF2_FAMILY_AMBZ } from "../../../src/platforms/rtl87xx/ambz2-image.js";
+
+const ambz2 = (family?: number) =>
+  makeLibreTinyUf2({
+    family,
+    blocks: [{ addr: 0, tags: AMBZ2_OTA_TAGS }],
+  });
 
 afterEach(() => {
   vi.doUnmock("../../../src/platforms/rtl87xx/ambz2-image.js");
@@ -21,6 +29,19 @@ describe("loadAmbz2Image", () => {
   it("names a file that is not a UF2", async () => {
     const { loadAmbz2Image } = await import("../../../src/platforms/rtl87xx/index.js");
     expect(await loadAmbz2Image(new Uint8Array(512))).toMatchObject({
+      key: "firmware.rtl_bad_uf2",
+    });
+  });
+});
+
+describe("checkAmbz2Image", () => {
+  it("reads the header of a build, or names what is wrong with it", async () => {
+    const { checkAmbz2Image } = await import("../../../src/platforms/rtl87xx/index.js");
+    expect(await checkAmbz2Image(ambz2())).toMatchObject({ file: { board: "bw15" } });
+    expect(await checkAmbz2Image(ambz2(UF2_FAMILY_AMBZ))).toMatchObject({
+      key: "firmware.rtl_wrong_family",
+    });
+    expect(await checkAmbz2Image(new Uint8Array(512))).toMatchObject({
       key: "firmware.rtl_bad_uf2",
     });
   });

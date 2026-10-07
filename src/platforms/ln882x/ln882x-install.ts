@@ -23,7 +23,7 @@ import {
   FlashImageSlot,
 } from "../platform-support.js";
 import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
-import { loadLn882xImage, runLn882x, warmLn882x } from "./index.js";
+import { checkLn882xImage, loadLn882xImage, runLn882x, warmLn882x } from "./index.js";
 import { lnHandoffLogs, lnLogsOnFlashPort } from "./serial-logs.js";
 
 declare module "../platform-support.js" {
@@ -129,7 +129,7 @@ export async function lnDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<voi
   host._step = "done";
 }
 
-const LN_UART_HANDOFF = uf2Handoff("ln-uart", refusalOf(loadLn882xImage), lnHandoffLogs);
+const LN_UART_HANDOFF = uf2Handoff("ln-uart", refusalOf(checkLn882xImage), lnHandoffLogs);
 
 export const ln882xInstall: BrowserInstall<"ln-uart"> = {
   id: "ln-uart",

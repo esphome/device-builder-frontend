@@ -15,16 +15,23 @@ import {
   flashWith,
   parseWith,
 } from "../lazy-chunk.js";
-import type { LibreTinyImage } from "../libretiny-uf2.js";
+import type { LibreTinyFile, LibreTinyImage } from "../libretiny-uf2.js";
 import type { BekenFlashHooks } from "./beken-flasher.js";
 
 export const loadBekenEngine = () => import("./beken-flasher.js");
 export const loadBekenParser = () => import("./beken-image.js");
 
+type BekenImageKey = "firmware.bk_wrong_family" | "firmware.bk_bad_uf2";
+
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */
-export type BekenImageFailure = ChunkParseFailure<
-  "firmware.bk_wrong_family" | "firmware.bk_bad_uf2"
->;
+export type BekenImageFailure = ChunkParseFailure<BekenImageKey>;
+
+/** The parser refuses a file as ``BekenImageError``; anything else is a bad file. */
+const bekenImageKey = (
+  parser: Awaited<ReturnType<typeof loadBekenParser>>,
+  err: unknown
+): BekenImageKey =>
+  err instanceof parser.BekenImageError ? err.key : "firmware.bk_bad_uf2";
 
 /** Parse a LibreTiny UF2 with the on-demand parser, for every flow that takes one; never throws. */
 export const loadBekenImage = (
@@ -34,7 +41,18 @@ export const loadBekenImage = (
     "[bk72xx]",
     loadBekenParser,
     (p) => ({ image: p.parseBekenImage(bytes) }),
-    (p, err) => (err instanceof p.BekenImageError ? err.key : "firmware.bk_bad_uf2")
+    bekenImageKey
+  );
+
+/** ``loadBekenImage`` without the flash runs, for a check of the file alone; never throws. */
+export const checkBekenImage = (
+  bytes: Uint8Array
+): Promise<{ file: LibreTinyFile } | BekenImageFailure> =>
+  parseWith(
+    "[bk72xx]",
+    loadBekenParser,
+    (p) => ({ file: p.checkBekenUf2(bytes) }),
+    bekenImageKey
   );
 
 type BekenFlashKey =

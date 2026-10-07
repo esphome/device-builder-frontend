@@ -57,6 +57,9 @@ export const ltPartInfoTags = (indexes: number[], names: string[]): Uf2Tag[] => 
   ltTag(LT_TAG.OTA_PART_INFO, ltPartInfo(indexes, names)),
 ];
 
+/** The two-slot OTA layout an RTL8720C build names: ``ota1`` and ``ota2`` for every scheme. */
+export const AMBZ2_OTA_TAGS = ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]);
+
 /** OTA_PART_INFO: one partition index (1-based, 0 = none) per scheme, then the names. */
 export function ltPartInfo(indexes: number[], names: string[]): Uint8Array {
   const digits = indexes.map((i) => i.toString(16)).join("");

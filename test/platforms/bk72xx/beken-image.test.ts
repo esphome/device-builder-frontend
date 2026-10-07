@@ -8,6 +8,7 @@ import {
 import { BEKEN_FAMILIES, familyOf } from "../../../src/platforms/bk72xx/beken-chips.js";
 import {
   BekenImageError,
+  checkBekenUf2,
   parseBekenImage,
 } from "../../../src/platforms/bk72xx/beken-image.js";
 
@@ -67,5 +68,24 @@ describe("familyOf", () => {
   it("knows the Beken families and no other", () => {
     expect(familyOf(0x159ac324)?.name).toBe("BK7238");
     expect(familyOf(0xe08f7564)).toBeUndefined();
+  });
+});
+
+describe("checkBekenUf2", () => {
+  it("reads the header of a build without its flash runs", () => {
+    const { id } = BEKEN_FAMILIES[0];
+    expect(checkBekenUf2(file(id))).toMatchObject({ familyId: id, board: "cb3s" });
+  });
+
+  it("names a build for a chip that is not Beken's", () => {
+    expect(() => checkBekenUf2(file(0xe08f7564))).toThrow(
+      expect.objectContaining({ key: "firmware.bk_wrong_family" })
+    );
+  });
+
+  it("names a file that is not a LibreTiny UF2", () => {
+    expect(() => checkBekenUf2(new Uint8Array(512))).toThrow(
+      expect.objectContaining({ key: "firmware.bk_bad_uf2" })
+    );
   });
 });
