@@ -16,6 +16,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { FacetSelection } from "../../util/device-filter.js";
 import {
   computeAreaFacet,
+  computeNetworkFacet,
   computePlatformFacet,
   computeStateFacet,
   computeUpdateFacet,
@@ -57,14 +58,15 @@ function renderLabelsFilter(ctx: FacetSectionsContext): TemplateResult {
 /**
  * The accordion sections, in canonical order. Mirrors the dashboard's
  * render rules: labels / status always render (status only off in YAML
- * mode), area / platform / updates surface only when the fleet has
- * something to filter by, and labels / status / updates are suppressed
+ * mode), area / platform / network / updates surface only when the fleet has
+ * something to filter by, and labels / status / network / updates are suppressed
  * in YAML mode (runtime + metadata facets don't apply to YAML matches).
  */
 export function renderFacetSections(ctx: FacetSectionsContext): TemplateResult {
   const { devices, localize, selection, yamlMode } = ctx;
   const areaOptions = computeAreaFacet(devices);
   const platformOptions = computePlatformFacet(devices);
+  const networkOptions = computeNetworkFacet(devices);
   const stateOptions = computeStateFacet(devices, localize, selection.selectedStates);
   const updateOptions = computeUpdateFacet(
     devices,
@@ -105,6 +107,23 @@ export function renderFacetSections(ctx: FacetSectionsContext): TemplateResult {
             .selected=${selection.selectedPlatforms}
             @facet-change=${(e: CustomEvent<string[]>) => {
               ctx.onChange({ selectedPlatforms: e.detail });
+            }}
+          ></esphome-filter-section>`
+        : nothing
+    }
+    ${
+      // mDNS-observed, so suppressed in YAML mode; needs two buckets,
+      // same rule as platform.
+      !yamlMode && networkOptions.length > 1
+        ? html`<esphome-filter-section
+            data-facet-key="network"
+            name=${localize("dashboard.filter_network")}
+            empty-label=${emptyLabel}
+            no-matches-label=${noMatchesLabel}
+            .options=${networkOptions}
+            .selected=${selection.selectedNetworks}
+            @facet-change=${(e: CustomEvent<string[]>) => {
+              ctx.onChange({ selectedNetworks: e.detail });
             }}
           ></esphome-filter-section>`
         : nothing

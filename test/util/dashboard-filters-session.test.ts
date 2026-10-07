@@ -25,6 +25,7 @@ describe("dashboard-filters-session", () => {
       labels: ["lbl-1", "lbl-2"],
       areas: ["Kitchen"],
       platforms: ["esp32"],
+      networks: [],
       states: ["online"],
       updates: ["update_available"],
     });
@@ -32,6 +33,7 @@ describe("dashboard-filters-session", () => {
       labels: ["lbl-1", "lbl-2"],
       areas: ["Kitchen"],
       platforms: ["esp32"],
+      networks: [],
       states: ["online"],
       updates: ["update_available"],
     });
@@ -58,6 +60,7 @@ describe("dashboard-filters-session", () => {
       labels: [],
       areas: [],
       platforms: ["esp32"],
+      networks: [],
       states: [],
       updates: [],
     });
@@ -70,6 +73,7 @@ describe("dashboard-filters-session", () => {
         labels: [],
         areas: [],
         platforms: ["esp32"],
+        networks: [],
         states: [],
         updates: [],
       })

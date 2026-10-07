@@ -40,6 +40,7 @@ function emptySelection(): FacetSelection {
     selectedLabels: [],
     selectedAreas: [],
     selectedPlatforms: [],
+    selectedNetworks: [],
     selectedStates: [],
     selectedUpdateStatus: [],
   };
@@ -75,6 +76,18 @@ describe("renderFacetSections", () => {
   it("suppresses labels / status / updates in YAML mode, keeps area + platform", () => {
     const { sections } = mount({ yamlMode: true });
     expect(keys(sections)).toEqual(["area", "platform"]);
+  });
+
+  it("shows network only for two or more links, and never in YAML mode", () => {
+    const linked = (network: string, configuration: string) =>
+      makeConfiguredDevice({ configuration, runtime_state: { network } });
+    const oneLink = [linked("wifi", "a.yaml"), linked("wifi", "b.yaml")];
+    const mixed = [linked("wifi", "a.yaml"), linked("ethernet", "b.yaml")];
+    expect(keys(mount({ devices: oneLink }).sections)).not.toContain("network");
+    expect(keys(mount({ devices: mixed }).sections)).toContain("network");
+    expect(keys(mount({ devices: mixed, yamlMode: true }).sections)).not.toContain(
+      "network"
+    );
   });
 
   it("forwards manageLabels to the labels section's managed property", () => {

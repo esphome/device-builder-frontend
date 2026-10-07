@@ -296,6 +296,14 @@ export function createDeviceColumns(
       enableHiding: true,
     },
     {
+      // Raw wire value, like the platform column.
+      accessorKey: "network",
+      header: localize("dashboard.table_col_network"),
+      cell: (info) => valueCell("cell-badge", info.getValue() as string),
+      size: 120,
+      enableHiding: true,
+    },
+    {
       accessorKey: "version",
       header: localize("dashboard.table_col_version"),
       cell: (info) => valueCell("cell-mono", info.getValue() as string),

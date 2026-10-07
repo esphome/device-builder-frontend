@@ -83,6 +83,19 @@ describe("device table empty-cell placeholder (#1038)", () => {
     expect(html).toContain("—");
   });
 
+  it("network: empty renders the shared muted placeholder", () => {
+    const html = rendered(renderCell("network", ""));
+    expect(html).toContain("cell-muted");
+    expect(html).toContain("—");
+    expect(html).not.toContain("cell-badge");
+  });
+
+  it("network: a populated value keeps the badge font, raw wire spelling", () => {
+    const html = rendered(renderCell("network", "ethernet"));
+    expect(html).toContain("cell-badge");
+    expect(html).toContain("ethernet");
+  });
+
   it("keeps the monospace value font when a value is present", () => {
     const html = rendered(renderCell("ip", "192.168.1.42"));
     expect(html).toContain("cell-mono");

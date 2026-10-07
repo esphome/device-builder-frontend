@@ -17,6 +17,7 @@ export interface DashboardFilterState {
   labels: string[];
   areas: string[];
   platforms: string[];
+  networks: string[];
   states: string[];
   updates: string[];
 }
@@ -38,6 +39,7 @@ export function loadDashboardFilters(): DashboardFilterState | null {
       labels: isStringArray(obj.labels) ? obj.labels : [],
       areas: isStringArray(obj.areas) ? obj.areas : [],
       platforms: isStringArray(obj.platforms) ? obj.platforms : [],
+      networks: isStringArray(obj.networks) ? obj.networks : [],
       states: isStringArray(obj.states) ? obj.states : [],
       updates: isStringArray(obj.updates) ? obj.updates : [],
     };

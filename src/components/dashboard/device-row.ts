@@ -15,6 +15,7 @@ export interface DeviceRow {
   mac_address: string;
   platform: string;
   version: string;
+  network: string;
   comment: string;
   area: string;
   /** Resolved label objects (catalog joined against

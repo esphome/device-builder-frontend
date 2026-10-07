@@ -2,7 +2,7 @@
  * Pure device-list filtering for the dashboard's faceted toolbar.
  *
  * The dashboard renders the configured-device list through a fixed
- * pipeline: facet narrowing (labels / area / platform / state /
+ * pipeline: facet narrowing (labels / area / platform / network / state /
  * update-status) followed by a free-text name search. Lifting that
  * pipeline out of the component keeps the rules testable over plain
  * arrays — no Lit element, no ``window``, no DOM — and gives the
@@ -19,13 +19,14 @@ import { matchesDeviceName, matchesMacAddress } from "./device-search.js";
 import { effectiveDeviceState } from "./device-status.js";
 import { UPDATE_FACET_BUCKETS, UPDATE_FACET_PREDICATES } from "./facets.js";
 
-/** The five facet selections the toolbar tracks. Each is the list
+/** The facet selections the toolbar tracks. Each is the list
  *  of currently-checked option ids for that facet (empty = facet
  *  not narrowing). */
 export interface FacetSelection {
   selectedLabels: string[];
   selectedAreas: string[];
   selectedPlatforms: string[];
+  selectedNetworks: string[];
   selectedStates: string[];
   selectedUpdateStatus: string[];
 }
@@ -35,7 +36,7 @@ export interface FacetSelection {
  *
  * Labels and update-status use AND semantics (a device must carry
  * every selected label / satisfy every selected update bucket — the
- * "drill down by tag stack" shape); area, platform, and state use OR
+ * "drill down by tag stack" shape); area, platform, network, and state use OR
  * within the facet and AND across facets, the conventional faceted-
  * search shape. An empty selection array leaves that facet inactive.
  */
@@ -47,6 +48,7 @@ export function applyFacetFilters(
     selectedLabels,
     selectedAreas,
     selectedPlatforms,
+    selectedNetworks,
     selectedStates,
     selectedUpdateStatus,
   } = selection;
@@ -67,6 +69,15 @@ export function applyFacetFilters(
   if (selectedPlatforms.length > 0) {
     const set = new Set(selectedPlatforms);
     out = out.filter((d) => set.has(d.target_platform));
+  }
+  // Truthiness-guarded like the area facet: ``?networks=`` is
+  // hand-editable, and an empty id would sweep in every unknown link.
+  if (selectedNetworks.length > 0) {
+    const set = new Set(selectedNetworks);
+    out = out.filter((d) => {
+      const network = d.runtime_state.network;
+      return !!network && set.has(network);
+    });
   }
   if (selectedStates.length > 0) {
     const set = new Set(selectedStates);
@@ -98,6 +109,7 @@ export function activeFacetCount(selection: FacetSelection): number {
     selection.selectedLabels.length +
     selection.selectedAreas.length +
     selection.selectedPlatforms.length +
+    selection.selectedNetworks.length +
     selection.selectedStates.length +
     selection.selectedUpdateStatus.length
   );

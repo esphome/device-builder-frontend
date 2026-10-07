@@ -11,6 +11,7 @@ import { makeConfiguredDevice } from "../_make-configured-device.js";
 import { DeviceState } from "../../src/api/types/devices.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import {
+  computeNetworkFacet,
   computeStateFacet,
   computeUpdateFacet,
   normalizeUpdateBuckets,
@@ -94,6 +95,25 @@ describe("computeUpdateFacet", () => {
     const opts = computeUpdateFacet([device({})], localize, ["update_available"]);
     expect(opts).toEqual([
       { id: "update_available", name: expect.any(String), count: 0 },
+    ]);
+  });
+});
+
+describe("computeNetworkFacet", () => {
+  it("tallies raw wire values, drops unannounced links, and counts offline devices", () => {
+    expect(
+      computeNetworkFacet([
+        device({ configuration: "a.yaml", runtime_state: { network: "wifi" } }),
+        device({
+          configuration: "b.yaml",
+          runtime_state: { state: DeviceState.OFFLINE, network: "wifi" },
+        }),
+        device({ configuration: "c.yaml", runtime_state: { network: "ethernet" } }),
+        device({ configuration: "d.yaml" }),
+      ])
+    ).toEqual([
+      { id: "wifi", name: "wifi", count: 2 },
+      { id: "ethernet", name: "ethernet", count: 1 },
     ]);
   });
 });

@@ -52,10 +52,16 @@ describe("dashboard-url comma round-trip", () => {
 
   it("round-trips multiple filter lists", () => {
     installUrl();
-    writeDashboardUrl({ labels: ["x,y"], areas: ["Kitchen, Bath"], search: "q,r" });
+    writeDashboardUrl({
+      labels: ["x,y"],
+      areas: ["Kitchen, Bath"],
+      networks: ["wifi", "ethernet"],
+      search: "q,r",
+    });
     const back = readDashboardUrl();
     expect(back.labels).toEqual(["x,y"]);
     expect(back.areas).toEqual(["Kitchen, Bath"]);
+    expect(back.networks).toEqual(["wifi", "ethernet"]);
     expect(back.search).toBe("q,r");
   });
 });

@@ -254,6 +254,45 @@ describe("device-table Version column identity gating", () => {
   });
 });
 
+describe("device-table network column is ungated", () => {
+  async function mountWith(
+    device: ConfiguredDevice,
+    columns: Record<string, boolean>
+  ): Promise<ESPHomeDeviceTable> {
+    const el = new ESPHomeDeviceTable();
+    el.devices = [device];
+    el.initialColumnVisibility = columns;
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await el.updateComplete;
+    return el;
+  }
+
+  function cellText(el: ESPHomeDeviceTable, column: string): string {
+    const cell = el.shadowRoot!.querySelector(`tbody td.col-${column}`);
+    expect(cell).not.toBeNull();
+    return cell!
+      .querySelector(".cell-mono, .cell-badge, .cell-muted")!
+      .textContent!.trim();
+  }
+
+  it("renders the persisted network where the Version column would blank", async () => {
+    const el = await mountWith(
+      makeConfiguredDevice({
+        api_enabled: false,
+        runtime_state: {
+          deployed_version: "2026.6.0",
+          deployed_identity_live: false,
+          network: "ethernet",
+        },
+      }),
+      { version: true, network: true }
+    );
+    expect(cellText(el, "version")).toBe("—");
+    expect(cellText(el, "network")).toBe("ethernet");
+  });
+});
+
 describe("device-table initialPageSize seeding", () => {
   const pagination = (el: ESPHomeDeviceTable) =>
     el.shadowRoot!.querySelector("esphome-table-pagination")!;

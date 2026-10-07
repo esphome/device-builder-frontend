@@ -37,6 +37,7 @@ function defaultSelection(): FacetSelection {
     selectedLabels: [],
     selectedAreas: [],
     selectedPlatforms: [],
+    selectedNetworks: [],
     selectedStates: [DeviceState.ONLINE],
     selectedUpdateStatus: ["update_available"],
   };

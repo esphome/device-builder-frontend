@@ -37,6 +37,7 @@ const emptySelection: FacetSelection = {
   selectedLabels: [],
   selectedAreas: [],
   selectedPlatforms: [],
+  selectedNetworks: [],
   selectedStates: [],
   selectedUpdateStatus: [],
 };
@@ -46,6 +47,17 @@ function selection(over: Partial<FacetSelection>): FacetSelection {
 }
 
 describe("applyFacetFilters", () => {
+  it("network facet keeps the selected link and never matches an empty id", () => {
+    const wifi = device({ name: "wifi", runtime_state: { network: "wifi" } });
+    const eth = device({ name: "eth", runtime_state: { network: "ethernet" } });
+    const unknown = device({ name: "unknown" });
+    const all = [wifi, eth, unknown];
+    expect(applyFacetFilters(all, selection({ selectedNetworks: ["ethernet"] }))).toEqual(
+      [eth]
+    );
+    expect(applyFacetFilters(all, selection({ selectedNetworks: [""] }))).toEqual([]);
+  });
+
   it("returns the list untouched when no facet is active", () => {
     const devices = [device(), device({ name: "bedroom" })];
     expect(applyFacetFilters(devices, emptySelection)).toBe(devices);

@@ -99,6 +99,7 @@ const DEFAULT_HIDDEN_COLUMNS: ColumnVisibilityState = {
   version: false,
   ip: false,
   mac_address: false,
+  network: false,
   build_size_bytes: false,
 };
 
@@ -271,6 +272,8 @@ export class ESPHomeDeviceTable extends LitElement {
           // belongs in the per-device drawer.
           platform: d.target_platform || "",
           version: deployedIdentityTrusted(d) ? rt.deployed_version : "",
+          // Ungated, unlike ``version``: the link drives no update verdict.
+          network: rt.network || "",
           build_size_bytes: d.build_size_bytes || 0,
           comment: d.comment || "",
           area: d.area || "",

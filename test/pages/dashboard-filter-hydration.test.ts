@@ -19,6 +19,7 @@ const FULL = {
   labels: ["lbl-1"],
   areas: ["Kitchen"],
   platforms: ["esp32"],
+  networks: ["wifi"],
   states: ["online"],
   updates: ["update_available"],
 };
@@ -52,6 +53,7 @@ describe("dashboard filter session seeding", () => {
     expect(page._selectedLabels).toEqual(["lbl-1"]);
     expect(page._selectedAreas).toEqual(["Kitchen"]);
     expect(page._selectedPlatforms).toEqual(["esp32"]);
+    expect(page._selectedNetworks).toEqual(["wifi"]);
     expect(page._selectedStates).toEqual(["online"]);
     expect(page._selectedUpdateStatus).toEqual(["update_available"]);
   });
@@ -82,6 +84,7 @@ describe("dashboard filter session seeding", () => {
       labels: ["lbl-1"],
       areas: [],
       platforms: [],
+      networks: [],
       states: [],
       updates: [],
     });

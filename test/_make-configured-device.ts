@@ -50,6 +50,7 @@ const _BASE = {
     ip_addresses: [],
     deployed_version: "",
     deployed_config_hash: "",
+    network: "",
     queued_update: false,
     api_encryption_active: null,
     // Happy-path default for the first-party evidence gate (both device
