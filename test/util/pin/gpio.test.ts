@@ -50,6 +50,7 @@ describe("parsePinGpio", () => {
     [{ pcf8574: { address: -1 }, number: 3 }, null],
     [{ pcf8574: { address: "0o10" }, number: 3 }, null],
     [{ pcf8574: { address: "abc" }, number: 3 }, null],
+    [{ pcf8574: { address: [0x20] }, number: 3 }, null],
     [{ pcf8574: { address: "" }, number: 3 }, null],
     [{ pcf8574: { address: 0x20, id: "x" }, number: 3 }, null],
     [{ pcf8574: {}, number: 3 }, null],

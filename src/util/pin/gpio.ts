@@ -143,7 +143,9 @@ export function expanderHubRef(hub: unknown): string | null {
   if (typeof hub === "string") return hub === "" ? null : hub;
   if (!isPlainObject(hub) || Object.keys(hub).length !== 1) return null;
   // esphome's i2c_address: a uint8 written as an int, 0x hex or decimal.
-  const address = parseIntInput(hub.address);
+  const raw = hub.address;
+  if (typeof raw !== "number" && typeof raw !== "string") return null;
+  const address = parseIntInput(raw);
   if (address === null || address < 0n || address > 0xffn) return null;
   return `@0x${address.toString(16).padStart(2, "0")}`;
 }
