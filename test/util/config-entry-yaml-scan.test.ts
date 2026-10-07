@@ -128,6 +128,53 @@ describe("findUsedPins", () => {
     expect(map.get("pcf8574:hub_in_1:0")).toBe("binary_sensor");
   });
 
+  it("namespaces an address-selected expander pin by its hub address", () => {
+    const config = [
+      "switch:",
+      "  - platform: gpio",
+      "    pin:",
+      "      pi4ioe5v6408:",
+      "        address: 0x44",
+      "      number: 4",
+      "      mode:",
+      "        output: true",
+      "  - platform: gpio",
+      "    pin: GPIO4",
+      "",
+    ].join("\n");
+    const map = findUsedPins(config);
+    expect(map.get("pi4ioe5v6408:@0x44:4")).toBe("switch");
+    expect(map.get(4)).toBe("switch");
+    expect(map.size).toBe(2);
+  });
+
+  it("leaves a flow-mapping hub selector unresolved rather than a junk token", () => {
+    const config = [
+      "switch:",
+      "  - platform: gpio",
+      "    pin:",
+      "      pi4ioe5v6408: {address: 0x44}",
+      "      number: 4",
+      "",
+    ].join("\n");
+    expect(findUsedPins(config).size).toBe(0);
+  });
+
+  it("ignores a mode map's flags when no hub address is nested", () => {
+    const config = [
+      "switch:",
+      "  - platform: gpio",
+      "    pin:",
+      "      pi4ioe5v6408:",
+      "      number: 4",
+      "      mode:",
+      "        address: 1",
+      "",
+    ].join("\n");
+    // A mid-edit empty provider resolves no hub, and mode's children never do.
+    expect(findUsedPins(config).size).toBe(0);
+  });
+
   it("reads expander pin keys even when a comment leads the long-form block", () => {
     const config = [
       "binary_sensor:",

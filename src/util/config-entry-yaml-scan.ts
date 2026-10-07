@@ -159,7 +159,7 @@ function stripInlineComment(line: string): string {
 /**
  * Read a long-form pin block opened at `openerIdx` (a `pin:` / `*_pin:` key
  * with no inline value) into its canonical identity via {@link parsePinGpio} — a
- * board GPIO `number`, or the `provider:hub_id:channel` token when the block
+ * board GPIO `number`, or the `provider:hub:channel` token when the block
  * sits on an I/O expander. Reconstructs the block's direct-child scalars into a
  * mapping and defers the identity decision to `parsePinGpio`; only the direct
  * children are collected so a nested `mode:` map's flags can't masquerade as a
@@ -172,8 +172,13 @@ function readLongFormPin(
 ): { pin: number | string | null; end: number } {
   const openIndent = indentOf(lines[openerIdx]);
   let childIndent = -1;
-  const block: Record<string, string> = {};
+  const block: Record<string, unknown> = {};
   let end = openerIdx;
+  // A block-style child's own direct children, kept as a nested mapping so
+  // parsePinGpio sees an address-selected hub; mode flags land here too and
+  // are ignored there.
+  let nested: Record<string, unknown> | null = null;
+  let nestedIndent = -1;
   for (let j = openerIdx + 1; j < lines.length; j++) {
     const line = lines[j];
     if (line.trim() === "") {
@@ -186,13 +191,28 @@ function readLongFormPin(
     const m = line.match(LINE_KEY_RE);
     if (m === null) continue; // comment / non-key line — don't anchor childIndent on it
     if (childIndent === -1) childIndent = indent;
-    if (indent !== childIndent) continue; // skip grandchildren (mode flags)
+    if (indent !== childIndent) {
+      if (nested !== null) {
+        if (nestedIndent === -1) nestedIndent = indent;
+        if (indent === nestedIndent) nested[m[2]] = readPinBlockScalar(line, m[2]);
+      }
+      continue;
+    }
     // Record the key even when it has no inline scalar (an empty, mid-edit
-    // `pcf8574:`), so parsePinGpio sees the provider and returns null rather
-    // than letting the bare `number:` alias a board GPIO.
-    block[m[2]] = readInstanceScalar(stripInlineComment(line), m[2]) ?? "";
+    // 'pcf8574:'), so parsePinGpio sees the provider and returns null rather
+    // than letting the bare 'number:' alias a board GPIO.
+    const scalar = readPinBlockScalar(line, m[2]);
+    nested = scalar === null ? {} : null;
+    nestedIndent = -1;
+    block[m[2]] = nested ?? scalar;
   }
   return { pin: parsePinGpio(block), end };
+}
+
+/** A pin block line's inline scalar; a flow collection reads as '' (unresolved). */
+function readPinBlockScalar(line: string, key: string): string | null {
+  const scalar = readInstanceScalar(stripInlineComment(line), key);
+  return scalar !== null && /^[[{]/.test(scalar) ? "" : scalar;
 }
 
 /**
@@ -455,7 +475,7 @@ function readInstancePinGpio(
   );
   if (scalar !== null) return scalar;
   // Expanded form: read the long-form block (board GPIO, or the
-  // `provider:hub_id:channel` token when the pin sits on an I/O expander).
+  // `provider:hub:channel` token when the pin sits on an I/O expander).
   return readLongFormPin(lines, lineNo - 1).pin;
 }
 

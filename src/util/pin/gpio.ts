@@ -31,6 +31,9 @@
  * is invalid) doesn't need to be threaded in here.
  */
 
+import { parseIntInput } from "../int-input.js";
+import { isPlainObject } from "../nested-values.js";
+
 // Long-form pin sub-keys that describe a board GPIO. Any other key in a pin
 // object names an I/O-expander provider (`pcf8574`, `mcp23xxx`, ...): its value
 // is the hub id and its `number` is an expander channel, not a board GPIO. The
@@ -67,7 +70,7 @@ const PORT_B_PIN_RE = /^\s*PB(\d+)\s*$/i;
 
 /**
  * Parse a pin reference into a board GPIO number, or an I/O-expander
- * channel's namespaced `provider:hub_id:channel` token. Used both for the
+ * channel's namespaced `provider:hub:channel` token. Used both for the
  * field's current value and for individual `suggestions` entries. Featured
  * manifests write pins as bare ints (`12`), string forms (`"GPIO12"`,
  * `"gpio12"`), nRF52 port.pin notation (`"P0.27"`, `"P1.1"`), LibreTiny
@@ -78,7 +81,9 @@ const PORT_B_PIN_RE = /^\s*PB(\d+)\s*$/i;
  * is occupied + inverted + needs the internal pull-up, all baked into
  * the preset). A pin on an I/O expander
  * (`{ pcf8574: 'hub_id', number: 0, ... }`) returns the namespaced token
- * `'pcf8574:hub_id:0'` so its channel never aliases board GPIO 0. Returns
+ * `'pcf8574:hub_id:0'` so its channel never aliases board GPIO 0; an
+ * address-selected hub (`{ pcf8574: { address: 0x20 }, ... }`) yields
+ * `'pcf8574:@0x20:0'`. Returns
  * `null` for anything we can't parse — the caller drops those entries rather
  * than letting a typo blank the dropdown.
  */
@@ -113,10 +118,10 @@ export function parsePinGpio(s: unknown): number | string | null {
     const channel = parsePinGpio(obj.number);
     if (provider !== undefined) {
       // I/O-expander channel: namespace it so it never aliases a board GPIO.
-      // A provider key with no resolved hub id (mid-edit) is null, NOT the bare
+      // A provider key with no resolved hub (mid-edit) is null, NOT the bare
       // channel — falling back would alias the channel to a board GPIO.
-      const hub = obj[provider];
-      return typeof hub === "string" && hub !== "" && typeof channel === "number"
+      const hub = expanderHubRef(obj[provider]);
+      return hub !== null && typeof channel === "number"
         ? pinIdentityToken(provider, hub, channel)
         : null;
     }
@@ -132,6 +137,21 @@ export function parsePinGpio(s: unknown): number | string | null {
  */
 export function pinIdentityToken(provider: string, hub: string, channel: number): string {
   return `${provider}:${hub}:${channel}`;
+}
+
+/** Normalise an expander hub value: a hub id passes through, an address selector becomes '@0x44'; null when unresolvable. */
+export function expanderHubRef(hub: unknown): string | null {
+  if (typeof hub === "string") return hub === "" ? null : hub;
+  if (!isPlainObject(hub) || Object.keys(hub).length !== 1) return null;
+  // esphome's i2c_address: a uint8 written as an int, 0x hex or decimal.
+  const address = parseIntInput(hub.address);
+  if (address === null || address < 0n || address > 0xffn) return null;
+  return `@0x${address.toString(16).padStart(2, "0")}`;
+}
+
+/** The I2C address an '@0x..' hub ref selects, or null for a hub id. */
+export function expanderHubAddress(hubRef: string): string | null {
+  return hubRef.startsWith("@") ? hubRef.slice(1) : null;
 }
 
 /** True when *value* is a long-form pin block naming an I/O-expander

@@ -41,6 +41,23 @@ import {
 } from "../../../src/util/pin/gpio.js";
 
 describe("parsePinGpio", () => {
+  it.each([
+    [{ pcf8574: { address: 0x20 }, number: 3 }, "pcf8574:@0x20:3"],
+    [{ pcf8574: { address: "0x20" }, number: 3 }, "pcf8574:@0x20:3"],
+    [{ pcf8574: { address: "32" }, number: "GPIO3" }, "pcf8574:@0x20:3"],
+    [{ pcf8574: { address: "010" }, number: 3 }, "pcf8574:@0x0a:3"],
+    [{ pcf8574: { address: 0xff }, number: 3 }, "pcf8574:@0xff:3"],
+    [{ pcf8574: { address: 0x100 }, number: 3 }, null],
+    [{ pcf8574: { address: -1 }, number: 3 }, null],
+    [{ pcf8574: { address: "0o10" }, number: 3 }, null],
+    [{ pcf8574: { address: "abc" }, number: 3 }, null],
+    [{ pcf8574: { address: "" }, number: 3 }, null],
+    [{ pcf8574: { address: 0x20, id: "x" }, number: 3 }, null],
+    [{ pcf8574: {}, number: 3 }, null],
+  ])("parses address-selected expander pin %j to %j", (value, expected) => {
+    expect(parsePinGpio(value)).toBe(expected);
+  });
+
   it("returns finite numbers verbatim", () => {
     expect(parsePinGpio(0)).toBe(0);
     expect(parsePinGpio(12)).toBe(12);

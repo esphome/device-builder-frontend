@@ -16,6 +16,8 @@ import {
   isPrimitiveOrNullish,
 } from "../../../util/nested-values.js";
 import {
+  expanderHubAddress,
+  expanderHubRef,
   formatPinValue,
   isExpanderPinValue,
   parseBoardGpio,
@@ -149,11 +151,9 @@ function boardPinsForSection(
       const provider = providerKeyOf(preset);
       const hub =
         provider !== undefined
-          ? (preset as Record<string, unknown>)[provider]
-          : undefined;
-      if (provider !== undefined && typeof hub === "string" && hub !== "") {
-        tokens.add(`${provider}:${hub}:*`);
-      }
+          ? expanderHubRef((preset as Record<string, unknown>)[provider])
+          : null;
+      if (hub !== null) tokens.add(`${provider}:${hub}:*`);
     }
   }
   return { lockedGpios, gpios, tokens };
@@ -613,6 +613,7 @@ function renderExpanderPin(
   boardPreset: boolean
 ): TemplateResult {
   const [provider, hub, channel] = identity.split(":");
+  const address = expanderHubAddress(hub);
   const guarded = boardPreset && !effectiveDisabled(entry, ctx);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
@@ -620,7 +621,15 @@ function renderExpanderPin(
       <input
         type="text"
         readonly
-        .value=${ctx.localize("device.pin_on_expander", { provider, hub, channel })}
+        .value=${
+          address === null
+            ? ctx.localize("device.pin_on_expander", { provider, hub, channel })
+            : ctx.localize("device.pin_on_expander_address", {
+                provider,
+                address,
+                channel,
+              })
+        }
       />
       ${renderFieldError(path, ctx)}
       ${renderPinWiring({

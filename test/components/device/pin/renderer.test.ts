@@ -875,15 +875,26 @@ describe("renderPinField long-form Advanced disclosure", () => {
 });
 
 describe("renderPinField on an I/O-expander pin", () => {
-  it("shows the locked channel read-only instead of an empty board-GPIO picker", () => {
+  it.each([
+    [
+      { pcf8574: "pcf8574_hub_in_1", number: 9, mode: "INPUT" },
+      "pcf8574 pcf8574_hub_in_1 · channel 9",
+    ],
+    [
+      { pi4ioe5v6408: { address: 0x44 }, number: 4 },
+      "pi4ioe5v6408 at address 0x44 · channel 4",
+    ],
+  ])("shows %j read-only instead of an empty board-GPIO picker", (pin, expected) => {
     const ctx = makeRenderCtx(
-      { pin: { pcf8574: "pcf8574_hub_in_1", number: 9, mode: "INPUT" } },
+      { pin },
       {
         overrides: {
           localize: (k, params) =>
             k === "device.pin_on_expander"
               ? `${params?.provider} ${params?.hub} · channel ${params?.channel}`
-              : k,
+              : k === "device.pin_on_expander_address"
+                ? `${params?.provider} at address ${params?.address} · channel ${params?.channel}`
+                : k,
         },
       }
     );
@@ -901,7 +912,7 @@ describe("renderPinField on an I/O-expander pin", () => {
     expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(0);
     // The channel is surfaced read-only so the field isn't blank.
     const input = findElementBindings(result, "input")[0];
-    expect(input[".value"]).toBe("pcf8574 pcf8574_hub_in_1 · channel 9");
+    expect(input[".value"]).toBe(expected);
   });
 
   it("renders no board-GPIO picker for an editable expander pin (no channel clobber)", () => {
