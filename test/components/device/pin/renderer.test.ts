@@ -940,6 +940,32 @@ describe("renderPinField on an I/O-expander pin", () => {
     expect(findElementBindings(result, "input")[0][".value"]).toBe(expected);
   });
 
+  it.each([[{}], [{ address: 0x44, id: "x" }], [{ address: 0x100 }]])(
+    "labels an invalid hub selector %j as unresolved",
+    (hub) => {
+      const ctx = makeRenderCtx(
+        { pin: { pi4ioe5v6408: hub, number: 4 } },
+        {
+          overrides: {
+            localize: (k, params) =>
+              k === "device.pin_on_expander_unresolved"
+                ? `${params?.provider} unresolved · channel ${params?.channel}`
+                : k,
+          },
+        }
+      );
+      const result = renderPinField(
+        makeEntry(ConfigEntryType.PIN, { key: "pin", pin_features: [] }),
+        ["pin"],
+        ctx
+      );
+      expect(findTemplatesByAnchor(result, "<wa-select").length).toBe(0);
+      expect(findElementBindings(result, "input")[0][".value"]).toBe(
+        "pi4ioe5v6408 unresolved · channel 4"
+      );
+    }
+  );
+
   it("renders no board-GPIO picker for an editable expander pin (no channel clobber)", () => {
     // Not locked: without the unconditional expander guard this would fall
     // through to the board <wa-select>, where picking a GPIO writes pin.number

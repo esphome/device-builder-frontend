@@ -979,6 +979,7 @@
     "pin_input_only": "Input only — can't be used as output",
     "pin_on_expander": "{provider} {hub} · channel {channel}",
     "pin_on_expander_address": "{provider} at address {address} · channel {channel}",
+    "pin_on_expander_unresolved": "{provider} (hub not resolved) · channel {channel}",
     "pin_group_supports": "Supports {features}",
     "pin_group_other": "Other pins",
     "pin_group_reserved": "Reserved",

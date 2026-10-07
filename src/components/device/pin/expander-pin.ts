@@ -2,7 +2,10 @@ import { html, type TemplateResult } from "lit";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { isPlainObject } from "../../../util/nested-values.js";
 import { expanderHubAddress, providerKeyOf } from "../../../util/pin/gpio.js";
-import { resolveSubstitutions } from "../../../util/substitutions.js";
+import {
+  isSubstitutionString,
+  resolveSubstitutions,
+} from "../../../util/substitutions.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -37,13 +40,15 @@ export function renderExpanderPin(
         type="text"
         readonly
         .value=${
-          address === null
-            ? ctx.localize("device.pin_on_expander", { provider, hub, channel })
-            : ctx.localize("device.pin_on_expander_address", {
-                provider,
-                address,
-                channel,
-              })
+          hub === ""
+            ? ctx.localize("device.pin_on_expander_unresolved", { provider, channel })
+            : address === null
+              ? ctx.localize("device.pin_on_expander", { provider, hub, channel })
+              : ctx.localize("device.pin_on_expander_address", {
+                  provider,
+                  address,
+                  channel,
+                })
         }
       />
       ${renderFieldError(path, ctx)}
@@ -79,12 +84,12 @@ export function resolveExpanderHub(
   return rawValue;
 }
 
-/** Display parts of an unresolvable expander pin, an address selector shown as '@<raw>'. */
+/** Display parts of an unresolvable expander pin; only an external substitution keeps its hub text. */
 function rawExpanderParts(rawValue: Record<string, unknown>): string[] {
   const provider = providerKeyOf(rawValue) ?? "";
   const hub = rawValue[provider];
-  const hubText = isPlainObject(hub)
-    ? `@${String(hub.address ?? "")}`
-    : String(hub ?? "");
+  const address = isPlainObject(hub) ? hub.address : undefined;
+  const hubText =
+    typeof hub === "string" ? hub : isSubstitutionString(address) ? `@${address}` : "";
   return [provider, hubText, String(rawValue.number ?? "")];
 }
