@@ -128,9 +128,6 @@ export async function lnDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<voi
   host._step = "done";
 }
 
-// The same UF2 the in-app flow parses, handed whole to web.esphome.io's
-// ln-uart engine when this origin cannot flash. The RAM code erases as it
-// writes.
 const LN_UART_HANDOFF = uf2Handoff("ln-uart", refusalOf(loadLn882xImage), lnHandoffLogs);
 
 export const ln882xInstall: BrowserInstall<"ln-uart"> = {

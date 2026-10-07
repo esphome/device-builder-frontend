@@ -108,7 +108,6 @@ export async function rtlAmbzDoFlash(host: ESPHomeFirmwareInstallDialog): Promis
   finishWithLogsPort(host, port, { notice: reset });
 }
 
-// Checked first, so an RTL8720C build is refused before the hand-off.
 const RTL_AMBZ_HANDOFF = uf2Handoff("rtl-ambz", refusalOf(loadAmbzImage));
 
 export const rtlAmbzInstall: BrowserInstall<"rtl-ambz"> = {

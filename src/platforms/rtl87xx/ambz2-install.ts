@@ -112,8 +112,7 @@ export async function rtlDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
   finishWithLogsPort(host, port, { openLogs: rebooted });
 }
 
-// The ROM downloader has no erase. The platform is also the RTL8710B, whose
-// image this flasher cannot write, so the family is checked first.
+// The platform is also the RTL8710B, whose image this flasher cannot write.
 const RTL_AMBZ2_HANDOFF = uf2Handoff("rtl-ambz2", refusalOf(loadAmbz2Image));
 
 export const rtlAmbz2Install: BrowserInstall<"rtl-ambz2"> = {

@@ -54,18 +54,21 @@ export function isHandoffFlasher(value: unknown): value is HandoffFlasher {
   return (HANDOFF_FLASHERS as readonly unknown[]).includes(value);
 }
 
-/**
- * How the dashboard hands a platform's firmware over when it cannot flash
- * itself (an insecure origin): the flasher that takes it, whether that
- * flasher erases first, which built artifact to send (as one part at address
- * 0), the copy for a build without one, and a check of the artifact.
- */
 /** Why a hand-off's artifact is refused: the copy for the user and the detail. */
 export interface HandoffRefusal {
   key: string;
   detail: string;
 }
 
+/** Whether the downloaded artifact is this flasher's image: its refusal, or null. */
+export type HandoffCheck = (bytes: Uint8Array) => Promise<HandoffRefusal | null>;
+
+/**
+ * How the dashboard hands a platform's firmware over when it cannot flash
+ * itself (an insecure origin): the flasher that takes it, whether that
+ * flasher erases first, which built artifact to send (as one part at address
+ * 0), the copy for a build without one, and a check of the artifact.
+ */
 export interface HandoffSpec {
   flasher: HandoffFlasher;
   erase: boolean;
@@ -80,7 +83,7 @@ export interface HandoffSpec {
    * backstop for a build that disagrees with it. Checked before the flasher
    * tab is offered.
    */
-  check?: (bytes: Uint8Array) => Promise<HandoffRefusal | null>;
+  check?: HandoffCheck;
   /** Where the device's serial logs are, for the receiver; absent when not known. */
   logs?: (device: ConfiguredDevice | null) => HandoffLogs | undefined;
 }

@@ -124,9 +124,6 @@ export async function bekenDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<
   host._step = "done";
 }
 
-// The same UF2 the in-app flow parses, handed whole to web.esphome.io's
-// bk-uart engine when this origin cannot flash. The downloader erases sector
-// by sector as it writes.
 const BK_UART_HANDOFF = uf2Handoff("bk-uart", refusalOf(loadBekenImage), bkHandoffLogs);
 
 export const bekenInstall: BrowserInstall<"bk-uart"> = {

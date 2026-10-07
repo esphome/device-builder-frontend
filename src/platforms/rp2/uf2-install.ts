@@ -146,7 +146,6 @@ function bootselFooter(): FlasherFooter {
 const withoutWebUsb = (key: string) => () =>
   isWebUsbSupported() ? key : `${key}_download`;
 
-// PICOBOOT erases what it writes.
 const RP2_PICOBOOT_HANDOFF = uf2Handoff("rp2-picoboot", refusalOf(parsePicoUf2));
 
 export const rp2Uf2Install: BrowserInstall<"rp2-uf2"> = {
