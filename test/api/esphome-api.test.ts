@@ -2010,8 +2010,15 @@ describe("ESPHomeAPI — getAutomationBodies", () => {
     ws.receive({
       message_id: ws.sentAs<{ message_id: string }>(0).message_id,
       result: {
-        "actions/delay": { id: "delay", name: "Delay", domain: "core" },
-        "actions/logger.log": { id: "logger.log", name: "Log", config_entries: entries },
+        bodies: {
+          "actions/delay": { id: "delay", name: "Delay", domain: "core" },
+          "actions/logger.log": {
+            id: "logger.log",
+            name: "Log",
+            config_entries: entries,
+          },
+        },
+        remaining: [],
       },
     });
     await expect(pending).resolves.toEqual({
@@ -2026,6 +2033,46 @@ describe("ESPHomeAPI — getAutomationBodies", () => {
 
     expect(await api.getAutomationBodies([])).toEqual({});
     expect(ws.sent).toHaveLength(0);
+  });
+
+  type Sent = { command: string; message_id: string; args: { refs: unknown[] } };
+  const a = { type: "actions", id: "a" } as const;
+  const b = { type: "actions", id: "b" } as const;
+
+  it("re-requests ``remaining`` until every page is in", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    const pending = api.getAutomationBodies([a, b]);
+    const first = ws.sentAs<Sent>(0);
+    expect(first.command).toBe("automations/get_bodies");
+    expect(first.args.refs).toEqual([a, b]);
+    ws.receive({
+      message_id: first.message_id,
+      result: { bodies: { "actions/a": { id: "a" } }, remaining: [b] },
+    });
+    await vi.waitFor(() => expect(ws.sent).toHaveLength(2));
+    const second = ws.sentAs<Sent>(1);
+    expect(second.args.refs).toEqual([b]);
+    ws.receive({
+      message_id: second.message_id,
+      result: { bodies: { "actions/b": { id: "b" } }, remaining: [] },
+    });
+    const bodies = await pending;
+    expect(Object.keys(bodies)).toEqual(["actions/a", "actions/b"]);
+    expect(bodies["actions/b"].config_entries).toEqual([]);
+  });
+
+  it("stops when a page makes no progress", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+    const pending = api.getAutomationBodies([a, b]);
+    const first = ws.sentAs<Sent>(0);
+    ws.receive({
+      message_id: first.message_id,
+      result: { bodies: {}, remaining: [a, b] },
+    });
+    expect(await pending).toEqual({});
+    expect(ws.sent).toHaveLength(1);
   });
 });
 

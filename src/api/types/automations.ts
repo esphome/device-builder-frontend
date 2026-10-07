@@ -158,6 +158,13 @@ export type Filter = RegistryCatalogEntry;
 export type AutomationCatalogBody =
   AutomationTrigger | AutomationAction | AutomationCondition | LightEffect | Filter;
 
+/** ``automations/get_bodies`` reply; re-request ``remaining`` for the
+ *  refs that didn't fit this reply's byte budget. */
+export interface GetAutomationBodiesResponse {
+  bodies: Record<string, AutomationCatalogBody>;
+  remaining: { type: AutomationCatalogBodyType; id: string }[];
+}
+
 /** Wire ``type`` field on an ``automations/get_bodies`` ref. */
 export type AutomationCatalogBodyType =
   "triggers" | "actions" | "conditions" | "light_effects" | "filters";

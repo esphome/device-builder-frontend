@@ -21,6 +21,7 @@ import type {
   AutomationTrigger,
   AvailableAutomations,
   Filter,
+  GetAutomationBodiesResponse,
   LightEffect,
   ParsedAutomation,
   YamlDiff,
@@ -1797,11 +1798,18 @@ export class ESPHomeAPI {
   async getAutomationBodies(
     refs: { type: AutomationCatalogBodyType; id: string }[]
   ): Promise<Record<string, AutomationCatalogBody>> {
-    if (refs.length === 0) return {};
-    const bodies = await this.sendCommand<Record<string, AutomationCatalogBody>>(
-      "automations/get_bodies",
-      { refs }
-    );
+    const bodies: Record<string, AutomationCatalogBody> = {};
+    // The backend pages large batches under a byte budget so no reply
+    // trips a proxy's WebSocket message size cap.
+    while (refs.length > 0) {
+      const page = await this.sendCommand<GetAutomationBodiesResponse>(
+        "automations/get_bodies",
+        { refs }
+      );
+      Object.assign(bodies, page.bodies);
+      if (page.remaining.length >= refs.length) break;
+      refs = page.remaining;
+    }
     for (const body of Object.values(bodies)) body.config_entries ??= [];
     return bodies;
   }
