@@ -58,7 +58,7 @@ export class LibreTinyCardElement extends LitElement {
   // Install was clicked while the dialog was on its way out.
   private _installAgain = false;
   @state() private _logsPort?: SerialPort;
-  // A picker is up; a second click must not open another beside it.
+  // A picker or a Wi-Fi setup session is up; another click must wait for it.
   private _picking = false;
 
   private async _showLogs(): Promise<void> {
