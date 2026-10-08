@@ -13,7 +13,8 @@ import { openImprovDialog } from "../improv/open-improv-dialog.js";
 import "../install/esphome-web-libretiny-install-dialog.js";
 import type { LibreTinyInstall } from "../install/esphome-web-libretiny-install-dialog.js";
 import "../logs/esphome-web-logs-dialog.js";
-import { pickPortForCard, pickPortForLogs } from "../util/pick-port-for-logs.js";
+import { pickPortForLogs } from "../util/pick-port-for-logs.js";
+import { pickPortForCard } from "../util/pick-port.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
@@ -41,8 +42,8 @@ export interface LibreTinyCard {
 /**
  * The card of a chip that sits behind a serial adapter: no connected state;
  * each install picks its own port and flashes through the chip's downloader,
- * and each logs or Wi-Fi setup session picks its own port. The family is the ``card`` it is
- * given.
+ * and each logs or Wi-Fi setup session picks its own port. The family is the
+ * ``card`` it is given.
  */
 @customElement("esphome-web-libretiny-card")
 export class LibreTinyCardElement extends LitElement {
