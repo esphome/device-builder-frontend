@@ -716,13 +716,15 @@ describe("renderRegistryListField — per-row params sub-form", () => {
   });
 
   it.each([
-    [{ seconds: 5 }, ConfigEntryType.TIME_PERIOD, ["filters", "0", "timeout"]],
-    [{ timeout: "5s", value: "last" }, "child", ["filters", "0", "timeout", "timeout"]],
+    [{ seconds: 5 }, ["filters", "0", "timeout"]],
+    [{ timeout: "5s", value: "last" }, ["filters", "0", "timeout", "timeout"]],
+    [{}, ["filters", "0", "timeout", "timeout"]],
+    [{ timout: "5s" }, ["filters", "0", "timeout", "timeout"]],
   ])(
-    "tells a duration's dict form from a fielded mapping on %j",
-    async (params, expectedType, expectedPath) => {
-      // Sensor ``timeout`` has fields while binary_sensor's is a bare
-      // duration; a mapping naming none of the fields is the dict form.
+    "routes a mapping on a fielded duration filter by its keys: %j",
+    async (params, path) => {
+      // Sensor ``timeout`` has fields while binary_sensor's is a bare duration;
+      // only a mapping of duration units is the dict form, the rest is the sub-form.
       const renderEntry = vi.fn();
       const catalog = [
         {
@@ -741,11 +743,10 @@ describe("renderRegistryListField — per-row params sub-form", () => {
         { key: "filters", registry: "filter", catalog, renderEntry }
       );
       await el.updateComplete;
-      const first = renderEntry.mock.calls[0];
-      expect(first[1]).toEqual(expectedPath);
-      if (expectedType !== "child") {
-        expect((first[0] as { type: string }).type).toBe(expectedType);
-      }
+      expect(renderEntry.mock.calls[0][0]).toMatchObject({
+        type: ConfigEntryType.TIME_PERIOD,
+      });
+      expect(renderEntry.mock.calls[0][1]).toEqual(path);
     }
   );
 

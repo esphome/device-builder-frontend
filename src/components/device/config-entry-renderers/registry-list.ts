@@ -23,7 +23,10 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { apiContext } from "../../../context/index.js";
 import { subscribeAutomationCatalogCache } from "../../../util/automation-catalog-cache.js";
-import { looksLikeTimePeriodScalar } from "../../../util/time-period.js";
+import {
+  isDurationMapping,
+  looksLikeTimePeriodScalar,
+} from "../../../util/time-period.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
@@ -357,16 +360,14 @@ export class ESPHomeRegistryList extends LitElement {
     // (``delayed_on_off: 50ms`` shorthand for the mapping form) the
     // catalog doesn't classify. Suppressed when params is already a
     // mapping so a hypothetical catalog miscategorisation can't
-    // clobber an existing nested config. A duration mapping that names none
-    // of the entry's fields is the value's own dict form
-    // (``throttle: {seconds: 5}``); ``config_entries`` is absent until
-    // the row's body hydrates, and only then is that known.
+    // clobber an existing nested config. A mapping of only duration units
+    // that names none of the entry's fields is the value's own dict form
+    // (``throttle: {seconds: 5}``).
     const fields = catalogEntry?.config_entries;
     const durationMapping =
       catalogEntry?.value_type === "time_period" &&
-      fields !== undefined &&
-      paramsIsMapping &&
-      !fields.some((field) => field.key in (params as Record<string, unknown>));
+      isDurationMapping(params) &&
+      !fields?.some((field) => Object.prototype.hasOwnProperty.call(params, field.key));
     const scalarConfigType =
       paramsIsMapping && !durationMapping
         ? null
@@ -378,10 +379,7 @@ export class ESPHomeRegistryList extends LitElement {
     // an empty sub-form otherwise; exponential_moving_average is the
     // canonical case). No catalog filter/effect carries depends_on on
     // sub-fields today; revisit if that changes.
-    const childEntries =
-      (params === null || paramsIsMapping) && catalogEntry?.config_entries
-        ? catalogEntry.config_entries
-        : [];
+    const childEntries = (params === null || paramsIsMapping) && fields ? fields : [];
     return html`
       <div class="registry-list-item" data-row-index=${index}>
         <div class="registry-list-row">

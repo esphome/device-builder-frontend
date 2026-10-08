@@ -126,6 +126,17 @@ const DURATION_MAPPING_UNITS: Record<string, TimePeriodUnit> = {
   days: "d",
 };
 
+/** Whether *raw* is a time period's mapping form: a non-empty mapping whose
+ *  keys are all `cv.time_period_dict` unit names. */
+export function isDurationMapping(raw: unknown): raw is Record<string, unknown> {
+  if (!isPlainObject(raw)) return false;
+  const keys = Object.keys(raw);
+  return (
+    keys.length > 0 &&
+    keys.every((key) => Object.prototype.hasOwnProperty.call(DURATION_MAPPING_UNITS, key))
+  );
+}
+
 /** The scalar a time period's mapping form (`{seconds: 2}`) is equivalent
  *  to (`"2s"`). Only a single-unit mapping fits one picker; a multi-unit one
  *  (`{minutes: 1, seconds: 30}`) or any other shape is `null`. */
