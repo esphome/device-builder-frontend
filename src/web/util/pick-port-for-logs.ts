@@ -29,16 +29,13 @@ export async function openLogsPortForCard(
 }
 
 /**
- * Pick a port in the click gesture and open it for a card's logs dialog;
- * ``null`` when the picker was dismissed, the pick or the open failed (a
- * toast said why), or the card was unmounted meanwhile. The picked port is
- * announced to the shell first, which may offer another board flow from
- * its ids.
+ * Pick a port in the click gesture and announce it to the shell, which may
+ * offer another board flow from its ids; ``null`` when the picker was
+ * dismissed or failed (a toast said why).
  */
-export async function pickPortForLogs(
+export async function pickPortForCard(
   host: HTMLElement,
-  localize: LocalizeFunc,
-  policy: SerialLogsPolicy
+  localize: LocalizeFunc
 ): Promise<SerialPort | null> {
   let port: SerialPort | null;
   try {
@@ -47,7 +44,21 @@ export async function pickPortForLogs(
     toast.error(openFailureMessage(err, localize, "web.connect.failed"));
     return null;
   }
+  if (port) fireEvent(host, "port-picked", port);
+  return port;
+}
+
+/**
+ * Pick a port (``pickPortForCard``) and open it for a card's logs dialog;
+ * ``null`` when no port was picked, the open failed (a toast said why), or
+ * the card was unmounted meanwhile.
+ */
+export async function pickPortForLogs(
+  host: HTMLElement,
+  localize: LocalizeFunc,
+  policy: SerialLogsPolicy
+): Promise<SerialPort | null> {
+  const port = await pickPortForCard(host, localize);
   if (!port) return null;
-  fireEvent(host, "port-picked", port);
   return (await openLogsPortForCard(host, port, localize, policy)) ? port : null;
 }
