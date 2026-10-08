@@ -1,11 +1,7 @@
-import toast from "sonner-js";
-
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
-import { fireEvent } from "../../util/fire-event.js";
-import { openFailureMessage } from "../../util/serial-open-error.js";
-import { requestSerialPort } from "../../util/web-serial.js";
 import { openPortForLogs } from "../logs/open-port-for-logs.js";
+import { pickPortForCard } from "./pick-port.js";
 import { releaseOrphanedPort } from "./release-port.js";
 
 /**
@@ -29,25 +25,16 @@ export async function openLogsPortForCard(
 }
 
 /**
- * Pick a port in the click gesture and open it for a card's logs dialog;
- * ``null`` when the picker was dismissed, the pick or the open failed (a
- * toast said why), or the card was unmounted meanwhile. The picked port is
- * announced to the shell first, which may offer another board flow from
- * its ids.
+ * Pick a port (``pickPortForCard``) and open it for a card's logs dialog;
+ * ``null`` when no port was picked, the open failed (a toast said why), or
+ * the card was unmounted meanwhile.
  */
 export async function pickPortForLogs(
   host: HTMLElement,
   localize: LocalizeFunc,
   policy: SerialLogsPolicy
 ): Promise<SerialPort | null> {
-  let port: SerialPort | null;
-  try {
-    port = await requestSerialPort();
-  } catch (err) {
-    toast.error(openFailureMessage(err, localize, "web.connect.failed"));
-    return null;
-  }
+  const port = await pickPortForCard(host, localize);
   if (!port) return null;
-  fireEvent(host, "port-picked", port);
   return (await openLogsPortForCard(host, port, localize, policy)) ? port : null;
 }

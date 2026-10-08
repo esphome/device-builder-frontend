@@ -5,8 +5,9 @@ The standalone, backend-free Web Serial tool published to
 browser: connect an ESP or Raspberry Pi Pico W over USB to install
 firmware, stream logs, and provision Wi-Fi via Improv; an nRF52 gets DFU
 installs, MCUboot updates over mcumgr, and logs, the last two over USB or
-Bluetooth; an RTL8720C or RTL8710B gets a LibreTiny UF2
-flashed through its ROM downloader and logs over its serial adapter. It shares the
+Bluetooth; a BK72xx, LN882H, RTL8720C or RTL8710B gets a
+LibreTiny UF2 flashed through its downloader, and logs and Improv Wi-Fi setup
+over its serial adapter. It shares the
 repo's `src/` tree (design system, the esptool-js flash engine in
 `src/platforms/esp/esptool.ts`, localization) and adds only this app.
 

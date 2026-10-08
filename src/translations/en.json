@@ -2139,7 +2139,7 @@
     },
     "bk": {
       "title": "BK72xx Device",
-      "connect_hint": "Install the UF2 of your ESPHome build on your Beken BK72xx device through a USB serial adapter, or read its logs. To install, wire adapter RX to TX1 and adapter TX to RX1; for the logs, move adapter RX to TX2.",
+      "connect_hint": "Install ESPHome on your Beken BK72xx device through a USB serial adapter, read its logs, or set up its Wi-Fi. To install, wire adapter RX to TX1 and adapter TX to RX1. The logs and Wi-Fi setup use UART2 by default: move adapter RX to TX2 for the logs, and adapter TX to RX2 as well for Wi-Fi setup. If the logger is set to UART1, leave the adapter on UART1.",
       "logs": "Serial logs",
       "install_title": "Install firmware on a BK72xx",
       "install_intro": "There is no ready-made ESPHome Web firmware for the BK72xx yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
@@ -2147,7 +2147,7 @@
     },
     "ln": {
       "title": "LN882H Device",
-      "connect_hint": "Install the UF2 of your ESPHome build on your Lightning LN882H device through a USB serial adapter, or read its logs. To install, wire adapter RX to TX0 (PA2) and adapter TX to RX0 (PA3), and connect BOOT (GPIOA9) to GND before the board powers up. The logs come out on UART1 (TX1 on PB9) by default; move adapter RX there for them, or leave it on TX0 if the logger is set to UART0.",
+      "connect_hint": "Install ESPHome on your Lightning LN882H device through a USB serial adapter, read its logs, or set up its Wi-Fi. To install, wire adapter RX to TX0 (PA2) and adapter TX to RX0 (PA3), and connect BOOT (GPIOA9) to GND before the board powers up. The logs and Wi-Fi setup use UART1 by default: move adapter RX to TX1 (PB9) for the logs, and adapter TX to RX1 as well for Wi-Fi setup. If the logger is set to UART0, leave the adapter on UART0.",
       "logs": "Serial logs",
       "install_title": "Install firmware on an LN882H",
       "install_intro": "There is no ready-made ESPHome Web firmware for the LN882H yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",
@@ -2155,7 +2155,7 @@
     },
     "rtl": {
       "title": "RTL87xx Device",
-      "connect_hint": "Install the UF2 of your ESPHome build on a Realtek RTL8720C or RTL8710B board, or read its logs; the file says which chip it is for. Wire a USB serial adapter to the board's log port (TX2 and RX2, plus GND) and power the board from a solid 3.3 V supply; you will be shown how to strap it into download mode. A development kit with its own USB port (such as the BW15 kit) may switch into flashing mode by itself.",
+      "connect_hint": "Install ESPHome on a Realtek RTL8720C or RTL8710B board, read its logs, or set up its Wi-Fi; your own UF2 says which chip it is for. Wire a USB serial adapter to the board's log port (TX2 and RX2, plus GND) and power the board from a solid 3.3 V supply; you will be shown how to strap it into download mode. A development kit with its own USB port (such as the BW15 kit) may switch into flashing mode by itself.",
       "logs": "Serial logs",
       "install_title": "Install firmware on an RTL87xx",
       "install_intro": "There is no ready-made ESPHome Web firmware for the RTL8720C or RTL8710B yet. Build your device in the ESPHome Device Builder and install its UF2 from here.",

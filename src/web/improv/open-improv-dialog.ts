@@ -8,6 +8,7 @@ import toast from "sonner-js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import { isRp2CdcPort } from "../../platforms/rp2/index.js";
+import { releaseControlLines } from "../../util/serial-control-lines.js";
 import { openFailureMessage } from "../../util/serial-open-error.js";
 import { openLiveSerialPort } from "../../util/serial-reacquire.js";
 import { sleep } from "../../util/sleep.js";
@@ -179,13 +180,7 @@ async function acquirePort(
   }
   // Clearing the lines keeps an auto-reset circuit on a UART-bridge board
   // from holding EN low (see ImprovOptions.keepLines for the exception).
-  if (weOpened && !(keepLines ?? isRp2CdcPort(live))) {
-    try {
-      await live.setSignals({ dataTerminalReady: false, requestToSend: false });
-    } catch {
-      /* Recoverable: the chip is most likely booting fine already. */
-    }
-  }
+  if (weOpened && !(keepLines ?? isRp2CdcPort(live))) await releaseControlLines(live);
   return { port: live, weOpened };
 }
 

@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiTextBoxOutline, mdiUpload } from "@mdi/js";
+import { mdiTextBoxOutline, mdiUpload, mdiWifiCog } from "@mdi/js";
 import { html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
@@ -9,17 +9,23 @@ import type { SerialLogsPolicy } from "../../platforms/serial-logs.js";
 import { actionBtnStyles } from "../../styles/action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import type { LibreTinyInstall } from "../install/esphome-web-libretiny-install-dialog.js";
+import { openImprovDialog } from "../improv/open-improv-dialog.js";
 import "../install/esphome-web-libretiny-install-dialog.js";
+import type { LibreTinyInstall } from "../install/esphome-web-libretiny-install-dialog.js";
 import "../logs/esphome-web-logs-dialog.js";
 import { pickPortForLogs } from "../util/pick-port-for-logs.js";
+import { pickPortForCard } from "../util/pick-port.js";
 import { cardActionsRowStyles } from "./card-actions-row.js";
 import "./esphome-web-card.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
-registerMdiIcons({ upload: mdiUpload, "text-box-outline": mdiTextBoxOutline });
+registerMdiIcons({
+  upload: mdiUpload,
+  "text-box-outline": mdiTextBoxOutline,
+  "wifi-cog": mdiWifiCog,
+});
 
 /** A family's card: its copy, its logs and its install. */
 export interface LibreTinyCard {
@@ -36,8 +42,8 @@ export interface LibreTinyCard {
 /**
  * The card of a chip that sits behind a serial adapter: no connected state;
  * each install picks its own port and flashes through the chip's downloader,
- * and each logs session picks its own port. The family is the ``card`` it is
- * given.
+ * and each logs or Wi-Fi setup session picks its own port. The family is the
+ * ``card`` it is given.
  */
 @customElement("esphome-web-libretiny-card")
 export class LibreTinyCardElement extends LitElement {
@@ -52,7 +58,7 @@ export class LibreTinyCardElement extends LitElement {
   // Install was clicked while the dialog was on its way out.
   private _installAgain = false;
   @state() private _logsPort?: SerialPort;
-  // A picker is up; a second click must not open another beside it.
+  // A picker or a Wi-Fi setup session is up; another click must wait for it.
   private _picking = false;
 
   private async _showLogs(): Promise<void> {
@@ -61,6 +67,19 @@ export class LibreTinyCardElement extends LitElement {
     try {
       const port = await pickPortForLogs(this, this._localize, this.card.logs);
       if (port) this._logsPort = port;
+    } finally {
+      this._picking = false;
+    }
+  }
+
+  private async _configureWifi(): Promise<void> {
+    if (this._picking) return;
+    this._picking = true;
+    try {
+      const port = await pickPortForCard(this, this._localize);
+      // The card stays busy until the session ends, so a second click cannot
+      // start another dialog on another port meanwhile.
+      if (port && this.isConnected) await openImprovDialog(port, this._localize);
     } finally {
       this._picking = false;
     }
@@ -110,6 +129,17 @@ export class LibreTinyCardElement extends LitElement {
             <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           </button>
           <wa-tooltip for="btn-logs">${this._localize(copy.logs)}</wa-tooltip>
+          <button
+            id="btn-wifi"
+            class="action-btn action-btn--ghost action-btn--tile"
+            aria-label=${this._localize("web.actions.configure_wifi")}
+            @click=${this._configureWifi}
+          >
+            <wa-icon library="mdi" name="wifi-cog"></wa-icon>
+          </button>
+          <wa-tooltip for="btn-wifi"
+            >${this._localize("web.actions.configure_wifi")}</wa-tooltip
+          >
         </div>
       </esphome-web-card>
       <esphome-web-libretiny-install-dialog
