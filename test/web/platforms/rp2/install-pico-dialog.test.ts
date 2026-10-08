@@ -85,10 +85,6 @@ const button = (el: ESPHomeWebInstallPicoDialog, label: string): HTMLElement =>
     (b) => b.textContent?.trim() === label
   ) as HTMLElement;
 
-// The dialog hands the write a function of the claimed board's chip.
-const imageFor = (source: unknown, board = "rp2040") =>
-  typeof source === "function" ? source(board) : source;
-
 describe("esphome-web-install-pico-dialog", () => {
   it("renders the download link once the manifest loads", async () => {
     fetchEsphomeWebManifest.mockResolvedValue({});
@@ -104,7 +100,7 @@ describe("esphome-web-install-pico-dialog", () => {
 
   it("offers a Pico 2 W download next to the Pico W one once the manifest has it", async () => {
     fetchEsphomeWebManifest.mockResolvedValue({});
-    mocks.picoImageChips.mockReturnValue(["rp2040", "rp2350"]);
+    mocks.picoImageChips.mockReturnValueOnce(["rp2040", "rp2350"]);
     mocks.picoUf2Url.mockImplementation(
       (_m, chip: string) => `https://example/${chip}.uf2`
     );
@@ -120,7 +116,6 @@ describe("esphome-web-install-pico-dialog", () => {
       "web.pico.setup_download_rp2040",
       "web.pico.setup_download_rp2350",
     ]);
-    mocks.picoImageChips.mockReturnValue(["rp2040"]);
   });
 
   it("shows the loading placeholder while the manifest is in flight", async () => {
@@ -175,7 +170,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     // reports a rejection as its own failure kind.
     mocks.flashPico.mockImplementation(async (uf2) => {
       await Promise.resolve()
-        .then(() => imageFor(uf2))
+        .then(() => uf2("rp2040"))
         .catch((err: unknown) => {
           throw new PicoFlashError("image", err);
         });
@@ -204,7 +199,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
   it("installs over PICOBOOT with progress, then Continue hands over the port", async () => {
     let opened!: () => void;
     mocks.flashPico.mockImplementation(async (uf2, hooks) => {
-      await imageFor(uf2);
+      await uf2("rp2040");
       await new Promise<void>((r) => (opened = r));
       hooks.onDeviceOpened?.();
       hooks.onProgress(50);
@@ -249,7 +244,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
 
   it("streams the engine's step lines into the card's details log", async () => {
     mocks.flashPico.mockImplementation(async (uf2, hooks) => {
-      await imageFor(uf2);
+      await uf2("rp2040");
       hooks.onLog?.("Claimed the RP2 Boot device (2e8a:0003)");
       hooks.onDeviceOpened?.();
       return true;
@@ -267,7 +262,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
       return true;
     });
     mocks.flashPico.mockImplementation(async (uf2, hooks) => {
-      await imageFor(uf2);
+      await uf2("rp2040");
       hooks.onLog?.("Claimed the RP2 Boot device (2e8a:0003)");
       return true;
     });
@@ -338,7 +333,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     );
     let written: unknown;
     mocks.flashPico.mockImplementation(async (uf2) => {
-      written = await imageFor(uf2, "rp2350");
+      written = await uf2("rp2350");
       return true;
     });
     const el = await mount();
@@ -365,10 +360,12 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     const el = await mount();
     button(el, "dashboard.install").click();
     await settle(el);
+    // The write gets the prefetched image: no second download for the RP2040.
     const source = mocks.flashPico.mock.calls[0][0];
-    expect(source("rp2040")).toBe(pending);
-    expect(mocks.loadPicoImage).toHaveBeenCalledOnce();
+    const written = source("rp2040");
     finish(image);
+    await expect(written).resolves.toBe(image);
+    expect(mocks.loadPicoImage).toHaveBeenCalledOnce();
   });
 
   it("resets a running Pico into BOOTSEL and waits for it, keeping Install at hand", async () => {

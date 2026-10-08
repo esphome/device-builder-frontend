@@ -1,7 +1,7 @@
 /**
  * Fetch the prebuilt "esphome-web" adoption firmware published at
  * firmware.esphome.io: the manifest and single files under its prefix. The
- * ESP build selection lives in ``platforms/esp/firmware-build.ts`` and the
+ * ESP parts download lives in ``platforms/esp/firmware-build.ts`` and the
  * Pico UF2 in ``platforms/rp2/pico-image.ts``.
  *
  * The manifest is the ESP Web Tools shape: ``builds[]`` keyed by ``chipFamily``
@@ -25,6 +25,19 @@ export interface FirmwareManifestBuild {
 export interface FirmwareManifest {
   version: string;
   builds: FirmwareManifestBuild[];
+}
+
+/**
+ * Find the build for a chip family, an exact, case-insensitive match. For an
+ * ESP the family is esptool-js's ``chip.CHIP_NAME`` (e.g. ``ESP32-C3``), for a
+ * Pico the chip (``rp2040``); the manifest keys on the same strings.
+ */
+export function selectBuild(
+  manifest: FirmwareManifest,
+  chipFamily: string
+): FirmwareManifestBuild | undefined {
+  const target = chipFamily.toLowerCase();
+  return manifest.builds.find((b) => b.chipFamily.toLowerCase() === target);
 }
 
 // The Pico install dialog and the ESP adoptable dialog share one manifest

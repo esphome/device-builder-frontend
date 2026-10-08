@@ -4,6 +4,7 @@ import {
   fetchEsphomeWebManifest,
   type FirmwareManifest,
   resetEsphomeWebManifest,
+  selectBuild,
 } from "../../src/web/util/esphome-web-firmware.js";
 
 const MANIFEST: FirmwareManifest = {
@@ -87,5 +88,17 @@ describe("fetchEsphomeWebManifest", () => {
     await expect(fetchEsphomeWebManifest()).rejects.toThrow(/503/);
     expect((await fetchEsphomeWebManifest()).version).toBe("26.5.1");
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("selectBuild", () => {
+  it("matches a chip family case-insensitively", () => {
+    expect(selectBuild(MANIFEST, "ESP32-C3")?.chipFamily).toBe("ESP32-C3");
+    expect(selectBuild(MANIFEST, "esp32-c3")?.chipFamily).toBe("ESP32-C3");
+    expect(selectBuild(MANIFEST, "ESP32")?.chipFamily).toBe("ESP32");
+  });
+
+  it("returns undefined for an unlisted chip", () => {
+    expect(selectBuild(MANIFEST, "ESP32-H2")).toBeUndefined();
   });
 });

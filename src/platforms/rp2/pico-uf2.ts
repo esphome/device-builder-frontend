@@ -18,7 +18,19 @@ export interface PicoUf2Failure {
   detail: string;
 }
 
-const PICO_FAMILIES = [UF2_FAMILY_RP2040, UF2_FAMILY_RP2350_ARM_S];
+/** The UF2 family each chip's image is built for. */
+export const PICO_UF2_FAMILY: Record<PicoChip, number> = {
+  rp2040: UF2_FAMILY_RP2040,
+  rp2350: UF2_FAMILY_RP2350_ARM_S,
+};
+
+/** Each chip's part number, the same in every language. */
+export const PICO_CHIP_NAME: Record<PicoChip, string> = {
+  rp2040: "RP2040",
+  rp2350: "RP2350",
+};
+
+const PICO_FAMILIES = Object.values(PICO_UF2_FAMILY);
 
 /** A built UF2 as a Pico image, for either chip; never throws. */
 export function parsePicoUf2(bytes: Uint8Array): { image: Uf2Image } | PicoUf2Failure {

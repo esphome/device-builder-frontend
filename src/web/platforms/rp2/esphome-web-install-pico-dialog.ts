@@ -15,9 +15,10 @@ import {
   picoFlashFailureCopy,
   RP2_SERIAL_PICK,
 } from "../../../platforms/rp2/index.js";
-import type { PicoChip } from "../../../platforms/rp2/pico-uf2.js";
+import { PICO_CHIP_NAME, type PicoChip } from "../../../platforms/rp2/pico-uf2.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
+import { KeyedPromiseCache } from "../../../util/keyed-promise-cache.js";
 import { notifyError } from "../../../util/notify.js";
 import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";
 import { connectFailureDetail } from "../../../util/serial-open-error.js";
@@ -64,9 +65,9 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._logLines = [...this._logLines, line];
   };
 
-  // The parsed image per chip, kept across opens; a failed fetch clears it so
-  // the next open or Install fetches again.
-  private _images = new Map<PicoChip, Promise<Uf2Image>>();
+  // The parsed image per chip, kept across opens; a failed fetch is dropped
+  // so the next open or Install fetches again.
+  private _images = new KeyedPromiseCache<Uf2Image>();
 
   protected updated(changed: Map<string, unknown>): void {
     if (!changed.has("open")) return;
@@ -111,16 +112,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private _fetchImage(chip: PicoChip): Promise<Uf2Image> {
-    let image = this._images.get(chip);
-    if (!image) {
-      const loading = loadPicoImage(chip);
-      loading.catch(() => {
-        if (this._images.get(chip) === loading) this._images.delete(chip);
-      });
-      this._images.set(chip, loading);
-      image = loading;
-    }
-    return image;
+    return this._images.fetch(chip, () => loadPicoImage(chip));
   }
 
   private async _loadManifest(): Promise<void> {
@@ -192,7 +184,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     }
     if (err.kind === "image") {
       if (err.cause instanceof PicoImageUnavailableError) {
-        const chip = err.cause.chip.toUpperCase();
+        const chip = PICO_CHIP_NAME[err.cause.chip];
         return [this._localize("web.pico.install_no_image", { chip }), ""];
       }
       const error = getErrorMessage(err.cause);

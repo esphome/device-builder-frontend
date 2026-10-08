@@ -20,16 +20,15 @@ const uf2Response = (family: number) => ({
   arrayBuffer: async () => makeUf2Block({ addr: 0x10000000, family }).buffer,
 });
 
+// The live manifest lists the RP2 builds without parts.
+const rp2040Only = { version: "26.5.1", builds: [{ chipFamily: "RP2040", parts: [] }] };
 const withRp2350 = {
   version: "26.5.1",
-  builds: [
-    { chipFamily: "RP2040", parts: [] },
-    { chipFamily: "RP2350", parts: [] },
-  ],
+  builds: [...rp2040Only.builds, { chipFamily: "RP2350", parts: [] }],
 };
 
 beforeEach(() => {
-  mocks.fetchEsphomeWebManifest.mockResolvedValue({ version: "26.5.1", builds: [] });
+  mocks.fetchEsphomeWebManifest.mockResolvedValue(rp2040Only);
 });
 
 afterEach(() => {
@@ -89,8 +88,9 @@ describe("loadPicoImage", () => {
 });
 
 describe("picoImageChips", () => {
-  it("offers the RP2040 alone until the manifest lists an RP2350 build", () => {
-    expect(picoImageChips({ version: "26.5.1", builds: [] })).toEqual(["rp2040"]);
+  it("offers each chip the manifest lists a build for", () => {
+    expect(picoImageChips({ version: "26.5.1", builds: [] })).toEqual([]);
+    expect(picoImageChips(rp2040Only)).toEqual(["rp2040"]);
     expect(picoImageChips(withRp2350)).toEqual(["rp2040", "rp2350"]);
   });
 });

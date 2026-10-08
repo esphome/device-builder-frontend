@@ -1,37 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  downloadBuildParts,
-  selectBuild,
-} from "../../../../src/web/platforms/esp/firmware-build.js";
-import type { FirmwareManifest } from "../../../../src/web/util/esphome-web-firmware.js";
-
-const MANIFEST: FirmwareManifest = {
-  version: "26.5.1",
-  builds: [
-    { chipFamily: "ESP32", parts: [{ path: "26.5.1/esp32.factory.bin", offset: 0 }] },
-    {
-      chipFamily: "ESP32-C3",
-      parts: [{ path: "26.5.1/esp32c3.factory.bin", offset: 0 }],
-    },
-  ],
-};
+import { downloadBuildParts } from "../../../../src/web/platforms/esp/firmware-build.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-});
-
-describe("selectBuild", () => {
-  it("matches a chip family case-insensitively", () => {
-    expect(selectBuild(MANIFEST, "ESP32-C3")?.chipFamily).toBe("ESP32-C3");
-    expect(selectBuild(MANIFEST, "esp32-c3")?.chipFamily).toBe("ESP32-C3");
-    expect(selectBuild(MANIFEST, "ESP32")?.chipFamily).toBe("ESP32");
-  });
-
-  it("returns undefined for an unlisted chip", () => {
-    expect(selectBuild(MANIFEST, "ESP32-H2")).toBeUndefined();
-  });
 });
 
 describe("downloadBuildParts", () => {

@@ -8,7 +8,7 @@ import { getErrorMessage } from "../../util/error-message.js";
 import { formatUsbId } from "../../util/flash-log.js";
 import { connectFailureDetail } from "../../util/serial-open-error.js";
 import type { Uf2Image } from "../../util/uf2.js";
-import { type PicoChip, picoChipOf } from "./pico-uf2.js";
+import { PICO_CHIP_NAME, type PicoChip, picoChipOf } from "./pico-uf2.js";
 import {
   classifyUsbDevice,
   isUsbAccessDenied,
@@ -16,9 +16,6 @@ import {
   loadPicoboot,
   requestPicobootDevice,
 } from "./web-usb.js";
-
-// Part numbers, the same in every language.
-const CHIP_NAME: Record<PicoChip, string> = { rp2040: "RP2040", rp2350: "RP2350" };
 
 /** Why the write stopped; ``picoFlashFailureCopy`` has the words. */
 export type PicoFlashFailure =
@@ -66,7 +63,7 @@ export interface PicoFlashHooks {
  * The image to write: one already chosen, or a function that picks it for the
  * chip of the board that was claimed.
  */
-export type PicoImageSource =
+type PicoImageSource =
   Uf2Image | Promise<Uf2Image> | ((board: PicoChip) => Uf2Image | Promise<Uf2Image>);
 
 /**
@@ -140,8 +137,8 @@ export function picoFlashFailureCopy(
   if (err instanceof PicoWrongBoardError) {
     return {
       title: localize("firmware.rp2_wrong_board", {
-        board: CHIP_NAME[err.board],
-        image: CHIP_NAME[err.image],
+        board: PICO_CHIP_NAME[err.board],
+        image: PICO_CHIP_NAME[err.image],
       }),
       detail: "",
     };
