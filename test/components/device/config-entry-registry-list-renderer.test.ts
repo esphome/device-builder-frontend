@@ -715,6 +715,40 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     ]);
   });
 
+  it.each([
+    [{ seconds: 5 }, ConfigEntryType.TIME_PERIOD, ["filters", "0", "timeout"]],
+    [{ timeout: "5s", value: "last" }, "child", ["filters", "0", "timeout", "timeout"]],
+  ])(
+    "tells a duration's dict form from a fielded mapping on %j",
+    async (params, expectedType, expectedPath) => {
+      // Sensor ``timeout`` has fields while binary_sensor's is a bare
+      // duration; a mapping naming none of the fields is the dict form.
+      const renderEntry = vi.fn();
+      const catalog = [
+        {
+          id: "timeout",
+          name: "Timeout",
+          config_entries: [
+            { key: "timeout", type: ConfigEntryType.TIME_PERIOD },
+            { key: "value", type: ConfigEntryType.FLOAT },
+          ],
+          applies_to: [],
+          value_type: "time_period",
+        },
+      ] as unknown as LightEffect[];
+      const { el } = mount(
+        { filters: [{ timeout: params }] },
+        { key: "filters", registry: "filter", catalog, renderEntry }
+      );
+      await el.updateComplete;
+      const first = renderEntry.mock.calls[0];
+      expect(first[1]).toEqual(expectedPath);
+      if (expectedType !== "child") {
+        expect((first[0] as { type: string }).type).toBe(expectedType);
+      }
+    }
+  );
+
   it("marks a templatable scalar filter so the row gets a lambda toggle", async () => {
     // multiply takes a float OR a lambda; the synthetic scalar entry must carry
     // templatable so renderEntry wraps it with the literal/lambda toggle.
