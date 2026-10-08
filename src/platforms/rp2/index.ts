@@ -4,6 +4,7 @@
  * and ``loadPicoboot`` (``web-usb.ts``) loads it on demand.
  */
 export * from "./pick-cdc-port.js";
+export * from "./pico-uf2.js";
 export * from "./rp2-flash.js";
 export * from "./rp2-logs-reset.js";
 export * from "./rp2-platform.js";

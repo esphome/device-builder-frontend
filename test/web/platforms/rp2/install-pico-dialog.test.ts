@@ -15,13 +15,16 @@ vi.mock("../../../../src/components/install-details-log.js", () => ({}));
 const mocks = vi.hoisted(() => ({
   loadPicoImage: vi.fn(),
   picoUf2Url: vi.fn(),
+  picoImageChips: vi.fn(() => ["rp2040"]),
   flashPico: vi.fn(),
   touchIntoBootloader: vi.fn(),
   loadPicoboot: vi.fn(async () => ({})),
 }));
-vi.mock("../../../../src/web/platforms/rp2/pico-image.js", () => ({
+vi.mock("../../../../src/web/platforms/rp2/pico-image.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   loadPicoImage: mocks.loadPicoImage,
   picoUf2Url: mocks.picoUf2Url,
+  picoImageChips: mocks.picoImageChips,
 }));
 vi.mock("../../../../src/platforms/rp2/rp2-flash.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -45,6 +48,7 @@ import {
   PicoWrongBoardError,
 } from "../../../../src/platforms/rp2/rp2-flash.js";
 import { ESPHomeWebInstallPicoDialog } from "../../../../src/web/platforms/rp2/esphome-web-install-pico-dialog.js";
+import { PicoImageUnavailableError } from "../../../../src/web/platforms/rp2/pico-image.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -92,6 +96,82 @@ describe("esphome-web-install-pico-dialog", () => {
     expect(link).not.toBeNull();
     expect(link!.getAttribute("href")).toBe("https://firmware.esphome.io/pico.uf2");
     expect(el.shadowRoot!.querySelector(".download-error")).toBeNull();
+  });
+
+  it("offers a Pico 2 W download next to the Pico W one once the manifest has it", async () => {
+    fetchEsphomeWebManifest.mockResolvedValue({});
+    mocks.picoImageChips.mockReturnValueOnce(["rp2040", "rp2350"]);
+    mocks.picoUf2Url.mockImplementation(
+      (_m, chip: string) => `https://example/${chip}.uf2`
+    );
+
+    const el = await mount();
+
+    const links = [...el.shadowRoot!.querySelectorAll<HTMLAnchorElement>("a[download]")];
+    expect(links.map((a) => a.getAttribute("href"))).toEqual([
+      "https://example/rp2040.uf2",
+      "https://example/rp2350.uf2",
+    ]);
+    expect(links.map((a) => a.textContent?.trim())).toEqual([
+      "web.pico.setup_download_rp2040",
+      "web.pico.setup_download_rp2350",
+    ]);
+    expect(el.shadowRoot!.querySelector(".download-note")).toBeNull();
+  });
+
+  it("notes the missing Pico 2 W build when the manifest only has the Pico W one", async () => {
+    fetchEsphomeWebManifest.mockResolvedValue({});
+    mocks.picoImageChips.mockReturnValueOnce(["rp2040"]);
+
+    const el = await mount();
+
+    expect(el.shadowRoot!.querySelectorAll("a[download]")).toHaveLength(1);
+    expect(el.shadowRoot!.querySelector(".download-note")?.textContent?.trim()).toBe(
+      "web.pico.install_no_image"
+    );
+  });
+
+  it("treats a manifest with no Pico build as a failed load, and retries on reopen", async () => {
+    fetchEsphomeWebManifest.mockResolvedValue({});
+    mocks.picoImageChips.mockReturnValueOnce([]);
+
+    const el = await mount();
+
+    expect((el as any)._downloadFailed).toBe(true);
+    expect(el.shadowRoot!.querySelector(".download-error")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector("a[download]")).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
+
+    el.open = false;
+    await settle(el);
+    el.open = true;
+    await settle(el);
+    expect((el as any)._downloadFailed).toBe(false);
+    expect(el.shadowRoot!.querySelector("a[download]")).not.toBeNull();
+  });
+
+  it("reads the manifest again on reopen, so a newly published chip shows up", async () => {
+    fetchEsphomeWebManifest.mockResolvedValue({});
+    mocks.picoUf2Url.mockImplementation(
+      (_m, chip: string) => `https://example/${chip}.uf2`
+    );
+    mocks.picoImageChips.mockReturnValueOnce(["rp2040"]);
+
+    const el = await mount();
+    const hrefs = () =>
+      [...el.shadowRoot!.querySelectorAll("a[download]")].map((a) =>
+        a.getAttribute("href")
+      );
+    expect(hrefs()).toEqual(["https://example/rp2040.uf2"]);
+
+    mocks.picoImageChips.mockReturnValueOnce(["rp2040", "rp2350"]);
+    el.open = false;
+    await settle(el);
+    el.open = true;
+    await settle(el);
+
+    expect(fetchEsphomeWebManifest).toHaveBeenCalledTimes(2);
+    expect(hrefs()).toEqual(["https://example/rp2040.uf2", "https://example/rp2350.uf2"]);
   });
 
   it("shows the loading placeholder while the manifest is in flight", async () => {
@@ -145,9 +225,11 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     // Like the real helper, the write awaits the image it was handed and
     // reports a rejection as its own failure kind.
     mocks.flashPico.mockImplementation(async (uf2) => {
-      await Promise.resolve(uf2).catch((err: unknown) => {
-        throw new PicoFlashError("image", err);
-      });
+      await Promise.resolve()
+        .then(() => uf2("rp2040"))
+        .catch((err: unknown) => {
+          throw new PicoFlashError("image", err);
+        });
       return true;
     });
   });
@@ -162,9 +244,9 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     expect(mocks.loadPicoImage).not.toHaveBeenCalled();
   });
 
-  it("fetches the image and warms the engine on open, without the download manifest", async () => {
+  it("fetches the RP2040 image and warms the engine on open, without the download manifest", async () => {
     const el = await mount();
-    expect(mocks.loadPicoImage).toHaveBeenCalledOnce();
+    expect(mocks.loadPicoImage).toHaveBeenCalledExactlyOnceWith("rp2040");
     expect(mocks.loadPicoboot).toHaveBeenCalledOnce();
     expect(fetchEsphomeWebManifest).not.toHaveBeenCalled();
     expect(text(el)).toContain("web.pico.install_step_bootsel");
@@ -173,7 +255,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
   it("installs over PICOBOOT with progress, then Continue hands over the port", async () => {
     let opened!: () => void;
     mocks.flashPico.mockImplementation(async (uf2, hooks) => {
-      await uf2;
+      await uf2("rp2040");
       await new Promise<void>((r) => (opened = r));
       hooks.onDeviceOpened?.();
       hooks.onProgress(50);
@@ -187,7 +269,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     expect(card(el).progress).toBeNull();
     opened();
     await settle(el);
-    expect(mocks.flashPico).toHaveBeenCalledWith(expect.any(Promise), expect.anything());
+    expect(mocks.flashPico).toHaveBeenCalledWith(expect.any(Function), expect.anything());
     // The status lives on the progress card's properties (the element is stubbed).
     expect(card(el).state).toBe("success");
     expect(card(el).statusMessage).toBe("web.pico.setup_step_5");
@@ -218,7 +300,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
 
   it("streams the engine's step lines into the card's details log", async () => {
     mocks.flashPico.mockImplementation(async (uf2, hooks) => {
-      await uf2;
+      await uf2("rp2040");
       hooks.onLog?.("Claimed the RP2 Boot device (2e8a:0003)");
       hooks.onDeviceOpened?.();
       return true;
@@ -236,7 +318,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
       return true;
     });
     mocks.flashPico.mockImplementation(async (uf2, hooks) => {
-      await uf2;
+      await uf2("rp2040");
       hooks.onLog?.("Claimed the RP2 Boot device (2e8a:0003)");
       return true;
     });
@@ -286,8 +368,36 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     mocks.flashPico.mockRejectedValue(new PicoWrongBoardError("rp2350", "rp2040"));
     button(el, "dashboard.install").click();
     await settle(el);
-    // This page's own line: its image is for the one chip.
-    expect(card(el).statusMessage).toBe("web.pico.install_wrong_board");
+    // A wrong pair reads as the shared copy.
+    expect(card(el).statusMessage).toBe("firmware.rp2_wrong_board");
+  });
+
+  it("names a chip ESPHome Web has no image for", async () => {
+    mocks.flashPico.mockRejectedValue(
+      new PicoFlashError("image", new PicoImageUnavailableError("rp2350"))
+    );
+    const el = await mount();
+    button(el, "dashboard.install").click();
+    await settle(el);
+    expect(card(el).statusMessage).toBe("web.pico.install_no_image");
+  });
+
+  it("loads the RP2350 image for an RP2350 board", async () => {
+    const image2350 = { familyId: 0xe48bff59, ranges: [], totalBytes: 0 };
+    mocks.loadPicoImage.mockImplementation(async (chip: string) =>
+      chip === "rp2350" ? image2350 : image
+    );
+    let written: unknown;
+    mocks.flashPico.mockImplementation(async (uf2) => {
+      written = await uf2("rp2350");
+      return true;
+    });
+    const el = await mount();
+    button(el, "dashboard.install").click();
+    await settle(el);
+    expect(mocks.loadPicoImage).toHaveBeenCalledWith("rp2350");
+    expect(written).toBe(image2350);
+    expect(card(el).state).toBe("success");
   });
 
   it("names this page's own reset action for a device that is not in BOOTSEL", async () => {
@@ -298,15 +408,20 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     expect(card(el).statusMessage).toBe("web.pico.install_not_bootsel");
   });
 
-  it("hands the image to the write as a promise, so the chooser is not held up by the download", async () => {
+  it("hands the write the prefetched image, so the chooser is not held up by the download", async () => {
     let finish!: (image: unknown) => void;
-    mocks.loadPicoImage.mockReset().mockReturnValue(new Promise((r) => (finish = r)));
+    const pending = new Promise((r) => (finish = r));
+    mocks.loadPicoImage.mockReset().mockReturnValue(pending);
     mocks.flashPico.mockResolvedValue(true);
     const el = await mount();
     button(el, "dashboard.install").click();
     await settle(el);
-    expect(mocks.flashPico).toHaveBeenCalledWith(expect.any(Promise), expect.anything());
+    // The write gets the prefetched image: no second download for the RP2040.
+    const source = mocks.flashPico.mock.calls[0][0];
+    const written = source("rp2040");
     finish(image);
+    await expect(written).resolves.toBe(image);
+    expect(mocks.loadPicoImage).toHaveBeenCalledOnce();
   });
 
   it("resets a running Pico into BOOTSEL and waits for it, keeping Install at hand", async () => {
