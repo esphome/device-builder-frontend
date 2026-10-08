@@ -46,7 +46,7 @@
     "@lit/reactive-element": "2.1.2",
     "@mdi/js": "7.4.47",
     "@replit/codemirror-indentation-markers": "^6.5.3",
-    "@tanstack/lit-table": "^9.2.4",
+    "@tanstack/lit-table": "^9.2.6",
     "codemirror": "^6.0.2",
     "esptool-js": "^0.7.0",
     "fflate": "^0.8.3",
