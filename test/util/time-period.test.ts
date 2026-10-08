@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampTimePeriodUnit,
   durationMappingAsScalar,
+  isDurationMapping,
   looksLikeTimePeriodScalar,
   parseTimePeriodScalar,
   serializeTimePeriod,
@@ -144,5 +145,20 @@ describe("clampTimePeriodUnit", () => {
     ["us", "ns", "us"],
   ] as const)("%s on a %s-precision field is %s", (unit, minUnit, expected) => {
     expect(clampTimePeriodUnit(unit, minUnit)).toBe(expected);
+  });
+});
+
+describe("isDurationMapping", () => {
+  it.each([
+    [{ seconds: 5 }, true],
+    [{ minutes: 1, seconds: 30 }, true],
+    [{ s: 5 }, false],
+    [{ timeout: "5s" }, false],
+    [{}, false],
+    [[], false],
+    [null, false],
+    ["5s", false],
+  ])("%j -> %s", (raw, expected) => {
+    expect(isDurationMapping(raw)).toBe(expected);
   });
 });

@@ -362,12 +362,16 @@ export class ESPHomeRegistryList extends LitElement {
     // mapping so a hypothetical catalog miscategorisation can't
     // clobber an existing nested config. A mapping of only duration units
     // that names none of the entry's fields is the value's own dict form
-    // (``throttle: {seconds: 5}``).
+    // (``throttle: {seconds: 5}``); on a duration with no fields any mapping
+    // goes to its renderer, which shows the YAML-only notice for a non-unit one.
     const fields = catalogEntry?.config_entries;
     const durationMapping =
       catalogEntry?.value_type === "time_period" &&
-      isDurationMapping(params) &&
-      !fields?.some((field) => Object.prototype.hasOwnProperty.call(params, field.key));
+      ((paramsIsMapping && fields?.length === 0) ||
+        (isDurationMapping(params) &&
+          !fields?.some((field) =>
+            Object.prototype.hasOwnProperty.call(params, field.key)
+          )));
     const scalarConfigType =
       paramsIsMapping && !durationMapping
         ? null

@@ -750,6 +750,38 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     }
   );
 
+  it("reads a duration's dict form before the row's body loads", async () => {
+    // A unit-keyed mapping is a duration whatever fields the body brings.
+    const renderEntry = vi.fn();
+    const catalog = [
+      { id: "throttle", name: "Throttle", value_type: "time_period" },
+    ] as unknown as LightEffect[];
+    const { el } = mount(
+      { filters: [{ throttle: { seconds: 5 } }] },
+      { key: "filters", registry: "filter", catalog, renderEntry }
+    );
+    await el.updateComplete;
+    expect(renderEntry.mock.calls[0][0]).toMatchObject({
+      type: ConfigEntryType.TIME_PERIOD,
+    });
+  });
+
+  it("hands a non-unit mapping on a fieldless duration to its renderer", async () => {
+    // The time period renderer shows the YAML-only notice for it.
+    const renderEntry = vi.fn();
+    const catalog = [
+      { id: "throttle", name: "Throttle", config_entries: [], value_type: "time_period" },
+    ] as unknown as LightEffect[];
+    const { el } = mount(
+      { filters: [{ throttle: { secnds: 5 } }] },
+      { key: "filters", registry: "filter", catalog, renderEntry }
+    );
+    await el.updateComplete;
+    expect(renderEntry.mock.calls[0][0]).toMatchObject({
+      type: ConfigEntryType.TIME_PERIOD,
+    });
+  });
+
   it("marks a templatable scalar filter so the row gets a lambda toggle", async () => {
     // multiply takes a float OR a lambda; the synthetic scalar entry must carry
     // templatable so renderEntry wraps it with the literal/lambda toggle.
