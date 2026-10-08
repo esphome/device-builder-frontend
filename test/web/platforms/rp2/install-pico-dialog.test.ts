@@ -116,6 +116,19 @@ describe("esphome-web-install-pico-dialog", () => {
       "web.pico.setup_download_rp2040",
       "web.pico.setup_download_rp2350",
     ]);
+    expect(el.shadowRoot!.querySelector(".download-note")).toBeNull();
+  });
+
+  it("notes the missing Pico 2 W build when the manifest only has the Pico W one", async () => {
+    fetchEsphomeWebManifest.mockResolvedValue({});
+    mocks.picoImageChips.mockReturnValueOnce(["rp2040"]);
+
+    const el = await mount();
+
+    expect(el.shadowRoot!.querySelectorAll("a[download]")).toHaveLength(1);
+    expect(el.shadowRoot!.querySelector(".download-note")?.textContent?.trim()).toBe(
+      "web.pico.install_no_image"
+    );
   });
 
   it("treats a manifest with no Pico build as a failed load, and retries on reopen", async () => {
@@ -127,7 +140,7 @@ describe("esphome-web-install-pico-dialog", () => {
     expect((el as any)._downloadFailed).toBe(true);
     expect(el.shadowRoot!.querySelector(".download-error")).not.toBeNull();
     expect(el.shadowRoot!.querySelector("a[download]")).toBeNull();
-    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
 
     el.open = false;
     await settle(el);

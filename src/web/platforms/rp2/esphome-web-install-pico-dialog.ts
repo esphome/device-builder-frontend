@@ -121,15 +121,21 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     try {
       const manifest = await fetchEsphomeWebManifest();
       const chips = picoImageChips(manifest);
-      // Nothing to offer reads as a failed load, so reopening tries again.
-      if (!chips.length) throw new Error("The manifest lists no Pico firmware");
-      this._downloads = chips.map((chip) => ({ chip, url: picoUf2Url(manifest, chip) }));
+      if (chips.length) {
+        this._downloads = chips.map((chip) => ({
+          chip,
+          url: picoUf2Url(manifest, chip),
+        }));
+        return;
+      }
     } catch (err) {
-      this._downloadFailed = true;
       toast.error(
         this._localize("web.pico.manifest_failed", { error: getErrorMessage(err) })
       );
     }
+    // Nothing to offer reads as a failed load too, so reopening tries again; the
+    // inline download error already says so.
+    this._downloadFailed = true;
   }
 
   // A Pico already running ESPHome: the 1200 baud touch reboots it into
@@ -319,12 +325,21 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
         <li>
           ${
             this._downloads
-              ? this._downloads.map(
+              ? html`${this._downloads.map(
                   ({ chip, url }) =>
                     html`<a href=${url} download
                       >${this._localize(`web.pico.setup_download_${chip}`)}</a
                     >`
-                )
+                )}${
+                  // The copy names the Pico 2 W, whose drive ignores the other chip's image
+                  this._downloads.some(({ chip }) => chip === "rp2350")
+                    ? nothing
+                    : html`<p class="download-note">
+                        ${this._localize("web.pico.install_no_image", {
+                          chip: PICO_CHIP_NAME.rp2350,
+                        })}
+                      </p>`
+                }`
               : this._downloadFailed
                 ? html`<span class="download-error"
                     >${this._localize("web.pico.setup_download_failed")}</span
