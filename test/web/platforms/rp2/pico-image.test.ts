@@ -18,6 +18,9 @@ import {
   resetEsphomeWebManifest,
 } from "../../../../src/web/util/esphome-web-firmware.js";
 
+// The deadline every UF2 download is given.
+const SIGNAL = { signal: expect.any(AbortSignal) };
+
 const uf2Response = (family: number) => ({
   ok: true,
   arrayBuffer: async () => makeUf2Block({ addr: 0x10000000, family }).buffer,
@@ -46,7 +49,8 @@ describe("loadPicoImage", () => {
     vi.stubGlobal("fetch", fetch);
     const loaded = await loadPicoImage("rp2040");
     expect(fetch).toHaveBeenCalledWith(
-      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2040.uf2"
+      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2040.uf2",
+      SIGNAL
     );
     expect(loaded.familyId).toBe(UF2_FAMILY_RP2040);
     expect(loaded.totalBytes).toBe(256);
@@ -58,7 +62,8 @@ describe("loadPicoImage", () => {
     vi.stubGlobal("fetch", fetch);
     const loaded = await loadPicoImage("rp2350");
     expect(fetch).toHaveBeenCalledWith(
-      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2350.uf2"
+      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2350.uf2",
+      SIGNAL
     );
     expect(loaded.familyId).toBe(UF2_FAMILY_RP2350_ARM_S);
   });

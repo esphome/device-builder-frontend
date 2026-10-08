@@ -49,6 +49,9 @@ import { argsLocalize } from "../../../_dom.js";
 import { BK_INSTALL } from "../../../../src/web/platforms/bk72xx/install.js";
 import { resetEsphomeWebManifest } from "../../../../src/web/util/esphome-web-firmware.js";
 
+// The deadline every UF2 download is given.
+const SIGNAL = { signal: expect.any(AbortSignal) };
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const IMAGE = { familyId: 0x159ac324, board: "b", runs: [], totalBytes: 0 };
@@ -180,7 +183,8 @@ describe("esphome-web-libretiny-install-dialog for the BK72xx's ESPHome Web firm
       expect.any(Object)
     );
     expect(fetch).toHaveBeenCalledWith(
-      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-bk7251.uf2"
+      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-bk7251.uf2",
+      SIGNAL
     );
     // The manifest read on open is the one used.
     expect(mocks.fetchEsphomeWebManifest).toHaveBeenCalledTimes(manifestReads);
@@ -215,4 +219,50 @@ describe("esphome-web-libretiny-install-dialog for the BK72xx's ESPHome Web firm
     expect(card(el).statusMessage).toBe(line);
     expect(card(el).statusDetail).toBe("");
   });
+
+  it.each([
+    [
+      "does not parse",
+      () => {
+        stubUf2Download();
+        mocks.loadBekenImage.mockResolvedValue({
+          key: "firmware.bk_bad_uf2",
+          detail: "no blocks",
+        });
+      },
+      "firmware.bk_bad_uf2",
+      "no blocks",
+    ],
+    [
+      "does not download",
+      () =>
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => ({ ok: false, status: 503 }))
+        ),
+      "web.install.prebuilt_download_failed",
+      expect.stringMatching(/esphome-web-bk7251\.uf2 failed \(503\)/),
+    ],
+  ])(
+    "names a published image that %s once linked as it would before the link",
+    async (_n, given, title, detail) => {
+      given();
+      mocks.runBeken.mockImplementation(async (_port, source) => {
+        try {
+          await source({ chip: "BK7252", family: "BK7251" });
+          return { rebooted: true };
+        } catch (error) {
+          return { detail: (error as Error).message, error };
+        }
+      });
+      const el = await mountBkPrebuilt("BK7251");
+
+      await el._flash();
+      await el.updateComplete;
+
+      expect(card(el).state).toBe("error");
+      expect(card(el).statusMessage).toBe(title);
+      expect(card(el).statusDetail).toEqual(detail);
+    }
+  );
 });

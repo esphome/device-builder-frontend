@@ -192,7 +192,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     }
     if (err.kind === "image") {
       if (err.cause instanceof PublishedImageUnavailableError) {
-        const chip = err.cause.label ?? "";
+        const chip = PICO_CHIP_NAME[err.cause.key as PicoChip];
         return [this._localize("web.pico.install_no_image", { chip }), ""];
       }
       const error = getErrorMessage(err.cause);

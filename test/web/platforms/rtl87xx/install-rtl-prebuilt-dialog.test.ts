@@ -34,6 +34,9 @@ import { card, mountPrebuilt, radios } from "../_libretiny-dialog.js";
 import { RTL87XX_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
 import { resetEsphomeWebManifest } from "../../../../src/web/util/esphome-web-firmware.js";
 
+// The deadline every UF2 download is given.
+const SIGNAL = { signal: expect.any(AbortSignal) };
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const AMBZ2_IMAGE = { runs: [], totalBytes: 0 };
@@ -79,7 +82,7 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx's ESPHome Web fir
       ["RTL8710B", false],
     ]);
     expect(text(el)).toContain("web.install.prebuilt_chip_label");
-    expect(fetch).toHaveBeenCalledWith(`${URL}rtl8720c.uf2`);
+    expect(fetch).toHaveBeenCalledWith(`${URL}rtl8720c.uf2`, SIGNAL);
 
     await el._flash();
     await el.updateComplete;
@@ -104,7 +107,7 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx's ESPHome Web fir
         value: { chip: "ambz" },
       })
     );
-    expect(fetch).toHaveBeenLastCalledWith(`${URL}rtl8710b.uf2`);
+    expect(fetch).toHaveBeenLastCalledWith(`${URL}rtl8710b.uf2`, SIGNAL);
     const flashing = el._flash();
     await vi.waitFor(() => expect(el._state).toBe("waiting"));
     await el.updateComplete;
@@ -135,6 +138,6 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx's ESPHome Web fir
     const el = await mountRtlPrebuilt("RTL8710B");
 
     expect(radios(el, "family")).toEqual([]);
-    expect(fetch).toHaveBeenCalledWith(`${URL}rtl8710b.uf2`);
+    expect(fetch).toHaveBeenCalledWith(`${URL}rtl8710b.uf2`, SIGNAL);
   });
 });

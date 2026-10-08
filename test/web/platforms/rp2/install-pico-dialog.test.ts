@@ -395,6 +395,18 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
     expect(card(el).statusMessage).toBe("web.pico.install_no_image");
   });
 
+  it("names the chip without an image by its own name, whatever label the error has", async () => {
+    mocks.flashPico.mockRejectedValue(
+      new PicoFlashError("image", new PublishedImageUnavailableError("rp2350", undefined))
+    );
+    const el = await mount();
+    (el as any)._localize = (k: string, args?: Record<string, unknown>) =>
+      [k, ...Object.values(args ?? {})].join(" | ");
+    button(el, "dashboard.install").click();
+    await settle(el);
+    expect(card(el).statusMessage).toBe("web.pico.install_no_image | RP2350");
+  });
+
   it("loads the RP2350 image for an RP2350 board", async () => {
     const image2350 = { familyId: 0xe48bff59, ranges: [], totalBytes: 0 };
     mocks.loadPicoImage.mockImplementation(async (chip: string) =>

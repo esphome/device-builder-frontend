@@ -45,6 +45,9 @@ import { UF2_FAMILY_LN882H } from "../../../../src/platforms/ln882x/ln882x-image
 import { LN_INSTALL } from "../../../../src/web/platforms/ln882x/install.js";
 import { resetEsphomeWebManifest } from "../../../../src/web/util/esphome-web-firmware.js";
 
+// The deadline every UF2 download is given.
+const SIGNAL = { signal: expect.any(AbortSignal) };
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const IMAGE = { familyId: UF2_FAMILY_LN882H, board: "b", runs: [], totalBytes: 0 };
@@ -161,7 +164,8 @@ describe("esphome-web-libretiny-install-dialog for the LN882H's ESPHome Web firm
     expect(radios(el, "family")).toEqual([]);
     expect(el.shadowRoot!.textContent).toContain("web.install.prebuilt_intro");
     expect(fetch).toHaveBeenCalledWith(
-      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-ln882h.uf2"
+      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-ln882h.uf2",
+      SIGNAL
     );
     expect(mocks.loadLn882xImage).toHaveBeenCalledWith(new Uint8Array([7]));
     expect(mocks.warmLn882x).toHaveBeenCalledOnce();

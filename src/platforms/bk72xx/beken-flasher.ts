@@ -125,12 +125,16 @@ export async function flashBeken(
     hooks.onLinked?.();
     const session = new BekenSession(link, log);
     const info = await session.detect();
+    // A download for the image is left to go on (it is shared) when the
+    // user gives up or the device goes; the port is let go at once.
     const image =
       typeof source === "function"
-        ? await source({
-            chip: info.chip ?? undefined,
-            family: info.chip ? familyOfChip(info.chip)?.name : undefined,
-          })
+        ? await link.whileLinked(
+            source({
+              chip: info.chip ?? undefined,
+              family: info.chip ? familyOfChip(info.chip)?.name : undefined,
+            })
+          )
         : source;
     log(`Linked: ${describeChip(info)}; ${image.runs.length} runs to write`);
     const family = familyOf(image.familyId);

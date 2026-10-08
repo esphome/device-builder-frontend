@@ -9,7 +9,11 @@ import {
   publishedUf2Url,
   resetEsphomeWebManifest,
   selectBuild,
+  UF2_DOWNLOAD_TIMEOUT_MS,
 } from "../../src/web/util/esphome-web-firmware.js";
+
+// The deadline every UF2 download is given.
+const SIGNAL = { signal: expect.any(AbortSignal) };
 
 const MANIFEST: FirmwareManifest = {
   version: "26.5.1",
@@ -129,7 +133,8 @@ describe("fetchPublishedUf2", () => {
 
     expect(await fetchPublishedUf2(UF2_MANIFEST, "BK7231N")).toEqual(bytes);
     expect(fetch).toHaveBeenCalledWith(
-      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-bk7231n.uf2"
+      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-bk7231n.uf2",
+      SIGNAL
     );
   });
 
@@ -167,6 +172,34 @@ describe("fetchPublishedUf2", () => {
     await expect(fetchPublishedUf2(UF2_MANIFEST, "LN882H")).rejects.toThrow(
       /esphome-web-ln882h\.uf2 failed \(404\)/
     );
+    expect(await fetchPublishedUf2(UF2_MANIFEST, "LN882H")).toEqual(new Uint8Array([1]));
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("fetchPublishedUf2, when the download stalls", () => {
+  it("gives up at its deadline, so a later attempt downloads again", async () => {
+    // The deadline, aborted here by hand rather than by the clock.
+    const deadline = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) =>
+            init.signal!.addEventListener("abort", () => reject(init.signal!.reason))
+          )
+      )
+      .mockResolvedValueOnce(uf2Response(new Uint8Array([1])));
+    vi.stubGlobal("fetch", fetch);
+
+    const stalled = fetchPublishedUf2(UF2_MANIFEST, "LN882H");
+    expect(timeout).toHaveBeenCalledWith(UF2_DOWNLOAD_TIMEOUT_MS);
+    // Until the deadline, an attempt waits on the same download.
+    expect(fetchPublishedUf2(UF2_MANIFEST, "LN882H")).toBe(stalled);
+    deadline.abort(new DOMException("timed out", "TimeoutError"));
+
+    await expect(stalled).rejects.toMatchObject({ name: "TimeoutError" });
     expect(await fetchPublishedUf2(UF2_MANIFEST, "LN882H")).toEqual(new Uint8Array([1]));
     expect(fetch).toHaveBeenCalledTimes(2);
   });

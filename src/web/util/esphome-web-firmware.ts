@@ -82,9 +82,16 @@ async function downloadManifest(): Promise<FirmwareManifest> {
   return (await resp.json()) as FirmwareManifest;
 }
 
-/** One file under the firmware prefix, as bytes; throws with the status on failure. */
-export async function fetchFirmwareFile(path: string): Promise<Uint8Array> {
-  const resp = await fetch(`${ESPHOME_WEB_FIRMWARE_PREFIX}/${path}`);
+/**
+ * One file under the firmware prefix, as bytes; throws with the status on
+ * failure, or with ``signal``'s reason once it aborts the request or the body.
+ */
+export async function fetchFirmwareFile(
+  path: string,
+  signal?: AbortSignal
+): Promise<Uint8Array> {
+  const url = `${ESPHOME_WEB_FIRMWARE_PREFIX}/${path}`;
+  const resp = await (signal ? fetch(url, { signal }) : fetch(url));
   if (!resp.ok) throw new Error(`Downloading ${path} failed (${resp.status})`);
   return new Uint8Array(await resp.arrayBuffer());
 }
@@ -120,7 +127,14 @@ const publishedUf2Path = (manifest: FirmwareManifest, key: string): string =>
 export const publishedUf2Url = (manifest: FirmwareManifest, key: string): string =>
   `${ESPHOME_WEB_FIRMWARE_PREFIX}/${publishedUf2Path(manifest, key)}`;
 
-// A reopen, or a switch back to an image already fetched, downloads nothing.
+/**
+ * How long a published UF2 (1-2 MB) gets, the body included. A stalled
+ * download would stay cached and hold every later install of the image.
+ */
+export const UF2_DOWNLOAD_TIMEOUT_MS = 60 * 1000;
+
+// A reopen, or a switch back to an image already fetched, downloads nothing;
+// a failed or timed-out download is dropped, so the next one starts anew.
 const uf2Cache = new KeyedPromiseCache<Uint8Array>();
 
 /**
@@ -137,6 +151,9 @@ export function fetchPublishedUf2(
     return Promise.reject(new PublishedImageUnavailableError(key, label));
   }
   return uf2Cache.fetch(`${manifest.version}/${key.toLowerCase()}`, () =>
-    fetchFirmwareFile(publishedUf2Path(manifest, key))
+    fetchFirmwareFile(
+      publishedUf2Path(manifest, key),
+      AbortSignal.timeout(UF2_DOWNLOAD_TIMEOUT_MS)
+    )
   );
 }

@@ -17,6 +17,7 @@ import {
   openFailureMessage,
 } from "../../util/serial-open-error.js";
 import { requestSerialPort } from "../../util/web-serial.js";
+import { LinkedImageError } from "../platforms/libretiny-image.js";
 import { PublishedImageUnavailableError } from "../util/esphome-web-firmware.js";
 
 import { filePickerStyles } from "./file-picker.js";
@@ -29,6 +30,7 @@ import {
 } from "./install-progress.js";
 import { renderSetup, setupStyles, unpublishedChipLine } from "./libretiny-setup-view.js";
 import { LibreTinySetup } from "./libretiny-setup.js";
+import { parseFailureCopy } from "./preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -229,6 +231,10 @@ export class LibreTinyInstallDialog extends LitElement {
     if ("detail" in result) {
       if (result.error instanceof PublishedImageUnavailableError) {
         this._fail(unpublishedChipLine(this._localize, result.error.label));
+      } else if (result.error instanceof LinkedImageError) {
+        // Named as the image would have been had it been fetched before the link.
+        const { key } = parseFailureCopy(result.error.key);
+        this._fail(this._localize(key), result.detail);
       } else {
         this._fail(
           this._localize(result.key ?? this._active.copy.failed),

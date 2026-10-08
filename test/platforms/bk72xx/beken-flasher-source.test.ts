@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { driveFakeTimers } from "../../_fake-timers.js";
 import { BekenChipMismatchError } from "../../../src/platforms/bk72xx/beken-flasher.js";
+import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 import {
   BK7231N,
   BK7231T,
@@ -81,6 +82,48 @@ describe("flashBeken with the image given for the linked chip", () => {
       expect(count(chip, 0x0f, true)).toBe(0);
       expect(chip.flash[0x11000]).toBe(oldByte(0x11000));
       expect(chip.raw.close).toHaveBeenCalledOnce();
+    }
+  );
+
+  // The source's download stays pending; only the abort or the unplug ends the wait.
+  it.each([
+    [
+      "the user gives up",
+      (_chip: unknown, abort: AbortController) => abort.abort(),
+      { name: "AbortError" },
+    ],
+    [
+      "the device goes away",
+      (chip: { dropLink: () => void }) => chip.dropLink(),
+      new SerialDeviceLostError(new Error("gone")),
+    ],
+  ])(
+    "lets the port go at once when %s while the image is fetched",
+    async (_n, stop, failure) => {
+      const abort = new AbortController();
+      let fetched!: () => void;
+      const source = vi.fn(
+        () =>
+          new Promise<never>(
+            (_resolve, reject) => (fetched = () => reject(new Error("late")))
+          )
+      );
+      const { chip, done } = flash(BK7231N, source, {}, { signal: abort.signal });
+      await vi.waitFor(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+        expect(source).toHaveBeenCalled();
+      });
+
+      stop(chip, abort);
+
+      await expect(driveFakeTimers(done)).rejects.toMatchObject(
+        failure instanceof Error ? { name: failure.name } : failure
+      );
+      expect(chip.raw.close).toHaveBeenCalledOnce();
+      expect(count(chip, 0x0f, true)).toBe(0);
+      // The download settling later changes nothing.
+      fetched();
+      await vi.advanceTimersByTimeAsync(10);
     }
   );
 });
