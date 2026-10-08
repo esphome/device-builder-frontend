@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing } from "lit";
-import { property, query, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../../common/localize.js";
 import "../../components/base-dialog.js";
@@ -91,12 +91,14 @@ type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" |
  * supplies (there is no ready-made ESPHome Web firmware for these chips
  * yet), flashed through the chip's downloader. The engine gets the chip
  * into it where it can; else the dialog shows the guide while the engine
- * keeps polling. A family's element extends this with its ``install``.
+ * keeps polling. The family is the ``install`` it is given.
  */
-export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends LitElement {
+@customElement("esphome-web-libretiny-install-dialog")
+export class LibreTinyInstallDialog extends LitElement {
   @property({ type: Boolean }) open = false;
 
-  protected abstract readonly install: LibreTinyInstall<Image>;
+  /** The family whose UF2 this installs. */
+  @property({ attribute: false }) install!: LibreTinyInstall<unknown>;
 
   @consume({ context: localizeContext, subscribe: true })
   @state()
@@ -129,7 +131,7 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
 
   // The UF2 is read and parsed when it is picked, so the click that installs
   // it goes straight to the port picker.
-  private _image = new Preparation<File, Image, FilePickerError>(
+  private _image = new Preparation<File, unknown, FilePickerError>(
     this,
     (file) => this._parse(file),
     (failure) => this._onPrepared(failure),
@@ -140,7 +142,7 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
     })
   );
 
-  private async _parse(file: File): Promise<Prepared<Image, FilePickerError>> {
+  private async _parse(file: File): Promise<Prepared<unknown, FilePickerError>> {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const parsed = await this.install.load(bytes);
     if ("image" in parsed) {
@@ -414,4 +416,10 @@ export abstract class LibreTinyInstallDialog<Image = LibreTinyImage> extends Lit
       }
     `,
   ];
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "esphome-web-libretiny-install-dialog": LibreTinyInstallDialog;
+  }
 }

@@ -23,7 +23,8 @@ vi.mock("../../../../src/platforms/bk72xx/index.js", () => ({
 
 import { pickerText, pickFile } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
-import { ESPHomeWebInstallBkDialog } from "../../../../src/web/platforms/bk72xx/esphome-web-install-bk-dialog.js";
+import { LibreTinyInstallDialog } from "../../../../src/web/install/esphome-web-libretiny-install-dialog.js";
+import { BK_INSTALL } from "../../../../src/web/platforms/bk72xx/install.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -32,10 +33,11 @@ const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
 const uf2 = () => new File([new Uint8Array(8)], "firmware.uf2");
 
 async function mountBare(): Promise<any> {
-  return (await mount(new ESPHomeWebInstallBkDialog(), {
+  return (await mount(new LibreTinyInstallDialog(), {
     _localize: identityLocalize,
     open: true,
-  } as Partial<ESPHomeWebInstallBkDialog>)) as any;
+    install: BK_INSTALL,
+  } as Partial<LibreTinyInstallDialog>)) as any;
 }
 
 async function mountDialog(): Promise<any> {
@@ -57,7 +59,7 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-describe("esphome-web-install-bk-dialog", () => {
+describe("esphome-web-libretiny-install-dialog for the BK72xx", () => {
   it("is titled and worded for the BK72xx", async () => {
     const el = await mountDialog();
 

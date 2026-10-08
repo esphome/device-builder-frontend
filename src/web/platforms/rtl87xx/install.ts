@@ -5,7 +5,7 @@ import {
   runAmbz,
   runAmbz2,
 } from "../../../platforms/rtl87xx/index.js";
-import type { LibreTinyInstall } from "../../install/libretiny-install-dialog.js";
+import type { LibreTinyInstall } from "../../install/esphome-web-libretiny-install-dialog.js";
 import { RTL_AMBZ_INSTALL } from "./ambz-install.js";
 import { RTL_AMBZ2_INSTALL } from "./ambz2-install.js";
 

@@ -6,9 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../src/web/platforms/esp/esphome-web-esp-connect-card.js", () => ({}));
 vi.mock("../../src/web/platforms/rp2/esphome-web-pico-connect-card.js", () => ({}));
 vi.mock("../../src/web/platforms/nrf52/esphome-web-nrf-card.js", () => ({}));
-vi.mock("../../src/web/platforms/rtl87xx/esphome-web-rtl-card.js", () => ({}));
-vi.mock("../../src/web/platforms/bk72xx/esphome-web-bk-card.js", () => ({}));
-vi.mock("../../src/web/platforms/ln882x/esphome-web-ln-card.js", () => ({}));
+vi.mock("../../src/web/dashboard/esphome-web-libretiny-card.js", () => ({}));
 vi.mock("../../src/web/dashboard/esphome-web-unsupported-card.js", () => ({}));
 vi.mock("../../src/util/web-serial.js", () => ({ isWebSerialSupported: () => true }));
 
@@ -67,26 +65,16 @@ describe("esphome-web-dashboard deep-link hint", () => {
   });
 });
 
-describe("esphome-web-dashboard BK72xx mode", () => {
-  it("renders the BK72xx card and its intro", async () => {
-    const el = await mount("bk");
-    expect(el.shadowRoot!.querySelector("esphome-web-bk-card")).not.toBeNull();
-    expect(el.shadowRoot!.textContent).toContain("web.intro.body_bk");
-  });
-});
-
-describe("esphome-web-dashboard LN882H mode", () => {
-  it("renders the LN882H card and its intro", async () => {
-    const el = await mount("ln");
-    expect(el.shadowRoot!.querySelector("esphome-web-ln-card")).not.toBeNull();
-    expect(el.shadowRoot!.textContent).toContain("web.intro.body_ln");
-  });
-});
-
-describe("esphome-web-dashboard RTL mode", () => {
-  it("renders the RTL card and its intro", async () => {
-    const el = await mount("rtl");
-    expect(el.shadowRoot!.querySelector("esphome-web-rtl-card")).not.toBeNull();
-    expect(el.shadowRoot!.textContent).toContain("web.intro.body_rtl");
+// The LibreTiny families share one card, told its family.
+describe.each([
+  ["BK72xx", "bk"],
+  ["LN882H", "ln"],
+  ["RTL", "rtl"],
+] as const)("esphome-web-dashboard %s mode", (_name, mode) => {
+  it("renders the family's card and its intro", async () => {
+    const el = await mount(mode);
+    const card = el.shadowRoot!.querySelector("esphome-web-libretiny-card")!;
+    expect(card.card.copy.title).toBe(`web.${mode}.title`);
+    expect(el.shadowRoot!.textContent).toContain(`web.intro.body_${mode}`);
   });
 });

@@ -5,7 +5,7 @@ import {
   loadAmbz2Image,
   runAmbz2,
 } from "../../../platforms/rtl87xx/index.js";
-import type { LibreTinyInstall } from "../../install/libretiny-install-dialog.js";
+import type { LibreTinyInstall } from "../../install/esphome-web-libretiny-install-dialog.js";
 import { RTL_COPY } from "./copy.js";
 
 export const RTL_AMBZ2_INSTALL: LibreTinyInstall = {
