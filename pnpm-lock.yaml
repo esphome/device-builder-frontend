@@ -32,8 +32,8 @@ importers:
         specifier: ^6.7.6
         version: 6.7.6
       '@codemirror/view':
-        specifier: ^6.43.12
-        version: 6.43.12
+        specifier: ^6.43.13
+        version: 6.43.13
       '@home-assistant/webawesome':
         specifier: 3.7.0
         version: 3.7.0(@floating-ui/utils@0.2.11)(@types/react@19.2.14)
@@ -60,7 +60,7 @@ importers:
         version: 7.4.47
       '@replit/codemirror-indentation-markers':
         specifier: ^6.5.3
-        version: 6.5.3(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.12)
+        version: 6.5.3(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)
       '@tanstack/lit-table':
         specifier: ^9.2.4
         version: 9.2.4(@lit/context@1.1.6)(lit@3.3.3)
@@ -173,8 +173,8 @@ packages:
   '@codemirror/state@6.7.6':
     resolution: {integrity: sha512-kAz+AncRtKuIknedxT1bq4XwXv4UowhbkHU1myPrtVb/jZtImWuV5BXzv5vK6i3kYACsdiZiQKFQQ5Mq7elW8w==}
 
-  '@codemirror/view@6.43.12':
-    resolution: {integrity: sha512-Nv0vxQ19NAqvB/c2pFzjIzFlzzJl7jmdtNkwOwGbn0Ks9mFAzibvumz7cQem5cRsFA2cEw2fg+uHZGbcHupLQQ==}
+  '@codemirror/view@6.43.13':
+    resolution: {integrity: sha512-sihaFrUzAsYBQsL9J2t69y8nfMQGwcYmggAZsk+kjPbjYZMyuf2hU8tUNTZ+P+isb6XRr8JE22TZlJxBoVdH1A==}
 
   '@ctrl/tinycolor@4.1.0':
     resolution: {integrity: sha512-WyOx8cJQ+FQus4Mm4uPIZA64gbk3Wxh0so5Lcii0aJifqwoVOlfFtorjLE0Hen4OYyHZMXDWqMmaQemBhgxFRQ==}
@@ -1500,14 +1500,14 @@ snapshots:
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/state': 6.7.6
-      '@codemirror/view': 6.43.12
+      '@codemirror/view': 6.43.13
       '@lezer/common': 1.5.3
 
   '@codemirror/commands@6.11.1':
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/state': 6.7.6
-      '@codemirror/view': 6.43.12
+      '@codemirror/view': 6.43.13
       '@lezer/common': 1.5.3
 
   '@codemirror/lang-cpp@6.0.3':
@@ -1528,7 +1528,7 @@ snapshots:
   '@codemirror/language@6.12.4':
     dependencies:
       '@codemirror/state': 6.7.6
-      '@codemirror/view': 6.43.12
+      '@codemirror/view': 6.43.13
       '@lezer/common': 1.5.3
       '@lezer/highlight': 1.2.5
       '@lezer/lr': 1.4.8
@@ -1537,20 +1537,20 @@ snapshots:
   '@codemirror/lint@6.9.7':
     dependencies:
       '@codemirror/state': 6.7.6
-      '@codemirror/view': 6.43.12
+      '@codemirror/view': 6.43.13
       crelt: 1.0.6
 
   '@codemirror/search@6.6.0':
     dependencies:
       '@codemirror/state': 6.7.6
-      '@codemirror/view': 6.43.12
+      '@codemirror/view': 6.43.13
       crelt: 1.0.7
 
   '@codemirror/state@6.7.6':
     dependencies:
       '@marijn/find-cluster-break': 1.0.4
 
-  '@codemirror/view@6.43.12':
+  '@codemirror/view@6.43.13':
     dependencies:
       '@codemirror/state': 6.7.6
       crelt: 1.0.7
@@ -1755,11 +1755,11 @@ snapshots:
 
   '@oxc-project/types@0.139.0': {}
 
-  '@replit/codemirror-indentation-markers@6.5.3(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.12)':
+  '@replit/codemirror-indentation-markers@6.5.3(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)':
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/state': 6.7.6
-      '@codemirror/view': 6.43.12
+      '@codemirror/view': 6.43.13
 
   '@rolldown/binding-android-arm64@1.1.5':
     optional: true
@@ -2222,7 +2222,7 @@ snapshots:
       '@codemirror/lint': 6.9.7
       '@codemirror/search': 6.6.0
       '@codemirror/state': 6.7.6
-      '@codemirror/view': 6.43.12
+      '@codemirror/view': 6.43.13
 
   composed-offset-position@0.0.6(@floating-ui/utils@0.2.11):
     dependencies:
