@@ -54,8 +54,9 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  @state() private _downloads?: { chip: PicoChip; url: string }[];
-  @state() private _downloadFailed = false;
+  // The download links, "failed" when the manifest could not be read or offers
+  // nothing, unset while it loads.
+  @state() private _downloads?: { chip: PicoChip; url: string }[] | "failed";
   @state() private _state: InstallState = "idle";
   @state() private _progress = 0;
   @state() private _errorTitle = "";
@@ -118,7 +119,8 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   private async _loadManifest(): Promise<void> {
-    this._downloadFailed = false;
+    // A reload starts from nothing, so the last links never outlive it.
+    this._downloads = undefined;
     try {
       const manifest = await fetchEsphomeWebManifest();
       const chips = picoImageChips(manifest);
@@ -136,7 +138,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     }
     // Nothing to offer reads as a failed load too, so reopening tries again; the
     // inline download error already says so.
-    this._downloadFailed = true;
+    this._downloads = "failed";
   }
 
   // A Pico already running ESPHome: the 1200 baud touch reboots it into
@@ -325,26 +327,26 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
         <li>${this._localize("web.pico.setup_step_2")}</li>
         <li>
           ${
-            this._downloads
-              ? html`${this._downloads.map(
-                  ({ chip, url }) =>
-                    html`<a href=${url} download
-                      >${this._localize(`web.pico.setup_download_${chip}`)}</a
-                    >`
-                )}${
-                  // The copy names the Pico 2 W, whose drive ignores the other chip's image
-                  this._downloads.some(({ chip }) => chip === "rp2350")
-                    ? nothing
-                    : html`<p class="download-note">
-                        ${this._localize("web.pico.install_no_image", {
-                          chip: PICO_CHIP_NAME.rp2350,
-                        })}
-                      </p>`
-                }`
-              : this._downloadFailed
-                ? html`<span class="download-error"
-                    >${this._localize("web.pico.setup_download_failed")}</span
-                  >`
+            this._downloads === "failed"
+              ? html`<span class="download-error"
+                  >${this._localize("web.pico.setup_download_failed")}</span
+                >`
+              : this._downloads
+                ? html`${this._downloads.map(
+                    ({ chip, url }) =>
+                      html`<a href=${url} download
+                        >${this._localize(`web.pico.setup_download_${chip}`)}</a
+                      >`
+                  )}${
+                    // The copy names the Pico 2 W, whose drive ignores the other chip's image
+                    this._downloads.some(({ chip }) => chip === "rp2350")
+                      ? nothing
+                      : html`<p class="download-note">
+                          ${this._localize("web.pico.install_no_image", {
+                            chip: PICO_CHIP_NAME.rp2350,
+                          })}
+                        </p>`
+                  }`
                 : this._localize("web.pico.setup_download_loading")
           }
         </li>

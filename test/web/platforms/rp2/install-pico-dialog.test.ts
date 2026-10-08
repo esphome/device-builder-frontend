@@ -61,6 +61,13 @@ async function settle(el: ESPHomeWebInstallPicoDialog): Promise<void> {
   }
 }
 
+async function reopen(el: ESPHomeWebInstallPicoDialog): Promise<void> {
+  el.open = false;
+  await settle(el);
+  el.open = true;
+  await settle(el);
+}
+
 async function mount(): Promise<ESPHomeWebInstallPicoDialog> {
   const el = new ESPHomeWebInstallPicoDialog();
   (el as any)._localize = (k: string) => k;
@@ -137,16 +144,13 @@ describe("esphome-web-install-pico-dialog", () => {
 
     const el = await mount();
 
-    expect((el as any)._downloadFailed).toBe(true);
+    expect((el as any)._downloads).toBe("failed");
     expect(el.shadowRoot!.querySelector(".download-error")).not.toBeNull();
     expect(el.shadowRoot!.querySelector("a[download]")).toBeNull();
     expect(toast.error).not.toHaveBeenCalled();
 
-    el.open = false;
-    await settle(el);
-    el.open = true;
-    await settle(el);
-    expect((el as any)._downloadFailed).toBe(false);
+    await reopen(el);
+    expect((el as any)._downloads).not.toBe("failed");
     expect(el.shadowRoot!.querySelector("a[download]")).not.toBeNull();
   });
 
@@ -165,13 +169,24 @@ describe("esphome-web-install-pico-dialog", () => {
     expect(hrefs()).toEqual(["https://example/rp2040.uf2"]);
 
     mocks.picoImageChips.mockReturnValueOnce(["rp2040", "rp2350"]);
-    el.open = false;
-    await settle(el);
-    el.open = true;
-    await settle(el);
+    await reopen(el);
 
     expect(fetchEsphomeWebManifest).toHaveBeenCalledTimes(2);
     expect(hrefs()).toEqual(["https://example/rp2040.uf2", "https://example/rp2350.uf2"]);
+  });
+
+  it("drops the last links when a reopen fails to load the manifest", async () => {
+    fetchEsphomeWebManifest.mockResolvedValue({});
+    mocks.picoUf2Url.mockReturnValue("https://firmware.esphome.io/pico.uf2");
+
+    const el = await mount();
+    expect(el.shadowRoot!.querySelector("a[download]")).not.toBeNull();
+
+    fetchEsphomeWebManifest.mockRejectedValueOnce(new Error("offline"));
+    await reopen(el);
+
+    expect(el.shadowRoot!.querySelector("a[download]")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".download-error")).not.toBeNull();
   });
 
   it("shows the loading placeholder while the manifest is in flight", async () => {
@@ -180,7 +195,7 @@ describe("esphome-web-install-pico-dialog", () => {
 
     const el = await mount();
 
-    expect((el as any)._downloadFailed).toBe(false);
+    expect((el as any)._downloads).not.toBe("failed");
     expect(el.shadowRoot!.querySelector("a[download]")).toBeNull();
     expect(el.shadowRoot!.querySelector(".download-error")).toBeNull();
   });
@@ -190,7 +205,7 @@ describe("esphome-web-install-pico-dialog", () => {
 
     const el = await mount();
 
-    expect((el as any)._downloadFailed).toBe(true);
+    expect((el as any)._downloads).toBe("failed");
     expect(el.shadowRoot!.querySelector(".download-error")).not.toBeNull();
     expect(el.shadowRoot!.querySelector("a[download]")).toBeNull();
     expect(toast.error).toHaveBeenCalledTimes(1);
@@ -200,17 +215,14 @@ describe("esphome-web-install-pico-dialog", () => {
     fetchEsphomeWebManifest.mockRejectedValueOnce(new Error("offline"));
 
     const el = await mount();
-    expect((el as any)._downloadFailed).toBe(true);
+    expect((el as any)._downloads).toBe("failed");
 
     // Reopen with a now-working fetch: the prior failure clears and the link renders.
     fetchEsphomeWebManifest.mockResolvedValue({});
     mocks.picoUf2Url.mockReturnValue("https://firmware.esphome.io/pico.uf2");
-    el.open = false;
-    await settle(el);
-    el.open = true;
-    await settle(el);
+    await reopen(el);
 
-    expect((el as any)._downloadFailed).toBe(false);
+    expect((el as any)._downloads).not.toBe("failed");
     expect(el.shadowRoot!.querySelector("a[download]")).not.toBeNull();
     expect(el.shadowRoot!.querySelector(".download-error")).toBeNull();
   });
