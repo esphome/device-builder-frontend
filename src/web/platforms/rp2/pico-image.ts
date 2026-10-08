@@ -3,7 +3,7 @@ import {
   PICO_CHIPS,
   PICO_UF2_FAMILY,
   type PicoChip,
-} from "../../../platforms/rp2/pico-uf2.js";
+} from "../../../platforms/rp2/index.js";
 import { parseUf2Image } from "../../../util/uf2.js";
 import type { Uf2Image } from "../../../util/uf2.js";
 import {

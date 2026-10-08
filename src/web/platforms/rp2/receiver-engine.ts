@@ -14,11 +14,11 @@ import {
   flashPico,
   isWebUsbSupported,
   loadPicoboot,
+  parsePicoUf2,
   picoFlashFailureCopy,
   RP2_SERIAL_LOGS,
   RP2_SERIAL_PICK,
 } from "../../../platforms/rp2/index.js";
-import { parsePicoUf2 } from "../../../platforms/rp2/pico-uf2.js";
 import { downloadBlob } from "../../../util/download-text.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { touchIntoBootloader } from "../../../util/serial-bootloader-touch.js";

@@ -11,11 +11,12 @@ import {
   isWebUsbSupported,
   loadPicoboot,
   pickRp2CdcPort,
+  PICO_CHIP_NAME,
+  type PicoChip,
   PicoFlashError,
   picoFlashFailureCopy,
   RP2_SERIAL_PICK,
 } from "../../../platforms/rp2/index.js";
-import { PICO_CHIP_NAME, type PicoChip } from "../../../platforms/rp2/pico-uf2.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { KeyedPromiseCache } from "../../../util/keyed-promise-cache.js";
@@ -119,10 +120,10 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._downloadFailed = false;
     try {
       const manifest = await fetchEsphomeWebManifest();
-      this._downloads = picoImageChips(manifest).map((chip) => ({
-        chip,
-        url: picoUf2Url(manifest, chip),
-      }));
+      const chips = picoImageChips(manifest);
+      // Nothing to offer reads as a failed load, so reopening tries again.
+      if (!chips.length) throw new Error("The manifest lists no Pico firmware");
+      this._downloads = chips.map((chip) => ({ chip, url: picoUf2Url(manifest, chip) }));
     } catch (err) {
       this._downloadFailed = true;
       toast.error(

@@ -118,6 +118,25 @@ describe("esphome-web-install-pico-dialog", () => {
     ]);
   });
 
+  it("treats a manifest with no Pico build as a failed load, and retries on reopen", async () => {
+    fetchEsphomeWebManifest.mockResolvedValue({});
+    mocks.picoImageChips.mockReturnValueOnce([]);
+
+    const el = await mount();
+
+    expect((el as any)._downloadFailed).toBe(true);
+    expect(el.shadowRoot!.querySelector(".download-error")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector("a[download]")).toBeNull();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+
+    el.open = false;
+    await settle(el);
+    el.open = true;
+    await settle(el);
+    expect((el as any)._downloadFailed).toBe(false);
+    expect(el.shadowRoot!.querySelector("a[download]")).not.toBeNull();
+  });
+
   it("shows the loading placeholder while the manifest is in flight", async () => {
     // A fetch that never settles keeps the step in its loading state.
     fetchEsphomeWebManifest.mockReturnValue(new Promise(() => {}));
