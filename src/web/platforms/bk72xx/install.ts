@@ -6,8 +6,10 @@
  */
 import { LIBRETINY_BEKEN_GUIDE_URL } from "../../../common/docs.js";
 import {
+  BEKEN_FAMILIES,
   loadBekenEngine,
   loadBekenImage,
+  loadBekenParser,
   runBeken,
 } from "../../../platforms/bk72xx/index.js";
 import type { LibreTinyInstall } from "../../install/esphome-web-libretiny-install-dialog.js";
@@ -28,7 +30,13 @@ export const BK_INSTALL: LibreTinyInstall = {
     badFile: "firmware.bk_bad_uf2",
   },
   guideUrl: LIBRETINY_BEKEN_GUIDE_URL,
-  loadEngine: loadBekenEngine,
+  // The parser too: a published image is parsed once the chip is linked.
+  loadEngine: () => Promise.all([loadBekenEngine(), loadBekenParser()]),
   load: loadBekenImage,
   run: runBeken,
+  // Told apart by the chip that answers, so the image is fetched once linked.
+  prebuilt: {
+    families: BEKEN_FAMILIES.map((family) => family.name),
+    runLinked: runBeken,
+  },
 };

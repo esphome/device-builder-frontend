@@ -1,13 +1,15 @@
 /**
  * Fetch the prebuilt "esphome-web" adoption firmware published at
- * firmware.esphome.io: the manifest and single files under its prefix. The
- * ESP parts download lives in ``platforms/esp/firmware-build.ts`` and the
- * Pico UF2 in ``platforms/rp2/pico-image.ts``.
+ * firmware.esphome.io: the manifest, single files under its prefix, and the
+ * UF2 published per chip or family (the Pico's and the LibreTiny families').
+ * The ESP parts download lives in ``platforms/esp/firmware-build.ts``.
  *
  * The manifest is the ESP Web Tools shape: ``builds[]`` keyed by ``chipFamily``
  * (matching esptool-js ``chip.CHIP_NAME``: ``ESP32``, ``ESP32-C3``, ...), each
  * with ``parts[]`` of ``{ path, offset }`` relative to the manifest.
  */
+import { KeyedPromiseCache } from "../../util/keyed-promise-cache.js";
+
 export const ESPHOME_WEB_FIRMWARE_PREFIX = "https://firmware.esphome.io/esphome-web";
 
 const MANIFEST_URL = `${ESPHOME_WEB_FIRMWARE_PREFIX}/manifest.json`;
@@ -64,9 +66,10 @@ export function fetchEsphomeWebManifest(): Promise<FirmwareManifest> {
   return manifest.promise;
 }
 
-/** Forget the cached manifest (tests). */
+/** Forget the cached manifest and UF2 images (tests). */
 export function resetEsphomeWebManifest(): void {
   manifest = undefined;
+  uf2Cache.clear();
 }
 
 async function downloadManifest(): Promise<FirmwareManifest> {
@@ -79,9 +82,78 @@ async function downloadManifest(): Promise<FirmwareManifest> {
   return (await resp.json()) as FirmwareManifest;
 }
 
-/** One file under the firmware prefix, as bytes; throws with the status on failure. */
-export async function fetchFirmwareFile(path: string): Promise<Uint8Array> {
-  const resp = await fetch(`${ESPHOME_WEB_FIRMWARE_PREFIX}/${path}`);
+/**
+ * One file under the firmware prefix, as bytes; throws with the status on
+ * failure, or with ``signal``'s reason once it aborts the request or the body.
+ */
+export async function fetchFirmwareFile(
+  path: string,
+  signal?: AbortSignal
+): Promise<Uint8Array> {
+  const url = `${ESPHOME_WEB_FIRMWARE_PREFIX}/${path}`;
+  const resp = await (signal ? fetch(url, { signal }) : fetch(url));
   if (!resp.ok) throw new Error(`Downloading ${path} failed (${resp.status})`);
   return new Uint8Array(await resp.arrayBuffer());
+}
+
+/**
+ * The manifest publishes no image for ``key``, or the chip could not be
+ * told, so there is no key. ``label`` names the chip for the user, absent
+ * when it is not known.
+ */
+export class PublishedImageUnavailableError extends Error {
+  constructor(
+    readonly key: string | undefined,
+    readonly label: string | undefined = key
+  ) {
+    super(`No ESPHome Web image for the ${label ?? "unknown chip"}`);
+    this.name = "PublishedImageUnavailableError";
+  }
+}
+
+/** Those of ``keys`` the manifest lists a build for, in their order. */
+export function publishedKeys<K extends string>(
+  manifest: FirmwareManifest,
+  keys: readonly K[]
+): K[] {
+  return keys.filter((key) => selectBuild(manifest, key));
+}
+
+/** A published UF2's path under the prefix for the manifest's version. */
+const publishedUf2Path = (manifest: FirmwareManifest, key: string): string =>
+  `${manifest.version}/esphome-web-${key.toLowerCase()}.uf2`;
+
+/** A published UF2's download URL for the manifest's version. */
+export const publishedUf2Url = (manifest: FirmwareManifest, key: string): string =>
+  `${ESPHOME_WEB_FIRMWARE_PREFIX}/${publishedUf2Path(manifest, key)}`;
+
+/**
+ * How long a published UF2 (1-2 MB) gets, the body included. A stalled
+ * download would stay cached and hold every later install of the image.
+ */
+export const UF2_DOWNLOAD_TIMEOUT_MS = 60 * 1000;
+
+// A reopen, or a switch back to an image already fetched, downloads nothing;
+// a failed or timed-out download is dropped, so the next one starts anew.
+const uf2Cache = new KeyedPromiseCache<Uint8Array>();
+
+/**
+ * The bytes of the UF2 ``manifest`` publishes for ``key``. Throws
+ * ``PublishedImageUnavailableError`` without downloading when it lists
+ * none, otherwise with the reason.
+ */
+export function fetchPublishedUf2(
+  manifest: FirmwareManifest,
+  key: string,
+  label = key
+): Promise<Uint8Array> {
+  if (!selectBuild(manifest, key)) {
+    return Promise.reject(new PublishedImageUnavailableError(key, label));
+  }
+  return uf2Cache.fetch(`${manifest.version}/${key.toLowerCase()}`, () =>
+    fetchFirmwareFile(
+      publishedUf2Path(manifest, key),
+      AbortSignal.timeout(UF2_DOWNLOAD_TIMEOUT_MS)
+    )
+  );
 }

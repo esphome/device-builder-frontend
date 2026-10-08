@@ -11,6 +11,12 @@ const mocks = vi.hoisted(() => ({
   parseRtl87xxImage: vi.fn(),
   flashAmbz2: vi.fn(),
   flashAmbz: vi.fn(),
+  fetchEsphomeWebManifest: vi.fn(),
+}));
+// No ESPHome Web firmware is published here; the prebuilt flow has its own tests.
+vi.mock("../../../../src/web/util/esphome-web-firmware.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  fetchEsphomeWebManifest: mocks.fetchEsphomeWebManifest,
 }));
 vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -38,12 +44,11 @@ vi.mock("../../../../src/platforms/rtl87xx/index.js", async (importOriginal) => 
   return { ...real, loadRtl87xxImage: seams.loadRtl87xxImage };
 });
 
-import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
-import { identityLocalize, mount } from "../../../_dom.js";
+import { card, manifest, mountInstall, pickUf2, uf2 } from "../_libretiny-dialog.js";
+import { pickerText, slowFile, watchFileInput } from "../../_pick-file.js";
 import { lapsedPick } from "../../../_web-serial.js";
 import type { LibreTinyImage } from "../../../../src/platforms/libretiny-uf2.js";
 import { RtlImageError } from "../../../../src/platforms/rtl87xx/ambz2-image.js";
-import { LibreTinyInstallDialog } from "../../../../src/web/install/esphome-web-libretiny-install-dialog.js";
 import { RTL_AMBZ2_INSTALL } from "../../../../src/web/platforms/rtl87xx/ambz2-install.js";
 import { RTL87XX_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.js";
 
@@ -57,27 +62,18 @@ const wrongFamily = (family: string) => () => {
 };
 const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
 
-const uf2 = (name = "firmware.uf2") => new File([new Uint8Array(8)], name);
-
-async function mountBare(): Promise<any> {
-  return (await mount(new LibreTinyInstallDialog(), {
-    _localize: identityLocalize,
-    open: true,
-    install: RTL87XX_INSTALL,
-  } as Partial<LibreTinyInstallDialog>)) as any;
-}
+const mountBare = () => mountInstall(RTL87XX_INSTALL);
 
 // A dialog with a UF2 picked, read and checked.
 async function mountDialog(): Promise<any> {
   const el = await mountBare();
-  await pickFile(el, "_image", uf2());
+  await pickUf2(el, uf2());
   return el;
 }
 
 const INSTALL = "firmware.browser_flash_action";
 const installDisabled = (el: any) => button(el, INSTALL).hasAttribute("disabled");
 
-const card = (el: any) => el.shadowRoot!.querySelector("esphome-process-terminal") as any;
 const log = (el: any) =>
   el.shadowRoot!.querySelector("esphome-install-details-log") as any;
 const text = (el: any) => el.shadowRoot!.textContent ?? "";
@@ -91,6 +87,7 @@ beforeEach(() => {
   mocks.parseRtl87xxImage.mockReturnValue({ chip: "ambz2", image: IMAGE });
   mocks.requestSerialPort.mockResolvedValue(PORT);
   mocks.flashAmbz2.mockResolvedValue(true);
+  mocks.fetchEsphomeWebManifest.mockResolvedValue(manifest());
 });
 
 afterEach(() => {
@@ -127,16 +124,12 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx", () => {
 
   it("has a line of its own for a family that has none for a reset by hand", async () => {
     mocks.flashAmbz2.mockResolvedValue(false);
-    const el = (await mount(new LibreTinyInstallDialog(), {
-      _localize: identityLocalize,
-      open: true,
-      install: {
-        ...RTL_AMBZ2_INSTALL,
-        copy: { ...RTL_AMBZ2_INSTALL.copy, doneByHand: undefined },
-        load: async () => ({ image: IMAGE as unknown as LibreTinyImage }),
-      },
-    } as Partial<LibreTinyInstallDialog>)) as any;
-    await pickFile(el, "_image", uf2());
+    const el = await mountInstall({
+      ...RTL_AMBZ2_INSTALL,
+      copy: { ...RTL_AMBZ2_INSTALL.copy, doneByHand: undefined },
+      load: async () => ({ image: IMAGE as unknown as LibreTinyImage }),
+    });
+    await pickUf2(el, uf2());
 
     await el._flash();
     await el.updateComplete;
@@ -206,12 +199,12 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx", () => {
     mocks.parseRtl87xxImage.mockImplementation(() => {
       throw new RtlImageError("firmware.rtl_bad_uf2", new Error("not a UF2"));
     });
-    await pickFile(el, "_image", uf2());
+    await pickUf2(el, uf2());
     expect(pickerText(el).error).toBe("firmware.rtl_bad_uf2: not a UF2");
 
     // A good file clears the line and offers the install.
     mocks.parseRtl87xxImage.mockReturnValue({ chip: "ambz2", image: IMAGE });
-    await pickFile(el, "_image", uf2("good.uf2"));
+    await pickUf2(el, uf2("good.uf2"));
     expect(pickerText(el)).toEqual({ name: "good.uf2", status: "", error: "" });
     expect(installDisabled(el)).toBe(false);
   });
@@ -222,7 +215,7 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx", () => {
     });
     const el = await mountBare();
     const cleared = watchFileInput(el);
-    await pickFile(el, "_image", uf2());
+    await pickUf2(el, uf2());
     expect(cleared).toHaveBeenCalledWith("");
   });
 
@@ -230,11 +223,11 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx", () => {
     const slow = slowFile("firmware.uf2");
     const el = await mountBare();
     const cleared = watchFileInput(el);
-    el._onFileChange({ target: { files: [slow.file] } });
+    el._setup.onFileChange({ target: { files: [slow.file] } });
     el.open = false;
     await el.updateComplete;
     expect(cleared).toHaveBeenCalledWith("");
-    expect(el._file).toBeNull();
+    expect(el._setup.file).toBeNull();
   });
 
   it("offers the install only once the picked file is read and checked", async () => {
@@ -242,7 +235,7 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx", () => {
     const el = await mountBare();
     expect(installDisabled(el)).toBe(true);
 
-    el._onFileChange({ target: { files: [slow.file] } });
+    el._setup.onFileChange({ target: { files: [slow.file] } });
     await el.updateComplete;
     expect(pickerText(el).status).toBe("web.install.preparing");
     expect(installDisabled(el)).toBe(true);

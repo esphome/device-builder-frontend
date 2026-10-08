@@ -9,54 +9,76 @@ vi.mock("../../../../src/components/install-details-log.js", () => ({}));
 const mocks = vi.hoisted(() => ({
   requestSerialPort: vi.fn(),
   loadBekenImage: vi.fn(),
+  loadBekenEngine: vi.fn(),
+  loadBekenParser: vi.fn(),
   runBeken: vi.fn(),
+  fetchEsphomeWebManifest: vi.fn(),
 }));
 vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
 }));
-vi.mock("../../../../src/platforms/bk72xx/index.js", () => ({
+vi.mock("../../../../src/web/util/esphome-web-firmware.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  fetchEsphomeWebManifest: mocks.fetchEsphomeWebManifest,
+}));
+vi.mock("../../../../src/platforms/bk72xx/index.js", async (importOriginal) => ({
+  BEKEN_FAMILIES: (
+    await importOriginal<typeof import("../../../../src/platforms/bk72xx/index.js")>()
+  ).BEKEN_FAMILIES,
   loadBekenImage: mocks.loadBekenImage,
-  loadBekenEngine: async () => ({}),
+  loadBekenEngine: mocks.loadBekenEngine,
+  loadBekenParser: mocks.loadBekenParser,
   runBeken: mocks.runBeken,
 }));
 
-import { pickerText, pickFile } from "../../_pick-file.js";
-import { identityLocalize, mount } from "../../../_dom.js";
-import { LibreTinyInstallDialog } from "../../../../src/web/install/esphome-web-libretiny-install-dialog.js";
+import {
+  card,
+  guide,
+  installButton,
+  manifest,
+  mountInstall,
+  mountPrebuilt,
+  pickUf2,
+  radios,
+  stubUf2Download,
+  uf2,
+} from "../_libretiny-dialog.js";
+import { pickerText } from "../../_pick-file.js";
+import { argsLocalize } from "../../../_dom.js";
 import { BK_INSTALL } from "../../../../src/web/platforms/bk72xx/install.js";
+import { resetEsphomeWebManifest } from "../../../../src/web/util/esphome-web-firmware.js";
+
+// The deadline every UF2 download is given.
+const SIGNAL = { signal: expect.any(AbortSignal) };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const IMAGE = { familyId: 0x159ac324, board: "b", runs: [], totalBytes: 0 };
 const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
-const uf2 = () => new File([new Uint8Array(8)], "firmware.uf2");
-
-async function mountBare(): Promise<any> {
-  return (await mount(new LibreTinyInstallDialog(), {
-    _localize: identityLocalize,
-    open: true,
-    install: BK_INSTALL,
-  } as Partial<LibreTinyInstallDialog>)) as any;
-}
 
 async function mountDialog(): Promise<any> {
-  const el = await mountBare();
-  await pickFile(el, "_image", uf2());
+  const el = await mountInstall(BK_INSTALL);
+  await pickUf2(el, uf2());
   return el;
 }
 
-const card = (el: any) => el.shadowRoot!.querySelector("esphome-process-terminal") as any;
-const guide = (el: any) => el.shadowRoot!.querySelector(".guide a") as HTMLAnchorElement;
+const mountBkPrebuilt = (...families: string[]) =>
+  mountPrebuilt(BK_INSTALL, mocks.fetchEsphomeWebManifest, ...families);
 
 beforeEach(() => {
   mocks.loadBekenImage.mockResolvedValue({ image: IMAGE });
+  mocks.loadBekenEngine.mockResolvedValue({});
+  mocks.loadBekenParser.mockResolvedValue({});
   mocks.requestSerialPort.mockResolvedValue(PORT);
   mocks.runBeken.mockResolvedValue({ rebooted: true });
+  mocks.fetchEsphomeWebManifest.mockResolvedValue(manifest());
 });
 
 afterEach(() => {
+  resetEsphomeWebManifest();
   vi.resetAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("esphome-web-libretiny-install-dialog for the BK72xx", () => {
@@ -120,11 +142,127 @@ describe("esphome-web-libretiny-install-dialog for the BK72xx", () => {
       key: "firmware.bk_wrong_family",
       detail: "family 0xe08f7564",
     });
-    const el = await mountBare();
+    const el = await mountInstall(BK_INSTALL);
 
-    await pickFile(el, "_image", uf2());
+    await pickUf2(el, uf2());
 
     expect(pickerText(el).error).toBe("firmware.bk_wrong_family: family 0xe08f7564");
     expect(mocks.runBeken).not.toHaveBeenCalled();
   });
+});
+
+describe("esphome-web-libretiny-install-dialog for the BK72xx's ESPHome Web firmware", () => {
+  it("offers it with no chip to pick and nothing fetched, warming the engine and parser", async () => {
+    const fetch = stubUf2Download();
+    const el = await mountBkPrebuilt("BK7231N", "BK7238");
+
+    expect(radios(el, "mode")[0].checked).toBe(true);
+    expect(radios(el, "family")).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.loadBekenEngine).toHaveBeenCalled();
+    expect(mocks.loadBekenParser).toHaveBeenCalled();
+    expect(installButton(el).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("flashes the image of the linked chip's family, fetched and parsed once linked", async () => {
+    const fetch = stubUf2Download(new Uint8Array([7]));
+    let image: unknown;
+    mocks.runBeken.mockImplementation(async (_port, source) => {
+      image = await source({ chip: "BK7252", family: "BK7251" });
+      return { rebooted: true };
+    });
+    const el = await mountBkPrebuilt("BK7231N", "BK7251");
+    const manifestReads = mocks.fetchEsphomeWebManifest.mock.calls.length;
+
+    await el._flash();
+    await el.updateComplete;
+
+    expect(mocks.runBeken).toHaveBeenCalledWith(
+      PORT,
+      expect.any(Function),
+      expect.any(Object)
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-bk7251.uf2",
+      SIGNAL
+    );
+    // The manifest read on open is the one used.
+    expect(mocks.fetchEsphomeWebManifest).toHaveBeenCalledTimes(manifestReads);
+    expect(mocks.loadBekenImage).toHaveBeenCalledWith(new Uint8Array([7]));
+    expect(image).toBe(IMAGE);
+    expect(card(el).statusMessage).toBe("firmware.status_done web.bk.logs_elsewhere");
+  });
+
+  it.each([
+    [{ chip: "BK7231Q", family: "BK7231Q" }, "web.install.prebuilt_no_image | BK7231Q"],
+    // Published, but not listed in this manifest.
+    [{ chip: "BK7238", family: "BK7238" }, "web.install.prebuilt_no_image | BK7238"],
+    [{ chip: undefined, family: undefined }, "web.install.prebuilt_unknown_chip"],
+  ])("names a linked chip without a published image (%o)", async (linked, line) => {
+    const fetch = stubUf2Download();
+    mocks.runBeken.mockImplementation(async (_port, source) => {
+      try {
+        await source(linked);
+        return { rebooted: true };
+      } catch (error) {
+        return { detail: String(error), error };
+      }
+    });
+    const el = await mountBkPrebuilt("BK7231N");
+    el._localize = argsLocalize;
+
+    await el._flash();
+    await el.updateComplete;
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(card(el).state).toBe("error");
+    expect(card(el).statusMessage).toBe(line);
+    expect(card(el).statusDetail).toBe("");
+  });
+
+  it.each([
+    [
+      "does not parse",
+      () => {
+        stubUf2Download();
+        mocks.loadBekenImage.mockResolvedValue({
+          key: "firmware.bk_bad_uf2",
+          detail: "no blocks",
+        });
+      },
+      "firmware.bk_bad_uf2",
+      "no blocks",
+    ],
+    [
+      "does not download",
+      () =>
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => ({ ok: false, status: 503 }))
+        ),
+      "web.install.prebuilt_download_failed",
+      expect.stringMatching(/esphome-web-bk7251\.uf2 failed \(503\)/),
+    ],
+  ])(
+    "names a published image that %s once linked as it would before the link",
+    async (_n, given, title, detail) => {
+      given();
+      mocks.runBeken.mockImplementation(async (_port, source) => {
+        try {
+          await source({ chip: "BK7252", family: "BK7251" });
+          return { rebooted: true };
+        } catch (error) {
+          return { detail: (error as Error).message, error };
+        }
+      });
+      const el = await mountBkPrebuilt("BK7251");
+
+      await el._flash();
+      await el.updateComplete;
+
+      expect(card(el).state).toBe("error");
+      expect(card(el).statusMessage).toBe(title);
+      expect(card(el).statusDetail).toEqual(detail);
+    }
+  );
 });

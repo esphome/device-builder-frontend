@@ -11,9 +11,15 @@ import { UF2_FAMILY_RP2040, UF2_FAMILY_RP2350_ARM_S } from "../../../../src/util
 import {
   loadPicoImage,
   picoImageChips,
-  PicoImageUnavailableError,
   picoUf2Url,
 } from "../../../../src/web/platforms/rp2/pico-image.js";
+import {
+  PublishedImageUnavailableError,
+  resetEsphomeWebManifest,
+} from "../../../../src/web/util/esphome-web-firmware.js";
+
+// The deadline every UF2 download is given.
+const SIGNAL = { signal: expect.any(AbortSignal) };
 
 const uf2Response = (family: number) => ({
   ok: true,
@@ -32,6 +38,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetEsphomeWebManifest();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -42,7 +49,8 @@ describe("loadPicoImage", () => {
     vi.stubGlobal("fetch", fetch);
     const loaded = await loadPicoImage("rp2040");
     expect(fetch).toHaveBeenCalledWith(
-      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2040.uf2"
+      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2040.uf2",
+      SIGNAL
     );
     expect(loaded.familyId).toBe(UF2_FAMILY_RP2040);
     expect(loaded.totalBytes).toBe(256);
@@ -54,7 +62,8 @@ describe("loadPicoImage", () => {
     vi.stubGlobal("fetch", fetch);
     const loaded = await loadPicoImage("rp2350");
     expect(fetch).toHaveBeenCalledWith(
-      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2350.uf2"
+      "https://firmware.esphome.io/esphome-web/26.5.1/esphome-web-rp2350.uf2",
+      SIGNAL
     );
     expect(loaded.familyId).toBe(UF2_FAMILY_RP2350_ARM_S);
   });
@@ -63,8 +72,8 @@ describe("loadPicoImage", () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     const err = await loadPicoImage("rp2350").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(PicoImageUnavailableError);
-    expect((err as PicoImageUnavailableError).chip).toBe("rp2350");
+    expect(err).toBeInstanceOf(PublishedImageUnavailableError);
+    expect(err).toMatchObject({ key: "rp2350", label: "RP2350" });
     expect(fetch).not.toHaveBeenCalled();
   });
 

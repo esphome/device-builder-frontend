@@ -8,21 +8,19 @@ import { localizeContext } from "../../context/index.js";
 import type {
   LibreTinyFlashHooks,
   LibreTinyFlashResult,
+  LinkedImageSource,
 } from "../../platforms/libretiny-flash.js";
 import type { LibreTinyImage } from "../../platforms/libretiny-uf2.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { getErrorMessage } from "../../util/error-message.js";
 import {
   connectFailureDetail,
   openFailureMessage,
 } from "../../util/serial-open-error.js";
 import { requestSerialPort } from "../../util/web-serial.js";
+import { LinkedImageError } from "../platforms/libretiny-image.js";
+import { PublishedImageUnavailableError } from "../util/esphome-web-firmware.js";
 
-import {
-  type FilePickerError,
-  filePickerStyles,
-  renderFilePicker,
-} from "./file-picker.js";
+import { filePickerStyles } from "./file-picker.js";
 import {
   installActionsStyles,
   installTerminalState,
@@ -30,8 +28,9 @@ import {
   renderProgressCard,
   renderRetryButton,
 } from "./install-progress.js";
-
-import { parseFailureCopy, Preparation, type Prepared } from "./preparation.js";
+import { renderSetup, setupStyles, unpublishedChipLine } from "./libretiny-setup-view.js";
+import { LibreTinySetup } from "./libretiny-setup.js";
+import { parseFailureCopy } from "./preparation.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -76,6 +75,27 @@ export interface LibreTinyInstall<Image = LibreTinyImage> {
   ): Promise<LibreTinyFlashResult>;
   /** For a family of several chips: the parsed file's chip copy, guide and engine. */
   forImage?(image: Image): LibreTinyChip;
+  /** The ESPHome Web firmware it also installs, where the manifest publishes it. */
+  readonly prebuilt?: LibreTinyPrebuilt<Image>;
+}
+
+/**
+ * The ESPHome Web firmware a family installs besides a UF2 the user picks:
+ * one image per LibreTiny family the manifest publishes.
+ */
+export interface LibreTinyPrebuilt<Image> {
+  /** The families the manifest may list, in the order the chip picker offers them. */
+  readonly families: readonly string[];
+  /**
+   * For chips told apart only once linked: flashes the image ``imageFor``
+   * gives for the chip that answered. Without it the family is known, or
+   * picked, before the install. Never throws.
+   */
+  runLinked?(
+    port: SerialPort,
+    imageFor: LinkedImageSource<Image>,
+    hooks: LibreTinyFlashHooks
+  ): Promise<LibreTinyFlashResult>;
 }
 
 /** What follows a parsed file's chip in a family of several. */
@@ -87,9 +107,9 @@ export type LibreTinyChip = Pick<
 type InstallState = "idle" | "connecting" | "waiting" | "flashing" | "success" | "error";
 
 /**
- * Install over a board's USB serial adapter: a LibreTiny UF2 the user
- * supplies (there is no ready-made ESPHome Web firmware for these chips
- * yet), flashed through the chip's downloader. The engine gets the chip
+ * Install over a board's USB serial adapter: the ESPHome Web firmware where
+ * the manifest publishes one for the family, or a LibreTiny UF2 the user
+ * supplies, flashed through the chip's downloader. The engine gets the chip
  * into it where it can; else the dialog shows the guide while the engine
  * keeps polling. The family is the ``install`` it is given.
  */
@@ -105,7 +125,6 @@ export class LibreTinyInstallDialog extends LitElement {
   private _localize: LocalizeFunc = (key) => key;
 
   @state() private _state: InstallState = "idle";
-  @state() private _file: File | null = null;
   @state() private _progress = 0;
   @state() private _errorTitle = "";
   @state() private _errorMessage = "";
@@ -114,58 +133,20 @@ export class LibreTinyInstallDialog extends LitElement {
   @state() private _manualReset = false;
   // Blocks a second click while the port picker is open.
   @state() private _pending = false;
-  // Why the picked file cannot be installed, shown under the picker.
-  @state() private _fileError: FilePickerError | null = null;
 
   @query("input[type=file]") private _fileInput?: HTMLInputElement;
 
   private _abort: AbortController | null = null;
-  // The picked file's chip, for a family of several; else the family's own.
-  private get _active(): LibreTinyChip {
-    const prepared = this._image.state;
-    return (
-      (prepared.kind === "ready" && this.install.forImage?.(prepared.value)) ||
-      this.install
-    );
-  }
 
-  // The UF2 is read and parsed when it is picked, so the click that installs
-  // it goes straight to the port picker.
-  private _image = new Preparation<File, unknown, FilePickerError>(
+  private _setup = new LibreTinySetup(
     this,
-    (file) => this._parse(file),
-    (failure) => this._onPrepared(failure),
-    // A revoked file handle rejects the read.
-    (err) => ({
-      title: this._localize(this.install.copy.badFile),
-      detail: getErrorMessage(err),
-    })
+    () => this.install,
+    () => this._localize,
+    () => this._fileInput
   );
 
-  private async _parse(file: File): Promise<Prepared<unknown, FilePickerError>> {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const parsed = await this.install.load(bytes);
-    if ("image" in parsed) {
-      // While the user clicks Install and picks the port; the flash names a failure.
-      void (this.install.forImage?.(parsed.image) ?? this.install)
-        .loadEngine()
-        .catch(() => {});
-      return { value: parsed.image };
-    }
-    const { key, retryable } = parseFailureCopy(parsed.key);
-    return { failure: { title: this._localize(key), detail: parsed.detail }, retryable };
-  }
-
-  private _onPrepared(failure: FilePickerError | null): void {
-    this._fileError = failure;
-    if (this._image.state.kind === "idle") this._unpick();
-  }
-
-  // The input is emptied with the file: it fires no change for the file it
-  // still holds, so that file could not be picked a second time.
-  private _unpick(): void {
-    this._file = null;
-    if (this._fileInput) this._fileInput.value = "";
+  private get _active() {
+    return this._setup.active;
   }
 
   private _log = (line: string) => {
@@ -173,7 +154,9 @@ export class LibreTinyInstallDialog extends LitElement {
   };
 
   protected updated(changed: Map<string, unknown>): void {
-    if (changed.has("open") && !this.open) this._reset();
+    if (!changed.has("open")) return;
+    if (this.open) this._setup.open();
+    else this._reset();
   }
 
   // Only a write in progress holds the dialog open. While the engine resets
@@ -187,9 +170,7 @@ export class LibreTinyInstallDialog extends LitElement {
     this._abort?.abort();
     this._abort = null;
     this._state = "idle";
-    this._unpick();
-    this._fileError = null;
-    this._image.clear();
+    this._setup.reset();
     this._progress = 0;
     this._errorTitle = "";
     this._errorMessage = "";
@@ -204,23 +185,9 @@ export class LibreTinyInstallDialog extends LitElement {
     this._state = "error";
   }
 
-  private _onFileChange = (e: Event): void => {
-    this._file = (e.target as HTMLInputElement).files?.[0] ?? null;
-    this._fileError = null;
-    if (this._file) this._image.start(this._file);
-    else this._image.clear();
-  };
-
-  // The parser did not load for the picked file: load it again.
-  private _retryFile = (): void => {
-    this._fileError = null;
-    this._image.retry();
-  };
-
   private async _flash(): Promise<void> {
-    const prepared = this._image.state;
-    if (prepared.kind !== "ready" || this._pending) return;
-    const image = prepared.value;
+    const run = this._setup.run;
+    if (!run || this._pending) return;
     this._pending = true;
     this._logLines = [];
     let port: SerialPort | null;
@@ -243,7 +210,7 @@ export class LibreTinyInstallDialog extends LitElement {
     this._abort = abort;
     // Closing the dialog aborts the run; its late hooks must not repaint it.
     const live = () => !abort.signal.aborted;
-    const result = await this.install.run(port, image, {
+    const result = await run(port, {
       signal: abort.signal,
       onLog: (line) => {
         if (live()) this._log(line);
@@ -262,10 +229,18 @@ export class LibreTinyInstallDialog extends LitElement {
     // The dialog closed and stopped the engine: nothing left to report to.
     if (!live()) return;
     if ("detail" in result) {
-      this._fail(
-        this._localize(result.key ?? this._active.copy.failed),
-        connectFailureDetail(result.error, this._localize, () => result.detail)
-      );
+      if (result.error instanceof PublishedImageUnavailableError) {
+        this._fail(unpublishedChipLine(this._localize, result.error.label));
+      } else if (result.error instanceof LinkedImageError) {
+        // Named as the image would have been had it been fetched before the link.
+        const { key } = parseFailureCopy(result.error.key);
+        this._fail(this._localize(key), result.detail);
+      } else {
+        this._fail(
+          this._localize(result.key ?? this._active.copy.failed),
+          connectFailureDetail(result.error, this._localize, () => result.detail)
+        );
+      }
       return;
     }
     this._manualReset = !result.rebooted;
@@ -314,31 +289,6 @@ export class LibreTinyInstallDialog extends LitElement {
     }
   }
 
-  private _renderSetup() {
-    const { copy } = this.install;
-    return html`
-      <p>${this._localize(copy.intro)}</p>
-      ${renderFilePicker({
-        label: this._localize("web.install.uf2_file_label"),
-        accept: ".uf2",
-        file: this._file,
-        placeholder: this._localize("web.install.uf2_file_placeholder"),
-        onChange: this._onFileChange,
-        preparing:
-          this._image.state.kind === "pending"
-            ? this._localize("web.install.preparing")
-            : undefined,
-        error: this._fileError,
-      })}
-      <p>${this._localize("web.install.uf2_howto_title")}</p>
-      <ol>
-        <li>${this._localize("web.install.upload_howto_1")}</li>
-        <li>${this._localize("web.install.upload_howto_2")}</li>
-        <li>${this._localize("web.install.uf2_howto_3")}</li>
-      </ol>
-    `;
-  }
-
   private _renderProgress() {
     return html`
       ${renderProgressCard(
@@ -366,13 +316,13 @@ export class LibreTinyInstallDialog extends LitElement {
   private _renderAction() {
     switch (this._state) {
       case "idle":
-        if (this._image.state.kind === "retryable") {
-          return renderRetryButton(this._localize, this._retryFile);
+        if (this._setup.image.state.kind === "retryable") {
+          return renderRetryButton(this._localize, this._setup.retry);
         }
         return html`
           <wa-button
             variant="brand"
-            ?disabled=${this._image.state.kind !== "ready" || this._pending}
+            ?disabled=${!this._setup.run || this._pending}
             @click=${this._flash}
           >
             ${this._localize("firmware.browser_flash_action")}
@@ -395,7 +345,11 @@ export class LibreTinyInstallDialog extends LitElement {
         ?busy=${this._busy}
         @after-hide=${this._onAfterHide}
       >
-        ${this._state === "idle" ? this._renderSetup() : this._renderProgress()}
+        ${
+          this._state === "idle"
+            ? renderSetup(this._setup, this._localize, this.install.copy.intro)
+            : this._renderProgress()
+        }
         <div class="actions">${this._renderAction()}</div>
       </esphome-base-dialog>
     `;
@@ -405,11 +359,8 @@ export class LibreTinyInstallDialog extends LitElement {
     espHomeStyles,
     filePickerStyles,
     installActionsStyles,
+    setupStyles,
     css`
-      ol {
-        padding-left: 1.5em;
-        color: var(--wa-color-text-quiet);
-      }
       .guide {
         margin: var(--wa-space-s) 0 0;
         font-size: var(--wa-font-size-s);

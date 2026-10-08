@@ -26,13 +26,11 @@ import { connectFailureDetail } from "../../../util/serial-open-error.js";
 import type { Uf2Image } from "../../../util/uf2.js";
 import { PortNotAcceptedError } from "../../../util/web-serial.js";
 import { type ProgressCard, renderProgressCard } from "../../install/install-progress.js";
-import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
 import {
-  loadPicoImage,
-  picoImageChips,
-  PicoImageUnavailableError,
-  picoUf2Url,
-} from "./pico-image.js";
+  fetchEsphomeWebManifest,
+  PublishedImageUnavailableError,
+} from "../../util/esphome-web-firmware.js";
+import { loadPicoImage, picoImageChips, picoUf2Url } from "./pico-image.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -193,8 +191,8 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
       return [this._localize("firmware.rp2_flash_failed"), getErrorMessage(err)];
     }
     if (err.kind === "image") {
-      if (err.cause instanceof PicoImageUnavailableError) {
-        const chip = PICO_CHIP_NAME[err.cause.chip];
+      if (err.cause instanceof PublishedImageUnavailableError) {
+        const chip = PICO_CHIP_NAME[err.cause.key as PicoChip];
         return [this._localize("web.pico.install_no_image", { chip }), ""];
       }
       const error = getErrorMessage(err.cause);

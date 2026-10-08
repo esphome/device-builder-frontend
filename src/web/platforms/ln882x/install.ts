@@ -32,4 +32,5 @@ export const LN_INSTALL: LibreTinyInstall = {
   loadEngine: warmLn882x,
   load: loadLn882xImage,
   run: runLn882x,
+  prebuilt: { families: ["LN882H"] },
 };

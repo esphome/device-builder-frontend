@@ -116,6 +116,15 @@ export class BekenLink extends SerialByteSession {
     }
   }
 
+  /**
+   * ``p``, or the abort, or the device going away, whichever comes first:
+   * work the flash waits on between commands must not hold the port past
+   * either. ``p`` itself goes on.
+   */
+  whileLinked<T>(p: Promise<T>): Promise<T> {
+    return this.untilAbortedOrGone(p);
+  }
+
   /** Write ``frame`` no faster than the wire drains it. */
   private async writePaced(frame: Uint8Array): Promise<void> {
     // A bridge without backpressure takes bytes faster than its UART sends

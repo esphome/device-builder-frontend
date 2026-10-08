@@ -24,3 +24,12 @@ export interface LibreTinyFlashHooks {
  */
 export type LibreTinyFlashResult =
   { rebooted: boolean } | { detail: string; error: unknown; key?: string };
+
+/** The chip that answered, and the LibreTiny family whose image runs on it; either may be unknown. */
+export interface LinkedChip {
+  chip?: string;
+  family?: string;
+}
+
+/** Gives the image for the chip that answered, for a flow that tells it only once linked. */
+export type LinkedImageSource<Image> = (linked: LinkedChip) => Promise<Image>;

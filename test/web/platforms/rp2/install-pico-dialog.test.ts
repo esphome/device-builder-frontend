@@ -6,7 +6,8 @@ vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
 
 const fetchEsphomeWebManifest = vi.fn();
-vi.mock("../../../../src/web/util/esphome-web-firmware.js", () => ({
+vi.mock("../../../../src/web/util/esphome-web-firmware.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   fetchEsphomeWebManifest: (...args: unknown[]) => fetchEsphomeWebManifest(...args),
 }));
 
@@ -48,7 +49,7 @@ import {
   PicoWrongBoardError,
 } from "../../../../src/platforms/rp2/rp2-flash.js";
 import { ESPHomeWebInstallPicoDialog } from "../../../../src/web/platforms/rp2/esphome-web-install-pico-dialog.js";
-import { PicoImageUnavailableError } from "../../../../src/web/platforms/rp2/pico-image.js";
+import { PublishedImageUnavailableError } from "../../../../src/web/util/esphome-web-firmware.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -386,12 +387,24 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
 
   it("names a chip ESPHome Web has no image for", async () => {
     mocks.flashPico.mockRejectedValue(
-      new PicoFlashError("image", new PicoImageUnavailableError("rp2350"))
+      new PicoFlashError("image", new PublishedImageUnavailableError("rp2350", "RP2350"))
     );
     const el = await mount();
     button(el, "dashboard.install").click();
     await settle(el);
     expect(card(el).statusMessage).toBe("web.pico.install_no_image");
+  });
+
+  it("names the chip without an image by its own name, whatever label the error has", async () => {
+    mocks.flashPico.mockRejectedValue(
+      new PicoFlashError("image", new PublishedImageUnavailableError("rp2350", undefined))
+    );
+    const el = await mount();
+    (el as any)._localize = (k: string, args?: Record<string, unknown>) =>
+      [k, ...Object.values(args ?? {})].join(" | ");
+    button(el, "dashboard.install").click();
+    await settle(el);
+    expect(card(el).statusMessage).toBe("web.pico.install_no_image | RP2350");
   });
 
   it("loads the RP2350 image for an RP2350 board", async () => {

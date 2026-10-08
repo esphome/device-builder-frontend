@@ -29,19 +29,29 @@ export function renderFilePicker(picker: {
       <span class="file-name"
         >${picker.file ? picker.file.name : picker.placeholder}</span
       >
-      ${
-        picker.preparing
-          ? html`<span class="file-status" role="status">${picker.preparing}</span>`
-          : nothing
-      }
-      ${
-        picker.error
-          ? html`<span class="file-status file-status--error" role="alert"
-              >${picker.error.title}${picker.error.detail ? `: ${picker.error.detail}` : ""}</span
-            >`
-          : nothing
-      }
+      ${renderFileStatus(picker.preparing, picker.error)}
     </div>
+  `;
+}
+
+/** What is happening to the file: being prepared, or refused. */
+export function renderFileStatus(
+  preparing?: string,
+  error?: FilePickerError | null
+): TemplateResult {
+  return html`
+    ${
+      preparing
+        ? html`<span class="file-status" role="status">${preparing}</span>`
+        : nothing
+    }
+    ${
+      error
+        ? html`<span class="file-status file-status--error" role="alert"
+            >${error.title}${error.detail ? `: ${error.detail}` : ""}</span
+          >`
+        : nothing
+    }
   `;
 }
 

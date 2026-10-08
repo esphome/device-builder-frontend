@@ -11,10 +11,15 @@ const mocks = vi.hoisted(() => ({
   loadLn882xImage: vi.fn(),
   runLn882x: vi.fn(),
   warmLn882x: vi.fn(),
+  fetchEsphomeWebManifest: vi.fn(),
 }));
 vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   requestSerialPort: mocks.requestSerialPort,
+}));
+vi.mock("../../../../src/web/util/esphome-web-firmware.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  fetchEsphomeWebManifest: mocks.fetchEsphomeWebManifest,
 }));
 vi.mock("../../../../src/platforms/ln882x/index.js", () => ({
   loadLn882xImage: mocks.loadLn882xImage,
@@ -23,44 +28,49 @@ vi.mock("../../../../src/platforms/ln882x/index.js", () => ({
   runLn882x: mocks.runLn882x,
 }));
 
-import { pickerText, pickFile } from "../../_pick-file.js";
-import { identityLocalize, mount } from "../../../_dom.js";
+import {
+  card,
+  guide,
+  installButton,
+  manifest,
+  mountInstall,
+  mountPrebuilt,
+  pickUf2,
+  radios,
+  stubUf2Download,
+  uf2,
+} from "../_libretiny-dialog.js";
+import { pickerText } from "../../_pick-file.js";
 import { UF2_FAMILY_LN882H } from "../../../../src/platforms/ln882x/ln882x-image.js";
-import { LibreTinyInstallDialog } from "../../../../src/web/install/esphome-web-libretiny-install-dialog.js";
 import { LN_INSTALL } from "../../../../src/web/platforms/ln882x/install.js";
+import { resetEsphomeWebManifest } from "../../../../src/web/util/esphome-web-firmware.js";
+
+// The deadline every UF2 download is given.
+const SIGNAL = { signal: expect.any(AbortSignal) };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const IMAGE = { familyId: UF2_FAMILY_LN882H, board: "b", runs: [], totalBytes: 0 };
 const PORT = { getInfo: () => ({}) } as unknown as SerialPort;
-const uf2 = () => new File([new Uint8Array(8)], "firmware.uf2");
-
-async function mountBare(): Promise<any> {
-  return (await mount(new LibreTinyInstallDialog(), {
-    _localize: identityLocalize,
-    open: true,
-    install: LN_INSTALL,
-  } as Partial<LibreTinyInstallDialog>)) as any;
-}
 
 async function mountDialog(): Promise<any> {
-  const el = await mountBare();
-  await pickFile(el, "_image", uf2());
+  const el = await mountInstall(LN_INSTALL);
+  await pickUf2(el, uf2());
   return el;
 }
-
-const card = (el: any) => el.shadowRoot!.querySelector("esphome-process-terminal") as any;
-const guide = (el: any) => el.shadowRoot!.querySelector(".guide a") as HTMLAnchorElement;
 
 beforeEach(() => {
   mocks.loadLn882xImage.mockResolvedValue({ image: IMAGE });
   mocks.requestSerialPort.mockResolvedValue(PORT);
   mocks.runLn882x.mockResolvedValue({ rebooted: true });
   mocks.warmLn882x.mockResolvedValue({});
+  mocks.fetchEsphomeWebManifest.mockResolvedValue(manifest());
 });
 
 afterEach(() => {
+  resetEsphomeWebManifest();
   vi.resetAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("esphome-web-libretiny-install-dialog for the LN882H", () => {
@@ -136,11 +146,40 @@ describe("esphome-web-libretiny-install-dialog for the LN882H", () => {
       key: "firmware.ln_wrong_family",
       detail: "family 0xe08f7564",
     });
-    const el = await mountBare();
+    const el = await mountInstall(LN_INSTALL);
 
-    await pickFile(el, "_image", uf2());
+    await pickUf2(el, uf2());
 
     expect(pickerText(el).error).toBe("firmware.ln_wrong_family: family 0xe08f7564");
     expect(mocks.runLn882x).not.toHaveBeenCalled();
+  });
+});
+
+describe("esphome-web-libretiny-install-dialog for the LN882H's ESPHome Web firmware", () => {
+  it("fetches and parses the published image before the click, with no chip to pick", async () => {
+    const fetch = stubUf2Download(new Uint8Array([7]));
+    const el = await mountPrebuilt(LN_INSTALL, mocks.fetchEsphomeWebManifest, "LN882H");
+
+    expect(radios(el, "mode")[0].checked).toBe(true);
+    expect(radios(el, "family")).toEqual([]);
+    expect(el.shadowRoot!.textContent).toContain("web.install.prebuilt_intro");
+    expect(fetch).toHaveBeenCalledWith(
+      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-ln882h.uf2",
+      SIGNAL
+    );
+    expect(mocks.loadLn882xImage).toHaveBeenCalledWith(new Uint8Array([7]));
+    expect(mocks.warmLn882x).toHaveBeenCalledOnce();
+    expect(installButton(el).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("goes straight to the port picker and flashes the published image", async () => {
+    stubUf2Download();
+    const el = await mountPrebuilt(LN_INSTALL, mocks.fetchEsphomeWebManifest, "LN882H");
+
+    await el._flash();
+    await el.updateComplete;
+
+    expect(mocks.runLn882x).toHaveBeenCalledWith(PORT, IMAGE, expect.any(Object));
+    expect(card(el).statusMessage).toBe("firmware.status_done web.ln.logs_elsewhere");
   });
 });
