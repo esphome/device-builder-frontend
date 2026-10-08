@@ -11,9 +11,12 @@ import { UF2_FAMILY_RP2040, UF2_FAMILY_RP2350_ARM_S } from "../../../../src/util
 import {
   loadPicoImage,
   picoImageChips,
-  PicoImageUnavailableError,
   picoUf2Url,
 } from "../../../../src/web/platforms/rp2/pico-image.js";
+import {
+  PublishedImageUnavailableError,
+  resetEsphomeWebManifest,
+} from "../../../../src/web/util/esphome-web-firmware.js";
 
 const uf2Response = (family: number) => ({
   ok: true,
@@ -32,6 +35,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetEsphomeWebManifest();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -63,8 +67,8 @@ describe("loadPicoImage", () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     const err = await loadPicoImage("rp2350").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(PicoImageUnavailableError);
-    expect((err as PicoImageUnavailableError).chip).toBe("rp2350");
+    expect(err).toBeInstanceOf(PublishedImageUnavailableError);
+    expect(err).toMatchObject({ key: "rp2350", label: "RP2350" });
     expect(fetch).not.toHaveBeenCalled();
   });
 

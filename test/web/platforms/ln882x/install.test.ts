@@ -25,4 +25,21 @@ describe("LN_INSTALL", () => {
   it("runs the engine as it is, with its hooks and its result", () => {
     expect(LN_INSTALL.run).toBe(mocks.runLn882x);
   });
+
+  it("offers the LN882H's published image, with English copy for its choice", () => {
+    expect(LN_INSTALL.prebuilt).toEqual({ families: ["LN882H"] });
+    for (const key of [
+      "mode_label",
+      "mode_prebuilt",
+      "mode_file",
+      "uf2_intro",
+      "prebuilt_intro",
+      "prebuilt_chip_label",
+      "prebuilt_download_failed",
+      "prebuilt_no_image",
+      "prebuilt_unknown_chip",
+    ]) {
+      expect(english(`web.install.${key}`), `missing en.json key "${key}"`).toBeTruthy();
+    }
+  });
 });

@@ -6,7 +6,8 @@ vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
 
 const fetchEsphomeWebManifest = vi.fn();
-vi.mock("../../../../src/web/util/esphome-web-firmware.js", () => ({
+vi.mock("../../../../src/web/util/esphome-web-firmware.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   fetchEsphomeWebManifest: (...args: unknown[]) => fetchEsphomeWebManifest(...args),
 }));
 
@@ -48,7 +49,7 @@ import {
   PicoWrongBoardError,
 } from "../../../../src/platforms/rp2/rp2-flash.js";
 import { ESPHomeWebInstallPicoDialog } from "../../../../src/web/platforms/rp2/esphome-web-install-pico-dialog.js";
-import { PicoImageUnavailableError } from "../../../../src/web/platforms/rp2/pico-image.js";
+import { PublishedImageUnavailableError } from "../../../../src/web/util/esphome-web-firmware.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -386,7 +387,7 @@ describe("esphome-web-install-pico-dialog over WebUSB", () => {
 
   it("names a chip ESPHome Web has no image for", async () => {
     mocks.flashPico.mockRejectedValue(
-      new PicoFlashError("image", new PicoImageUnavailableError("rp2350"))
+      new PicoFlashError("image", new PublishedImageUnavailableError("rp2350", "RP2350"))
     );
     const el = await mount();
     button(el, "dashboard.install").click();

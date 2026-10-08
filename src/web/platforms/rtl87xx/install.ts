@@ -21,4 +21,6 @@ export const RTL87XX_INSTALL: LibreTinyInstall<RtlImage> = {
       ? runAmbz(port, rtl.image, hooks)
       : runAmbz2(port, rtl.image, hooks),
   forImage: (rtl) => (rtl.chip === "ambz" ? RTL_AMBZ_INSTALL : RTL_AMBZ2_INSTALL),
+  // The user picks the chip; the parsed image picks its downloader.
+  prebuilt: { families: ["RTL8720C", "RTL8710B"] },
 };

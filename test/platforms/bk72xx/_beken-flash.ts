@@ -42,7 +42,7 @@ export const isCommand = (frame: Uint8Array, code: number, long: boolean) =>
 
 export function flash(
   spec: ChipSpec,
-  image: LibreTinyImage,
+  image: Parameters<typeof flashBeken>[1],
   opts: FakeOptions = {},
   hooks: Partial<Parameters<typeof flashBeken>[2]> = {}
 ) {

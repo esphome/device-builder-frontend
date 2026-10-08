@@ -6,6 +6,7 @@
 export type * from "../libretiny-uf2.js";
 export type * from "./beken-flasher.js";
 export type * from "./beken-image.js";
+export { BEKEN_FAMILIES } from "./beken-families.js";
 export * from "./bk72xx-platform.js";
 export * from "./serial-logs.js";
 
@@ -15,6 +16,7 @@ import {
   flashWith,
   parseWith,
 } from "../lazy-chunk.js";
+import type { LinkedImageSource } from "../libretiny-flash.js";
 import type { LibreTinyFile, LibreTinyImage } from "../libretiny-uf2.js";
 import type { BekenFlashHooks } from "./beken-flasher.js";
 
@@ -74,10 +76,13 @@ const bekenKey = (
         ? "firmware.bk_no_bootloader"
         : undefined;
 
-/** Flash a parsed image through the on-demand UART engine, for the same flows; never throws. */
+/**
+ * Flash a parsed image, or the one ``image`` gives for the linked chip,
+ * through the on-demand UART engine, for the same flows; never throws.
+ */
 export const runBeken = (
   port: SerialPort,
-  image: LibreTinyImage,
+  image: LibreTinyImage | LinkedImageSource<LibreTinyImage>,
   hooks: BekenFlashHooks
 ): Promise<{ rebooted: true } | BekenFlashFailure> =>
   flashWith(

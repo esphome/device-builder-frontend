@@ -124,4 +124,27 @@ describe("runBeken", () => {
     expect(await runBeken(PORT, IMAGE, HOOKS)).toEqual({ rebooted: true });
     expect(flashBeken).toHaveBeenCalledWith(PORT, IMAGE, HOOKS);
   });
+
+  it("hands a source of the image to the engine, and a source's failure back as the flash's", async () => {
+    const unavailable = new Error("No ESPHome Web image for the BK7231Q");
+    const flashBeken = vi.fn(
+      async (_port, source: (linked: object) => Promise<unknown>) => {
+        await source({ chip: "BK7231Q", family: "BK7231Q" });
+      }
+    );
+    vi.doMock("../../../src/platforms/bk72xx/beken-flasher.js", () => ({
+      BekenChipMismatchError: class extends Error {},
+      BekenNoBootloaderError: class extends Error {},
+      BekenUnknownFlashError: class extends Error {},
+      flashBeken,
+    }));
+    const { runBeken } = await import("../../../src/platforms/bk72xx/index.js");
+    const source = vi.fn().mockRejectedValue(unavailable);
+
+    const failed = await runBeken(PORT, source, HOOKS);
+
+    expect(flashBeken).toHaveBeenCalledWith(PORT, source, HOOKS);
+    expect(source).toHaveBeenCalledWith({ chip: "BK7231Q", family: "BK7231Q" });
+    expect(failed).toEqual({ detail: unavailable.message, error: unavailable });
+  });
 });

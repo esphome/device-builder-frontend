@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   fetchEsphomeWebManifest,
+  fetchPublishedUf2,
   type FirmwareManifest,
+  PublishedImageUnavailableError,
+  publishedKeys,
+  publishedUf2Url,
   resetEsphomeWebManifest,
   selectBuild,
 } from "../../src/web/util/esphome-web-firmware.js";
@@ -100,5 +104,85 @@ describe("selectBuild", () => {
 
   it("returns undefined for an unlisted chip", () => {
     expect(selectBuild(MANIFEST, "ESP32-H2")).toBeUndefined();
+  });
+});
+
+// The UF2 builds are listed without parts.
+const UF2_MANIFEST: FirmwareManifest = {
+  version: "26.10.0",
+  builds: [
+    { chipFamily: "BK7231N", parts: [] },
+    { chipFamily: "LN882H", parts: [] },
+    { chipFamily: "RTL8720C", parts: [] },
+  ],
+};
+const uf2Response = (bytes: Uint8Array) => ({
+  ok: true,
+  arrayBuffer: async () => bytes.buffer,
+});
+
+describe("fetchPublishedUf2", () => {
+  it("downloads the key's UF2 for the manifest's version", async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const fetch = vi.fn(async () => uf2Response(bytes));
+    vi.stubGlobal("fetch", fetch);
+
+    expect(await fetchPublishedUf2(UF2_MANIFEST, "BK7231N")).toEqual(bytes);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-bk7231n.uf2"
+    );
+  });
+
+  it("names a key the manifest has no image for, without downloading", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+
+    const err = await fetchPublishedUf2(UF2_MANIFEST, "BK7238", "BK7238 chip").catch(
+      (e: unknown) => e
+    );
+
+    expect(err).toBeInstanceOf(PublishedImageUnavailableError);
+    expect(err).toMatchObject({ key: "BK7238", label: "BK7238 chip" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("downloads an image once, for every later fetch of it", async () => {
+    const fetch = vi.fn(async () => uf2Response(new Uint8Array([1])));
+    vi.stubGlobal("fetch", fetch);
+
+    await fetchPublishedUf2(UF2_MANIFEST, "LN882H");
+    await fetchPublishedUf2(UF2_MANIFEST, "LN882H");
+    await fetchPublishedUf2(UF2_MANIFEST, "RTL8720C");
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops a failed download, so the next fetch downloads again", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce(uf2Response(new Uint8Array([1])));
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(fetchPublishedUf2(UF2_MANIFEST, "LN882H")).rejects.toThrow(
+      /esphome-web-ln882h\.uf2 failed \(404\)/
+    );
+    expect(await fetchPublishedUf2(UF2_MANIFEST, "LN882H")).toEqual(new Uint8Array([1]));
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("publishedKeys", () => {
+  it("keeps the keys the manifest lists, in the order asked", () => {
+    expect(publishedKeys(UF2_MANIFEST, ["RTL8710B", "RTL8720C"])).toEqual(["RTL8720C"]);
+    expect(publishedKeys({ version: "1", builds: [] }, ["LN882H"])).toEqual([]);
+  });
+});
+
+describe("publishedUf2Url", () => {
+  it("builds the versioned UF2 url for the key", () => {
+    expect(publishedUf2Url(UF2_MANIFEST, "RTL8720C")).toBe(
+      "https://firmware.esphome.io/esphome-web/26.10.0/esphome-web-rtl8720c.uf2"
+    );
   });
 });

@@ -9,9 +9,9 @@
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import { sleep } from "../../util/sleep.js";
 import { settledWithin } from "../../util/with-deadline.js";
-import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
+import type { LibreTinyFlashHooks, LinkedImageSource } from "../libretiny-flash.js";
 import type { LibreTinyImage } from "../libretiny-uf2.js";
-import { type BekenChip, familyOf } from "./beken-chips.js";
+import { type BekenChip, familyOf, familyOfChip } from "./beken-chips.js";
 import {
   BEKEN_BAUD_RATE,
   BekenLink,
@@ -107,10 +107,12 @@ const describeChip = (info: BekenChipInfo): string =>
  * downloader by itself; otherwise a reset over the adapter's lines is
  * tried, and failing that the downloader is polled until the user resets
  * the chip or ``signal`` aborts. The chip boots the firmware at the end.
+ * ``source`` is the image, or what gives it for the chip once linked; what
+ * it throws fails the flash.
  */
 export async function flashBeken(
   port: SerialPort,
-  image: LibreTinyImage,
+  source: LibreTinyImage | LinkedImageSource<LibreTinyImage>,
   hooks: BekenFlashHooks
 ): Promise<void> {
   if (!port.readable) await port.open({ baudRate: BEKEN_BAUD_RATE });
@@ -123,6 +125,13 @@ export async function flashBeken(
     hooks.onLinked?.();
     const session = new BekenSession(link, log);
     const info = await session.detect();
+    const image =
+      typeof source === "function"
+        ? await source({
+            chip: info.chip ?? undefined,
+            family: info.chip ? familyOfChip(info.chip)?.name : undefined,
+          })
+        : source;
     log(`Linked: ${describeChip(info)}; ${image.runs.length} runs to write`);
     const family = familyOf(image.familyId);
     // Before anything is erased. A chip that could not be told is let

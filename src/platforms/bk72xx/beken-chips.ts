@@ -10,6 +10,8 @@
  */
 export type BekenProtocol = "full" | "basic-beken" | "basic-tuya";
 
+export * from "./beken-families.js";
+
 export type BekenChip =
   "BK7231Q" | "BK7231U" | "BK7231T" | "BK7231N" | "BK7238" | "BK7252";
 
@@ -111,21 +113,3 @@ export const SR_PROTECT_MASK = 0x407c;
  * register locks (LB1 to LB3): never set, since setting any can be for good.
  */
 export const SR_LOCK_MASK = 0x3980;
-
-/** A LibreTiny UF2 family and the chips its image runs on. */
-export interface BekenFamily {
-  id: number;
-  name: string;
-  chips: readonly BekenChip[];
-}
-
-export const BEKEN_FAMILIES: readonly BekenFamily[] = [
-  { id: 0x7b3ef230, name: "BK7231N", chips: ["BK7231N"] },
-  { id: 0x675a40b0, name: "BK7231T", chips: ["BK7231T", "BK7231U"] },
-  { id: 0xafe81d49, name: "BK7231Q", chips: ["BK7231Q"] },
-  { id: 0x159ac324, name: "BK7238", chips: ["BK7238"] },
-  { id: 0x6a82cc42, name: "BK7251", chips: ["BK7252"] },
-];
-
-export const familyOf = (id: number): BekenFamily | undefined =>
-  BEKEN_FAMILIES.find((f) => f.id === id);
