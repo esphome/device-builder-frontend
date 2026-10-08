@@ -83,9 +83,10 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
       // chunk warms too.
       void this._fetchImage("rp2040").catch(() => {});
       void loadPicoboot().catch(() => {});
-    } else if (!this._downloads) {
-      // Retry on each (re)open while we have no URL yet, so a failure has a
-      // recovery path.
+    } else {
+      // Read the manifest on each (re)open, so a failure has a recovery path
+      // and a newly published chip shows up; the manifest cache keeps a recent
+      // one cheap.
       void this._loadManifest();
     }
   }

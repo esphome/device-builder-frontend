@@ -150,6 +150,30 @@ describe("esphome-web-install-pico-dialog", () => {
     expect(el.shadowRoot!.querySelector("a[download]")).not.toBeNull();
   });
 
+  it("reads the manifest again on reopen, so a newly published chip shows up", async () => {
+    fetchEsphomeWebManifest.mockResolvedValue({});
+    mocks.picoUf2Url.mockImplementation(
+      (_m, chip: string) => `https://example/${chip}.uf2`
+    );
+    mocks.picoImageChips.mockReturnValueOnce(["rp2040"]);
+
+    const el = await mount();
+    const hrefs = () =>
+      [...el.shadowRoot!.querySelectorAll("a[download]")].map((a) =>
+        a.getAttribute("href")
+      );
+    expect(hrefs()).toEqual(["https://example/rp2040.uf2"]);
+
+    mocks.picoImageChips.mockReturnValueOnce(["rp2040", "rp2350"]);
+    el.open = false;
+    await settle(el);
+    el.open = true;
+    await settle(el);
+
+    expect(fetchEsphomeWebManifest).toHaveBeenCalledTimes(2);
+    expect(hrefs()).toEqual(["https://example/rp2040.uf2", "https://example/rp2350.uf2"]);
+  });
+
   it("shows the loading placeholder while the manifest is in flight", async () => {
     // A fetch that never settles keeps the step in its loading state.
     fetchEsphomeWebManifest.mockReturnValue(new Promise(() => {}));

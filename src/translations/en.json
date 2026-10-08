@@ -2038,7 +2038,7 @@
       "connected_hint": "Your device is connected. Use the actions below to install firmware, view logs, or configure Wi-Fi."
     },
     "pico": {
-      "title": "Raspberry Pi Pico W",
+      "title": "Raspberry Pi Pico W or Pico 2 W",
       "connect_hint": "Connect a Raspberry Pi Pico W or Pico 2 W already running ESPHome, or run the first-time setup to install it.",
       "connected_hint": "Your Pico is connected. Use the actions below to view logs or configure Wi-Fi.",
       "first_time_setup": "First-time setup",
