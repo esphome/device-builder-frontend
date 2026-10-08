@@ -15,6 +15,7 @@ import {
   picoFlashFailureCopy,
   RP2_SERIAL_PICK,
 } from "../../../platforms/rp2/index.js";
+import type { PicoChip } from "../../../platforms/rp2/pico-uf2.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import { notifyError } from "../../../util/notify.js";
@@ -24,7 +25,12 @@ import type { Uf2Image } from "../../../util/uf2.js";
 import { PortNotAcceptedError } from "../../../util/web-serial.js";
 import { type ProgressCard, renderProgressCard } from "../../install/install-progress.js";
 import { fetchEsphomeWebManifest } from "../../util/esphome-web-firmware.js";
-import { loadPicoImage, picoUf2Url } from "./pico-image.js";
+import {
+  loadPicoImage,
+  picoImageChips,
+  PicoImageUnavailableError,
+  picoUf2Url,
+} from "./pico-image.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 
@@ -32,9 +38,10 @@ type InstallState =
   "idle" | "resetting" | "waiting" | "connecting" | "flashing" | "success" | "error";
 
 /**
- * First-time Raspberry Pi Pico W setup. With WebUSB, Install writes the
- * manifest's UF2 over PICOBOOT to a Pico in BOOTSEL; otherwise the UF2
- * download and the drag-onto-RPI-RP2 steps remain. Continue then requests
+ * First-time Raspberry Pi Pico W and Pico 2 W setup. With WebUSB, Install
+ * writes the manifest's UF2 for the claimed board's chip over PICOBOOT to a
+ * Pico in BOOTSEL; otherwise the UF2 downloads and the drag-onto-the-drive
+ * steps remain. Continue then requests
  * the now-ESPHome Pico's serial port so the caller can provision Wi-Fi.
  */
 @customElement("esphome-web-install-pico-dialog")
@@ -45,7 +52,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  @state() private _downloadUrl?: string;
+  @state() private _downloads?: { chip: PicoChip; url: string }[];
   @state() private _downloadFailed = false;
   @state() private _state: InstallState = "idle";
   @state() private _progress = 0;
@@ -57,9 +64,9 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._logLines = [...this._logLines, line];
   };
 
-  // The parsed image, kept across opens; a failed fetch clears it so the
-  // next open or Install fetches again.
-  private _image: Promise<Uf2Image> | null = null;
+  // The parsed image per chip, kept across opens; a failed fetch clears it so
+  // the next open or Install fetches again.
+  private _images = new Map<PicoChip, Promise<Uf2Image>>();
 
   protected updated(changed: Map<string, unknown>): void {
     if (!changed.has("open")) return;
@@ -69,10 +76,12 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     }
     if (isWebUsbSupported()) {
       // Fetched ahead of the click: the WebUSB chooser needs the click's
-      // activation, which a download would use up. The engine chunk warms too.
-      void this._fetchImage();
+      // activation, which a download would use up. The RP2040 image is the
+      // common one; an RP2350 board fetches its own once claimed. The engine
+      // chunk warms too.
+      void this._fetchImage("rp2040").catch(() => {});
       void loadPicoboot().catch(() => {});
-    } else if (!this._downloadUrl) {
+    } else if (!this._downloads) {
       // Retry on each (re)open while we have no URL yet, so a failure has a
       // recovery path.
       void this._loadManifest();
@@ -101,22 +110,27 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._state = "error";
   }
 
-  private _fetchImage(): Promise<Uf2Image> {
-    if (!this._image) {
-      const image = loadPicoImage();
-      image.catch(() => {
-        if (this._image === image) this._image = null;
+  private _fetchImage(chip: PicoChip): Promise<Uf2Image> {
+    let image = this._images.get(chip);
+    if (!image) {
+      const loading = loadPicoImage(chip);
+      loading.catch(() => {
+        if (this._images.get(chip) === loading) this._images.delete(chip);
       });
-      this._image = image;
+      this._images.set(chip, loading);
+      image = loading;
     }
-    return this._image;
+    return image;
   }
 
   private async _loadManifest(): Promise<void> {
     this._downloadFailed = false;
     try {
       const manifest = await fetchEsphomeWebManifest();
-      this._downloadUrl = picoUf2Url(manifest);
+      this._downloads = picoImageChips(manifest).map((chip) => ({
+        chip,
+        url: picoUf2Url(manifest, chip),
+      }));
     } catch (err) {
       this._downloadFailed = true;
       toast.error(
@@ -154,7 +168,7 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
     this._state = "connecting";
     this._progress = 0;
     try {
-      const flashed = await flashPico(this._fetchImage(), {
+      const flashed = await flashPico((board) => this._fetchImage(board), {
         onDeviceOpened: () => (this._state = "flashing"),
         onProgress: (percent) => (this._progress = percent),
         onLog: this._log,
@@ -170,18 +184,19 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
   }
 
   // The shared copy, except where this page's own words fit better: its
-  // reset button has another name, the image is this page's download, and
-  // that download is for the one chip.
+  // reset button has another name, and the image is this page's download,
+  // which may not be published for the board's chip.
   private _failureCopy(err: unknown): [string, string] {
     if (!(err instanceof PicoFlashError)) {
       return [this._localize("firmware.rp2_flash_failed"), getErrorMessage(err)];
     }
     if (err.kind === "image") {
+      if (err.cause instanceof PicoImageUnavailableError) {
+        const chip = err.cause.chip.toUpperCase();
+        return [this._localize("web.pico.install_no_image", { chip }), ""];
+      }
       const error = getErrorMessage(err.cause);
       return [this._localize("web.pico.install_image_failed", { error }), ""];
-    }
-    if (err.kind === "wrong-board") {
-      return [this._localize("web.pico.install_wrong_board"), ""];
     }
     const { title, detail } = picoFlashFailureCopy(err, this._localize);
     return [
@@ -310,10 +325,13 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
         <li>${this._localize("web.pico.setup_step_2")}</li>
         <li>
           ${
-            this._downloadUrl
-              ? html`<a href=${this._downloadUrl} download
-                  >${this._localize("web.pico.setup_download")}</a
-                >`
+            this._downloads
+              ? this._downloads.map(
+                  ({ chip, url }) =>
+                    html`<a href=${url} download
+                      >${this._localize(`web.pico.setup_download_${chip}`)}</a
+                    >`
+                )
               : this._downloadFailed
                 ? html`<span class="download-error"
                     >${this._localize("web.pico.setup_download_failed")}</span
@@ -345,6 +363,9 @@ export class ESPHomeWebInstallPicoDialog extends LitElement {
       }
       a {
         color: var(--esphome-primary);
+      }
+      a + a {
+        margin-left: var(--wa-space-m);
       }
       .download-error {
         color: var(--esphome-error);

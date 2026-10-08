@@ -2039,18 +2039,19 @@
     },
     "pico": {
       "title": "Raspberry Pi Pico W",
-      "connect_hint": "Connect a Raspberry Pi Pico W already running ESPHome, or run the first-time setup to install it.",
+      "connect_hint": "Connect a Raspberry Pi Pico W or Pico 2 W already running ESPHome, or run the first-time setup to install it.",
       "connected_hint": "Your Pico is connected. Use the actions below to view logs or configure Wi-Fi.",
       "first_time_setup": "First-time setup",
       "manifest_failed": "Could not load the firmware manifest: {error}",
-      "setup_title": "Prepare your Raspberry Pi Pico W for first use",
+      "setup_title": "Prepare your Raspberry Pi Pico W or Pico 2 W for first use",
       "setup_intro": "To get started, ESPHome needs to be installed on your Pico. You can do this with your computer's file explorer — no extra programs required.",
       "setup_step_1": "Disconnect your Raspberry Pi Pico from your computer.",
-      "setup_step_2": "Hold the BOOTSEL button and connect the Pico to your computer. It appears as a USB drive named RPI-RP2.",
-      "setup_download": "Download ESPHome for Pico",
+      "setup_step_2": "Hold the BOOTSEL button and connect the Pico to your computer. It appears as a USB drive named RPI-RP2, or RP2350 on a Pico 2 W.",
+      "setup_download_rp2040": "Download ESPHome for Pico W",
+      "setup_download_rp2350": "Download ESPHome for Pico 2 W",
       "setup_download_loading": "Loading download link…",
       "setup_download_failed": "Could not load the download link. Close and reopen to try again.",
-      "setup_step_4": "Drag the downloaded file onto the RPI-RP2 drive. The install is complete when the drive disappears.",
+      "setup_step_4": "Drag the downloaded file onto the Pico's drive. The install is complete when the drive disappears.",
       "setup_step_5": "Your Pico now runs ESPHome 🎉",
       "setup_continue_hint": "Click Continue to connect it to Wi-Fi. Once connected, it shows up automatically on your ESPHome Device Builder.",
       "install_intro": "ESPHome can be installed on your Pico straight from this page.",
@@ -2062,7 +2063,7 @@
       "install_not_bootsel": "The selected device is not in BOOTSEL mode. Click Reset into BOOTSEL, or hold BOOTSEL while plugging it in, then try again.",
       "install_waiting": "Wait a few seconds for the Pico to reconnect as RP2 Boot, then click Install. If it does not, hold BOOTSEL while plugging it in, then click Install.",
       "install_image_failed": "Could not load the firmware: {error}",
-      "install_wrong_board": "The selected device is an RP2350. ESPHome Web installs on the RP2040 only; install on a Pico 2 from the ESPHome Device Builder."
+      "install_no_image": "ESPHome Web has no firmware for the {chip} yet. Install on this board from the ESPHome Device Builder."
     },
     "unsupported": {
       "status": "Unsupported",
@@ -2092,7 +2093,7 @@
     "intro": {
       "welcome": "Welcome to ESPHome Web!",
       "body_esp": "ESPHome Web lets you prepare your device for first use, install new versions, and check the device logs directly from your browser.",
-      "body_pico": "ESPHome Web lets you prepare your Raspberry Pi Pico W for first use and check the device logs directly from your browser.",
+      "body_pico": "ESPHome Web lets you prepare your Raspberry Pi Pico W or Pico 2 W for first use and check the device logs directly from your browser.",
       "privacy": "ESPHome Web runs 100% in your browser. No data will leave your computer.",
       "lite": "This page is a lite variant of the ESPHome Device Builder. To create and edit ESPHome projects, install it on your computer or inside Home Assistant (it's free!).",
       "get_esphome": "Get ESPHome",

@@ -123,6 +123,32 @@ describe("flashPico", () => {
     expect(flashUf2).toHaveBeenCalledWith(dev, image2350, expect.anything());
   });
 
+  it("asks a source function for the image of the claimed board's chip", async () => {
+    const flashUf2 = vi.fn(async () => {});
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel(RP2350_PID));
+    engine(async () => ({}), flashUf2);
+    const source = vi.fn(async () => image2350);
+    await expect(flashPico(source, { onProgress: () => {} })).resolves.toBe(true);
+    expect(source).toHaveBeenCalledWith("rp2350");
+    expect(flashUf2).toHaveBeenCalledWith(
+      expect.anything(),
+      image2350,
+      expect.anything()
+    );
+  });
+
+  it("reports a source function that throws as the image kind", async () => {
+    mocks.requestPicobootDevice.mockResolvedValue(bootsel());
+    const err = await flashPico(
+      () => {
+        throw new Error("no image");
+      },
+      { onProgress: () => {} }
+    ).catch((e: unknown) => e);
+    expect(err).toMatchObject({ kind: "image" });
+    expect(mocks.loadPicoboot).not.toHaveBeenCalled();
+  });
+
   it.each([
     {
       name: "an RP2040 image on an RP2350",
