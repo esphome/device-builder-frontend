@@ -222,6 +222,25 @@ describe("esphome-web-libretiny-card Wi-Fi setup", () => {
     expect(mocks.openPortForLogs).not.toHaveBeenCalled();
   });
 
+  it("stays busy until the Improv session ends", async () => {
+    mocks.requestSerialPort.mockResolvedValue({ getInfo: () => ({}) });
+    let finish!: () => void;
+    mocks.openImprovDialog.mockImplementation(
+      () => new Promise<void>((resolve) => (finish = resolve))
+    );
+    const el = await mountCard();
+    const session = (el as any)._configureWifi();
+    await vi.waitFor(() => expect(mocks.openImprovDialog).toHaveBeenCalledTimes(1));
+    await (el as any)._configureWifi();
+    await (el as any)._showLogs();
+    expect(mocks.requestSerialPort).toHaveBeenCalledTimes(1);
+    finish();
+    await session;
+    mocks.openImprovDialog.mockResolvedValue(undefined);
+    await (el as any)._configureWifi();
+    expect(mocks.requestSerialPort).toHaveBeenCalledTimes(2);
+  });
+
   it("does not open Improv when the card was removed during the pick", async () => {
     let pick!: (port: unknown) => void;
     mocks.requestSerialPort.mockImplementation(

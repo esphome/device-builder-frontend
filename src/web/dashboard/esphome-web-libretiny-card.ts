@@ -77,7 +77,9 @@ export class LibreTinyCardElement extends LitElement {
     this._picking = true;
     try {
       const port = await pickPortForCard(this, this._localize);
-      if (port && this.isConnected) void openImprovDialog(port, this._localize);
+      // The card stays busy until the session ends, so a second click cannot
+      // start another dialog on another port meanwhile.
+      if (port && this.isConnected) await openImprovDialog(port, this._localize);
     } finally {
       this._picking = false;
     }
