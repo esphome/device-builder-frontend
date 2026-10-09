@@ -198,6 +198,27 @@ describe("flashAmbd", () => {
     expect(chip.signals).toEqual([]);
   });
 
+  it("names a board unplugged, and an install cancelled, while it waits for the strap", async () => {
+    let chip!: ReturnType<typeof fakeAmbd>;
+    const lost = flash({ lostResets: 99 }, { onWaiting: () => chip.dropLink() });
+    chip = lost.chip;
+    await expect(driveFakeTimers(lost.done)).rejects.toBeInstanceOf(
+      SerialDeviceLostError
+    );
+
+    const abort = new AbortController();
+    const cancelled = flash(
+      { lostResets: 99 },
+      {
+        signal: abort.signal,
+        onWaiting: () => abort.abort(new DOMException("stopped", "AbortError")),
+      }
+    );
+    await expect(driveFakeTimers(cancelled.done)).rejects.toMatchObject({
+      name: "AbortError",
+    });
+  });
+
   it("fails when the loader does not start", async () => {
     const { done } = flash({ loaderDead: true });
     await expect(driveFakeTimers(done)).rejects.toThrow(/flash id read/);

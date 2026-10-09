@@ -10,14 +10,10 @@ import {
   type LibreTinyImage,
   libreTinyImageFor,
   type LibreTinyParseOptions,
+  type LibreTinyPartition,
   parseLibreTinyFile,
 } from "../libretiny-uf2.js";
-import {
-  type LibreTinyPartition,
-  ota2PartitionOf,
-  RtlImageError,
-  toRtlImageError,
-} from "./ambz2-image.js";
+import { ota2PartitionOf, RtlImageError, toRtlImageError } from "./ambz2-image.js";
 
 export { RtlImageError };
 

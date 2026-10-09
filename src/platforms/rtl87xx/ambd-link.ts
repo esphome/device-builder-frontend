@@ -95,9 +95,23 @@ export class AmbdLink extends SerialByteSession implements XmodemIo {
     }
   }
 
+  /** Exactly ``count`` reply bytes within ``timeoutMs``; a reply that stops short is a protocol error. */
+  private async readReply(count: number, doc: string, timeoutMs = REPLY_MS) {
+    const out = new Uint8Array(count);
+    const deadline = Date.now() + timeoutMs;
+    for (let i = 0; i < count; i++) {
+      const left = deadline - Date.now();
+      const byte = left > 0 ? await this.readByte(left) : null;
+      if (byte === null) throw new AmbdProtocolError(`Reply to ${doc} stopped short`);
+      out[i] = byte;
+    }
+    return out;
+  }
+
   /**
    * The word at ``address``, or null when nothing answered as the ROM or
-   * the loader would: the probe for a chip in download mode.
+   * the loader would: the probe for a chip in download mode. A port that
+   * went away or an abort still throws, so a poll ends with its real cause.
    */
   async readWord(address: number): Promise<Uint8Array | null> {
     this.drain();
@@ -105,10 +119,11 @@ export class AmbdLink extends SerialByteSession implements XmodemIo {
     try {
       await this.expectByte(CMD_READ_WORD, "the register read");
       // The word, then the NAK the ROM ends every reply with.
-      const reply = await this.readBytes(5, REPLY_MS);
+      const reply = await this.readReply(5, "the register read");
       return reply[4] === NAK ? reply.subarray(0, 4) : null;
-    } catch {
-      return null;
+    } catch (err) {
+      if (err instanceof AmbdProtocolError) return null;
+      throw err;
     }
   }
 
@@ -117,7 +132,7 @@ export class AmbdLink extends SerialByteSession implements XmodemIo {
     this.drain();
     await this.write(FLASH_ID_REQUEST);
     await this.expectByte(CMD_FLASH_STATUS, "the flash id read");
-    return this.readBytes(3, REPLY_MS);
+    return this.readReply(3, "the flash id read");
   }
 
   /** Erase ``sectors`` 4 KiB sectors from ``offset`` (sector aligned). */
@@ -144,7 +159,7 @@ export class AmbdLink extends SerialByteSession implements XmodemIo {
       "the checksum",
       Math.max(CHECKSUM_MIN_MS, Math.ceil((length / 2 ** 20) * CHECKSUM_MS_PER_MIB))
     );
-    const reply = await this.readBytes(4, REPLY_MS);
+    const reply = await this.readReply(4, "the checksum");
     return new DataView(reply.buffer, reply.byteOffset, 4).getUint32(0, true);
   }
 
