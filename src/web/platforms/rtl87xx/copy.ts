@@ -1,4 +1,4 @@
-/** The RTL87xx install copy both Realtek chips share. */
+/** The RTL87xx install copy the Realtek chips share. */
 export const RTL_COPY = {
   title: "web.rtl.install_title",
   intro: "web.rtl.install_intro",

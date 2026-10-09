@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   parseRtl87xxImage: vi.fn(),
   flashAmbz2: vi.fn(),
   flashAmbz: vi.fn(),
+  flashAmbd: vi.fn(),
   fetchEsphomeWebManifest: vi.fn(),
 }));
 // No ESPHome Web firmware is published here; the prebuilt flow has its own tests.
@@ -31,6 +32,10 @@ vi.mock("../../../../src/platforms/rtl87xx/ambz-image.js", async (importOriginal
 }));
 vi.mock("../../../../src/platforms/rtl87xx/ambz-flasher.js", () => ({
   flashAmbz: mocks.flashAmbz,
+}));
+vi.mock("../../../../src/platforms/rtl87xx/ambd-flasher.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  flashAmbd: mocks.flashAmbd,
 }));
 // The real parse, behind a seam a test can make fail as a chunk that did not load.
 const seams = vi.hoisted(() => ({
@@ -56,6 +61,7 @@ import { RTL87XX_INSTALL } from "../../../../src/web/platforms/rtl87xx/install.j
 
 const IMAGE = { runs: [], totalBytes: 0 };
 const AMBZ_IMAGE = { ota1: IMAGE, ota2: IMAGE, ota2Offset: 0x80000 };
+const AMBD_IMAGE = { image: IMAGE, ota2Offset: 0x206000 };
 // What the RTL8720C parser says of an RTL8710B build, and of anything else.
 const wrongFamily = (family: string) => () => {
   throw new RtlImageError("firmware.rtl_wrong_family", new Error(`family ${family}`));
@@ -181,6 +187,34 @@ describe("esphome-web-libretiny-install-dialog for the RTL87xx", () => {
     // The engine leaves an RTL8710B for a reset by hand.
     expect(card(el).statusMessage).toBe("web.rtl.install_done_reset");
   });
+
+  it.each([
+    ["rebooted by the adapter", true, "web.rtl.install_done"],
+    ["left for a reset by hand", false, "firmware.rtl_ambd_done_manual_reset"],
+  ])(
+    "flashes an RTL8720D build with its own engine and guide, %s",
+    async (_n, rebooted, done) => {
+      mocks.parseRtl87xxImage.mockReturnValue({ chip: "ambd", image: AMBD_IMAGE });
+      let wait!: () => void;
+      mocks.flashAmbd.mockImplementation(async (_port, _image, hooks) => {
+        hooks.onWaiting?.();
+        await new Promise<void>((resolve) => (wait = resolve));
+        return rebooted;
+      });
+      const el = await mountDialog();
+      const pending = el._flash();
+      await vi.waitFor(() => expect(mocks.flashAmbd).toHaveBeenCalled());
+      await el.updateComplete;
+      expect(mocks.flashAmbd).toHaveBeenCalledWith(PORT, AMBD_IMAGE, expect.any(Object));
+      expect(mocks.flashAmbz2).not.toHaveBeenCalled();
+      expect(card(el).statusDetail).toBe("firmware.rtl_ambd_wait_desc");
+      expect(text(el)).toContain("firmware.rtl_ambd_guide_link");
+      wait();
+      await pending;
+      await el.updateComplete;
+      expect(card(el).statusMessage).toBe(done);
+    }
+  );
 
   it("names a build for neither RTL87xx chip and a bad file under the picker, when they are picked", async () => {
     mocks.parseRtl87xxImage.mockImplementation(wrongFamily("0xe08f7564"));

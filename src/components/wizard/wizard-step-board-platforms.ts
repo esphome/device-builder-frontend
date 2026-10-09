@@ -69,6 +69,7 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
   { platform: "bk72xx", variant: "", mcu: "bk7251", label: "BK7251" },
   { platform: "rtl87xx", variant: "", mcu: "rtl8710b", label: "RTL8710B" },
   { platform: "rtl87xx", variant: "", mcu: "rtl8720c", label: "RTL8720C" },
+  { platform: "rtl87xx", variant: "", mcu: "rtl8720d", label: "RTL8720D" },
   { platform: "ln882x", variant: "", mcu: "ln882h", label: "LN882H" },
   { platform: "nrf52", variant: "", label: "nRF52" },
 ];

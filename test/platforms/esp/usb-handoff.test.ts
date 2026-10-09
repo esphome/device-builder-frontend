@@ -208,15 +208,15 @@ describe("handOffToFlasher", () => {
     expect(host._failureKind).toBe("unsupported-browser");
   });
 
-  it("hands an RTL8710B to its own ROM downloader", () => {
+  it.each([
+    ["an RTL8710B", "rtl8710b", "rtl-ambz"],
+    ["an RTL8720D", "rtl8720d", "rtl-ambd"],
+  ])("hands %s to its own ROM downloader", (_n, mcu, flasher) => {
     const host = makeHost();
     host._device.target_platform = "rtl87xx";
-    host._device.mcu = "rtl8710b";
+    host._device.mcu = mcu;
     handOffToFlasher(asHost(host));
-    expect(openFlasher.mock.calls[0][3]).toMatchObject({
-      flasher: "rtl-ambz",
-      erase: false,
-    });
+    expect(openFlasher.mock.calls[0][3]).toMatchObject({ flasher, erase: false });
   });
 
   it("fails with the unsupported-browser message when the hand-off is declined", () => {

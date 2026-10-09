@@ -38,6 +38,15 @@ export const BW15_PARTITIONS: LtPartitionSpec[] = [
   { name: "ota2", offset: 0x104000, length: 0xf8000 },
 ];
 
+/**
+ * The bw16 (RTL8720D, 4 MB) slots the AmebaD flasher writes and clears;
+ * uf2tool's writer keeps only the partitions the images use, so the table fits a tag.
+ */
+export const BW16_PARTITIONS: LtPartitionSpec[] = [
+  { name: "ota1", offset: 0x6000, length: 0x1fa000 },
+  { name: "ota2", offset: 0x206000, length: 0x1e2000 },
+];
+
 export function ltPartitionTable(parts: LtPartitionSpec[]): Uint8Array {
   const table = new Uint8Array(parts.length * PARTITION_ENTRY_SIZE);
   const v = new DataView(table.buffer);

@@ -5,7 +5,7 @@ import type { WebPlatform } from "../web-platform.js";
 import "../../dashboard/esphome-web-libretiny-card.js";
 import { RTL_CARD } from "./card.js";
 
-/** RTL87xx (RTL8720C, RTL8710B): behind generic UART bridges, so no port claims it. */
+/** RTL87xx (RTL8720C, RTL8710B, RTL8720D): behind generic UART bridges, so no port claims it. */
 export const rtlWebMode: WebPlatform<"rtl"> = {
   mode: "rtl",
   logo: "rtl8720c.svg",

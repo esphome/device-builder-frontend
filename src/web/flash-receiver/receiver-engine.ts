@@ -122,4 +122,6 @@ export const RECEIVER_ENGINES: Record<HandoffFlasher, () => Promise<ReceiverEngi
     (await import("../platforms/ln882x/receiver-engine.js")).lnUartReceiverEngine,
   "rtl-ambz": async () =>
     (await import("../platforms/rtl87xx/ambz-receiver-engine.js")).rtlAmbzReceiverEngine,
+  "rtl-ambd": async () =>
+    (await import("../platforms/rtl87xx/ambd-receiver-engine.js")).rtlAmbdReceiverEngine,
 };

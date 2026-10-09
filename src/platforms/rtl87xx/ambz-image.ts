@@ -13,6 +13,7 @@ import {
   type LibreTinyScheme,
   parseLibreTinyFile,
 } from "../libretiny-uf2.js";
+import { type AmbdImage, ambdImageOf, UF2_FAMILY_AMBD } from "./ambd-image.js";
 import {
   AMBZ2_PARSE,
   RtlImageError,
@@ -33,12 +34,14 @@ export interface AmbzImage {
 
 /** A parsed RTL87xx UF2 and the chip it was built for. */
 export type RtlImage =
-  { chip: "ambz2"; image: LibreTinyImage } | { chip: "ambz"; image: AmbzImage };
+  | { chip: "ambz2"; image: LibreTinyImage }
+  | { chip: "ambz"; image: AmbzImage }
+  | { chip: "ambd"; image: AmbdImage };
 
 /**
  * Parse a LibreTiny UF2 for the RTL8710B flasher. Another Realtek family
- * (AmebaZ2) is a real build for the other Realtek flasher's chip; anything
- * else is a bad file. Fails as ``RtlImageError``.
+ * (AmebaZ2, AmebaD) is a real build for one of the other Realtek flashers'
+ * chips; anything else is a bad file. Fails as ``RtlImageError``.
  */
 export function parseAmbzImage(bytes: Uint8Array): AmbzImage {
   try {
@@ -59,13 +62,22 @@ export function checkAmbzUf2(bytes: Uint8Array): LibreTinyFile {
   }
 }
 
-/** Parse an RTL8720C or RTL8710B UF2 in one pass; its family names the chip. Fails as ``RtlImageError``. */
+/** Parse an RTL8720C, RTL8710B or RTL8720D UF2 in one pass; its family names the chip. Fails as ``RtlImageError``. */
 export function parseRtl87xxImage(bytes: Uint8Array): RtlImage {
   try {
-    const file = parseLibreTinyFile(bytes, [UF2_FAMILY_AMBZ2, UF2_FAMILY_AMBZ]);
-    return file.familyId === UF2_FAMILY_AMBZ
-      ? { chip: "ambz", image: ambzImageOf(file) }
-      : { chip: "ambz2", image: libreTinyImageFor(file, AMBZ2_PARSE) };
+    const file = parseLibreTinyFile(bytes, [
+      UF2_FAMILY_AMBZ2,
+      UF2_FAMILY_AMBZ,
+      UF2_FAMILY_AMBD,
+    ]);
+    switch (file.familyId) {
+      case UF2_FAMILY_AMBZ:
+        return { chip: "ambz", image: ambzImageOf(file) };
+      case UF2_FAMILY_AMBD:
+        return { chip: "ambd", image: ambdImageOf(file) };
+      default:
+        return { chip: "ambz2", image: libreTinyImageFor(file, AMBZ2_PARSE) };
+    }
   } catch (err) {
     throw toRtlImageError(err);
   }

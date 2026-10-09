@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ltPartInfoTags, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
+import { makeAmbdUf2 } from "./_fake-ambd.js";
 import { fixtureUf2 } from "./_fake-ambz.js";
 
 const AMBZ = await fixtureUf2();
+const AMBD = makeAmbdUf2();
 const AMBZ2 = makeLibreTinyUf2({
   blocks: [
     { addr: 0x0, fill: 0xa1, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) },
@@ -28,6 +30,9 @@ describe("loadRtl87xxImage", () => {
     expect(await loadRtl87xxImage(AMBZ)).toMatchObject({
       image: { chip: "ambz", image: { ota2Offset: 0x80000 } },
     });
+    expect(await loadRtl87xxImage(AMBD)).toMatchObject({
+      image: { chip: "ambd", image: { ota2Offset: 0x206000, image: { board: "bw16" } } },
+    });
   });
 
   it("reads the file once, whichever chip it is for", async () => {
@@ -46,7 +51,8 @@ describe("loadRtl87xxImage", () => {
     const loadRtl87xxImage = await load();
     await loadRtl87xxImage(AMBZ);
     await loadRtl87xxImage(AMBZ2);
-    expect(calls).toHaveBeenCalledTimes(2);
+    await loadRtl87xxImage(AMBD);
+    expect(calls).toHaveBeenCalledTimes(3);
   });
 
   it("refuses another family and a file that is not a UF2", async () => {
