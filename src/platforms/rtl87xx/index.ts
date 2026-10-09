@@ -112,7 +112,7 @@ export const loadRtl87xxImage = (
     "[rtl87xx]",
     loadRtl87xxParser,
     (p) => ({ image: p.parseRtl87xxImage(bytes) }),
-    (p, err) => (err instanceof p.RtlImageError ? err.key : "firmware.rtl_bad_uf2")
+    rtlKey
   );
 
 /** The RTL8710B counterpart of ``runAmbz2``; never throws. */

@@ -63,6 +63,10 @@ export function checkAmbdUf2(bytes: Uint8Array): LibreTinyFile {
 /** The first slot's runs and the second slot's offset from a parsed file. */
 export function ambdImageOf(file: LibreTinyFile): AmbdImage {
   const ota2 = ota2PartitionOf(file);
+  // Its first sector is erased whole, so it has to start on one.
+  if (ota2.offset % AMBD_PARSE.blockSize !== 0) {
+    throw new Error("Invalid UF2: the 'ota2' partition is not sector aligned");
+  }
   const image = libreTinyImageFor(file, AMBD_PARSE);
   // The flasher clears the second slot's first sector after the write: a
   // first slot that reaches into it would lose its own head.

@@ -26,6 +26,18 @@ const NO_OTA2 = makeLibreTinyUf2({
   }),
   blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 0, 0, 1, 0], ["ota1"]) }],
 });
+// A second slot off the sector grid: its first sector could not be erased alone.
+const UNALIGNED_OTA2 = makeLibreTinyUf2({
+  family: UF2_FAMILY_AMBD,
+  headerTags: ltHeaderTags({
+    BOARD: "bw16",
+    FAL_PTABLE: ltPartitionTable([
+      { name: "ota1", offset: 0x6000, length: 0x1fa000 },
+      { name: "ota2", offset: 0x206800, length: 0x1e1800 },
+    ]),
+  }),
+  blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
+});
 // OTA_PART_INFO sends the flasher's first slot into ota2, whose head the flasher clears.
 const IN_OTA2 = makeLibreTinyUf2({
   family: UF2_FAMILY_AMBD,
@@ -53,6 +65,10 @@ describe("parseAmbdImage", () => {
 
   it("refuses a layout without a second slot", () => {
     expect(() => parseAmbdImage(NO_OTA2)).toThrow(/no 'ota2' partition/);
+  });
+
+  it("refuses a second slot off the sector grid", () => {
+    expect(() => parseAmbdImage(UNALIGNED_OTA2)).toThrow(/not sector aligned/);
   });
 
   it("refuses a first slot that lands in the second", () => {

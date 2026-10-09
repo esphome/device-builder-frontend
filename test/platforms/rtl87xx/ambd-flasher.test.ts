@@ -140,6 +140,21 @@ describe("flashAmbd", () => {
     expect(written(chip)).toBe(true);
   });
 
+  it("loads the loader again when RAM kept its first word across the reset but nothing answers", async () => {
+    // The fake keeps RAM across a reset while the loader itself is gone: the
+    // word reads as resident, the flash id read gets no answer, and the
+    // upload is repeated. Flashing twice on one chip is the Retry case.
+    const chip = fakeAmbd();
+    const log: string[] = [];
+    const hooks = { onProgress: () => {}, onLog: (l: string) => log.push(l) };
+    await driveFakeTimers(flashAmbd(chip.port, IMAGE, hooks));
+    await expect(driveFakeTimers(flashAmbd(chip.port, IMAGE, hooks))).resolves.toBe(true);
+    expect(log).toContain("The loader in RAM did not answer; loading it again");
+    // Loader and run the first time; the loader again and the run the second.
+    expect(chip.commands.filter((c) => c === "xmodem")).toHaveLength(4);
+    expect(written(chip)).toBe(true);
+  });
+
   it("takes a ROM that asks for CRC blocks, and one that NAKs the first block", async () => {
     for (const opts of [{ asksForCrc: true }, { nakFirstBlock: true }]) {
       const { chip, done } = flash(opts);
@@ -154,6 +169,27 @@ describe("flashAmbd", () => {
     await expect(driveFakeTimers(done)).rejects.toBeInstanceOf(AmbdLinkError);
     expect(onWaiting).toHaveBeenCalledOnce();
     expect(chip.raw.readable).toBeNull();
+  });
+
+  it("refuses a chip too small for the second slot's sector, before writing anything", async () => {
+    // A 2 MiB part: the bw16 layout's second slot lies past its end.
+    const { chip, done } = flash({ flashSizeLog2: 0x15 });
+    await expect(driveFakeTimers(done)).rejects.toThrow(/does not fit/);
+    expect(chip.erased.size).toBe(0);
+    expect(chip.raw.readable).toBeNull();
+  });
+
+  it("goes no further than the loader fetch when the install was cancelled meanwhile", async () => {
+    const abort = new AbortController();
+    mocks.loadAmbdLoader.mockImplementationOnce(async () => {
+      abort.abort(new DOMException("stopped", "AbortError"));
+      return LOADER;
+    });
+    const { chip, done } = flash({}, { signal: abort.signal });
+    await expect(driveFakeTimers(done)).rejects.toMatchObject({ name: "AbortError" });
+    // The port was never opened, so the board saw no reset.
+    expect(chip.raw.open).not.toHaveBeenCalled();
+    expect(chip.signals).toEqual([]);
   });
 
   it("fails when the loader does not start", async () => {

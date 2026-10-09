@@ -31,8 +31,9 @@ const STX = 0x02;
 const EOT = 0x04;
 const CAN = 0x18;
 const CRC_REQUEST = 0x43;
-/** What a JEDEC id read says: XMC, 4 MiB. */
-const FLASH_ID = [0x20, 0x40, 0x16];
+/** What a JEDEC id read says: XMC, with the size's log2 as the third byte (0x16: 4 MiB). */
+const FLASH_ID = [0x20, 0x40];
+const FLASH_SIZE_LOG2 = 0x16;
 const BANNER = new TextEncoder().encode("UARTIMG_Download 2\n\r");
 /** The AmebaD image signature, at the head of a slot that holds a valid image. */
 export const IMAGE_SIGNATURE = new TextEncoder().encode("81958711");
@@ -65,6 +66,8 @@ export interface FakeAmbdOptions {
   loaderDead?: boolean;
   /** A valid image signature sits at the head of the second slot. */
   ota2Valid?: boolean;
+  /** The flash size the JEDEC id reports, as its log2 (the default is 4 MiB). */
+  flashSizeLog2?: number;
   /**
    * Whether the ROM and the loader NAK after every reply and on every reset,
    * as the real chip does while it idles. Off for the transcript test, whose
@@ -181,7 +184,7 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
     } else if (cmd === 0x21 && pending.length === 3) {
       pending = [];
       commands.push("flash id");
-      if (loaderUp) reply([0x21, ...FLASH_ID]);
+      if (loaderUp) reply([0x21, ...FLASH_ID, opts.flashSizeLog2 ?? FLASH_SIZE_LOG2]);
       idleNak();
     } else if (cmd === 0x17 && pending.length === 6) {
       const offset = pending[1] | (pending[2] << 8) | (pending[3] << 16);

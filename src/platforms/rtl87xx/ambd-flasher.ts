@@ -170,6 +170,8 @@ export async function flashAmbd(
   hooks: AmbdFlashHooks
 ): Promise<boolean> {
   const loader = await loadAmbdLoader();
+  // A dialog closed during the fetch must not reset the board.
+  hooks.signal?.throwIfAborted();
   if (!port.readable) await port.open({ baudRate: AMBD_BAUD_RATE });
   const log = hooks.onLog ?? (() => {});
   let link: AmbdLink | undefined;
@@ -187,20 +189,36 @@ export async function flashAmbd(
       if (!word) throw new AmbdLinkError();
     }
     hooks.onLinked?.();
-    // The word at the loader's address is the loader's own first word once it runs.
-    if (bytesEqual(word, loader.subarray(0, 4))) {
-      log("The flash loader is already running");
-    } else {
+    const loadLoader = async () => {
       log(`Loading the flash loader (${loader.length} bytes) into RAM`);
-      await link.memoryWrite(AMBD_LOADER_ADDRESS, loader);
+      await link!.memoryWrite(AMBD_LOADER_ADDRESS, loader);
       await sleep(LOADER_START_MS);
+    };
+    // The word at the loader's address is the loader's own first word once
+    // it runs; RAM that kept it across a reset would say so too, and then
+    // the ROM is what answers, so a loader that stays silent is loaded again.
+    const resident = bytesEqual(word, loader.subarray(0, 4));
+    if (resident) log("The flash loader is already running");
+    else await loadLoader();
+    let id: Uint8Array;
+    try {
+      id = await link.flashId();
+    } catch (err) {
+      if (!resident) throw err;
+      log("The loader in RAM did not answer; loading it again");
+      await loadLoader();
+      id = await link.flashId();
     }
-    const id = await link.flashId();
     const size = flashSizeOf(id);
     log(
       `Linked to the flash loader (flash id ${toHex(id, " ")}${size ? `, ${size / 2 ** 20} MiB` : ""}); ${image.runs.length} runs to write`
     );
-    if (size && image.runs.some((r) => r.address + r.data.length > size)) {
+    // The second slot's sector is erased after the write, so it has to be on the chip too.
+    if (
+      size &&
+      (ota2Offset + AMBD_SECTOR_SIZE > size ||
+        image.runs.some((r) => r.address + r.data.length > size))
+    ) {
       throw new Error("The image does not fit the chip's flash");
     }
     let done = 0;
