@@ -234,7 +234,7 @@ export class ESPHomeAdoptDialog extends LitElement {
 
                 ${this._renderSource(device.package_import_url)}
 
-                <div class="name-pair">
+                <div>
                   <esphome-device-name-inputs
                     autofocus
                     .friendlyLabelKey=${"dashboard.adopt_field_friendly_name"}
