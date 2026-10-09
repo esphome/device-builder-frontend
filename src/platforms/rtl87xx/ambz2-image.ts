@@ -27,6 +27,8 @@ export const AMBZ2_PARSE: LibreTinyParseOptions = {
 };
 
 /** Why a Realtek image was refused (any of the families); ``key`` is the install dialogs' title copy. */
+export type { LibreTinyPartition };
+
 export class RtlImageError extends Error {
   constructor(
     readonly key: "firmware.rtl_wrong_family" | "firmware.rtl_bad_uf2",

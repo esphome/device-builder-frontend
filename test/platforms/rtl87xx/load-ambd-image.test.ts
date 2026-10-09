@@ -38,6 +38,18 @@ const UNALIGNED_OTA2 = makeLibreTinyUf2({
   }),
   blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
 });
+// The two slots share flash: the second's cleared sector is inside the first.
+const OVERLAPPING = makeLibreTinyUf2({
+  family: UF2_FAMILY_AMBD,
+  headerTags: ltHeaderTags({
+    BOARD: "bw16",
+    FAL_PTABLE: ltPartitionTable([
+      { name: "ota1", offset: 0x6000, length: 0x202000 },
+      { name: "ota2", offset: 0x206000, length: 0x1e2000 },
+    ]),
+  }),
+  blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
+});
 // OTA_PART_INFO sends the flasher's first slot into ota2, whose head the flasher clears.
 const IN_OTA2 = makeLibreTinyUf2({
   family: UF2_FAMILY_AMBD,
@@ -71,8 +83,11 @@ describe("parseAmbdImage", () => {
     expect(() => parseAmbdImage(UNALIGNED_OTA2)).toThrow(/not sector aligned/);
   });
 
-  it("refuses a first slot that lands in the second", () => {
-    expect(() => parseAmbdImage(IN_OTA2)).toThrow(/overlaps the 'ota2' partition/);
+  it("refuses slots that share flash, and a first slot written anywhere but 'ota1'", () => {
+    expect(() => parseAmbdImage(OVERLAPPING)).toThrow(
+      /'ota1' and 'ota2' partitions overlap/
+    );
+    expect(() => parseAmbdImage(IN_OTA2)).toThrow(/not in the 'ota1' partition/);
   });
 
   it("names a build for another Realtek chip as the wrong family", () => {

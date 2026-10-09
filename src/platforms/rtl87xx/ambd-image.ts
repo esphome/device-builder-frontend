@@ -12,7 +12,12 @@ import {
   type LibreTinyParseOptions,
   parseLibreTinyFile,
 } from "../libretiny-uf2.js";
-import { ota2PartitionOf, RtlImageError, toRtlImageError } from "./ambz2-image.js";
+import {
+  type LibreTinyPartition,
+  ota2PartitionOf,
+  RtlImageError,
+  toRtlImageError,
+} from "./ambz2-image.js";
 
 export { RtlImageError };
 
@@ -62,19 +67,28 @@ export function checkAmbdUf2(bytes: Uint8Array): LibreTinyFile {
 
 /** The first slot's runs and the second slot's offset from a parsed file. */
 export function ambdImageOf(file: LibreTinyFile): AmbdImage {
+  const ota1 = file.partitions.find((p) => p.name === "ota1");
+  if (!ota1) throw new Error("Invalid UF2: no 'ota1' partition");
   const ota2 = ota2PartitionOf(file);
   // Its first sector is erased whole, so it has to start on one.
   if (ota2.offset % AMBD_PARSE.blockSize !== 0) {
     throw new Error("Invalid UF2: the 'ota2' partition is not sector aligned");
   }
+  // The flasher clears the second slot's first sector after the write: the
+  // slots must not share flash, or the first slot would lose its own head.
+  if (overlap(ota1, ota2)) {
+    throw new Error("Invalid UF2: the 'ota1' and 'ota2' partitions overlap");
+  }
   const image = libreTinyImageFor(file, AMBD_PARSE);
-  // The flasher clears the second slot's first sector after the write: a
-  // first slot that reaches into it would lose its own head.
-  const cleared = ota2.offset + AMBD_PARSE.blockSize;
+  // The scheme names its partition per block group; only the first slot is written.
+  const end = ota1.offset + ota1.length;
   if (
-    image.runs.some((r) => r.address < cleared && r.address + r.data.length > ota2.offset)
+    !image.runs.every((r) => r.address >= ota1.offset && r.address + r.data.length <= end)
   ) {
-    throw new Error("Invalid UF2: the first slot overlaps the 'ota2' partition");
+    throw new Error("Invalid UF2: the first slot is not in the 'ota1' partition");
   }
   return { image, ota2Offset: ota2.offset };
 }
+
+const overlap = (a: LibreTinyPartition, b: LibreTinyPartition): boolean =>
+  a.offset < b.offset + b.length && b.offset < a.offset + a.length;

@@ -210,14 +210,15 @@ export async function flashAmbd(
       id = await link.flashId();
     }
     const size = flashSizeOf(id);
+    // Nothing is erased on a chip whose size the id does not give.
+    if (!size) throw new Error(`Unknown flash size (id ${toHex(id, " ")})`);
     log(
-      `Linked to the flash loader (flash id ${toHex(id, " ")}${size ? `, ${size / 2 ** 20} MiB` : ""}); ${image.runs.length} runs to write`
+      `Linked to the flash loader (flash id ${toHex(id, " ")}, ${size / 2 ** 20} MiB); ${image.runs.length} runs to write`
     );
     // The second slot's sector is erased after the write, so it has to be on the chip too.
     if (
-      size &&
-      (ota2Offset + AMBD_SECTOR_SIZE > size ||
-        image.runs.some((r) => r.address + r.data.length > size))
+      ota2Offset + AMBD_SECTOR_SIZE > size ||
+      image.runs.some((r) => r.address + r.data.length > size)
     ) {
       throw new Error("The image does not fit the chip's flash");
     }
