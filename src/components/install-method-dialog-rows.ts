@@ -324,7 +324,11 @@ export function renderOtaAddressCard(card: {
                   .value=${card.value}
                   @input=${(e: Event) => card.onInput((e.target as HTMLInputElement).value)}
                   @keydown=${(e: KeyboardEvent) => {
-                    if (e.key === "Enter" && canSubmit) card.onSubmit();
+                    if (e.key !== "Enter" || !canSubmit) return;
+                    // The progress dialog this opens focuses its close button
+                    // in showModal(); an unclaimed Enter would then activate it.
+                    e.preventDefault();
+                    card.onSubmit();
                   }}
                 />
                 <div class="ota-form-actions">
