@@ -135,7 +135,7 @@ class Chip:
             self.reply(bytes([ACK]))
             self.xmodem = bytearray()
             self.reply(bytes([NAK]))  # asks for checksum blocks
-        elif byte in (0x31, 0x21, 0x17, 0x27, 0x05):
+        elif byte in (0x31, 0x21, 0x17, 0x27):
             self.pending = [byte]
 
     def argument(self) -> None:
@@ -168,9 +168,6 @@ class Chip:
             if not self.loader_up:
                 return
             self.reply(bytes([0x27]) + struct.pack("<I", self.checksum(offset, length)))
-        elif cmd == 0x05 and len(self.pending) == 2:
-            self.pending = []
-            self.reply(bytes([ACK]))
 
     def checksum(self, offset: int, length: int) -> int:
         data = bytes(self.flash[offset : offset + length])

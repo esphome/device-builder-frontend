@@ -24,7 +24,7 @@ import {
 } from "../platform-support.js";
 import { NO_UF2_KEY, pickUf2, uf2Handoff } from "../uf2-handoff.js";
 import type { AmbdImage } from "./ambd-image.js";
-import { checkAmbdImage, loadAmbdImage, runAmbd } from "./index.js";
+import { checkAmbdImage, loadAmbdImage, runAmbd, warmAmbd } from "./index.js";
 
 declare module "../platform-support.js" {
   interface BrowserFlasherSteps {
@@ -52,6 +52,8 @@ export async function startRtlAmbdInstall(
   }
   rtlAmbdImage.set(host, parsed.image);
   host._binaries = [artifact.binary];
+  // The engine and the flash loader download while the user reads the step.
+  void warmAmbd().catch(() => {});
   showReadyStep(host);
 }
 

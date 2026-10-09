@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   dispatchShowLogsAfterInstall: vi.fn(() => true),
   flashAmbd:
     vi.fn<(p: unknown, i: unknown, hooks: LibreTinyFlashHooks) => Promise<boolean>>(),
+  warmAmbd: vi.fn(async () => {}),
 }));
 vi.mock("../../../src/util/web-serial.js", () => ({
   requestSerialPort: mocks.requestSerialPort,
@@ -17,8 +18,14 @@ vi.mock("../../../src/platforms/rtl87xx/ambd-flasher.js", async (importOriginal)
   ...(await importOriginal<object>()),
   flashAmbd: mocks.flashAmbd,
 }));
+// The ready step's warm-up imports the engine chunk on its own; left running
+// across tests it would race the mock above, and nothing here tests it.
+vi.mock("../../../src/platforms/rtl87xx/index.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  warmAmbd: mocks.warmAmbd,
+}));
 
-import { ltPartInfoTags, makeLibreTinyUf2 } from "../../_make-libretiny-uf2.js";
+import { makeAmbz2Uf2 } from "../../_make-libretiny-uf2.js";
 import type { ConfiguredDevice } from "../../../src/api/types/devices.js";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
 import type { LibreTinyFlashHooks } from "../../../src/platforms/libretiny-flash.js";
@@ -86,13 +93,12 @@ describe("startRtlAmbdInstall", () => {
     expect(rtlAmbdImage.get(asHost(host))?.ota2Offset).toBe(0x206000);
     expect(host._step).toBe("rtl-ambd-ready");
     expect(host._statusMessage).toBe("firmware.rtl_ready_title");
+    // The engine and the flash loader download while the user reads the step.
+    expect(mocks.warmAmbd).toHaveBeenCalledOnce();
   });
 
   it("refuses an RTL8720C build as the wrong family", async () => {
-    const ambz2 = makeLibreTinyUf2({
-      blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
-    });
-    const host = makeHost({ uf2: ambz2.buffer });
+    const host = makeHost({ uf2: makeAmbz2Uf2().buffer });
     await startRtlAmbdInstall(asHost(host));
     expect(host._statusMessage).toBe("firmware.rtl_wrong_family");
     expect(rtlAmbdImage.get(asHost(host))).toBeNull();
@@ -203,10 +209,7 @@ describe("rtlAmbdInstall", () => {
         ?.file
     ).toBe("firmware.uf2");
     expect(await handoff.check!(UF2)).toBeNull();
-    const ambz2 = makeLibreTinyUf2({
-      blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
-    });
-    expect(await handoff.check!(ambz2)).toMatchObject({
+    expect(await handoff.check!(makeAmbz2Uf2())).toMatchObject({
       key: "firmware.rtl_wrong_family",
     });
   });

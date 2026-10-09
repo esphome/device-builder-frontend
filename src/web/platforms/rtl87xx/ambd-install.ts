@@ -2,9 +2,9 @@
 import { LIBRETINY_AMBD_GUIDE_URL } from "../../../common/docs.js";
 import {
   type AmbdImage,
-  loadAmbdEngine,
   loadAmbdImage,
   runAmbd,
+  warmAmbd,
 } from "../../../platforms/rtl87xx/index.js";
 import type { LibreTinyInstall } from "../../install/esphome-web-libretiny-install-dialog.js";
 import { RTL_COPY } from "./copy.js";
@@ -18,7 +18,7 @@ export const RTL_AMBD_INSTALL: LibreTinyInstall<AmbdImage> = {
     doneByHand: "firmware.rtl_ambd_done_manual_reset",
   },
   guideUrl: LIBRETINY_AMBD_GUIDE_URL,
-  loadEngine: loadAmbdEngine,
+  loadEngine: warmAmbd,
   load: loadAmbdImage,
   run: runAmbd,
 };

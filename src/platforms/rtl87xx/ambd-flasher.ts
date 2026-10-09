@@ -8,7 +8,7 @@
  * drop the loader. Loaded on demand by the install flow; nothing here
  * touches the DOM.
  */
-import { bytesEqual } from "../../util/bytes.js";
+import { bytesEqual, toHex } from "../../util/bytes.js";
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import { resetIntoFirmware } from "../../util/serial-control-lines.js";
 import { sleep } from "../../util/sleep.js";
@@ -198,9 +198,7 @@ export async function flashAmbd(
     const id = await link.flashId();
     const size = flashSizeOf(id);
     log(
-      `Linked to the flash loader (flash id ${Array.from(id, (b) => b.toString(16).padStart(2, "0")).join(" ")}${
-        size ? `, ${size / 2 ** 20} MiB` : ""
-      }); ${image.runs.length} runs to write`
+      `Linked to the flash loader (flash id ${toHex(id, " ")}${size ? `, ${size / 2 ** 20} MiB` : ""}); ${image.runs.length} runs to write`
     );
     if (size && image.runs.some((r) => r.address + r.data.length > size)) {
       throw new Error("The image does not fit the chip's flash");

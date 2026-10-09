@@ -10,10 +10,9 @@ import {
   type LibreTinyImage,
   libreTinyImageFor,
   type LibreTinyParseOptions,
-  type LibreTinyPartition,
   parseLibreTinyFile,
 } from "../libretiny-uf2.js";
-import { RtlImageError, toRtlImageError } from "./ambz2-image.js";
+import { ota2PartitionOf, RtlImageError, toRtlImageError } from "./ambz2-image.js";
 
 export { RtlImageError };
 
@@ -24,7 +23,7 @@ export const UF2_FAMILY_AMBD = 0x3379cfe2;
  * What the RTL8720D flasher writes, and how: the loader erases 4 KiB
  * sectors on the flash grid before the write, so a run pads to those.
  */
-export const AMBD_PARSE: LibreTinyParseOptions = {
+const AMBD_PARSE: LibreTinyParseOptions = {
   scheme: "flasher-ota1",
   blockSize: 0x1000,
   blocksFrom: "flash",
@@ -74,11 +73,4 @@ export function ambdImageOf(file: LibreTinyFile): AmbdImage {
     throw new Error("Invalid UF2: the first slot overlaps the 'ota2' partition");
   }
   return { image, ota2Offset: ota2.offset };
-}
-
-/** The ``ota2`` partition whose signature decides what the bootloader runs. */
-function ota2PartitionOf(file: LibreTinyFile): LibreTinyPartition {
-  const ota2 = file.partitions.find((p) => p.name === "ota2");
-  if (!ota2) throw new Error("Invalid UF2: no 'ota2' partition");
-  return ota2;
 }

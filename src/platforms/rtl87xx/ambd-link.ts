@@ -6,17 +6,14 @@
  * in front of the data. The ROM only writes RAM; the loader it is given
  * writes flash, addressed through the XIP window.
  */
-import { int32LE } from "../../util/bytes.js";
+import { int24LE, int32LE } from "../../util/bytes.js";
 import { SerialByteSession } from "../../util/serial-byte-session.js";
 import { sleep } from "../../util/sleep.js";
 import {
   awaitStart,
-  buildBlock,
-  EOT_FRAME,
-  sendFrame,
-  XMODEM_BLOCK_SIZE,
   type XmodemIo,
   XmodemNoStartError,
+  xmodemSendAddressed,
 } from "../../util/xmodem.js";
 
 /** Where the flash loader runs (KM0 SRAM), and where the ROM reads to find it. */
@@ -38,8 +35,6 @@ const CMD_CHECKSUM = 0x27;
 const CMD_READ_WORD = 0x31;
 /** The JEDEC id read: the ``9F`` opcode and its three reply bytes. */
 const FLASH_ID_REQUEST = new Uint8Array([CMD_FLASH_STATUS, 0x9f, 0x03]);
-/** Each address-prefixed block's payload: 4 address bytes and the data. */
-const BLOCK_PAYLOAD = 4 + XMODEM_BLOCK_SIZE;
 
 /** A reply, as ltchiptool waits for one. */
 const REPLY_MS = 600;
@@ -53,7 +48,7 @@ const XMODEM_START_MS = 3000;
 const XMODEM_REPLY_MS = 3000;
 const XMODEM_RETRIES = 16;
 
-export class AmbdProtocolError extends Error {
+class AmbdProtocolError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "AmbdProtocolError";
@@ -71,8 +66,6 @@ export function checksum32(data: Uint8Array): number {
   }
   return sum;
 }
-
-const int24LE = (v: number): number[] => [v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff];
 
 export class AmbdLink extends SerialByteSession implements XmodemIo {
   async write(data: Uint8Array): Promise<void> {
@@ -169,23 +162,10 @@ export class AmbdLink extends SerialByteSession implements XmodemIo {
       if (!(err instanceof XmodemNoStartError)) throw err;
       return false;
     });
-    let seq = 1;
-    for (let off = 0; off < data.length; off += XMODEM_BLOCK_SIZE) {
-      const chunk = data.subarray(off, Math.min(off + XMODEM_BLOCK_SIZE, data.length));
-      const payload = new Uint8Array(BLOCK_PAYLOAD).fill(0xff);
-      payload.set(int32LE(address + off), 0);
-      payload.set(chunk, 4);
-      const frame = buildBlock(seq, payload, crc, BLOCK_PAYLOAD, 0xff);
-      await sendFrame(this, frame, `block ${seq}`, XMODEM_RETRIES, XMODEM_REPLY_MS);
-      seq = (seq + 1) & 0xff;
-      onBlock?.(off + chunk.length);
-    }
-    await sendFrame(
-      this,
-      EOT_FRAME,
-      "the end of the file",
-      XMODEM_RETRIES,
-      XMODEM_REPLY_MS
-    );
+    await xmodemSendAddressed(this, address, data, crc, {
+      retries: XMODEM_RETRIES,
+      timeoutMs: XMODEM_REPLY_MS,
+      onBlock,
+    });
   }
 }

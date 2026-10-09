@@ -5,17 +5,14 @@
  * 1 KiB pieces, and memory writes over XModem-1k whose blocks carry their
  * target address in front of the data.
  */
-import { int32LE } from "../../util/bytes.js";
+import { int24LE } from "../../util/bytes.js";
 import { SerialByteSession } from "../../util/serial-byte-session.js";
 import { sleep } from "../../util/sleep.js";
 import {
   awaitStart,
-  buildBlock,
-  EOT_FRAME,
-  sendFrame,
-  XMODEM_BLOCK_SIZE,
   type XmodemIo,
   XmodemNoStartError,
+  xmodemSendAddressed,
 } from "../../util/xmodem.js";
 
 export const AMBZ_ROM_BAUD = 1500000;
@@ -39,8 +36,6 @@ const CMD_XMODEM_CAN = 0x18;
 const DISCONNECT = new Uint8Array([CMD_XMODEM_CAN, CMD_XMODEM_HANDSHAKE, CMD_XMODEM_CAN]);
 const READ_BLOCK = 4096;
 const READ_ACK_SIZE = 1024;
-/** Each address-prefixed block's payload: 4 address bytes and the data. */
-const BLOCK_PAYLOAD = 4 + XMODEM_BLOCK_SIZE;
 
 /** A reply, waited on with the timeout restarting at every byte (as ltchiptool reads). */
 const READ_MS = 500;
@@ -158,12 +153,7 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     await this.quietHandshake();
     // The offset in 3 bytes, the count of 4 KiB blocks in 2, both little endian.
     await this.write(
-      new Uint8Array([
-        CMD_FLASH_READ,
-        ...int32LE(offset).subarray(0, 3),
-        blocks & 0xff,
-        blocks >> 8,
-      ])
+      new Uint8Array([CMD_FLASH_READ, ...int24LE(offset), blocks & 0xff, blocks >> 8])
     );
     const out = new Uint8Array(blocks * READ_BLOCK);
     for (let at = 0; at < out.length; at += READ_ACK_SIZE) {
@@ -191,23 +181,10 @@ export class AmbzLink extends SerialByteSession implements XmodemIo {
     // Its blocks carry an 8-bit sum; a ROM asking for CRC would refuse every one.
     if (crc)
       throw new AmbzProtocolError("The ROM asked for CRC blocks, which it does not take");
-    let seq = 1;
-    for (let off = 0; off < data.length; off += XMODEM_BLOCK_SIZE) {
-      const chunk = data.subarray(off, Math.min(off + XMODEM_BLOCK_SIZE, data.length));
-      const payload = new Uint8Array(BLOCK_PAYLOAD).fill(0xff);
-      payload.set(int32LE(address + off), 0);
-      payload.set(chunk, 4);
-      const frame = buildBlock(seq, payload, false, BLOCK_PAYLOAD, 0xff);
-      await sendFrame(this, frame, `block ${seq}`, XMODEM_RETRIES, XMODEM_REPLY_MS);
-      seq = (seq + 1) & 0xff;
-      onBlock?.(off + chunk.length);
-    }
-    await sendFrame(
-      this,
-      EOT_FRAME,
-      "the end of the file",
-      XMODEM_RETRIES,
-      XMODEM_REPLY_MS
-    );
+    await xmodemSendAddressed(this, address, data, false, {
+      retries: XMODEM_RETRIES,
+      timeoutMs: XMODEM_REPLY_MS,
+      onBlock,
+    });
   }
 }

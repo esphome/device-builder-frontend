@@ -26,7 +26,7 @@ vi.mock("../../../../src/util/web-serial.js", async (importOriginal) => ({
 vi.mock("../../../../src/platforms/rtl87xx/ambz2-flasher.js", () => ({
   flashAmbz2: mocks.flashAmbz2,
 }));
-vi.mock("../../../../src/platforms/rtl87xx/ambz-image.js", async (importOriginal) => ({
+vi.mock("../../../../src/platforms/rtl87xx/rtl87xx-image.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   parseRtl87xxImage: mocks.parseRtl87xxImage,
 }));

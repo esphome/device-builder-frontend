@@ -9,6 +9,7 @@ import {
   type LibreTinyFile,
   type LibreTinyImage,
   type LibreTinyParseOptions,
+  type LibreTinyPartition,
   parseLibreTinyFile,
   parseLibreTinyImage,
 } from "../libretiny-uf2.js";
@@ -55,6 +56,13 @@ export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
   } catch (err) {
     throw toRtlImageError(err);
   }
+}
+
+/** The ``ota2`` partition the other Realtek flashers need (the chip's system data or bootloader points at it). */
+export function ota2PartitionOf(file: LibreTinyFile): LibreTinyPartition {
+  const ota2 = file.partitions.find((p) => p.name === "ota2");
+  if (!ota2) throw new Error("Invalid UF2: no 'ota2' partition");
+  return ota2;
 }
 
 /** ``parseAmbz2Image`` without the flash runs. Fails as ``RtlImageError``. */

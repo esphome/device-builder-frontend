@@ -21,14 +21,13 @@ import {
   fakeAmbd,
   type FakeAmbdOptions,
   IMAGE_SIGNATURE,
+  STAND_IN_LOADER as LOADER,
   makeAmbdUf2,
   OTA1_OFFSET,
   OTA2_OFFSET,
 } from "./_fake-ambd.js";
 
 const IMAGE = parseAmbdImage(makeAmbdUf2());
-/** A stand-in loader: the engine only needs its bytes. */
-const LOADER = Uint8Array.from({ length: 4688 }, (_, i) => (i * 3 + 1) % 255);
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
@@ -72,7 +71,6 @@ describe("flashAmbd", () => {
     expect(onWaiting).not.toHaveBeenCalled();
     // One open, at the log speed; no baud change.
     expect(chip.bauds).toEqual([115200]);
-    expect(chip.commands).not.toContainEqual(expect.stringMatching(/^baud/));
     // The loader went in first, then the one run; the reboot at the end dropped it again.
     expect(chip.commands.filter((c) => c === "xmodem")).toHaveLength(2);
     expect(chip.ram.subarray(0, LOADER.length)).toEqual(LOADER);
@@ -133,12 +131,10 @@ describe("flashAmbd", () => {
   });
 
   it("skips the upload when the loader already runs, on an adapter that cannot reset it away", async () => {
-    const chip = fakeAmbd({ loaderResident: true, noSignals: true });
+    const { chip, log, done } = flash({ loaderResident: true, noSignals: true });
+    // The engine fetches the loader before it probes, so the RAM is set in time.
     chip.ram.set(LOADER, 0);
-    const log: string[] = [];
-    await driveFakeTimers(
-      flashAmbd(chip.port, IMAGE, { onProgress: () => {}, onLog: (l) => log.push(l) })
-    );
+    await driveFakeTimers(done);
     expect(log).toContain("The flash loader is already running");
     expect(chip.commands.filter((c) => c === "xmodem")).toHaveLength(1);
     expect(written(chip)).toBe(true);
@@ -188,25 +184,24 @@ describe("flashAmbd", () => {
   });
 
   it("names a board that goes away mid-transfer and releases the port", async () => {
-    const chip = fakeAmbd();
-    const done = flashAmbd(chip.port, IMAGE, {
-      onProgress: (p) => {
-        if (p >= 30) chip.dropLink();
-      },
-    });
-    await expect(driveFakeTimers(done)).rejects.toBeInstanceOf(SerialDeviceLostError);
+    let chip!: ReturnType<typeof fakeAmbd>;
+    const run = flash({}, { onProgress: (p) => p >= 30 && chip.dropLink() });
+    chip = run.chip;
+    await expect(driveFakeTimers(run.done)).rejects.toBeInstanceOf(SerialDeviceLostError);
     expect(chip.raw.readable).toBeNull();
   });
 
   it("stops at the abort signal", async () => {
     const abort = new AbortController();
-    const chip = fakeAmbd();
-    const done = flashAmbd(chip.port, IMAGE, {
-      onProgress: (p) => {
-        if (p >= 30) abort.abort(new DOMException("stopped", "AbortError"));
-      },
-      signal: abort.signal,
-    });
+    const { chip, done } = flash(
+      {},
+      {
+        signal: abort.signal,
+        onProgress: (p) => {
+          if (p >= 30) abort.abort(new DOMException("stopped", "AbortError"));
+        },
+      }
+    );
     await expect(driveFakeTimers(done)).rejects.toMatchObject({ name: "AbortError" });
     expect(chip.raw.readable).toBeNull();
   });

@@ -9,17 +9,14 @@ import {
   type LibreTinyFile,
   type LibreTinyImage,
   libreTinyImageFor,
-  type LibreTinyPartition,
   type LibreTinyScheme,
   parseLibreTinyFile,
 } from "../libretiny-uf2.js";
-import { type AmbdImage, ambdImageOf, UF2_FAMILY_AMBD } from "./ambd-image.js";
 import {
-  AMBZ2_PARSE,
+  ota2PartitionOf,
   RtlImageError,
   toRtlImageError,
   UF2_FAMILY_AMBZ,
-  UF2_FAMILY_AMBZ2,
 } from "./ambz2-image.js";
 
 export { RtlImageError };
@@ -31,12 +28,6 @@ export interface AmbzImage {
   /** The ``ota2`` partition's flash offset, which the chip's system data must point at. */
   ota2Offset: number;
 }
-
-/** A parsed RTL87xx UF2 and the chip it was built for. */
-export type RtlImage =
-  | { chip: "ambz2"; image: LibreTinyImage }
-  | { chip: "ambz"; image: AmbzImage }
-  | { chip: "ambd"; image: AmbdImage };
 
 /**
  * Parse a LibreTiny UF2 for the RTL8710B flasher. Another Realtek family
@@ -62,28 +53,8 @@ export function checkAmbzUf2(bytes: Uint8Array): LibreTinyFile {
   }
 }
 
-/** Parse an RTL8720C, RTL8710B or RTL8720D UF2 in one pass; its family names the chip. Fails as ``RtlImageError``. */
-export function parseRtl87xxImage(bytes: Uint8Array): RtlImage {
-  try {
-    const file = parseLibreTinyFile(bytes, [
-      UF2_FAMILY_AMBZ2,
-      UF2_FAMILY_AMBZ,
-      UF2_FAMILY_AMBD,
-    ]);
-    switch (file.familyId) {
-      case UF2_FAMILY_AMBZ:
-        return { chip: "ambz", image: ambzImageOf(file) };
-      case UF2_FAMILY_AMBD:
-        return { chip: "ambd", image: ambdImageOf(file) };
-      default:
-        return { chip: "ambz2", image: libreTinyImageFor(file, AMBZ2_PARSE) };
-    }
-  } catch (err) {
-    throw toRtlImageError(err);
-  }
-}
-
-function ambzImageOf(file: LibreTinyFile): AmbzImage {
+/** Both slots and the second's offset from a parsed file. */
+export function ambzImageOf(file: LibreTinyFile): AmbzImage {
   const slot = (scheme: LibreTinyScheme) =>
     libreTinyImageFor(file, {
       scheme,
@@ -106,11 +77,4 @@ function ambzImageOf(file: LibreTinyFile): AmbzImage {
     throw new Error("Invalid UF2: the second slot is not in the 'ota2' partition");
   }
   return image;
-}
-
-/** The ``ota2`` partition the chip's system data must point at. */
-function ota2PartitionOf(file: LibreTinyFile): LibreTinyPartition {
-  const ota2 = file.partitions.find((p) => p.name === "ota2");
-  if (!ota2) throw new Error("Invalid UF2: no 'ota2' partition");
-  return ota2;
 }

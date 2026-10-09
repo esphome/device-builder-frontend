@@ -9,6 +9,7 @@ export type * from "./ambz-flasher.js";
 export type * from "./ambz-image.js";
 export type * from "./ambd-flasher.js";
 export type * from "./ambd-image.js";
+export type * from "./rtl87xx-image.js";
 export type * from "../libretiny-uf2.js";
 export type * from "./ambz2-image.js";
 export * from "./rtl87xx-platform.js";
@@ -19,8 +20,9 @@ import type { LibreTinyFlashHooks, LibreTinyFlashResult } from "../libretiny-fla
 import type { LibreTinyFile, LibreTinyImage } from "../libretiny-uf2.js";
 import type { AmbdFlashHooks } from "./ambd-flasher.js";
 import type { AmbdImage } from "./ambd-image.js";
-import type { AmbzImage, RtlImage } from "./ambz-image.js";
+import type { AmbzImage } from "./ambz-image.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
+import type { RtlImage } from "./rtl87xx-image.js";
 
 export const loadAmbz2Engine = () => import("./ambz2-flasher.js");
 export const loadAmbz2Parser = () => import("./ambz2-image.js");
@@ -78,6 +80,7 @@ export const runAmbz2 = (
 
 export const loadAmbzEngine = () => import("./ambz-flasher.js");
 export const loadAmbzParser = () => import("./ambz-image.js");
+export const loadRtl87xxParser = () => import("./rtl87xx-image.js");
 
 /** The RTL8710B counterpart of ``loadAmbz2Image``; never throws. */
 export const loadAmbzImage = (
@@ -106,10 +109,10 @@ export const loadRtl87xxImage = (
   bytes: Uint8Array
 ): Promise<{ image: RtlImage } | RtlImageFailure> =>
   parseWith(
-    "[rtl87xx AmebaZ]",
-    loadAmbzParser,
+    "[rtl87xx]",
+    loadRtl87xxParser,
     (p) => ({ image: p.parseRtl87xxImage(bytes) }),
-    rtlKey
+    (p, err) => (err instanceof p.RtlImageError ? err.key : "firmware.rtl_bad_uf2")
   );
 
 /** The RTL8710B counterpart of ``runAmbz2``; never throws. */
@@ -125,6 +128,19 @@ export const runAmbz = (
 
 export const loadAmbdEngine = () => import("./ambd-flasher.js");
 export const loadAmbdParser = () => import("./ambd-image.js");
+
+/**
+ * The engine chunk and the flash loader it needs, fetched side by side, for
+ * a flow to start while the user picks a port: the flash then finds both
+ * cached. Rejects with whichever failed; the flash itself names it.
+ */
+export async function warmAmbd(): Promise<unknown> {
+  const [engine] = await Promise.all([
+    loadAmbdEngine(),
+    import("./ambd-loader.js").then((loader) => loader.loadAmbdLoader()),
+  ]);
+  return engine;
+}
 
 /** The RTL8720D counterpart of ``loadAmbz2Image``; never throws. */
 export const loadAmbdImage = (

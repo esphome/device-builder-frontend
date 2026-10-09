@@ -106,6 +106,10 @@ export function ltHeaderTags(
   return tags;
 }
 
+/** The smallest RTL8720C build: one block in ``ota1`` of the bw15 layout. */
+export const makeAmbz2Uf2 = (): Uint8Array<ArrayBuffer> =>
+  makeLibreTinyUf2({ blocks: [{ addr: 0, tags: AMBZ2_OTA_TAGS }] });
+
 /** A whole file: a header block (no payload, not main flash) then the data blocks. */
 export function makeLibreTinyUf2(spec: LtUf2Spec): Uint8Array<ArrayBuffer> {
   const family = spec.family === undefined ? UF2_FAMILY_AMBZ2 : spec.family;

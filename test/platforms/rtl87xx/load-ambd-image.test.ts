@@ -4,14 +4,13 @@ import {
   ltHeaderTags,
   ltPartInfoTags,
   ltPartitionTable,
+  makeAmbz2Uf2,
   makeLibreTinyUf2,
 } from "../../_make-libretiny-uf2.js";
 import {
-  AMBD_PARSE,
   parseAmbdImage,
   UF2_FAMILY_AMBD,
 } from "../../../src/platforms/rtl87xx/ambd-image.js";
-import { UF2_FAMILY_AMBZ2 } from "../../../src/platforms/rtl87xx/ambz2-image.js";
 import { makeAmbdUf2, OTA1_OFFSET, OTA2_OFFSET } from "./_fake-ambd.js";
 
 const UF2 = makeAmbdUf2();
@@ -50,11 +49,6 @@ describe("parseAmbdImage", () => {
     ]);
     expect(image.totalBytes).toBe(10 * 256 + 40);
     expect(ota2Offset).toBe(OTA2_OFFSET);
-    expect(AMBD_PARSE).toEqual({
-      scheme: "flasher-ota1",
-      blockSize: 0x1000,
-      blocksFrom: "flash",
-    });
   });
 
   it("refuses a layout without a second slot", () => {
@@ -66,11 +60,7 @@ describe("parseAmbdImage", () => {
   });
 
   it("names a build for another Realtek chip as the wrong family", () => {
-    const ambz2 = makeLibreTinyUf2({
-      family: UF2_FAMILY_AMBZ2,
-      blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
-    });
-    expect(() => parseAmbdImage(ambz2)).toThrow(
+    expect(() => parseAmbdImage(makeAmbz2Uf2())).toThrow(
       expect.objectContaining({ key: "firmware.rtl_wrong_family" })
     );
     expect(() => parseAmbdImage(new Uint8Array(512))).toThrow(

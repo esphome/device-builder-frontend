@@ -5,8 +5,7 @@ import {
   loadAmbdLoader,
   resetAmbdLoaderForTests,
 } from "../../../src/platforms/rtl87xx/ambd-loader.js";
-
-const LOADER = Uint8Array.from({ length: 4688 }, (_, i) => (i * 3 + 1) % 255);
+import { STAND_IN_LOADER as LOADER } from "./_fake-ambd.js";
 const expectedDigest = Uint8Array.from(
   AMBD_LOADER_SHA256.match(/../g)!.map((h) => parseInt(h, 16))
 );

@@ -13,7 +13,7 @@ const AMBZ2 = makeLibreTinyUf2({
 
 afterEach(() => {
   vi.doUnmock("../../../src/platforms/libretiny-uf2.js");
-  vi.doUnmock("../../../src/platforms/rtl87xx/ambz-image.js");
+  vi.doUnmock("../../../src/platforms/rtl87xx/rtl87xx-image.js");
   vi.resetModules();
   vi.restoreAllMocks();
 });
@@ -68,7 +68,7 @@ describe("loadRtl87xxImage", () => {
 
   it("names a parser chunk that did not load, instead of throwing", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.doMock("../../../src/platforms/rtl87xx/ambz-image.js", () => {
+    vi.doMock("../../../src/platforms/rtl87xx/rtl87xx-image.js", () => {
       throw new TypeError("Failed to fetch");
     });
     const loadRtl87xxImage = await load();

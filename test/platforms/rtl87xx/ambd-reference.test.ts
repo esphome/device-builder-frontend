@@ -18,17 +18,15 @@ vi.mock("../../../src/platforms/rtl87xx/ambd-loader.js", async (importOriginal) 
 
 import { flashAmbd } from "../../../src/platforms/rtl87xx/ambd-flasher.js";
 import { parseAmbdImage } from "../../../src/platforms/rtl87xx/ambd-image.js";
-import { fakeAmbd, fixtureAmbdUf2 } from "./_fake-ambd.js";
+import { fakeAmbd, fixtureAmbdUf2, STAND_IN_LOADER } from "./_fake-ambd.js";
 import reference from "./fixtures/ambd-ota1.json";
 
 const UF2 = await fixtureAmbdUf2();
-/** The recorder's stand-in loader: the transcript is about the protocol, not the file. */
-const LOADER = Uint8Array.from({ length: 4688 }, (_, i) => (i * 3 + 1) % 255);
 
 describe("flashAmbd against ltchiptool's transcript", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-    mocks.loadAmbdLoader.mockResolvedValue(LOADER);
+    mocks.loadAmbdLoader.mockResolvedValue(STAND_IN_LOADER);
   });
   afterEach(() => {
     vi.useRealTimers();

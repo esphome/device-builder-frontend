@@ -18,6 +18,7 @@ import {
 } from "../../_make-libretiny-uf2.js";
 import { fakeSerialPort } from "../../_web-serial.js";
 import { UF2_FAMILY_AMBD } from "../../../src/platforms/rtl87xx/ambd-image.js";
+import { checksum32 } from "../../../src/platforms/rtl87xx/ambd-link.js";
 import { crc16Xmodem } from "../../../src/util/xmodem.js";
 
 const FLASH_SIZE = 0x400000;
@@ -37,14 +38,18 @@ const BANNER = new TextEncoder().encode("UARTIMG_Download 2\n\r");
 export const IMAGE_SIGNATURE = new TextEncoder().encode("81958711");
 export const OTA1_OFFSET = 0x6000;
 export const OTA2_OFFSET = 0x206000;
+/** The stand-in flash loader the tests and the transcript recorder agree on. */
+export const STAND_IN_LOADER = Uint8Array.from(
+  { length: 4688 },
+  (_, i) => (i * 3 + 1) % 255
+);
 
 /** What the flash holds before the flash: never FF, so an erase shows; built once, copied per chip. */
-const OLD_FLASH = Uint8Array.from({ length: FLASH_SIZE }, (_, i) => (i * 7 + 3) % 251);
+const OLD_FLASH = new Uint8Array(FLASH_SIZE);
+for (let i = 0; i < FLASH_SIZE; i++) OLD_FLASH[i] = (i * 7 + 3) % 251;
 
 export interface FakeAmbdOptions {
-  /** In the ROM already (the default is the application, deaf until a reset or ``strap()``). */
-  strapped?: boolean;
-  /** The loader already runs from a previous session (implies ``strapped``). */
+  /** The loader already runs from a previous session. */
   loaderResident?: boolean;
   /** Fail setSignals as an adapter without control lines would. */
   noSignals?: boolean;
@@ -76,7 +81,7 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
   if (opts.ota2Valid) flash.set(IMAGE_SIGNATURE, OTA2_OFFSET);
   const ram = Uint8Array.from({ length: RAM_SIZE }, (_, i) => (i * 13 + 5) % 253);
   const erased = new Set<number>();
-  let rom = (opts.strapped ?? false) || (opts.loaderResident ?? false);
+  let rom = opts.loaderResident ?? false;
   let loaderUp = opts.loaderResident ?? false;
   let dtr = false;
   let rts = false;
@@ -94,17 +99,6 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
   /** The ROM and the loader NAK after every reply, as they do while idle. */
   const idleNak = () => {
     if (opts.idleNaks ?? true) reply([NAK]);
-  };
-
-  const sum32 = (offset: number, length: number): number => {
-    let sum = 0;
-    const words = length - (length % 4);
-    const view = new DataView(flash.buffer, offset, length);
-    for (let i = 0; i < words; i += 4) sum = (sum + view.getUint32(i, true)) >>> 0;
-    for (let i = words; i < length; i++) {
-      sum = (sum + flash[offset + i] * 2 ** ((i - words) * 8)) >>> 0;
-    }
-    return sum;
   };
 
   const endTransfer = () => {
@@ -207,13 +201,11 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
       pending = [];
       commands.push(`checksum 0x${offset.toString(16)}+${length}`);
       if (!loaderUp) return;
-      const sum = opts.badChecksum ? 0 : sum32(offset, length);
+      const sum = opts.badChecksum
+        ? 0
+        : checksum32(flash.subarray(offset, offset + length));
       reply([0x27, sum & 0xff, (sum >>> 8) & 0xff, (sum >>> 16) & 0xff, sum >>> 24]);
       idleNak();
-    } else if (cmd === 0x05 && pending.length === 2) {
-      pending = [];
-      commands.push(`baud index 0x${pending[1]?.toString(16)}`);
-      reply([ACK]);
     }
   };
 
@@ -224,7 +216,7 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
       reply([ACK]);
       xmodem = { buf: [], crc: opts.asksForCrc ?? false, naked: false };
       reply([opts.asksForCrc ? CRC_REQUEST : NAK]);
-    } else if ([0x31, 0x21, 0x17, 0x27, 0x05].includes(byte)) {
+    } else if ([0x31, 0x21, 0x17, 0x27].includes(byte)) {
       pending = [byte];
     }
   };
@@ -262,8 +254,8 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
         xmodem = null;
         loaderUp = false;
         rom = dtr && !rts;
-        if (!rom) booted++;
         if (rom) idleNak();
+        else booted++;
       }
     },
   });
