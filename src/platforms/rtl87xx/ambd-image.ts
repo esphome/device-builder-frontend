@@ -97,8 +97,30 @@ export function ambdImageOf(file: LibreTinyFile): AmbdImage {
   ) {
     throw new Error("Invalid UF2: the first slot is not in the 'ota1' partition");
   }
+  // Each run is erased by whole sectors and written in whole blocks: two
+  // runs whose footprints share a sector would have the later one erase or
+  // pad over the earlier, verified one.
+  const footprints = image.runs
+    .map((r) => ({
+      address: r.address,
+      start: r.address - (r.address % AMBD_PARSE.blockSize),
+      end: sectorEnd(r.address + writtenLength(r.data.length)),
+    }))
+    .sort((a, b) => a.start - b.start);
+  for (let i = 1; i < footprints.length; i++) {
+    const prev = footprints[i - 1];
+    const next = footprints[i];
+    if (prev.end > next.start) {
+      throw new Error(
+        `Invalid UF2: runs at 0x${prev.address.toString(16)} and 0x${next.address.toString(16)} share a sector`
+      );
+    }
+  }
   return { image, ota2Offset: ota2.offset };
 }
+
+const sectorEnd = (n: number): number =>
+  Math.ceil(n / AMBD_PARSE.blockSize) * AMBD_PARSE.blockSize;
 
 const overlap = (a: LibreTinyPartition, b: LibreTinyPartition): boolean =>
   a.offset < b.offset + b.length && b.offset < a.offset + a.length;

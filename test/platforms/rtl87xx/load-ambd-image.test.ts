@@ -58,6 +58,15 @@ const PADDED_PAST_OTA1 = makeLibreTinyUf2({
     { addr: 0x1f9f00, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) },
   ],
 });
+// Two runs whose erase and padded write reach into each other's sector.
+const SHARED_SECTOR = makeLibreTinyUf2({
+  family: UF2_FAMILY_AMBD,
+  headerTags: bw16Tags(),
+  blocks: [
+    { addr: 0x1100, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) },
+    { addr: 0xf00 },
+  ],
+});
 // The two slots share flash: the second's cleared sector is inside the first.
 const OVERLAPPING = makeLibreTinyUf2({
   family: UF2_FAMILY_AMBD,
@@ -110,6 +119,14 @@ describe("parseAmbdImage", () => {
     expect(() => parseAmbdImage(IN_OTA2)).toThrow(/not in the 'ota1' partition/);
     // The 256 bytes at 0x1fff00 fit, their padded XModem block does not.
     expect(() => parseAmbdImage(PADDED_PAST_OTA1)).toThrow(/not in the 'ota1' partition/);
+  });
+
+  it("refuses runs whose erase or padded write would reach each other", () => {
+    // 0x7100 and 0x6f00: the lower run's erase takes sector 0x7000 and its
+    // block pads to 0x7300, over the other run.
+    expect(() => parseAmbdImage(SHARED_SECTOR)).toThrow(
+      /runs at 0x6f00 and 0x7100 share a sector/
+    );
   });
 
   it("refuses a second slot shorter than the sector the flasher clears", () => {
