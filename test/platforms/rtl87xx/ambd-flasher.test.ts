@@ -130,6 +130,19 @@ describe("flashAmbd", () => {
     expect(run.log).toContainEqual(expect.stringContaining("reset it by hand"));
   });
 
+  it("gives up on a line change that never settles and goes on to the strap guide", async () => {
+    let chip!: ReturnType<typeof fakeAmbd>;
+    const onWaiting = vi.fn(() => chip.strap());
+    const run = flash({ hangSignals: true }, { onWaiting });
+    chip = run.chip;
+    // The reboot at the end hangs the same way, so the user is told to reset.
+    await expect(driveFakeTimers(run.done)).resolves.toBe(false);
+    expect(onWaiting).toHaveBeenCalledOnce();
+    expect(run.log).toContainEqual(expect.stringContaining("LOG_TX to GND"));
+    expect(written(chip)).toBe(true);
+    expect(chip.raw.readable).toBeNull();
+  });
+
   it("skips the upload when the loader already runs, on an adapter that cannot reset it away", async () => {
     const { chip, log, done } = flash({ loaderResident: true, noSignals: true });
     // The engine fetches the loader before it probes, so the RAM is set in time.

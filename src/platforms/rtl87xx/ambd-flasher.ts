@@ -10,9 +10,12 @@
  */
 import { bytesEqual, toHex } from "../../util/bytes.js";
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
-import { resetIntoFirmware } from "../../util/serial-control-lines.js";
+import {
+  releaseControlLines,
+  resetIntoFirmware,
+} from "../../util/serial-control-lines.js";
 import { sleep } from "../../util/sleep.js";
-import { settledWithin } from "../../util/with-deadline.js";
+import { settledWithin, withDeadline } from "../../util/with-deadline.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
 import type { AmbdImage } from "./ambd-image.js";
 import {
@@ -47,6 +50,8 @@ const LOADER_START_MS = 300;
 const WRITE_SETTLE_MS = 150;
 /** How long the reboot and the close after a flash each get. */
 const TEARDOWN_MS = 2000;
+/** A line change left pending (the adapter unplugged mid change) is given up after this. */
+const LINES_MS = 2000;
 
 /** ``onWaiting``: the automatic reset produced nothing; the user has to strap the board. */
 export type AmbdFlashHooks = LibreTinyFlashHooks;
@@ -66,6 +71,18 @@ export class AmbdVerifyError extends Error {
   }
 }
 
+/** Change the control lines, giving up after ``LINES_MS``. */
+const setLines = (port: SerialPort, signals: SerialOutputSignals): Promise<void> =>
+  withDeadline(
+    port.setSignals(signals),
+    LINES_MS,
+    () => new Error("The adapter did not change its control lines")
+  );
+
+/** Release both lines, best effort and bounded. */
+const releaseLines = (port: SerialPort): Promise<boolean> =>
+  settledWithin(releaseControlLines(port), LINES_MS);
+
 /**
  * The BW16 kit's USB port drives an ESP-style auto-download circuit: the
  * reset is pulled while RTS is asserted and DTR released, the strap (BURN,
@@ -77,14 +94,16 @@ export class AmbdVerifyError extends Error {
  */
 async function autoReset(port: SerialPort): Promise<boolean> {
   try {
-    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+    await setLines(port, { dataTerminalReady: false, requestToSend: true });
     await sleep(RESET_HOLD_MS);
-    await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+    await setLines(port, { dataTerminalReady: true, requestToSend: false });
     await sleep(ROM_SETTLE_MS);
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    await setLines(port, { dataTerminalReady: false, requestToSend: false });
     await sleep(STRAP_RELEASE_MS);
     return true;
   } catch {
+    // Not with a line left held, which could keep the chip in reset or its TX low.
+    await releaseLines(port);
     return false;
   }
 }

@@ -54,6 +54,8 @@ export interface FakeAmbdOptions {
   loaderResident?: boolean;
   /** Fail setSignals as an adapter without control lines would. */
   noSignals?: boolean;
+  /** Never settle a line change, as on an adapter unplugged mid change. */
+  hangSignals?: boolean;
   /** Resets that do not reach the chip before one does (a CH340's first session). */
   lostResets?: number;
   /** NAK the first block of every transfer once. */
@@ -239,6 +241,7 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
   const link = fakeSerialPort({
     feed,
     noSignals: opts.noSignals,
+    hangSignals: opts.hangSignals,
     onOpen: ({ baudRate }) => {
       bauds.push(baudRate);
       if (rom) idleNak();
