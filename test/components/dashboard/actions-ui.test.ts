@@ -15,6 +15,7 @@ import {
   executeConfirm,
   type PendingConfirm,
 } from "../../../src/components/dashboard/render-dialogs.js";
+import type { RenameConfirmDetail } from "../../../src/components/rename-device-dialog.js";
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 import { makeDashboardHost } from "./_host.js";
 
@@ -53,12 +54,24 @@ vi.mock("../../../src/util/web-serial.js", async (importOriginal) => ({
 const localize = ((key: string, params?: Record<string, string>) =>
   params ? `${key} ${Object.values(params).join(" ")}` : key) as unknown as LocalizeFunc;
 
-function makeHost(
-  renameDevice: ESPHomeAPI["renameDevice"],
-  state: DeviceState = DeviceState.ONLINE,
-  otaSigned = false
-): { host: ESPHomePageDashboard; openConfirm: ReturnType<typeof vi.fn> } {
+const okRename = () =>
+  vi.fn(async () => ({ configuration: "rename-test.yaml", job: null }));
+const okFriendly = () =>
+  vi.fn(async () => ({ configuration: "rename_test.yaml", rewritten: true }));
+
+function makeHost({
+  state = DeviceState.ONLINE,
+  otaSigned = false,
+  renameDevice = okRename(),
+  editFriendlyName = okFriendly(),
+}: {
+  state?: DeviceState;
+  otaSigned?: boolean;
+  renameDevice?: ReturnType<typeof vi.fn>;
+  editFriendlyName?: ReturnType<typeof vi.fn>;
+} = {}) {
   const openConfirm = vi.fn();
+  const openInstallMethod = vi.fn();
   const host = makeDashboardHost({
     _actionDevice: makeConfiguredDevice({
       name: "rename_test",
@@ -66,15 +79,16 @@ function makeHost(
       configuration: "rename_test.yaml",
       runtime_state: { state, ota_signed: otaSigned },
     }),
-    _api: { renameDevice } as unknown as ESPHomeAPI,
+    _api: { renameDevice, editFriendlyName } as unknown as ESPHomeAPI,
     _localize: localize,
     _openConfirm: openConfirm,
+    _openInstallMethod: openInstallMethod,
   });
-  return { host, openConfirm };
+  return { host, openConfirm, openInstallMethod, renameDevice, editFriendlyName };
 }
 
-function renameEvent(newName: string): CustomEvent<string> {
-  return new CustomEvent("rename-confirm", { detail: newName });
+function renameEvent(detail: RenameConfirmDetail): CustomEvent<RenameConfirmDetail> {
+  return new CustomEvent("rename-confirm", { detail });
 }
 
 describe("openLogsWithMethod web-serial", () => {
@@ -206,7 +220,10 @@ describe("adoptFollowUp", () => {
     });
 
     expect(highlight).toHaveBeenCalledWith("foo-1234.yaml");
-    expect(renameDevice).toHaveBeenCalledWith("foo-1234.yaml", "kitchen", false);
+    expect(renameDevice).toHaveBeenCalledWith("foo-1234.yaml", "kitchen", {
+      configOnly: undefined,
+      newFriendlyName: undefined,
+    });
     expect(followJob).toHaveBeenCalledTimes(1);
   });
 
@@ -227,62 +244,55 @@ describe("adoptFollowUp", () => {
 });
 
 describe("executeRename", () => {
-  beforeEach(() => toastError.mockClear());
+  beforeEach(() => {
+    toastError.mockClear();
+    toastSuccess.mockClear();
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it("renames an online device directly (no confirm, OTA path)", async () => {
-    const renameDevice = vi.fn(async () => ({
-      configuration: "rename-test.yaml",
-      job: null,
-    }));
-    const { host, openConfirm } = makeHost(
-      renameDevice as unknown as ESPHomeAPI["renameDevice"]
-    );
+    const { host, openConfirm, renameDevice } = makeHost();
 
-    await executeRename(host, renameEvent("rename-test"));
+    await executeRename(host, renameEvent({ newName: "rename-test", install: true }));
 
     expect(openConfirm).not.toHaveBeenCalled();
-    expect(renameDevice).toHaveBeenCalledWith("rename_test.yaml", "rename-test", false);
+    expect(renameDevice).toHaveBeenCalledWith("rename_test.yaml", "rename-test", {
+      configOnly: false,
+      newFriendlyName: undefined,
+    });
   });
 
   it("confirms before renaming an offline device, without calling the API", async () => {
-    const renameDevice = vi.fn();
-    const { host, openConfirm } = makeHost(
-      renameDevice as unknown as ESPHomeAPI["renameDevice"],
-      DeviceState.OFFLINE
-    );
+    const { host, openConfirm, renameDevice } = makeHost({ state: DeviceState.OFFLINE });
 
-    await executeRename(host, renameEvent("rename-test"));
+    await executeRename(host, renameEvent({ newName: "rename-test", install: true }));
 
     expect(renameDevice).not.toHaveBeenCalled();
     expect(openConfirm).toHaveBeenCalledTimes(1);
     const pending = openConfirm.mock.calls[0][0] as PendingConfirm;
-    expect(pending).toMatchObject({ kind: "rename-config-only", newName: "rename-test" });
+    expect(pending).toMatchObject({
+      kind: "rename-config-only",
+      request: { newName: "rename-test" },
+    });
   });
 
   it("confirms for an online device that rejects unsigned OTA images", async () => {
-    const renameDevice = vi.fn();
-    const { host, openConfirm } = makeHost(
-      renameDevice as unknown as ESPHomeAPI["renameDevice"],
-      DeviceState.ONLINE,
-      true
-    );
+    const { host, openConfirm, renameDevice } = makeHost({ otaSigned: true });
 
-    await executeRename(host, renameEvent("rename-test"));
+    await executeRename(host, renameEvent({ newName: "rename-test", install: true }));
 
     expect(renameDevice).not.toHaveBeenCalled();
     const pending = openConfirm.mock.calls[0][0] as PendingConfirm;
-    expect(pending).toMatchObject({ kind: "rename-config-only", newName: "rename-test" });
+    expect(pending).toMatchObject({
+      kind: "rename-config-only",
+      request: { newName: "rename-test" },
+    });
   });
 
   it("confirms for an unknown-state device too (only online skips the prompt)", async () => {
-    const renameDevice = vi.fn();
-    const { host, openConfirm } = makeHost(
-      renameDevice as unknown as ESPHomeAPI["renameDevice"],
-      DeviceState.UNKNOWN
-    );
+    const { host, openConfirm, renameDevice } = makeHost({ state: DeviceState.UNKNOWN });
 
-    await executeRename(host, renameEvent("rename-test"));
+    await executeRename(host, renameEvent({ newName: "rename-test", install: true }));
 
     expect(renameDevice).not.toHaveBeenCalled();
     expect(openConfirm).toHaveBeenCalledTimes(1);
@@ -290,15 +300,131 @@ describe("executeRename", () => {
 
   it("surfaces the backend reason in the rename-failure toast", async () => {
     const reason = "A device named rename-test.yaml already exists";
-    const renameDevice = vi.fn(async () => {
-      throw new Error(`invalid_args: ${reason}`);
-    }) as unknown as ESPHomeAPI["renameDevice"];
-    const { host } = makeHost(renameDevice);
+    const { host } = makeHost({
+      renameDevice: vi.fn(async () => {
+        throw new Error(`invalid_args: ${reason}`);
+      }),
+    });
 
-    await executeRename(host, renameEvent("rename-test"));
+    await executeRename(host, renameEvent({ newName: "rename-test", install: true }));
 
     expect(toastError).toHaveBeenCalledTimes(1);
     expect(toastError.mock.calls[0][0]).toContain(reason);
+  });
+
+  it("sends both names in one rename call when both changed", async () => {
+    const { host, openConfirm, renameDevice } = makeHost();
+
+    await executeRename(
+      host,
+      renameEvent({
+        newName: "rename-test",
+        newFriendlyName: "Rename Test",
+        install: true,
+      })
+    );
+
+    expect(openConfirm).not.toHaveBeenCalled();
+    expect(renameDevice).toHaveBeenCalledWith("rename_test.yaml", "rename-test", {
+      configOnly: false,
+      newFriendlyName: "Rename Test",
+    });
+  });
+
+  it("carries the friendly name into the offline confirm", async () => {
+    const { host, openConfirm, renameDevice } = makeHost({ state: DeviceState.OFFLINE });
+
+    await executeRename(
+      host,
+      renameEvent({
+        newName: "rename-test",
+        newFriendlyName: "Rename Test",
+        install: true,
+      })
+    );
+
+    expect(renameDevice).not.toHaveBeenCalled();
+    const pending = openConfirm.mock.calls[0][0] as PendingConfirm;
+    expect(pending).toMatchObject({
+      kind: "rename-config-only",
+      request: { newName: "rename-test", newFriendlyName: "Rename Test" },
+    });
+  });
+
+  it("renames config-only without a confirm when install is unticked", async () => {
+    const { host, openConfirm, renameDevice } = makeHost({ state: DeviceState.OFFLINE });
+
+    await executeRename(
+      host,
+      renameEvent({
+        newName: "rename-test",
+        newFriendlyName: "Rename Test",
+        install: false,
+      })
+    );
+
+    expect(openConfirm).not.toHaveBeenCalled();
+    expect(renameDevice).toHaveBeenCalledWith("rename_test.yaml", "rename-test", {
+      configOnly: true,
+      newFriendlyName: "Rename Test",
+    });
+    expect(toastSuccess.mock.calls[0][0]).toContain(
+      "dashboard.action_rename_both_success"
+    );
+    expect(toastSuccess.mock.calls[0][0]).toContain("Rename Test");
+  });
+
+  it("names only the hostname in the toast when the friendly name was unchanged", async () => {
+    const { host } = makeHost();
+
+    await executeRename(host, renameEvent({ newName: "rename-test", install: false }));
+
+    expect(toastSuccess.mock.calls[0][0]).toContain("dashboard.action_rename_success");
+  });
+
+  it("edits the friendly name alone and opens the install picker", async () => {
+    const { host, openConfirm, openInstallMethod, renameDevice, editFriendlyName } =
+      makeHost({
+        state: DeviceState.OFFLINE,
+      });
+
+    await executeRename(
+      host,
+      renameEvent({ newFriendlyName: "Rename Test", install: true })
+    );
+
+    expect(renameDevice).not.toHaveBeenCalled();
+    expect(openConfirm).not.toHaveBeenCalled();
+    expect(editFriendlyName).toHaveBeenCalledWith("rename_test.yaml", "Rename Test");
+    expect(openInstallMethod).toHaveBeenCalledWith(host._actionDevice);
+  });
+
+  it("skips the install picker for a friendly-name-only edit with install unticked", async () => {
+    const { host, openInstallMethod, editFriendlyName } = makeHost();
+
+    await executeRename(
+      host,
+      renameEvent({ newFriendlyName: "Rename Test", install: false })
+    );
+
+    expect(editFriendlyName).toHaveBeenCalledTimes(1);
+    expect(openInstallMethod).not.toHaveBeenCalled();
+  });
+
+  it("skips the install picker when the backend reports the friendly name unchanged", async () => {
+    const { host, openInstallMethod } = makeHost({
+      editFriendlyName: vi.fn(async () => ({
+        configuration: "rename_test.yaml",
+        rewritten: false,
+      })),
+    });
+
+    await executeRename(
+      host,
+      renameEvent({ newFriendlyName: "Rename_Test", install: true })
+    );
+
+    expect(openInstallMethod).not.toHaveBeenCalled();
   });
 });
 
@@ -377,25 +503,45 @@ describe("executeClone", () => {
 describe("executeConfirm rename-config-only", () => {
   afterEach(() => vi.restoreAllMocks());
 
+  const request = (host: ESPHomePageDashboard, newFriendlyName?: string) => ({
+    configuration: "rename_test.yaml",
+    currentName: (host._actionDevice as ConfiguredDevice).name,
+    newName: "rename-test",
+    newFriendlyName,
+  });
+
   it("forwards config_only=true to the API on the confirmed offline path", async () => {
-    const renameDevice = vi.fn(async () => ({
-      configuration: "rename-test.yaml",
-      job: null,
-    }));
-    const { host } = makeHost(
-      renameDevice as unknown as ESPHomeAPI["renameDevice"],
-      DeviceState.OFFLINE
-    );
+    const { host, renameDevice } = makeHost({ state: DeviceState.OFFLINE });
     const pending: PendingConfirm = {
       kind: "rename-config-only",
       device: host._actionDevice as ConfiguredDevice,
-      newName: "rename-test",
+      request: request(host),
     };
 
     executeConfirm(host, pending);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(renameDevice).toHaveBeenCalledWith("rename_test.yaml", "rename-test", true);
+    expect(renameDevice).toHaveBeenCalledWith("rename_test.yaml", "rename-test", {
+      configOnly: true,
+      newFriendlyName: undefined,
+    });
+  });
+
+  it("forwards the friendly name alongside config_only on the confirmed path", async () => {
+    const { host, renameDevice } = makeHost({ state: DeviceState.OFFLINE });
+    const pending: PendingConfirm = {
+      kind: "rename-config-only",
+      device: host._actionDevice as ConfiguredDevice,
+      request: request(host, "Rename Test"),
+    };
+
+    executeConfirm(host, pending);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(renameDevice).toHaveBeenCalledWith("rename_test.yaml", "rename-test", {
+      configOnly: true,
+      newFriendlyName: "Rename Test",
+    });
   });
 
   it("is destructive so a stray Enter can't confirm the offline rename", () => {
@@ -405,7 +551,15 @@ describe("executeConfirm rename-config-only", () => {
       configuration: "rename_test.yaml",
     });
     const copy = confirmDialogCopy(
-      { kind: "rename-config-only", device, newName: "rename-test" },
+      {
+        kind: "rename-config-only",
+        device,
+        request: {
+          configuration: "rename_test.yaml",
+          currentName: "rename_test",
+          newName: "x",
+        },
+      },
       localize,
       0,
       () => ({})
@@ -417,7 +571,15 @@ describe("executeConfirm rename-config-only", () => {
   it("explains the USB install for a device that rejects unsigned OTA images", () => {
     const device = makeConfiguredDevice({ runtime_state: { ota_signed: true } });
     const copy = confirmDialogCopy(
-      { kind: "rename-config-only", device, newName: "rename-test" },
+      {
+        kind: "rename-config-only",
+        device,
+        request: {
+          configuration: device.configuration,
+          currentName: device.name,
+          newName: "x",
+        },
+      },
       localize,
       0,
       () => ({})

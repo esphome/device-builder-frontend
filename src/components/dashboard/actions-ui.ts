@@ -13,46 +13,7 @@ import { clearJustCreated } from "../../util/just-created.js";
 import { launchLogsWithMethod } from "../../util/logs-launch.js";
 import { notifyError, notifySuccess } from "../../util/notify.js";
 import { otaNeedsUsb } from "../../util/ota-signed.js";
-
-export async function executeFriendlyName(
-  host: ESPHomePageDashboard,
-  e: CustomEvent<{ newFriendlyName: string; install: boolean }>
-): Promise<void> {
-  const device = host._actionDevice;
-  if (!device) return;
-  const { newFriendlyName, install } = e.detail;
-  let result: Awaited<ReturnType<ESPHomeAPI["editFriendlyName"]>>;
-  try {
-    result = await host._api.editFriendlyName(device.configuration, newFriendlyName);
-  } catch (err) {
-    const reason = getErrorMessage(err);
-    notifyError(
-      host._localize("dashboard.action_friendly_name_failed", {
-        name: device.name,
-        reason,
-      })
-    );
-    return;
-  }
-  if (!result.rewritten) {
-    notifySuccess(host._localize("dashboard.action_friendly_name_unchanged"));
-    return;
-  }
-  if (!install) {
-    notifySuccess(
-      host._localize("dashboard.action_friendly_name_success", {
-        name: newFriendlyName,
-      })
-    );
-    return;
-  }
-  notifySuccess(
-    host._localize("dashboard.action_friendly_name_success", {
-      name: newFriendlyName,
-    })
-  );
-  host._openInstallMethod(device);
-}
+import type { RenameConfirmDetail } from "../rename-device-dialog.js";
 
 export async function executeClone(
   host: ESPHomePageDashboard,
@@ -81,22 +42,65 @@ export async function executeClone(
 
 export async function executeRename(
   host: ESPHomePageDashboard,
-  e: CustomEvent<string>
+  e: CustomEvent<RenameConfirmDetail>
 ): Promise<void> {
   const device = host._actionDevice;
   if (!device) return;
-  const newName = e.detail;
-  if (newName === device.name) return;
+  const { newName, newFriendlyName, install } = e.detail;
+  if (newName === undefined) {
+    if (newFriendlyName !== undefined) {
+      await editFriendlyName(host, device, newFriendlyName, install);
+    }
+    return;
+  }
+  const request: RenameRequest = {
+    configuration: device.configuration,
+    currentName: device.name,
+    newName,
+    newFriendlyName,
+  };
   // The default rename compiles + OTA-installs, which only works against a
   // reachable device. Route offline/unknown devices to a confirm before a
   // config-only rename (renames the YAML now; the device keeps its old name
   // until reflashed, which the prompt spells out). A device that rejects
   // unsigned OTA images takes the same route.
-  if (device.runtime_state.state !== DeviceState.ONLINE || otaNeedsUsb(device)) {
-    host._openConfirm({ kind: "rename-config-only", device, newName });
+  if (
+    install &&
+    (device.runtime_state.state !== DeviceState.ONLINE || otaNeedsUsb(device))
+  ) {
+    host._openConfirm({ kind: "rename-config-only", device, request });
     return;
   }
-  await performRename(host, device.configuration, device.name, newName, false);
+  await performRename(host, { ...request, configOnly: !install });
+}
+
+/** Friendly-name-only edit: rewrite the YAML, then offer the install picker. */
+async function editFriendlyName(
+  host: ESPHomePageDashboard,
+  device: ConfiguredDevice,
+  newFriendlyName: string,
+  install: boolean
+): Promise<void> {
+  let result: Awaited<ReturnType<ESPHomeAPI["editFriendlyName"]>>;
+  try {
+    result = await host._api.editFriendlyName(device.configuration, newFriendlyName);
+  } catch (err) {
+    const reason = getErrorMessage(err);
+    notifyError(
+      host._localize("dashboard.action_rename_failed", { name: device.name, reason })
+    );
+    return;
+  }
+  if (!result.rewritten) {
+    notifySuccess(host._localize("dashboard.action_friendly_name_unchanged"));
+    return;
+  }
+  notifySuccess(
+    host._localize("dashboard.action_friendly_name_success", {
+      name: newFriendlyName,
+    })
+  );
+  if (install) host._openInstallMethod(device);
 }
 
 /** Payload of the adopt dialog's ``adopted`` event — the one shape the
@@ -122,21 +126,34 @@ export async function adoptFollowUp(
   // running factory firmware never broadcasts.
   host._highlightFreshDevice(detail.configuration);
   if (detail.renameTo) {
-    await performRename(host, detail.configuration, detail.name, detail.renameTo, false);
+    await performRename(host, {
+      configuration: detail.configuration,
+      currentName: detail.name,
+      newName: detail.renameTo,
+    });
   }
+}
+
+/** One ``devices/rename`` call; ``currentName`` only labels the failure toast. */
+export interface RenameRequest {
+  configuration: string;
+  currentName: string;
+  newName: string;
+  newFriendlyName?: string;
+  configOnly?: boolean;
 }
 
 /** Call ``devices/rename`` and surface the result (job-follow, success, or error). */
 export async function performRename(
   host: ESPHomePageDashboard,
-  configuration: string,
-  currentName: string,
-  newName: string,
-  configOnly: boolean
+  { configuration, currentName, newName, newFriendlyName, configOnly }: RenameRequest
 ): Promise<void> {
   let response: RenameDeviceResponse;
   try {
-    response = await host._api.renameDevice(configuration, newName, configOnly);
+    response = await host._api.renameDevice(configuration, newName, {
+      configOnly,
+      newFriendlyName,
+    });
   } catch (err) {
     const reason = getErrorMessage(err);
     notifyError(
@@ -162,7 +179,14 @@ export async function performRename(
     );
     return;
   }
-  notifySuccess(host._localize("dashboard.action_rename_success", { name: newName }));
+  notifySuccess(
+    newFriendlyName === undefined
+      ? host._localize("dashboard.action_rename_success", { name: newName })
+      : host._localize("dashboard.action_rename_both_success", {
+          name: newName,
+          friendly: newFriendlyName,
+        })
+  );
 }
 
 export async function toggleIgnore(

@@ -10,7 +10,7 @@ import { computeLabelUsage } from "../../util/label-usage.js";
 import { isNeverFlashed } from "../../util/never-flashed.js";
 import { otaNeedsUsb } from "../../util/ota-signed.js";
 import { takenHostnameSet } from "../../util/taken-hostnames.js";
-import { performRename } from "./actions-ui.js";
+import { performRename, type RenameRequest } from "./actions-ui.js";
 import {
   archiveBulkDevices,
   clearQueuedUpdate,
@@ -24,7 +24,7 @@ export type PendingConfirm =
   | { kind: "delete-bulk" }
   | { kind: "archive-single"; device: ConfiguredDevice }
   | { kind: "archive-bulk" }
-  | { kind: "rename-config-only"; device: ConfiguredDevice; newName: string }
+  | { kind: "rename-config-only"; device: ConfiguredDevice; request: RenameRequest }
   | { kind: "clear-queued-update"; device: ConfiguredDevice }
   | { kind: "delete-label"; label: Label };
 
@@ -181,13 +181,7 @@ export function executeConfirm(
       void host._archiveDevice(pending.device);
       return;
     case "rename-config-only":
-      void performRename(
-        host,
-        pending.device.configuration,
-        pending.device.name,
-        pending.newName,
-        true
-      );
+      void performRename(host, { ...pending.request, configOnly: true });
       return;
     case "clear-queued-update":
       void clearQueuedUpdate(pending.device, host._api, host._localize);
@@ -218,9 +212,6 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
       @clone-confirm=${host._executeClone}
     ></esphome-clone-device-dialog>
-    <esphome-friendly-name-dialog
-      @friendly-name-confirm=${host._executeFriendlyName}
-    ></esphome-friendly-name-dialog>
     <esphome-rename-device-dialog
       @rename-confirm=${host._executeRename}
     ></esphome-rename-device-dialog>

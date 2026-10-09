@@ -13,9 +13,8 @@ import { html, nothing } from "lit";
  *   message follows the visual flow and screen readers
  *   announce it via the label association. The dialogs that
  *   surface per-field validation errors (adopt-dialog,
- *   friendly-name-dialog, clone-device-dialog,
- *   rename-device-dialog, the config-entry renderers) use this
- *   shape.
+ *   clone-device-dialog, rename-device-dialog, the config-entry
+ *   renderers) use this shape.
  *
  * - **Status-region banner error** — a ``<div class="field-error"
  *   role="alert">`` placed below the form, used for

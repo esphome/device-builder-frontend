@@ -442,6 +442,62 @@ describe("ESPHomeAPI — getAvailableAutomations", () => {
   });
 });
 
+describe("ESPHomeAPI — renameDevice", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("omits config_only and new_friendly_name unless given", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const pending = api.renameDevice("kitchen.yaml", "livingroom");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/rename");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml", new_name: "livingroom" });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { configuration: "livingroom.yaml", job: null },
+    });
+    await expect(pending).resolves.toEqual({
+      configuration: "livingroom.yaml",
+      job: null,
+    });
+  });
+
+  it("forwards new_friendly_name beside config_only", async () => {
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const pending = api.renameDevice("kitchen.yaml", "livingroom", {
+      configOnly: true,
+      newFriendlyName: "Living Room",
+    });
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_name: "livingroom",
+      config_only: true,
+      new_friendly_name: "Living Room",
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { configuration: "livingroom.yaml", job: null },
+    });
+    await expect(pending).resolves.toEqual({
+      configuration: "livingroom.yaml",
+      job: null,
+    });
+  });
+});
+
 describe("ESPHomeAPI — editFriendlyName", () => {
   beforeEach(() => {
     installMockWebSocket();
