@@ -17,7 +17,7 @@
     "action_ignore_failed": "Failed to ignore \"{name}\"",
     "action_unignore_failed": "Failed to unignore \"{name}\"",
     "adopt_title": "Take control",
-    "adopt_description": "Creates a local ESPHome config for {name} built on the vendor's package. You build and install updates from this dashboard; the vendor no longer pushes firmware to the device.",
+    "adopt_description": "Creates a local ESPHome config for {name} built on the vendor's package. You build and install updates from this dashboard.",
     "adopt_source_label": "Configuration source",
     "adopt_rename_hint": "Changing the hostname will build and install new firmware over the network.",
     "adopt_ota_signed_hint": "This device runs firmware signed by its manufacturer, so the first install of your own firmware needs a USB cable. You can change the hostname after that.",
