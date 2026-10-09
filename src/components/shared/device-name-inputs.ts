@@ -1,6 +1,13 @@
 import { consume } from "@lit/context";
 import { mdiHelpCircleOutline } from "@mdi/js";
-import { css, html, LitElement, nothing, type PropertyValues } from "lit";
+import {
+  css,
+  html,
+  LitElement,
+  nothing,
+  type PropertyValues,
+  type TemplateResult,
+} from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -25,7 +32,8 @@ registerMdiIcons({ "help-circle-outline": mdiHelpCircleOutline });
 /**
  * The shared friendly-name-first naming pair: a friendly-name input that
  * live-derives the hostname via ``slugifyHostname``, with the derived
- * hostname behind a chevron disclosure for overrides.
+ * hostname behind a chevron disclosure for overrides, or as a plain
+ * second field when ``hostnameInline`` is set.
  *
  * Typing in the friendly field keeps the hostname in sync until the user
  * edits the hostname directly; clearing the hostname restores the derived
@@ -75,6 +83,11 @@ export class ESPHomeDeviceNameInputs extends LitElement {
    *  the field is read-only. */
   @property({ attribute: false })
   hostnameLocked = false;
+
+  /** Show the hostname as a plain field under the friendly name instead of
+   *  behind the disclosure (adopt, where it is an existing identity). */
+  @property({ attribute: false })
+  hostnameInline = false;
 
   /** Hostnames already in use; a collision blocks submit. */
   @property({ attribute: false })
@@ -234,11 +247,19 @@ export class ESPHomeDeviceNameInputs extends LitElement {
 
   protected render() {
     const validity = this.validity;
-    // An error holds the panel open (it is the only place the blocking
-    // reason renders). Warnings auto-open via the input handlers instead,
-    // so the toggle stays functional — submit is enabled, and the user may
-    // legitimately collapse an advisory.
-    const open = this._open || validity.err !== null;
+    const help = html`
+      <button
+        type="button"
+        class="help"
+        id="hostname-help"
+        aria-label=${this._localize("naming.hostname_help_label")}
+      >
+        <wa-icon library="mdi" name="help-circle-outline" aria-hidden="true"></wa-icon>
+      </button>
+      <wa-tooltip for="hostname-help"
+        >${this._localize("naming.hostname_help")}</wa-tooltip
+      >
+    `;
     return html`
       <div class="field">
         <label for="device-friendly-name">${this._localize(this.friendlyLabelKey)}</label>
@@ -257,70 +278,77 @@ export class ESPHomeDeviceNameInputs extends LitElement {
             : nothing
         }
       </div>
-      <div class="hostname-row">
-        ${renderDisclosure({
-          open,
-          // A hard error owns the panel; the toggle would be a no-op, so
-          // mark it disabled rather than swallowing activations silently.
-          disabled: validity.err !== null,
-          onToggle: () => {
-            this._open = !open;
-          },
-          localize: this._localize,
-          labelKey: "naming.hostname_disclosure",
-          labelParams: { hostname: this.hostname || "…" },
-          variant: "quiet",
-          panelId: "hostname-panel",
-          body: () => html`
-            ${renderDeviceNameField({
-              localize: this._localize,
-              labelKey: "naming.hostname_label",
-              value: this._hostname,
-              validity,
-              onInput: (value) => {
-                this._hostnameEdited = value.trim().length > 0;
-                // Clearing is an undo: restore the derived value instead of
-                // stranding an empty field behind a required-hostname error.
-                this._hostname = this._hostnameEdited
-                  ? value
-                  : slugifyHostname(this._friendly) || this._hostnameFallback;
-                // Typing here is an explicit override; keep the panel open
-                // once the edit clears the error that force-opened it, or
-                // the field unmounts mid-keystroke.
-                this._open = true;
-                // Select-all + delete restores a value identical to the last
-                // committed one, so no @state changes; force a render so the
-                // live() binding can resync the visually emptied DOM input.
-                this.requestUpdate();
-                this._notify();
-              },
-              id: "device-hostname",
-              placeholder: this.hostnamePlaceholder,
-              autofocus: false,
-              readonly: this.hostnameLocked,
-            })}
-            ${
-              this.hostnameLocked
-                ? nothing
-                : html`<span class="helper"
-                    >${this._localize("naming.hostname_helper")}</span
-                  >`
-            }
-          `,
-        })}
-        <button
-          type="button"
-          class="help"
-          id="hostname-help"
-          aria-label=${this._localize("naming.hostname_help_label")}
-        >
-          <wa-icon library="mdi" name="help-circle-outline" aria-hidden="true"></wa-icon>
-        </button>
-        <wa-tooltip for="hostname-help">
-          ${this._localize("naming.hostname_help")}
-        </wa-tooltip>
-      </div>
+      ${this.hostnameInline ? this._renderHostnameField(validity, help) : this._renderDisclosure(validity, help)}
     `;
+  }
+
+  private _renderDisclosure(validity: DeviceNameValidity, help: TemplateResult) {
+    // An error holds the panel open (it is the only place the blocking
+    // reason renders). Warnings auto-open via the input handlers instead,
+    // so the toggle stays functional — submit is enabled, and the user may
+    // legitimately collapse an advisory.
+    const open = this._open || validity.err !== null;
+    return html`<div class="hostname-row">
+      ${renderDisclosure({
+        open,
+        // A hard error owns the panel; the toggle would be a no-op, so
+        // mark it disabled rather than swallowing activations silently.
+        disabled: validity.err !== null,
+        onToggle: () => {
+          this._open = !open;
+        },
+        localize: this._localize,
+        labelKey: "naming.hostname_disclosure",
+        labelParams: { hostname: this.hostname || "…" },
+        variant: "quiet",
+        panelId: "hostname-panel",
+        body: () => html`
+          ${this._renderHostnameField(validity)}
+          ${
+            this.hostnameLocked
+              ? nothing
+              : html`<span class="helper"
+                  >${this._localize("naming.hostname_helper")}</span
+                >`
+          }
+        `,
+      })}
+      ${help}
+    </div>`;
+  }
+
+  private _renderHostnameField(
+    validity: DeviceNameValidity,
+    labelSuffix?: TemplateResult
+  ) {
+    return renderDeviceNameField({
+      localize: this._localize,
+      labelKey: "naming.hostname_label",
+      labelSuffix,
+      value: this._hostname,
+      validity,
+      onInput: (value) => {
+        this._hostnameEdited = value.trim().length > 0;
+        // Clearing is an undo: restore the derived value instead of
+        // stranding an empty field behind a required-hostname error.
+        this._hostname = this._hostnameEdited
+          ? value
+          : slugifyHostname(this._friendly) || this._hostnameFallback;
+        // Typing here is an explicit override; under the disclosure, keep
+        // the panel open once the edit clears the error that force-opened
+        // it, or the field unmounts mid-keystroke. Inline mode never reads it.
+        this._open = true;
+        // Select-all + delete restores a value identical to the last
+        // committed one, so no @state changes; force a render so the
+        // live() binding can resync the visually emptied DOM input.
+        this.requestUpdate();
+        this._notify();
+      },
+      id: "device-hostname",
+      placeholder: this.hostnamePlaceholder,
+      autofocus: false,
+      readonly: this.hostnameLocked,
+    });
   }
 
   private _onFriendlyInput = (e: Event) => {

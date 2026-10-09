@@ -132,6 +132,25 @@ describe("device-name-inputs derivation", () => {
   });
 });
 
+describe("device-name-inputs inline hostname", () => {
+  it("renders the hostname field without a disclosure and keeps deriving", async () => {
+    const el = await mountInputs({ hostnameInline: true });
+    expect(el.shadowRoot!.querySelector(".disclosure-toggle")).toBeNull();
+    expect(el.shadowRoot!.querySelector("#device-hostname")).not.toBeNull();
+    expect(el.shadowRoot!.querySelector("#hostname-help")).not.toBeNull();
+    await typeFriendly(el, "Bedroom Plug");
+    expect(el.hostname).toBe("bedroom-plug");
+    await typeHostname(el, "plug-1");
+    await typeFriendly(el, "Other");
+    expect(el.hostname).toBe("plug-1");
+  });
+
+  it("renders a locked hostname read-only", async () => {
+    const el = await mountInputs({ hostnameInline: true, hostnameLocked: true });
+    expect((await hostnameInput(el)).readOnly).toBe(true);
+  });
+});
+
 describe("device-name-inputs disclosure + validity", () => {
   it("toggles the hostname panel via the chevron", async () => {
     const el = await mountInputs();

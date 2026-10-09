@@ -46,6 +46,8 @@ export interface DeviceNameFieldOptions {
   readonly?: boolean;
   /** Helper text shown while the slot holds neither an error nor a warning. */
   helperKey?: string;
+  /** Rendered after the label text, on the label row (a help chip). */
+  labelSuffix?: TemplateResult;
 }
 
 /** The labelled device-name input plus its inline error / warning slot
@@ -54,7 +56,14 @@ export function renderDeviceNameField(o: DeviceNameFieldOptions): TemplateResult
   const { err, warning } = o.validity;
   return html`
     <div class="field">
-      <label for=${o.id ?? nothing}>${o.localize(o.labelKey)}</label>
+      ${
+        o.labelSuffix
+          ? html`<div class="label-row">
+              <label for=${o.id ?? nothing}>${o.localize(o.labelKey)}</label>
+              ${o.labelSuffix}
+            </div>`
+          : html`<label for=${o.id ?? nothing}>${o.localize(o.labelKey)}</label>`
+      }
       <input
         id=${o.id ?? nothing}
         type="text"

@@ -27,6 +27,12 @@ export const dialogFieldStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
+  .label-row {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+  }
+
   .helper {
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);

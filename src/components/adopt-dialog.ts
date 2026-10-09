@@ -3,6 +3,7 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
+import { ESPHOME_DOCS_BASE } from "../common/docs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import {
@@ -11,6 +12,7 @@ import {
 } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
+import { linkButtonStyles } from "../styles/link-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
@@ -27,6 +29,9 @@ import type { ESPHomeDeviceNameInputs } from "./shared/device-name-inputs.js";
 
 import "./base-dialog.js";
 import "./shared/device-name-inputs.js";
+
+/** Security guide behind the encryption Details link. */
+const ENCRYPTION_DOCS_URL = `${ESPHOME_DOCS_BASE}/guides/security_best_practices/`;
 
 @customElement("esphome-adopt-dialog")
 export class ESPHomeAdoptDialog extends LitElement {
@@ -69,6 +74,7 @@ export class ESPHomeAdoptDialog extends LitElement {
     // Before the local block so this dialog's own `.field` / `label`
     // spacing wins; only `.field-label` / `.error` (unique here) apply.
     wifiFieldsStyles,
+    linkButtonStyles,
     dialogActionsRowStyles,
     dialogActionButtonStyles,
     css`
@@ -162,21 +168,21 @@ export class ESPHomeAdoptDialog extends LitElement {
 
       .checkbox-row {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: var(--wa-space-s);
         padding-bottom: var(--wa-space-m);
+      }
+
+      .checkbox-label {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--wa-space-s);
         cursor: pointer;
         user-select: none;
       }
 
-      .checkbox-row input[type="checkbox"] {
-        margin-top: 3px;
-      }
-
-      .checkbox-text {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+      .checkbox-link {
+        font-size: var(--wa-font-size-xs);
       }
 
       .checkbox-title {
@@ -185,22 +191,12 @@ export class ESPHomeAdoptDialog extends LitElement {
         color: var(--wa-color-text-normal);
       }
 
-      .checkbox-hint {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-      }
-
-      /* The shared name pair carries no outer margins (its hosts own
-         the rhythm); without this the hostname row sits flush on the
-         encryption checkbox. */
-      .name-pair {
-        margin-bottom: var(--wa-space-m);
-      }
-
+      /* The inline hostname field ends on its own field padding; the
+         hint pulls back up under the input it describes. */
       .name-hint {
         font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
-        margin-top: var(--wa-space-2xs);
+        margin: calc(-1 * var(--wa-space-s)) 0 var(--wa-space-m);
       }
 
       /* Adoption's commit affordance is success-green rather than the
@@ -387,6 +383,7 @@ export class ESPHomeAdoptDialog extends LitElement {
                     .friendlyLabelKey=${"dashboard.adopt_field_friendly_name"}
                     .takenHostnames=${this._takenMinusFactory}
                     .hostnameLocked=${device.ota_signed}
+                    .hostnameInline=${true}
                     .friendlyHelperKey=${device.ota_signed ? "dashboard.adopt_ota_signed_hint" : ""}
                     @device-name-changed=${() => this.requestUpdate()}
                   ></esphome-device-name-inputs>
@@ -421,24 +418,28 @@ export class ESPHomeAdoptDialog extends LitElement {
                     : nothing
                 }
 
-                <label class="checkbox-row">
-                  <input
-                    type="checkbox"
-                    .checked=${this._encryption}
-                    ?disabled=${this._busy}
-                    @change=${(e: Event) => {
-                      this._encryption = (e.target as HTMLInputElement).checked;
-                    }}
-                  />
-                  <span class="checkbox-text">
+                <div class="checkbox-row">
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      .checked=${this._encryption}
+                      ?disabled=${this._busy}
+                      @change=${(e: Event) => {
+                        this._encryption = (e.target as HTMLInputElement).checked;
+                      }}
+                    />
                     <span class="checkbox-title"
                       >${this._localize("dashboard.adopt_encryption_title")}</span
                     >
-                    <span class="checkbox-hint"
-                      >${this._localize("dashboard.adopt_encryption_hint")}</span
-                    >
-                  </span>
-                </label>
+                  </label>
+                  <a
+                    class="checkbox-link link-button"
+                    href=${ENCRYPTION_DOCS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >${this._localize("dashboard.adopt_encryption_details")}</a
+                  >
+                </div>
 
                 ${
                   this._error
