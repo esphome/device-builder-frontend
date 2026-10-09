@@ -179,7 +179,14 @@ export async function performRename(
     );
     return;
   }
-  notifySuccess(host._localize("dashboard.action_rename_success", { name: newName }));
+  notifySuccess(
+    newFriendlyName === undefined
+      ? host._localize("dashboard.action_rename_success", { name: newName })
+      : host._localize("dashboard.action_rename_both_success", {
+          name: newName,
+          friendly: newFriendlyName,
+        })
+  );
 }
 
 export async function toggleIgnore(

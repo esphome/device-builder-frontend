@@ -244,7 +244,10 @@ describe("adoptFollowUp", () => {
 });
 
 describe("executeRename", () => {
-  beforeEach(() => toastError.mockClear());
+  beforeEach(() => {
+    toastError.mockClear();
+    toastSuccess.mockClear();
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it("renames an online device directly (no confirm, OTA path)", async () => {
@@ -365,6 +368,18 @@ describe("executeRename", () => {
       configOnly: true,
       newFriendlyName: "Rename Test",
     });
+    expect(toastSuccess.mock.calls[0][0]).toContain(
+      "dashboard.action_rename_both_success"
+    );
+    expect(toastSuccess.mock.calls[0][0]).toContain("Rename Test");
+  });
+
+  it("names only the hostname in the toast when the friendly name was unchanged", async () => {
+    const { host } = makeHost();
+
+    await executeRename(host, renameEvent({ newName: "rename-test", install: false }));
+
+    expect(toastSuccess.mock.calls[0][0]).toContain("dashboard.action_rename_success");
   });
 
   it("edits the friendly name alone and opens the install picker", async () => {
