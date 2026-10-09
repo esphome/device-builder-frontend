@@ -332,6 +332,7 @@ describe("openFlasher", () => {
     ["a BK72xx UF2", "bk-uart"],
     ["an LN882H UF2", "ln-uart"],
     ["an RTL8710B UF2", "rtl-ambz"],
+    ["an RTL8720D UF2", "rtl-ambd"],
   ] as const)(
     "hands %s to a receiver that lists its flasher, and to no other",
     (_n, id) => {

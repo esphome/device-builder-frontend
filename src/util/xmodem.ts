@@ -4,6 +4,8 @@
  * same handshake python-xmodem drives for ltchiptool, so a ROM that accepts
  * one accepts the other.
  */
+import { int32LE } from "./bytes.js";
+
 export interface XmodemIo {
   write(data: Uint8Array): Promise<void>;
   /** The next byte, or null when none arrived within the timeout. */
@@ -139,6 +141,40 @@ export async function sendFrame(
 
 /** The end of a file, sent until ACKed (a receiver may NAK the first). */
 export const EOT_FRAME = new Uint8Array([EOT]);
+
+/**
+ * XModem-1k whose blocks carry their target address in front of the data,
+ * as the Realtek ROMs take memory writes: 4 address bytes then the data,
+ * padded with 0xff to a 1028-byte payload, the address advancing with the
+ * data. The caller has done the receiver's own start handshake and read
+ * ``crcMode`` from it.
+ */
+export async function xmodemSendAddressed(
+  io: XmodemIo,
+  address: number,
+  data: Uint8Array,
+  crcMode: boolean,
+  { retries = 16, timeoutMs = 3000, onBlock }: XmodemOptions = {}
+): Promise<void> {
+  const size = 4 + XMODEM_BLOCK_SIZE;
+  let seq = 1;
+  for (let off = 0; off < data.length; off += XMODEM_BLOCK_SIZE) {
+    const chunk = data.subarray(off, Math.min(off + XMODEM_BLOCK_SIZE, data.length));
+    const payload = new Uint8Array(4 + chunk.length);
+    payload.set(int32LE(address + off), 0);
+    payload.set(chunk, 4);
+    await sendFrame(
+      io,
+      buildBlock(seq, payload, crcMode, size, 0xff),
+      `block ${seq}`,
+      retries,
+      timeoutMs
+    );
+    seq = (seq + 1) & 0xff;
+    onBlock?.(off + chunk.length);
+  }
+  await sendFrame(io, EOT_FRAME, "the end of the file", retries, timeoutMs);
+}
 
 export async function xmodemSend(
   io: XmodemIo,

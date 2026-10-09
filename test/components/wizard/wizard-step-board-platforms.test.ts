@@ -53,7 +53,7 @@ describe("wizard step-board platform chips", () => {
   it("splits the libretiny platforms into per-chip filters, kept adjacent", () => {
     // The libretiny platforms bundle genuinely different silicon, so each
     // is split into per-chip filters (BK7231/BK7238/BK7251, RTL8710B/
-    // RTL8720C, LN882H) told apart by `mcu`, the same way rp2 splits.
+    // RTL8720C/RTL8720D, LN882H) told apart by `mcu`, the same way rp2 splits.
     // They stay contiguous so the user scanning the chip row sees them as
     // one family; pin both the mapping and the ordering.
     const bk72xx = WIZARD_BOARD_PLATFORMS.filter((p) => p.platform === "bk72xx");
@@ -66,12 +66,21 @@ describe("wizard step-board platform chips", () => {
     expect(rtl.map((p) => [p.label, p.mcu])).toEqual([
       ["RTL8710B", "rtl8710b"],
       ["RTL8720C", "rtl8720c"],
+      ["RTL8720D", "rtl8720d"],
     ]);
 
     const labels = WIZARD_BOARD_PLATFORMS.map((p) => p.label);
     const first = labels.indexOf("BK7231");
     expect(first).toBeGreaterThanOrEqual(0);
-    const chain = ["BK7231", "BK7238", "BK7251", "RTL8710B", "RTL8720C", "LN882H"];
+    const chain = [
+      "BK7231",
+      "BK7238",
+      "BK7251",
+      "RTL8710B",
+      "RTL8720C",
+      "RTL8720D",
+      "LN882H",
+    ];
     expect(labels.slice(first, first + chain.length)).toEqual(chain);
   });
 

@@ -85,6 +85,10 @@ export const LIBRETINY_AMBZ_GUIDE_URL =
 export const LIBRETINY_AMBZ2_GUIDE_URL =
   "https://docs.libretiny.eu/docs/platform/realtek-ambz2/";
 
+/** LibreTiny's AmebaD (RTL8720D) page: the LOG_UART wiring and the LOG_TX strap. */
+export const LIBRETINY_AMBD_GUIDE_URL =
+  "https://docs.libretiny.eu/docs/platform/realtek-ambd/";
+
 /** LibreTiny's LN882H flashing guide: the UART0 wiring and the BOOT strap. */
 export const LIBRETINY_LN882H_FLASHING_URL =
   "https://docs.libretiny.eu/link/flashing-ln882h";

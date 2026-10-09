@@ -1,11 +1,15 @@
 /**
- * RTL8720C (AmebaZ2) and RTL8710B (AmebaZ) API shared by the Device Builder
- * and web.esphome.io. The ROM-downloader engines and the LibreTiny UF2
- * parsers are re-exported as types only, and the loaders fetch them on demand.
+ * RTL8720C (AmebaZ2), RTL8710B (AmebaZ) and RTL8720D (AmebaD) API shared by
+ * the Device Builder and web.esphome.io. The ROM-downloader engines and the
+ * LibreTiny UF2 parsers are re-exported as types only, and the loaders fetch
+ * them on demand.
  */
 export type * from "./ambz2-flasher.js";
 export type * from "./ambz-flasher.js";
 export type * from "./ambz-image.js";
+export type * from "./ambd-flasher.js";
+export type * from "./ambd-image.js";
+export type * from "./rtl87xx-image.js";
 export type * from "../libretiny-uf2.js";
 export type * from "./ambz2-image.js";
 export * from "./rtl87xx-platform.js";
@@ -14,8 +18,11 @@ export * from "./serial-logs.js";
 import { type ChunkParseFailure, flashWith, parseWith } from "../lazy-chunk.js";
 import type { LibreTinyFlashHooks, LibreTinyFlashResult } from "../libretiny-flash.js";
 import type { LibreTinyFile, LibreTinyImage } from "../libretiny-uf2.js";
-import type { AmbzImage, RtlImage } from "./ambz-image.js";
+import type { AmbdFlashHooks } from "./ambd-flasher.js";
+import type { AmbdImage } from "./ambd-image.js";
+import type { AmbzImage } from "./ambz-image.js";
 import type { Ambz2FlashHooks } from "./ambz2-flasher.js";
+import type { RtlImage } from "./rtl87xx-image.js";
 
 export const loadAmbz2Engine = () => import("./ambz2-flasher.js");
 export const loadAmbz2Parser = () => import("./ambz2-image.js");
@@ -25,7 +32,7 @@ type RtlImageKey = "firmware.rtl_wrong_family" | "firmware.rtl_bad_uf2";
 /** Why a LibreTiny UF2 could not be parsed: the copy for the user and the detail. */
 export type RtlImageFailure = ChunkParseFailure<RtlImageKey>;
 
-/** Both parser chunks refuse a file as ``RtlImageError``; anything else is a bad file. */
+/** Every parser chunk refuses a file as ``RtlImageError``; anything else is a bad file. */
 const rtlKey = (
   parser: Pick<Awaited<ReturnType<typeof loadAmbz2Parser>>, "RtlImageError">,
   err: unknown
@@ -73,6 +80,7 @@ export const runAmbz2 = (
 
 export const loadAmbzEngine = () => import("./ambz-flasher.js");
 export const loadAmbzParser = () => import("./ambz-image.js");
+export const loadRtl87xxParser = () => import("./rtl87xx-image.js");
 
 /** The RTL8710B counterpart of ``loadAmbz2Image``; never throws. */
 export const loadAmbzImage = (
@@ -96,13 +104,13 @@ export const checkAmbzImage = (
     rtlKey
   );
 
-/** Parse an RTL8720C or RTL8710B UF2 in one pass, naming its chip; never throws. */
+/** Parse an RTL8720C, RTL8710B or RTL8720D UF2 in one pass, naming its chip; never throws. */
 export const loadRtl87xxImage = (
   bytes: Uint8Array
 ): Promise<{ image: RtlImage } | RtlImageFailure> =>
   parseWith(
-    "[rtl87xx AmebaZ]",
-    loadAmbzParser,
+    "[rtl87xx]",
+    loadRtl87xxParser,
     (p) => ({ image: p.parseRtl87xxImage(bytes) }),
     rtlKey
   );
@@ -117,3 +125,57 @@ export const runAmbz = (
     await e.flashAmbz(port, image, hooks);
     return { rebooted: false };
   });
+
+export const loadAmbdEngine = () => import("./ambd-flasher.js");
+export const loadAmbdParser = () => import("./ambd-image.js");
+
+/**
+ * The engine chunk and the flash loader it needs, fetched side by side, for
+ * a flow to start while the user picks a port: the flash then finds both
+ * cached. Rejects with whichever failed; the flash itself names it.
+ */
+export async function warmAmbd(): Promise<unknown> {
+  const [engine] = await Promise.all([
+    loadAmbdEngine(),
+    import("./ambd-loader.js").then((loader) => loader.loadAmbdLoader()),
+  ]);
+  return engine;
+}
+
+/** The RTL8720D counterpart of ``loadAmbz2Image``; never throws. */
+export const loadAmbdImage = (
+  bytes: Uint8Array
+): Promise<{ image: AmbdImage } | RtlImageFailure> =>
+  parseWith(
+    "[rtl87xx AmebaD]",
+    loadAmbdParser,
+    (p) => ({ image: p.parseAmbdImage(bytes) }),
+    rtlKey
+  );
+
+/** ``loadAmbdImage`` without the flash runs, for a check of the file alone; never throws. */
+export const checkAmbdImage = (
+  bytes: Uint8Array
+): Promise<{ file: LibreTinyFile } | RtlImageFailure> =>
+  parseWith(
+    "[rtl87xx AmebaD]",
+    loadAmbdParser,
+    (p) => ({ file: p.checkAmbdUf2(bytes) }),
+    rtlKey
+  );
+
+/**
+ * The RTL8720D counterpart of ``runAmbz2``; never throws. A flash loader
+ * that could not be fetched, or was not the expected file, names its own copy.
+ */
+export const runAmbd = (
+  port: SerialPort,
+  image: AmbdImage,
+  hooks: AmbdFlashHooks
+): Promise<LibreTinyFlashResult> =>
+  flashWith(
+    "[rtl87xx AmebaD]",
+    loadAmbdEngine,
+    async (e) => ({ rebooted: await e.flashAmbd(port, image, hooks) }),
+    (e, err) => (err instanceof e.AmbdLoaderError ? err.key : undefined)
+  );

@@ -15,6 +15,7 @@ import html from "../../public/index.html?raw";
 import webHtml from "../../public/web/index.html?raw";
 import { DECODER_ORIGIN, DECODER_URL } from "../../src/common/docs.js";
 import { LN882H_RAMCODE_URL } from "../../src/platforms/ln882x/ln882x-ramcode.js";
+import { AMBD_LOADER_URL } from "../../src/platforms/rtl87xx/ambd-loader.js";
 
 // Find the CSP meta tag, then read its content, so attribute order or an added
 // attribute (a reformat) doesn't break the test while the policy is unchanged.
@@ -69,14 +70,18 @@ describe.each([
   ["the Device Builder", html],
   ["web.esphome.io", webHtml],
 ])("%s's Content-Security-Policy", (_name, page) => {
-  it("lets the LN882H flasher fetch its RAM code, and nothing else from the CDN", () => {
-    // A path ending in a slash matches everything under it; the grant is the
-    // one ltchiptool release, not cdn.jsdelivr.net.
+  it("lets the LN882H and RTL8720D flashers fetch their loaders, and nothing else from the CDN", () => {
+    // A path ending in a slash matches everything under it; each grant is
+    // the one release or commit a loader is fetched from, not cdn.jsdelivr.net.
     const sources = directiveIn(policyOf(page), "connect-src").split(/\s+/);
-    const grant = sources.find((src) => src.startsWith("https://cdn.jsdelivr.net/"));
-    expect(grant).toBeDefined();
-    expect(grant!.endsWith("/")).toBe(true);
-    expect(LN882H_RAMCODE_URL.startsWith(grant!)).toBe(true);
-    expect(grant).not.toBe("https://cdn.jsdelivr.net/");
+    const grants = sources.filter((src) => src.startsWith("https://cdn.jsdelivr.net/"));
+    expect(grants).toHaveLength(2);
+    for (const grant of grants) {
+      expect(grant.endsWith("/")).toBe(true);
+      expect(grant).not.toBe("https://cdn.jsdelivr.net/");
+    }
+    for (const url of [LN882H_RAMCODE_URL, AMBD_LOADER_URL]) {
+      expect(grants.filter((grant) => url.startsWith(grant))).toHaveLength(1);
+    }
   });
 });

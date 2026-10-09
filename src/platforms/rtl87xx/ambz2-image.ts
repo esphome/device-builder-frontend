@@ -9,6 +9,7 @@ import {
   type LibreTinyFile,
   type LibreTinyImage,
   type LibreTinyParseOptions,
+  type LibreTinyPartition,
   parseLibreTinyFile,
   parseLibreTinyImage,
 } from "../libretiny-uf2.js";
@@ -25,7 +26,7 @@ export const AMBZ2_PARSE: LibreTinyParseOptions = {
   blocksFrom: "run",
 };
 
-/** Why a Realtek image was refused (either family); ``key`` is the install dialogs' title copy. */
+/** Why a Realtek image was refused (any of the families); ``key`` is the install dialogs' title copy. */
 export class RtlImageError extends Error {
   constructor(
     readonly key: "firmware.rtl_wrong_family" | "firmware.rtl_bad_uf2",
@@ -46,8 +47,8 @@ export function toRtlImageError(err: unknown): RtlImageError {
 
 /**
  * Parse a LibreTiny UF2 for the RTL8720C flasher. Another Realtek family
- * (AmebaZ) is a real build for the other Realtek flasher's chip; anything
- * else is a bad file. Fails as ``RtlImageError``.
+ * (AmebaZ, AmebaD) is a real build for one of the other Realtek flashers'
+ * chips; anything else is a bad file. Fails as ``RtlImageError``.
  */
 export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
   try {
@@ -55,6 +56,13 @@ export function parseAmbz2Image(bytes: Uint8Array): LibreTinyImage {
   } catch (err) {
     throw toRtlImageError(err);
   }
+}
+
+/** The ``ota2`` partition the other Realtek flashers need (the chip's system data or bootloader points at it). */
+export function ota2PartitionOf(file: LibreTinyFile): LibreTinyPartition {
+  const ota2 = file.partitions.find((p) => p.name === "ota2");
+  if (!ota2) throw new Error("Invalid UF2: no 'ota2' partition");
+  return ota2;
 }
 
 /** ``parseAmbz2Image`` without the flash runs. Fails as ``RtlImageError``. */

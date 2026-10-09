@@ -50,8 +50,8 @@ const SAMPLE_PLATFORM: Record<string, string> = {
 // where the platform has one.
 const CHIPS: Record<string, { takes: string[]; refuses?: string }> = {
   rp2: { takes: ["rp2040", "rp2350"] },
-  // One flasher per chip: the two ROM downloaders speak different protocols.
-  rtl87xx: { takes: ["rtl8720c", "rtl8710b"], refuses: "rtl8711am" },
+  // One flasher per chip: the three ROM downloaders speak different protocols.
+  rtl87xx: { takes: ["rtl8720c", "rtl8710b", "rtl8720d"], refuses: "rtl8711am" },
   // Both protocols of the platform are written by the one flasher.
   bk72xx: { takes: ["bk7231", "bk7238", "bk7251"] },
   ln882x: { takes: ["ln882h"] },
@@ -145,6 +145,7 @@ describe("PLATFORMS", () => {
       );
     expect(rtl("rtl8720c")).toEqual(["rtl-ambz2"]);
     expect(rtl("rtl8710b")).toEqual(["rtl-ambz"]);
+    expect(rtl("rtl8720d")).toEqual(["rtl-ambd"]);
     expect(rtl("rtl8711am")).toEqual([]);
   });
 

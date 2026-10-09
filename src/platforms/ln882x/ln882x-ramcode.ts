@@ -5,7 +5,7 @@
  * flash time from the ltchiptool release that ships it and checked against
  * the hash of that release before it goes near a chip.
  */
-import { getErrorMessage } from "../../util/error-message.js";
+import { pinnedFetch } from "../../util/pinned-fetch.js";
 
 /** ltchiptool 4.14.4's copy, served by jsDelivr from the tagged GitHub tree. */
 export const LN882H_RAMCODE_URL =
@@ -24,46 +24,23 @@ export class Ln882xRamcodeError extends Error {
   }
 }
 
-let cached: Promise<Uint8Array<ArrayBuffer>> | undefined;
-
-const toHex = (bytes: Uint8Array): string =>
-  Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-
-async function fetchRamcode(): Promise<Uint8Array<ArrayBuffer>> {
-  let bytes: Uint8Array<ArrayBuffer>;
-  try {
-    const response = await fetch(LN882H_RAMCODE_URL);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    bytes = new Uint8Array(await response.arrayBuffer());
-  } catch (err) {
-    throw new Ln882xRamcodeError(
-      "firmware.ln_ramcode_unavailable",
-      `Could not download the LN882H RAM code: ${getErrorMessage(err)}`
-    );
-  }
-  const digest = toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
-  if (digest !== LN882H_RAMCODE_SHA256) {
-    throw new Ln882xRamcodeError(
-      "firmware.ln_ramcode_mismatch",
-      `The LN882H RAM code does not match its expected hash (got ${digest})`
-    );
-  }
-  return bytes;
-}
+const ramcode = pinnedFetch(LN882H_RAMCODE_URL, LN882H_RAMCODE_SHA256, (kind, detail) =>
+  kind === "unavailable"
+    ? new Ln882xRamcodeError(
+        "firmware.ln_ramcode_unavailable",
+        `Could not download the LN882H RAM code: ${detail}`
+      )
+    : new Ln882xRamcodeError(
+        "firmware.ln_ramcode_mismatch",
+        `The LN882H RAM code does not match its expected hash (got ${detail})`
+      )
+);
 
 /**
  * The RAM code, fetched once per page and only when its hash matches. A
  * failed fetch is forgotten so that Retry fetches again.
  */
-export function loadRamcode(): Promise<Uint8Array<ArrayBuffer>> {
-  cached ??= fetchRamcode().catch((err: unknown) => {
-    cached = undefined;
-    throw err;
-  });
-  return cached;
-}
+export const loadRamcode = ramcode.load;
 
 /** Forget the fetched copy; for tests. */
-export function resetRamcodeCache(): void {
-  cached = undefined;
-}
+export const resetRamcodeCache = ramcode.reset;

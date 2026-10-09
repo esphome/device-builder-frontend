@@ -17,8 +17,12 @@
           for its HMR socket — see build-scripts/rspack.cjs.
         * connect-src also adds https://cdn.jsdelivr.net/gh/libretiny-eu/ltchiptool@v4.14.4/
           — the one ltchiptool release the LN882H flasher fetches its RAM
-          code from (platforms/ln882x/ln882x-ramcode.ts), scoped to that
-          path and checked against a pinned SHA-256 before it reaches a chip.
+          code from (platforms/ln882x/ln882x-ramcode.ts) — and
+          https://cdn.jsdelivr.net/gh/Ameba-AIoT/ameba-arduino-d@52aac0dd423cbb11a013711c8e1c3004adf31ef8/
+          — the one commit of Realtek's Arduino repository the RTL8720D
+          flasher fetches its flash loader from (platforms/rtl87xx/ambd-loader.ts).
+          Both are scoped to that path and checked against a pinned SHA-256
+          before they reach a chip.
         * img-src keeps 'self' data: https: for the runtime-built MDI icon
           data: URIs and any remote logos.
       script-src falls back to default-src 'self' so injected
@@ -27,7 +31,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' data: https://firmware.esphome.io https://cdn.jsdelivr.net/gh/libretiny-eu/ltchiptool@v4.14.4/; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' data: https://firmware.esphome.io https://cdn.jsdelivr.net/gh/libretiny-eu/ltchiptool@v4.14.4/ https://cdn.jsdelivr.net/gh/Ameba-AIoT/ameba-arduino-d@52aac0dd423cbb11a013711c8e1c3004adf31ef8/; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>ESPHome Web</title>
     <link rel="icon" type="image/svg+xml" href="/static/logo/esphome-favicon.svg" />

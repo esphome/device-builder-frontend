@@ -38,6 +38,15 @@ export const BW15_PARTITIONS: LtPartitionSpec[] = [
   { name: "ota2", offset: 0x104000, length: 0xf8000 },
 ];
 
+/**
+ * The bw16 (RTL8720D, 4 MB) slots the AmebaD flasher writes and clears;
+ * uf2tool's writer keeps only the partitions the images use, so the table fits a tag.
+ */
+export const BW16_PARTITIONS: LtPartitionSpec[] = [
+  { name: "ota1", offset: 0x6000, length: 0x1fa000 },
+  { name: "ota2", offset: 0x206000, length: 0x1e2000 },
+];
+
 export function ltPartitionTable(parts: LtPartitionSpec[]): Uint8Array {
   const table = new Uint8Array(parts.length * PARTITION_ENTRY_SIZE);
   const v = new DataView(table.buffer);
@@ -96,6 +105,10 @@ export function ltHeaderTags(
   add("FAL_PTABLE", ltPartitionTable(BW15_PARTITIONS));
   return tags;
 }
+
+/** The smallest RTL8720C build: one block in ``ota1`` of the bw15 layout. */
+export const makeAmbz2Uf2 = (): Uint8Array<ArrayBuffer> =>
+  makeLibreTinyUf2({ blocks: [{ addr: 0, tags: AMBZ2_OTA_TAGS }] });
 
 /** A whole file: a header block (no payload, not main flash) then the data blocks. */
 export function makeLibreTinyUf2(spec: LtUf2Spec): Uint8Array<ArrayBuffer> {

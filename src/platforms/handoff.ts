@@ -33,8 +33,9 @@ export const MSG_PROGRESS = "esphome-web-flash:progress";
  * the UART downloader of a Beken BK72xx, under the BootROM's protocol or a
  * bootloader's, which the engine tells apart, ``"ln-uart"`` the LN882H's
  * BootROM and the RAM code it loads, ``"rtl-ambz"`` the RTL8710B (AmebaZ) ROM
- * downloader. Named after the flasher, not the platform: ``rtl87xx`` covers
- * both Realtek ids, whose ROMs speak different protocols.
+ * downloader, ``"rtl-ambd"`` the RTL8720D (AmebaD) ROM and the flash loader
+ * it is given. Named after the flasher, not the platform: ``rtl87xx`` covers
+ * three Realtek ids, whose ROMs speak different protocols.
  */
 export const HANDOFF_FLASHERS = [
   "esp",
@@ -44,6 +45,7 @@ export const HANDOFF_FLASHERS = [
   "bk-uart",
   "ln-uart",
   "rtl-ambz",
+  "rtl-ambd",
 ] as const;
 export type HandoffFlasher = (typeof HANDOFF_FLASHERS)[number];
 /** What an absent ``flasher`` or ``flashers`` means: esptool, as in v1. */
