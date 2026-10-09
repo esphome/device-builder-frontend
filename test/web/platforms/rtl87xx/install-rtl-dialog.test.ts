@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   flashAmbz2: vi.fn(),
   flashAmbz: vi.fn(),
   flashAmbd: vi.fn(),
+  loadAmbdLoader: vi.fn<() => Promise<Uint8Array>>(),
   fetchEsphomeWebManifest: vi.fn(),
 }));
 // No ESPHome Web firmware is published here; the prebuilt flow has its own tests.
@@ -36,6 +37,12 @@ vi.mock("../../../../src/platforms/rtl87xx/ambz-flasher.js", () => ({
 vi.mock("../../../../src/platforms/rtl87xx/ambd-flasher.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   flashAmbd: mocks.flashAmbd,
+}));
+// The RTL8720D flow fetches Realtek's flash loader before it flashes; a
+// stand-in keeps the network out of the test (ambd-loader.test.ts covers it).
+vi.mock("../../../../src/platforms/rtl87xx/ambd-loader.js", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  loadAmbdLoader: mocks.loadAmbdLoader,
 }));
 // The real parse, behind a seam a test can make fail as a chunk that did not load.
 const seams = vi.hoisted(() => ({
@@ -88,11 +95,22 @@ const button = (el: any, label: string): HTMLElement =>
     (b: Element) => b.textContent?.trim() === label
   ) as HTMLElement;
 
+// The engine chunks load lazily on the first flash; load them here so the
+// transform is not inside a flash test's one-second wait.
+beforeAll(async () => {
+  await Promise.all([
+    import("../../../../src/platforms/rtl87xx/ambd-flasher.js"),
+    import("../../../../src/platforms/rtl87xx/ambz-flasher.js"),
+    import("../../../../src/platforms/rtl87xx/ambz2-flasher.js"),
+  ]);
+});
+
 beforeEach(() => {
   seams.loadRtl87xxImage.mockImplementation((bytes: Uint8Array) => seams.real!(bytes));
   mocks.parseRtl87xxImage.mockReturnValue({ chip: "ambz2", image: IMAGE });
   mocks.requestSerialPort.mockResolvedValue(PORT);
   mocks.flashAmbz2.mockResolvedValue(true);
+  mocks.loadAmbdLoader.mockResolvedValue(new Uint8Array(16));
   mocks.fetchEsphomeWebManifest.mockResolvedValue(manifest());
 });
 
