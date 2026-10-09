@@ -228,8 +228,6 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         downloadYaml(e.detail, host._api, host._localize)}
       @rename-device=${(e: CustomEvent<ConfiguredDevice>) => host._openRename(e.detail)}
       @clone-device=${(e: CustomEvent<ConfiguredDevice>) => host._openClone(e.detail)}
-      @edit-friendly-name=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._openFriendlyName(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
       @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
@@ -346,8 +344,6 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
         downloadYaml(e.detail, host._api, host._localize)}
       @rename-device=${(e: CustomEvent<ConfiguredDevice>) => host._openRename(e.detail)}
       @clone-device=${(e: CustomEvent<ConfiguredDevice>) => host._openClone(e.detail)}
-      @edit-friendly-name=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._openFriendlyName(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
       @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}

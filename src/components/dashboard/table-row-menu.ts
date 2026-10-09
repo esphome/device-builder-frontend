@@ -231,13 +231,6 @@ export class ESPHomeTableRowMenu extends LitElement {
         </div>
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
-          @click=${this.busy ? undefined : () => this._emit("edit-friendly-name")}
-        >
-          <wa-icon library="mdi" name="form-textbox"></wa-icon>
-          ${this._localize("dashboard.action_edit_friendly_name")}
-        </div>
-        <div
-          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
           @click=${this.busy ? undefined : () => this._emit("rename-device")}
         >
           <wa-icon library="mdi" name="rename-outline"></wa-icon>

@@ -4,7 +4,7 @@
  * Pins that the adopt _submit guards re-entry, so the Enter path (which
  * bypasses the disabled button via the shared EnterController) can't
  * double-import on a held Enter. The Enter->action wiring itself mirrors
- * friendly-name-dialog and is covered there.
+ * rename-device-dialog and is covered there.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

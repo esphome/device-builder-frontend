@@ -44,6 +44,8 @@ export interface DeviceNameFieldOptions {
   /** Focus this input on open (default true); pass false when another field leads. */
   autofocus?: boolean;
   readonly?: boolean;
+  /** Helper text shown while the slot holds neither an error nor a warning. */
+  helperKey?: string;
 }
 
 /** The labelled device-name input plus its inline error / warning slot
@@ -70,7 +72,9 @@ export function renderDeviceNameField(o: DeviceNameFieldOptions): TemplateResult
             ? html`<span class="field-warning"
                 >${o.localize(warning.code, warning.params)}</span
               >`
-            : nothing
+            : o.helperKey
+              ? html`<span class="helper">${o.localize(o.helperKey)}</span>`
+              : nothing
       }
     </div>
   `;

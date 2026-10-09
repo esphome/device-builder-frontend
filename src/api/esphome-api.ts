@@ -1011,11 +1011,19 @@ export class ESPHomeAPI {
   async renameDevice(
     configuration: string,
     newName: string,
-    configOnly = false
+    {
+      configOnly = false,
+      newFriendlyName,
+    }: { configOnly?: boolean; newFriendlyName?: string } = {}
   ): Promise<RenameDeviceResponse> {
     return this.sendCommand<RenameDeviceResponse>(
       "devices/rename",
-      { configuration, new_name: newName, ...(configOnly ? { config_only: true } : {}) },
+      {
+        configuration,
+        new_name: newName,
+        ...(configOnly ? { config_only: true } : {}),
+        ...(newFriendlyName !== undefined ? { new_friendly_name: newFriendlyName } : {}),
+      },
       60000
     );
   }

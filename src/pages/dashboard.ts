@@ -27,7 +27,6 @@ import {
   adoptFollowUp,
   deleteLabel,
   executeClone,
-  executeFriendlyName,
   executeRename,
   scheduleScrollIntoView,
   toggleIgnore,
@@ -156,8 +155,6 @@ import type { ESPHomeEncryptionKeyDialog } from "../components/encryption-key-di
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import "../components/discovered-device-card.js";
 import "../components/firmware-install-dialog.js";
-import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
-import "../components/friendly-name-dialog.js";
 import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/labels/bulk-labels-dialog.js";
@@ -165,7 +162,10 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/labels/label-dialog.js";
 import "../components/logs-dialog.js";
 import "../components/remote-build-panel.js";
-import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
+import type {
+  ESPHomeRenameDeviceDialog,
+  RenameConfirmDetail,
+} from "../components/rename-device-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
 import "../components/select-bar.js";
@@ -330,7 +330,6 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-confirm-dialog") _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog") _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-clone-device-dialog") _cloneDialog!: ESPHomeCloneDeviceDialog;
-  @query("esphome-friendly-name-dialog") _friendlyNameDialog!: ESPHomeFriendlyNameDialog;
   @query("esphome-bulk-labels-dialog") _bulkLabelsDialog!: ESPHomeBulkLabelsDialog;
   @query("esphome-rename-device-dialog") _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") _adoptDialog!: ESPHomeAdoptDialog;
@@ -975,23 +974,16 @@ export class ESPHomePageDashboard extends LitElement {
 
   _openRename = (device: ConfiguredDevice) => {
     this._actionDevice = device;
-    this._renameDialog.open(device.name);
+    this._renameDialog.open(device.name, device.friendly_name || device.name);
   };
   _openClone = (device: ConfiguredDevice) => {
     this._actionDevice = device;
     this._cloneDialog.open(device.name);
   };
-  _openFriendlyName = (device: ConfiguredDevice) => {
-    this._actionDevice = device;
-    this._friendlyNameDialog.open(device.name, device.friendly_name || device.name);
-  };
 
-  _executeRename = (e: CustomEvent<string>) => void executeRename(this, e);
+  _executeRename = (e: CustomEvent<RenameConfirmDetail>) => void executeRename(this, e);
   _executeClone = (e: CustomEvent<{ newName: string; newFriendlyName: string }>) =>
     void executeClone(this, e);
-  _executeFriendlyName = (
-    e: CustomEvent<{ newFriendlyName: string; install: boolean }>
-  ) => void executeFriendlyName(this, e);
 
   _showEncryptionKey = async (device: ConfiguredDevice) => {
     const key = await fetchEncryptionKey(device, this._api, this._localize);
