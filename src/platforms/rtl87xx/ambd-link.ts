@@ -48,7 +48,8 @@ const XMODEM_START_MS = 3000;
 const XMODEM_REPLY_MS = 3000;
 const XMODEM_RETRIES = 16;
 
-class AmbdProtocolError extends Error {
+/** The ROM or the loader did not answer a command as it should have. */
+export class AmbdProtocolError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "AmbdProtocolError";

@@ -9,6 +9,7 @@
  * touches the DOM.
  */
 import { bytesEqual, toHex } from "../../util/bytes.js";
+import { getErrorMessage } from "../../util/error-message.js";
 import { formatAddress, tenthLogger } from "../../util/flash-log.js";
 import {
   releaseControlLines,
@@ -23,6 +24,7 @@ import {
   AMBD_LOADER_ADDRESS,
   AMBD_SECTOR_SIZE,
   AmbdLink,
+  AmbdProtocolError,
   checksum32,
 } from "./ambd-link.js";
 import { loadAmbdLoader } from "./ambd-loader.js";
@@ -92,7 +94,10 @@ const releaseLines = (port: SerialPort): Promise<boolean> =>
  * chip's TX line low, so it is released before the ROM is probed. False
  * when the adapter has no control lines to drive.
  */
-async function autoReset(port: SerialPort): Promise<boolean> {
+async function autoReset(
+  port: SerialPort,
+  log: (line: string) => void
+): Promise<boolean> {
   try {
     await setLines(port, { dataTerminalReady: false, requestToSend: true });
     await sleep(RESET_HOLD_MS);
@@ -101,7 +106,8 @@ async function autoReset(port: SerialPort): Promise<boolean> {
     await setLines(port, { dataTerminalReady: false, requestToSend: false });
     await sleep(STRAP_RELEASE_MS);
     return true;
-  } catch {
+  } catch (err) {
+    log(`The adapter's control lines could not be driven: ${getErrorMessage(err)}`);
     // Not with a line left held, which could keep the chip in reset or its TX low.
     await releaseLines(port);
     return false;
@@ -134,7 +140,7 @@ async function autoLink(
         ? "Resetting the board into download mode over DTR/RTS"
         : `No answer from the ROM; resetting again (attempt ${attempt} of ${AUTO_RESET_ATTEMPTS})`
     );
-    const driven = await autoReset(port);
+    const driven = await autoReset(port, log);
     const word = await linkRom(link, AUTO_LINK_MS);
     if (word) return word;
     if (!driven) return null;
@@ -230,7 +236,8 @@ export async function flashAmbd(
     try {
       id = await link.flashId();
     } catch (err) {
-      if (!resident) throw err;
+      // Only a loader that stayed silent; an abort or a lost port is what it is.
+      if (!resident || !(err instanceof AmbdProtocolError)) throw err;
       log("The loader in RAM did not answer; loading it again");
       await loadLoader();
       id = await link.flashId();

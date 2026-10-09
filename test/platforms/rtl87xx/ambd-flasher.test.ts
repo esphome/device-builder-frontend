@@ -151,6 +151,29 @@ describe("flashAmbd", () => {
     expect(written(chip)).toBe(true);
   });
 
+  it("says why the automatic reset could not be driven", async () => {
+    let chip!: ReturnType<typeof fakeAmbd>;
+    const run = flash({ noSignals: true }, { onWaiting: () => chip.strap() });
+    chip = run.chip;
+    await driveFakeTimers(run.done);
+    expect(run.log).toContainEqual(
+      expect.stringMatching(/control lines could not be driven: .*no lines/)
+    );
+  });
+
+  it("does not take an unplug during the flash id read for a silent resident loader", async () => {
+    const chip = fakeAmbd({ loaderResident: true, noSignals: true });
+    chip.ram.set(LOADER, 0);
+    const done = flashAmbd(chip.port, IMAGE, {
+      onProgress: () => {},
+      onLog: (line) => {
+        if (line === "The flash loader is already running") chip.dropLink();
+      },
+    });
+    await expect(driveFakeTimers(done)).rejects.toBeInstanceOf(SerialDeviceLostError);
+    expect(chip.commands.filter((c) => c === "xmodem")).toHaveLength(0);
+  });
+
   it("reaches the strap guide on an adapter without control lines and leaves the reset to the user", async () => {
     let chip!: ReturnType<typeof fakeAmbd>;
     const onWaiting = vi.fn(() => chip.strap());
