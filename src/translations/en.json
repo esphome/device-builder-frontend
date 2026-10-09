@@ -1275,7 +1275,7 @@
     "hostname_edge_hyphen": "A hostname can't start or end with a hyphen.",
     "hostname_taken": "A device named {hostname} already exists.",
     "hostname_help_label": "About the hostname",
-    "hostname_help": "The hostname identifies this device on your network (mDNS) and names its YAML file. It is derived from the name and can be edited. Tip: set the device's room with an area in Home Assistant rather than putting it in the name."
+    "hostname_help": "The hostname identifies this device on your network (mDNS) and names its YAML file. Tip: set the device's room with an area in Home Assistant rather than putting it in the name."
   },
   "validation": {
     "required": "This field is required",
