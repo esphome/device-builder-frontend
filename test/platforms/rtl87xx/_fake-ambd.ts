@@ -1,7 +1,8 @@
 /**
- * A simulated RTL8720D behind a fake Web Serial port, as the BW16 kit on a
- * CH340 behaves: a reset with DTR held (or the user's strap) lands in the
- * ROM downloader, which answers register reads, takes address-prefixed
+ * A simulated RTL8720D behind a fake Web Serial port, as the BW16 kit on its
+ * USB port behaves: an ESP-style auto-download circuit holds the reset while
+ * RTS alone is asserted and the strap while DTR alone is, so a reset released
+ * with the strap held (or the user's strap) lands in the ROM downloader, which answers register reads, takes address-prefixed
  * XModem-1k into RAM, and NAKs while it idles; a loader written to its
  * address takes over, prints its banner, and adds the flash commands
  * (id, erase, write through the XIP window, checksum). A reset with DTR
@@ -73,6 +74,7 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
   let loaderUp = opts.loaderResident ?? false;
   let dtr = false;
   let rts = false;
+  let inReset = false;
   let resets = 0;
   let booted = 0;
   let pending: number[] = [];
@@ -240,16 +242,19 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
     },
     onSignals: (s) => {
       if (s.dataTerminalReady !== undefined) dtr = s.dataTerminalReady;
-      const wasRts = rts;
       if (s.requestToSend !== undefined) rts = s.requestToSend;
-      // RTS falling edge: the reset the kit's wiring gives.
-      if (wasRts && !rts) {
+      // The kit's circuit: reset held while RTS alone is asserted, the strap
+      // while DTR alone is; both asserted pull nothing. The chip samples the
+      // strap as the reset is released.
+      const wasReset = inReset;
+      inReset = rts && !dtr;
+      if (wasReset && !inReset) {
         if (++resets <= (opts.lostResets ?? 0)) return;
         pending = [];
         xmodem = null;
         loaderUp = false;
-        rom = dtr;
-        if (!dtr) booted++;
+        rom = dtr && !rts;
+        if (!rom) booted++;
         if (rom) idleNak();
       }
     },

@@ -67,18 +67,21 @@ export class AmbdVerifyError extends Error {
 }
 
 /**
- * Boards wired like the BW16 kit on a CH340 tie RTS to the reset and DTR to
- * the download strap (LOG_TX low), so a reset with DTR held boots the ROM
- * downloader; the strap is released after, since held it also holds the
- * chip's TX line low. False when the adapter has no control lines to drive.
+ * The BW16 kit's USB port drives an ESP-style auto-download circuit: the
+ * reset is pulled while RTS is asserted and DTR released, the strap (BURN,
+ * LOG_TX low) while DTR is asserted and RTS released, and nothing while both
+ * are. So: hold the reset, swap the lines to release it with the strap held
+ * (the ROM samples it there), then let go. Held, the strap also holds the
+ * chip's TX line low, so it is released before the ROM is probed. False
+ * when the adapter has no control lines to drive.
  */
 async function autoReset(port: SerialPort): Promise<boolean> {
   try {
-    await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
     await sleep(RESET_HOLD_MS);
-    await port.setSignals({ requestToSend: false });
+    await port.setSignals({ dataTerminalReady: true, requestToSend: false });
     await sleep(ROM_SETTLE_MS);
-    await port.setSignals({ dataTerminalReady: false });
+    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
     await sleep(STRAP_RELEASE_MS);
     return true;
   } catch {
