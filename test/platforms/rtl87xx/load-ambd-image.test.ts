@@ -38,6 +38,26 @@ const UNALIGNED_OTA2 = makeLibreTinyUf2({
   }),
   blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
 });
+// A second slot too short to hold the sector the flasher clears.
+const SHORT_OTA2 = makeLibreTinyUf2({
+  family: UF2_FAMILY_AMBD,
+  headerTags: ltHeaderTags({
+    BOARD: "bw16",
+    FAL_PTABLE: ltPartitionTable([
+      { name: "ota1", offset: 0x6000, length: 0x1fa000 },
+      { name: "ota2", offset: 0x206000, length: 0x800 },
+    ]),
+  }),
+  blocks: [{ addr: 0, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) }],
+});
+// A run whose padded last block reaches past the end of the first slot.
+const PADDED_PAST_OTA1 = makeLibreTinyUf2({
+  family: UF2_FAMILY_AMBD,
+  headerTags: bw16Tags(),
+  blocks: [
+    { addr: 0x1f9f00, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) },
+  ],
+});
 // The two slots share flash: the second's cleared sector is inside the first.
 const OVERLAPPING = makeLibreTinyUf2({
   family: UF2_FAMILY_AMBD,
@@ -88,6 +108,12 @@ describe("parseAmbdImage", () => {
       /'ota1' and 'ota2' partitions overlap/
     );
     expect(() => parseAmbdImage(IN_OTA2)).toThrow(/not in the 'ota1' partition/);
+    // The 256 bytes at 0x1fff00 fit, their padded XModem block does not.
+    expect(() => parseAmbdImage(PADDED_PAST_OTA1)).toThrow(/not in the 'ota1' partition/);
+  });
+
+  it("refuses a second slot shorter than the sector the flasher clears", () => {
+    expect(() => parseAmbdImage(SHORT_OTA2)).toThrow(/shorter than a sector/);
   });
 
   it("names a build for another Realtek chip as the wrong family", () => {

@@ -152,10 +152,10 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
     if (address >>> 24 === 0x08) {
       if (!loaderUp) throw new Error("flash write without the loader");
       const offset = address & 0xffffff;
-      for (let i = 0; i < data.length; i += SECTOR) {
-        const sector = offset + i - ((offset + i) % SECTOR);
-        if (!erased.has(sector))
-          throw new Error(`write to unerased sector 0x${sector.toString(16)}`);
+      // Every sector the block touches, the padded tail included.
+      for (let at = offset - (offset % SECTOR); at < offset + data.length; at += SECTOR) {
+        if (!erased.has(at))
+          throw new Error(`write to unerased sector 0x${at.toString(16)}`);
       }
       flash.set(data, offset);
     } else if (

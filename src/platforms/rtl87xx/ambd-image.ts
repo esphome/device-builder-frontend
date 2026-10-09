@@ -5,6 +5,7 @@
  * clears so the bootloader starts the first. The parser itself is shared
  * with the other LibreTiny families.
  */
+import { XMODEM_BLOCK_SIZE } from "../../util/xmodem.js";
 import {
   type LibreTinyFile,
   type LibreTinyImage,
@@ -29,6 +30,13 @@ const AMBD_PARSE: LibreTinyParseOptions = {
   blockSize: 0x1000,
   blocksFrom: "flash",
 };
+
+/**
+ * How far a run's write reaches: the loader takes whole XModem blocks, so
+ * the last one is padded to the block size from the run's start.
+ */
+export const writtenLength = (length: number): number =>
+  Math.ceil(length / XMODEM_BLOCK_SIZE) * XMODEM_BLOCK_SIZE;
 
 /** An RTL8720D build: the first slot's image and where the second slot lives. */
 export interface AmbdImage {
@@ -66,9 +74,12 @@ export function ambdImageOf(file: LibreTinyFile): AmbdImage {
   const ota1 = file.partitions.find((p) => p.name === "ota1");
   if (!ota1) throw new Error("Invalid UF2: no 'ota1' partition");
   const ota2 = ota2PartitionOf(file);
-  // Its first sector is erased whole, so it has to start on one.
+  // Its first sector is erased whole, so it has to start on one and hold it.
   if (ota2.offset % AMBD_PARSE.blockSize !== 0) {
     throw new Error("Invalid UF2: the 'ota2' partition is not sector aligned");
+  }
+  if (ota2.length < AMBD_PARSE.blockSize) {
+    throw new Error("Invalid UF2: the 'ota2' partition is shorter than a sector");
   }
   // The flasher clears the second slot's first sector after the write: the
   // slots must not share flash, or the first slot would lose its own head.
@@ -76,10 +87,13 @@ export function ambdImageOf(file: LibreTinyFile): AmbdImage {
     throw new Error("Invalid UF2: the 'ota1' and 'ota2' partitions overlap");
   }
   const image = libreTinyImageFor(file, AMBD_PARSE);
-  // The scheme names its partition per block group; only the first slot is written.
+  // The scheme names its partition per block group; only the first slot is
+  // written, padding included.
   const end = ota1.offset + ota1.length;
   if (
-    !image.runs.every((r) => r.address >= ota1.offset && r.address + r.data.length <= end)
+    !image.runs.every(
+      (r) => r.address >= ota1.offset && r.address + writtenLength(r.data.length) <= end
+    )
   ) {
     throw new Error("Invalid UF2: the first slot is not in the 'ota1' partition");
   }

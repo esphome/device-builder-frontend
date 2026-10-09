@@ -9,12 +9,22 @@ vi.mock("../../../src/platforms/rtl87xx/ambd-loader.js", async (importOriginal) 
 }));
 
 import {
+  BW16_PARTITIONS,
+  ltHeaderTags,
+  ltPartInfoTags,
+  ltPartitionTable,
+  makeLibreTinyUf2,
+} from "../../_make-libretiny-uf2.js";
+import {
   AmbdLinkError,
   AmbdLoaderError,
   AmbdVerifyError,
   flashAmbd,
 } from "../../../src/platforms/rtl87xx/ambd-flasher.js";
-import { parseAmbdImage } from "../../../src/platforms/rtl87xx/ambd-image.js";
+import {
+  parseAmbdImage,
+  UF2_FAMILY_AMBD,
+} from "../../../src/platforms/rtl87xx/ambd-image.js";
 import { checksum32 } from "../../../src/platforms/rtl87xx/ambd-link.js";
 import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 import {
@@ -92,6 +102,28 @@ describe("flashAmbd", () => {
     expect(log).toContainEqual(expect.stringMatching(/^Verified 0x6000/));
   });
 
+  it("erases every sector the padded last block reaches", async () => {
+    // 256 bytes at 0x6f00: the block pads to 0x7300, into the next sector.
+    const image = parseAmbdImage(
+      makeLibreTinyUf2({
+        family: UF2_FAMILY_AMBD,
+        headerTags: ltHeaderTags({
+          BOARD: "bw16",
+          FAL_PTABLE: ltPartitionTable(BW16_PARTITIONS),
+        }),
+        blocks: [
+          { addr: 0xf00, tags: ltPartInfoTags([0, 1, 2, 0, 1, 2], ["ota1", "ota2"]) },
+        ],
+      })
+    );
+    const chip = fakeAmbd();
+    await expect(
+      driveFakeTimers(flashAmbd(chip.port, image, { onProgress: () => {} }))
+    ).resolves.toBe(true);
+    expect([...chip.erased].sort((a, b) => a - b)).toEqual([0x6000, 0x7000, OTA2_OFFSET]);
+    expect(chip.flash.subarray(0x7000, 0x7300).every((b) => b === 0xff)).toBe(true);
+  });
+
   it("reports progress per block and lands on 100", async () => {
     const percents: number[] = [];
     const { done } = flash({}, { onProgress: (p) => percents.push(p) });
@@ -128,6 +160,7 @@ describe("flashAmbd", () => {
     expect(onWaiting).toHaveBeenCalledOnce();
     expect(written(chip)).toBe(true);
     expect(run.log).toContainEqual(expect.stringContaining("reset it by hand"));
+    expect(run.log).toContainEqual(expect.stringContaining("no control lines"));
   });
 
   it("gives up on a line change that never settles and goes on to the strap guide", async () => {

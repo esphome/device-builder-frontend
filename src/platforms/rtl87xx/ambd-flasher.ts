@@ -17,7 +17,7 @@ import {
 import { sleep } from "../../util/sleep.js";
 import { settledWithin, withDeadline } from "../../util/with-deadline.js";
 import type { LibreTinyFlashHooks } from "../libretiny-flash.js";
-import type { AmbdImage } from "./ambd-image.js";
+import { type AmbdImage, writtenLength } from "./ambd-image.js";
 import {
   AMBD_FLASH_ADDRESS,
   AMBD_LOADER_ADDRESS,
@@ -159,8 +159,11 @@ async function writeRun(
   onBytes: (sent: number) => void,
   log: (line: string) => void
 ): Promise<void> {
+  // Every sector the write reaches, the padded last block included.
   const first = address - (address % AMBD_SECTOR_SIZE);
-  const sectors = Math.ceil((address - first + data.length) / AMBD_SECTOR_SIZE);
+  const sectors = Math.ceil(
+    (address - first + writtenLength(data.length)) / AMBD_SECTOR_SIZE
+  );
   log(`Erasing ${sectors} sectors at ${formatAddress(first)}`);
   await link.erase(first, sectors);
   log(`Writing ${formatAddress(address)} (${data.length} bytes)`);
@@ -241,7 +244,7 @@ export async function flashAmbd(
     // The second slot's sector is erased after the write, so it has to be on the chip too.
     if (
       ota2Offset + AMBD_SECTOR_SIZE > size ||
-      image.runs.some((r) => r.address + r.data.length > size)
+      image.runs.some((r) => r.address + writtenLength(r.data.length) > size)
     ) {
       throw new Error("The image does not fit the chip's flash");
     }
@@ -279,7 +282,7 @@ export async function flashAmbd(
       log(
         rebooted
           ? "Rebooting into the firmware"
-          : "No control lines to reboot the board; reset it by hand"
+          : "The board was not rebooted (no control lines, or a change that did not settle); reset it by hand"
       );
     }
     await settledWithin(port.close(), TEARDOWN_MS);
