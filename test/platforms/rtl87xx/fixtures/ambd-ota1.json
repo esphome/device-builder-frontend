@@ -1,0 +1,185 @@
+{
+ "name": "ambd-ota1",
+ "reference": "ltchiptool PR 98 AmbDTool: loader_ensure, flash_read_id, flash_write per part at 115200, then flash_erase of the second slot's first sector",
+ "flash_sha256": "035196650274a7bc0b3883ef0274844bdd137286161c3b67a8757b51f4d67531",
+ "frames": [
+  {
+   "dir": "tx",
+   "length": 10,
+   "hex": "18181818183100200800"
+  },
+  {
+   "dir": "rx",
+   "length": 6,
+   "hex": "3105121f2c15"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "07"
+  },
+  {
+   "dir": "rx",
+   "length": 2,
+   "hex": "0615"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0201fe002008000104070a0d10131619",
+   "sha256": "62a44c095782c9d7c6707b67d72868b66301ccc935d9766f3f3b6dae1c90f90e"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0202fd002408000d101316191c1f2225",
+   "sha256": "f74ae9c1a8d365fea235532206bcabc46027087105c356a4dc6f766ca1ce50cc"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0203fc00280800191c1f2225282b2e31",
+   "sha256": "1d955aad0decbad55d5b293bb75683d2ad42d3af25dd1722283551cd940f360b"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0204fb002c080025282b2e3134373a3d",
+   "sha256": "0d72a71f230aa1707b8e203b5b92203c653639e269dd37f5ee5be3468e5f7885"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0205fa003008003134373a3d40434649",
+   "sha256": "237483985580903a538d0410db65f33f4107e0cf55ac7ec917bdfffa3fd01aa4"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "04"
+  },
+  {
+   "dir": "rx",
+   "length": 21,
+   "hex": "0655415254494d475f446f776e6c6f616420320a0d"
+  },
+  {
+   "dir": "tx",
+   "length": 3,
+   "hex": "219f03"
+  },
+  {
+   "dir": "rx",
+   "length": 4,
+   "hex": "21204016"
+  },
+  {
+   "dir": "tx",
+   "length": 6,
+   "hex": "170060000100"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "07"
+  },
+  {
+   "dir": "rx",
+   "length": 2,
+   "hex": "0615"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0201fe00600008010101010101010101",
+   "sha256": "7c2137eefc1284565876c39234d738c6d5759b91cb2d495b35202ae93c13ecd2"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0202fd00640008454545454545454545",
+   "sha256": "eb3c9da1785c7a7be6c8974ea4c5409277282089e2cba52e527f194388cc9ead"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1032,
+   "head": "0203fc00680008898989898989898989",
+   "sha256": "d5b85699062e99d5c5faecda946fe475e5074f21b626904bd216b9a1ad06cb54"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 1,
+   "hex": "04"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  },
+  {
+   "dir": "tx",
+   "length": 7,
+   "hex": "27006000280a00"
+  },
+  {
+   "dir": "rx",
+   "length": 5,
+   "hex": "27050b4077"
+  },
+  {
+   "dir": "tx",
+   "length": 6,
+   "hex": "170060200100"
+  },
+  {
+   "dir": "rx",
+   "length": 1,
+   "hex": "06"
+  }
+ ]
+}

@@ -60,6 +60,12 @@ export interface FakeAmbdOptions {
   loaderDead?: boolean;
   /** A valid image signature sits at the head of the second slot. */
   ota2Valid?: boolean;
+  /**
+   * Whether the ROM and the loader NAK after every reply and on every reset,
+   * as the real chip does while it idles. Off for the transcript test, whose
+   * recorder's chip answers only what a command asks for.
+   */
+  idleNaks?: boolean;
 }
 
 export function fakeAmbd(opts: FakeAmbdOptions = {}) {
@@ -86,7 +92,9 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
     link.enqueue(bytes);
   };
   /** The ROM and the loader NAK after every reply, as they do while idle. */
-  const idleNak = () => reply([NAK]);
+  const idleNak = () => {
+    if (opts.idleNaks ?? true) reply([NAK]);
+  };
 
   const sum32 = (offset: number, length: number): number => {
     let sum = 0;
@@ -281,6 +289,13 @@ export function fakeAmbd(opts: FakeAmbdOptions = {}) {
       return booted;
     },
   };
+}
+
+/** The recorded fixture's UF2 (record-ambd.py builds it), read from the repo root as the tests run. */
+export async function fixtureAmbdUf2(): Promise<Uint8Array> {
+  // @ts-expect-error - node-only module (see gen-language-manifest.test.ts)
+  const { readFileSync } = await import("node:fs");
+  return new Uint8Array(readFileSync("test/platforms/rtl87xx/fixtures/ambd.uf2"));
 }
 
 /** A small bw16 build: one run in ``ota1`` of ten blocks and a bit, so the last XModem block is short. */
