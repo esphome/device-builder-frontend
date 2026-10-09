@@ -58,7 +58,7 @@ async function openSettled(priv: Priv, device: AdoptableDevice): Promise<void> {
   await priv.updateComplete;
 }
 
-/** Type into the nested hostname field (expanding the disclosure). */
+/** Type into the nested hostname field (expanding a disclosure when there is one). */
 async function typeHostname(priv: Priv, value: string): Promise<void> {
   const inputs = await deviceNameInputsOf(priv);
   const toggle =
@@ -201,14 +201,22 @@ describe("adopt-then-rename (#2412)", () => {
     );
     expect(adopted.mock.calls[0][0].detail.renameTo).toBe(null);
     expect(inputs.shadowRoot!.textContent).toContain("dashboard.adopt_ota_signed_hint");
-    const toggle =
-      inputs.shadowRoot!.querySelector<HTMLButtonElement>(".disclosure-toggle")!;
-    toggle.click();
-    await inputs.updateComplete;
     const hostname =
       inputs.shadowRoot!.querySelector<HTMLInputElement>("#device-hostname")!;
     expect(hostname.readOnly).toBe(true);
     expect(inputs.shadowRoot!.textContent).not.toContain("naming.hostname_helper");
+  });
+
+  it("shows the hostname as a plain field, with the encryption details link", async () => {
+    const { priv } = await makeDialog([]);
+    await openSettled(priv, ethernetDevice());
+    const inputs = await deviceNameInputsOf(priv);
+    expect(inputs.shadowRoot!.querySelector(".disclosure-toggle")).toBeNull();
+    expect(inputs.shadowRoot!.querySelector("#device-hostname")).not.toBeNull();
+    expect(inputs.shadowRoot!.querySelector("#hostname-help")).not.toBeNull();
+    const link = priv.shadowRoot!.querySelector(".checkbox-link") as HTMLAnchorElement;
+    expect(link.href).toContain("esphome.io");
+    expect(link.textContent).toContain("dashboard.adopt_encryption_details");
   });
 
   it("returns the hostname to the factory broadcast when the friendly name is cleared", async () => {

@@ -1,8 +1,9 @@
 import { consume } from "@lit/context";
-import { css, html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
+import { ESPHOME_DOCS_BASE } from "../common/docs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import {
@@ -11,6 +12,7 @@ import {
 } from "../styles/dialog-action-buttons.js";
 import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
+import { linkButtonStyles } from "../styles/link-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { EnterController } from "../util/enter-controller.js";
@@ -25,8 +27,13 @@ import { wifiFieldsStyles } from "./onboarding/wifi-fields-styles.js";
 import { isWifiPasswordTooShort, renderWifiFields } from "./onboarding/wifi-fields.js";
 import type { ESPHomeDeviceNameInputs } from "./shared/device-name-inputs.js";
 
+import { adoptDialogStyles } from "./adopt-dialog.styles.js";
+
 import "./base-dialog.js";
 import "./shared/device-name-inputs.js";
+
+/** Security guide behind the encryption Details link. */
+const ENCRYPTION_DOCS_URL = `${ESPHOME_DOCS_BASE}/guides/security_best_practices/`;
 
 @customElement("esphome-adopt-dialog")
 export class ESPHomeAdoptDialog extends LitElement {
@@ -69,164 +76,10 @@ export class ESPHomeAdoptDialog extends LitElement {
     // Before the local block so this dialog's own `.field` / `label`
     // spacing wins; only `.field-label` / `.error` (unique here) apply.
     wifiFieldsStyles,
+    linkButtonStyles,
     dialogActionsRowStyles,
     dialogActionButtonStyles,
-    css`
-      esphome-base-dialog {
-        --width: 460px;
-      }
-
-      esphome-base-dialog::part(body) {
-        padding: 0 var(--wa-space-l);
-      }
-
-      .description {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-normal);
-        margin: 0 0 var(--wa-space-m);
-        line-height: 1.5;
-      }
-
-      /* Surface the package_import_url so the user can see where
-         the adoption flow is fetching its YAML / Python from.
-         Most "Made for ESPHome" firmware advertises this routinely
-         (Athom, Apollo, etc.), so neutral informational treatment
-         rather than a warning. The user can still notice if the
-         hostname looks unfamiliar. See
-         esphome/device-builder#120 finding B-2. */
-      .source-info {
-        margin-bottom: var(--wa-space-m);
-      }
-
-      .source-info-label {
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-quiet);
-        margin-bottom: var(--wa-space-2xs);
-      }
-
-      /* Show the URL in monospace; long URLs wrap inside the
-         dialog instead of overflowing or getting truncated. The
-         word-break:break-word + overflow-wrap:anywhere pair
-         (same one yaml-diff.ts and ansi-log.ts use) breaks only
-         on the longest unbreakable run rather than mid-token —
-         hostnames stay intact, which matters here because the
-         hostname is the highest-signal part for deciding trust.
-         break-all would happily split github.com across two
-         lines and hide the signal. */
-      .source-info-url {
-        font-family: var(--wa-font-family-code);
-        font-size: var(--wa-font-size-2xs);
-        color: var(--wa-color-text-normal);
-        word-break: break-word;
-        overflow-wrap: anywhere;
-        background: var(--wa-color-surface-lowered);
-        padding: 6px 10px;
-        border-radius: var(--wa-border-radius-s);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        display: block;
-      }
-
-      /* Anchor variant of the URL block for when the value is a
-         recognised github / gitlab / codeberg shorthand and we can
-         resolve a clickable browse URL. Same monospace + wrap shape
-         as the plain-text variant; just adds hover affordance and
-         the primary-colour underline so the user can tell it's
-         interactive. */
-      a.source-info-url {
-        color: var(--esphome-primary);
-        text-decoration: none;
-      }
-
-      a.source-info-url:hover {
-        text-decoration: underline;
-      }
-
-      a.source-info-url:focus-visible {
-        outline: 2px solid var(--esphome-primary-light);
-        outline-offset: 2px;
-      }
-
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-xs);
-        padding-bottom: var(--wa-space-m);
-      }
-
-      label {
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-quiet);
-      }
-
-      .checkbox-row {
-        display: flex;
-        align-items: flex-start;
-        gap: var(--wa-space-s);
-        padding-bottom: var(--wa-space-m);
-        cursor: pointer;
-        user-select: none;
-      }
-
-      .checkbox-row input[type="checkbox"] {
-        margin-top: 3px;
-      }
-
-      .checkbox-text {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-
-      .checkbox-title {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
-      .checkbox-hint {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-      }
-
-      /* The shared name pair carries no outer margins (its hosts own
-         the rhythm); without this the hostname row sits flush on the
-         encryption checkbox. */
-      .name-pair {
-        margin-bottom: var(--wa-space-m);
-      }
-
-      .name-hint {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        margin-top: var(--wa-space-2xs);
-      }
-
-      /* Adoption's commit affordance is success-green rather than the
-         standard primary tint (dialogActionButtonStyles); per that
-         module's guidance, divergent colour intents stay local. This
-         block sits after the shared fragment so it wins the cascade. */
-      .btn--primary {
-        background: var(--esphome-success);
-      }
-
-      .btn--primary:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-success), black 10%);
-      }
-
-      .field-error {
-        color: var(--esphome-error);
-        font-size: var(--wa-font-size-xs);
-        margin-top: var(--wa-space-2xs);
-      }
-
-      .submit-error {
-        color: var(--esphome-error);
-        font-size: var(--wa-font-size-xs);
-        padding-bottom: var(--wa-space-s);
-      }
-    `,
+    adoptDialogStyles,
   ];
 
   private readonly _dialog = new DialogOpenController(this);
@@ -381,12 +234,13 @@ export class ESPHomeAdoptDialog extends LitElement {
 
                 ${this._renderSource(device.package_import_url)}
 
-                <div class="name-pair">
+                <div>
                   <esphome-device-name-inputs
                     autofocus
                     .friendlyLabelKey=${"dashboard.adopt_field_friendly_name"}
                     .takenHostnames=${this._takenMinusFactory}
                     .hostnameLocked=${device.ota_signed}
+                    .hostnameInline=${true}
                     .friendlyHelperKey=${device.ota_signed ? "dashboard.adopt_ota_signed_hint" : ""}
                     @device-name-changed=${() => this.requestUpdate()}
                   ></esphome-device-name-inputs>
@@ -421,24 +275,28 @@ export class ESPHomeAdoptDialog extends LitElement {
                     : nothing
                 }
 
-                <label class="checkbox-row">
-                  <input
-                    type="checkbox"
-                    .checked=${this._encryption}
-                    ?disabled=${this._busy}
-                    @change=${(e: Event) => {
-                      this._encryption = (e.target as HTMLInputElement).checked;
-                    }}
-                  />
-                  <span class="checkbox-text">
+                <div class="checkbox-row">
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      .checked=${this._encryption}
+                      ?disabled=${this._busy}
+                      @change=${(e: Event) => {
+                        this._encryption = (e.target as HTMLInputElement).checked;
+                      }}
+                    />
                     <span class="checkbox-title"
                       >${this._localize("dashboard.adopt_encryption_title")}</span
                     >
-                    <span class="checkbox-hint"
-                      >${this._localize("dashboard.adopt_encryption_hint")}</span
-                    >
-                  </span>
-                </label>
+                  </label>
+                  <a
+                    class="checkbox-link link-button"
+                    href=${ENCRYPTION_DOCS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >${this._localize("dashboard.adopt_encryption_details")}</a
+                  >
+                </div>
 
                 ${
                   this._error
