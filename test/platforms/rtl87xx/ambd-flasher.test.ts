@@ -184,11 +184,17 @@ describe("flashAmbd", () => {
     expect(chip.raw.readable).toBeNull();
   });
 
-  it("refuses a chip whose flash size its id does not give, before writing anything", async () => {
-    const { chip, done } = flash({ flashSizeLog2: 0x30 });
-    await expect(driveFakeTimers(done)).rejects.toThrow(/Unknown flash size/);
-    expect(chip.erased.size).toBe(0);
-  });
+  it.each([
+    ["one its id does not give", 0x30],
+    ["one past what 24-bit offsets reach", 0x19],
+  ])(
+    "refuses a chip whose flash size is %s, before writing anything",
+    async (_n, log2) => {
+      const { chip, done } = flash({ flashSizeLog2: log2 });
+      await expect(driveFakeTimers(done)).rejects.toThrow(/Unknown flash size/);
+      expect(chip.erased.size).toBe(0);
+    }
+  );
 
   it("refuses a chip too small for the second slot's sector, before writing anything", async () => {
     // A 2 MiB part: the bw16 layout's second slot lies past its end.

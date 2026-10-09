@@ -142,10 +142,14 @@ async function autoLink(
   return null;
 }
 
-/** The flash size the JEDEC id names, or null for an id outside the usual range. */
+/**
+ * The flash size the JEDEC id names, or null for an id outside the range
+ * the loader can address: its erase and checksum commands take 24-bit
+ * offsets, so 16 MiB is the most.
+ */
 function flashSizeOf(id: Uint8Array): number | null {
   const log2 = id[2];
-  return log2 >= 0x11 && log2 <= 0x19 ? 2 ** log2 : null;
+  return log2 >= 0x11 && log2 <= 0x18 ? 2 ** log2 : null;
 }
 
 async function writeRun(
