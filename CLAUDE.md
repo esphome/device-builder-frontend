@@ -233,6 +233,11 @@ for the full flow. The load-bearing rules:
   that shipped inside an unrelated PR. Key *names* are frozen API
   (`logs_method_wireless` keeps its name); the rule is about
   user-visible values.
+- **Menu items and buttons never end in `…`.** An action that
+  opens a dialog reads `Rename`, not `Rename…` (#374 dropped the
+  convention; #2017 caught one that crept back). A trailing `…`
+  is only for ongoing state (`Installing…`) and input
+  placeholders (`Search devices…`).
 - The language picker is data-driven: each locale's autonym +
   flag come from its file's top-level `language` / `flag` keys,
   surfaced via a generated manifest
