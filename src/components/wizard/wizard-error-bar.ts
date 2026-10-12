@@ -4,9 +4,10 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 
 // The backend refusal phrasing, not the bare filename: a device named "secrets" must not match.
-const SECRETS_REFUSAL = /\bsecrets\.yaml (has a duplicate key|doesn't parse|defines ")/;
+const SECRETS_REFUSAL =
+  /\bsecrets\.yaml (has a duplicate key|has an invalid |has invalid values|doesn't parse|defines ")/;
 
-/** True when *message* is the backend's secrets.yaml refusal (duplicate key, parse failure, or a key it can't rewrite). */
+/** True when *message* is the backend's secrets.yaml refusal (duplicate key, parse failure, a value esphome rejects, or a key it can't rewrite). */
 export function isSecretsRefusal(message: string): boolean {
   return SECRETS_REFUSAL.test(message);
 }
