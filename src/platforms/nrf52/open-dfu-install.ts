@@ -121,7 +121,8 @@ async function skipTouchIfInBootloader(
   let granted: SerialPort[];
   try {
     granted = await navigator.serial.getPorts();
-  } catch {
+  } catch (err) {
+    console.warn("Listing the granted serial ports failed", err);
     return;
   }
   const stillHere =

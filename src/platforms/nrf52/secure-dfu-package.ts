@@ -8,7 +8,10 @@ import type { DfuPackage } from "./nrf-dfu.js";
  */
 export function secureDfuRefusal(pkg: DfuPackage): string | undefined {
   const types = pkg.parts.map((p) => p.type);
-  if (types.length === 1 && types[0] === "application") return undefined;
-  const holds = types.length ? types.join(" + ") : "no image";
-  return `the package holds ${holds}; Secure DFU over USB takes one application image`;
+  if (types.length !== 1 || types[0] !== "application") {
+    const holds = types.length ? types.join(" + ") : "no image";
+    return `the package holds ${holds}; Secure DFU over USB takes one application image`;
+  }
+  if (pkg.parts[0].bin.length === 0) return "the application image is empty";
+  return undefined;
 }

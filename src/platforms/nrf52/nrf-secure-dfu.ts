@@ -304,6 +304,10 @@ class SecureDfuSession extends SlipFrameSession {
       await this.writeBytes(frameRequest(writeRequest(piece)));
       crc = crc32(piece, crc);
     }
+    // With receipts off a Write is answered only when it failed; the answer
+    // waits here, as the next request would drop it with its reason.
+    const refused = this.unclaimed.map(parseResponse).find((r) => r?.op === OP_WRITE);
+    if (refused) throw new DfuResponseError(OP_NAMES[OP_WRITE], responseFailure(refused));
     const end = offset + data.length;
     const p = await this.request(calcCrcRequest());
     const got = { offset: u32(p, 0), crc: u32(p, 4) };

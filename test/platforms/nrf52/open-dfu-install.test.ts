@@ -213,6 +213,21 @@ describe("showFirstStep", () => {
     await new Promise((r) => setTimeout(r, 5));
     expect(host._step).toBe("nrf-open-reset");
   });
+
+  it("stays on the reset step, and says so, when the granted ports cannot be listed", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = readyHost();
+    restoreSerial();
+    restoreSerial = withWebSerial(true, {
+      getPorts: vi.fn(async () => {
+        throw new Error("no permission");
+      }),
+    });
+    nrfOpenDfuInstall.showFirstStep(asHost(host));
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledOnce());
+    expect(host._step).toBe("nrf-open-reset");
+    warn.mockRestore();
+  });
 });
 
 describe("nrfOpenDfuInstall", () => {

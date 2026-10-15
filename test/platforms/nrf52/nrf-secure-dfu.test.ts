@@ -243,6 +243,20 @@ describe("flashSecureDfuPackage", () => {
     expect(port.close).toHaveBeenCalledOnce();
   });
 
+  it("names a Write the bootloader refused instead of the CRC mismatch it leaves", async () => {
+    const bootloader = new FakeOpenDfuBootloader();
+    let writes = 0;
+    bootloader.onRequest = (op) =>
+      op === OP_WRITE && ++writes === 5 ? [op, 0x04] : undefined;
+    const { port } = fakeOpenDfuPort(bootloader);
+    const flash = flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
+    await expect(flash).rejects.toThrow(DfuResponseError);
+    await expect(flash).rejects.toThrow(
+      "Write object: the bootloader answered insufficient resources"
+    );
+    expect(port.close).toHaveBeenCalledOnce();
+  });
+
   it("fails when the bootloader's CRC does not match what was sent", async () => {
     const bootloader = new FakeOpenDfuBootloader();
     let checks = 0;

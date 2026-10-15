@@ -19,6 +19,9 @@ const part = (type: DfuFirmwarePart["type"]): DfuFirmwarePart => ({
 describe("secureDfuRefusal", () => {
   it("takes one application image and nothing else", () => {
     expect(secureDfuRefusal({ parts: [part("application")] })).toBeUndefined();
+    expect(
+      secureDfuRefusal({ parts: [{ ...part("application"), bin: new Uint8Array() }] })
+    ).toBe("the application image is empty");
     expect(secureDfuRefusal({ parts: [] })).toBe(
       "the package holds no image; Secure DFU over USB takes one application image"
     );
