@@ -20,6 +20,7 @@ import { type HandoffSpec, refusalOf } from "../handoff.js";
 import {
   type BrowserInstall,
   FLASH_ACTION_KEY,
+  type FlasherFooter,
   FlashImageSlot,
   RESET_ACTION_KEY,
 } from "../platform-support.js";
@@ -212,10 +213,18 @@ async function pickNrfAppPort(localize: LocalizeFunc): Promise<SerialPort | null
   }
 }
 
-/**
- * Two user-gesture steps. Step 1 offers Flash beside Reset: a device already
- * in its bootloader (factory fresh, or after RESET) skips the touch.
- */
+// Reset stays beside Flash on both steps: every nRF52 running ESPHome
+// carries the same USB ids, so a touch that went to another board "succeeds"
+// silently, and a device already in its bootloader (factory fresh, or after
+// RESET) skips the touch altogether.
+function openDfuFooter(): FlasherFooter {
+  return {
+    secondary: { run: nrfOpenDoReset, labelKey: RESET_ACTION_KEY },
+    primary: { run: nrfOpenDoFlash, labelKey: FLASH_ACTION_KEY },
+  };
+}
+
+/** Two user-gesture steps, each with the touch and the flash a click away. */
 export const nrfOpenDfuInstall: BrowserInstall<"nrf-open-dfu"> = {
   id: "nrf-open-dfu",
   methodKey: "nrf_open_dfu",
@@ -229,14 +238,8 @@ export const nrfOpenDfuInstall: BrowserInstall<"nrf-open-dfu"> = {
   steps: {
     "nrf-open-reset": {
       detailKey: "firmware.nrf_open_step1_desc",
-      footer: () => ({
-        secondary: { run: nrfOpenDoFlash, labelKey: FLASH_ACTION_KEY },
-        primary: { run: nrfOpenDoReset, labelKey: RESET_ACTION_KEY },
-      }),
+      footer: openDfuFooter,
     },
-    "nrf-open-wait": {
-      detailKey: "firmware.nrf_open_step2_desc",
-      footer: () => ({ primary: { run: nrfOpenDoFlash, labelKey: FLASH_ACTION_KEY } }),
-    },
+    "nrf-open-wait": { detailKey: "firmware.nrf_open_step2_desc", footer: openDfuFooter },
   },
 };

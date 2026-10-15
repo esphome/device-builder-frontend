@@ -558,7 +558,7 @@
     "nrf_open_step1_title": "Ready to flash via DFU",
     "nrf_open_step1_desc": "Click Reset Device to put the board into its bootloader over USB. If it is already in the bootloader (the dongle's red LED pulses), click Flash directly.",
     "nrf_open_step2_title": "Device is entering the bootloader…",
-    "nrf_open_step2_desc": "Wait a moment for the bootloader to appear, then click Flash and pick it. If no new port appears, the firmware did not act on the reset (it needs dfu: in its configuration): press the RESET button on the side of the dongle, then click Flash.",
+    "nrf_open_step2_desc": "Wait a moment for the bootloader to appear, then click Flash and pick it. If no new port appears, the reset went to another board (click Reset Device again and pick the dongle's port) or the firmware did not act on it (it needs dfu: in its configuration): press the RESET button on the side of the dongle, then click Flash.",
     "nrf_open_manual_bootloader_hint": "{error}. Press the RESET button on the side of the dongle to enter the bootloader by hand, then retry and pick the new port.",
     "nrf_open_port_refused": "That port is not an nRF52 running ESPHome. Pick the board's own USB port, or press the RESET button on the side of the dongle and click Flash.",
     "rp2_bootsel_title": "Ready to flash over USB",

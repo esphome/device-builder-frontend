@@ -228,4 +228,14 @@ describe("nrfOpenDfuInstall", () => {
     expect(nrfOpenDfuInstall.handoff?.flasher).toBe("nrf-secure-dfu");
     expect(nrfOpenDfuInstall.handoff?.erase).toBe(false);
   });
+
+  // Every nRF52 running ESPHome carries the same USB ids, so a touch on
+  // another board's port "succeeds": the wait step keeps Reset to try again.
+  it("offers Reset beside Flash on both steps", () => {
+    for (const step of ["nrf-open-reset", "nrf-open-wait"] as const) {
+      const footer = nrfOpenDfuInstall.steps[step].footer!();
+      expect(footer.primary.run).toBe(nrfOpenDoFlash);
+      expect(footer.secondary?.run).toBe(nrfOpenDoReset);
+    }
+  });
 });
