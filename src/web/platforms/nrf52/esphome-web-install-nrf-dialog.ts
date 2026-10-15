@@ -12,9 +12,9 @@ import {
   loadDfuEngine,
   loadDfuPackage,
   loadSecureDfuEngine,
+  secureDfuRefusal,
   withManualBootloaderHint,
 } from "../../../platforms/nrf52/index.js";
-import { secureDfuRefusal } from "../../../platforms/nrf52/secure-dfu-package.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import {
