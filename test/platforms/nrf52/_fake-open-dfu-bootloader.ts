@@ -52,6 +52,8 @@ export class FakeOpenDfuBootloader {
   onRequest?: (op: number, args: Uint8Array) => number[] | null | undefined;
   /** Frames left in the bootloader, sent ahead of the first ping's answer. */
   staleFrames: number[][] = [];
+  /** Frames sent right after the first ping's answer, as a bootloader that answers twice. */
+  trailingFrames: number[][] = [];
 
   private progress: Record<number, Progress> = {
     [OBJECT_COMMAND]: { committed: [], object: null, objectSize: 0 },
@@ -72,9 +74,11 @@ export class FakeOpenDfuBootloader {
   /** The frames the bootloader sends for one decoded request; none for a write (no receipt asked for). */
   replies(frame: Uint8Array): number[][] {
     const stale = this.staleFrames;
+    const trailing = this.trailingFrames;
     this.staleFrames = [];
+    this.trailingFrames = [];
     const reply = this.handle(frame);
-    return reply ? [...stale, reply] : stale;
+    return reply ? [...stale, reply, ...trailing] : stale;
   }
 
   /** The reply to one decoded request frame; null for a write (no receipt asked for). */

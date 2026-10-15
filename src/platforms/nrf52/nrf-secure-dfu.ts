@@ -150,9 +150,9 @@ const u32 = (payload: Uint8Array, at: number): number =>
     true
   );
 
-/** Whether ``res`` answers the ping ``id``; a refused ping still says the bootloader is up. */
+/** Whether ``res`` is the answer to the ping ``id``, as pc-nrfutil checks it. */
 const answersPing = (res: DfuResponse | null, id: number): boolean =>
-  res?.op === OP_PING && (res.result !== RESULT_SUCCESS || res.payload[0] === id);
+  res?.op === OP_PING && res.result === RESULT_SUCCESS && res.payload[0] === id;
 
 // ── Session ──────────────────────────────────────────────────────────────────
 
@@ -237,10 +237,11 @@ class SecureDfuSession extends SlipFrameSession {
   }
 
   /**
-   * The bootloader is up when it answers a ping at all. A frame that is not
-   * this ping's answer (one left in the bootloader, or an earlier ping's that
-   * came late) is read past within the same attempt, so that the next ping
-   * is not sent while its answer is still on the way.
+   * The bootloader is up when it answers a ping. A frame that is not this
+   * ping's answer (one left in the bootloader, or an earlier ping's that came
+   * late) is read past within the same attempt, so that the next ping is not
+   * sent while its answer is still on the way; whatever came after the
+   * answer is dropped, so the first request gets its own.
    */
   async ping(): Promise<void> {
     for (let attempt = 1; attempt <= PING_ATTEMPTS; attempt++) {
@@ -250,6 +251,7 @@ class SecureDfuSession extends SlipFrameSession {
         while (!answersPing(res, id)) {
           res = parseResponse(await this.nextFrame(PING_TIMEOUT_MS));
         }
+        this.unclaimed = [];
         return;
       } catch (err) {
         if (this.signal?.aborted || this.readEnded) throw err;
@@ -269,7 +271,11 @@ class SecureDfuSession extends SlipFrameSession {
 
   /** The largest object of a type the bootloader takes (Select's first field). */
   async selectMaxSize(objectType: number): Promise<number> {
-    return u32(await this.request(selectRequest(objectType)), 0);
+    const maxSize = u32(await this.request(selectRequest(objectType)), 0);
+    if (maxSize < 1) {
+      throw new Error(`The bootloader takes objects of ${maxSize} bytes`);
+    }
+    return maxSize;
   }
 
   async create(objectType: number, size: number): Promise<void> {
@@ -380,11 +386,11 @@ export async function flashSecureDfuPackage(
     await session.sendInitPacket(part.dat);
     await session.sendFirmware(part.bin, onProgress);
     log("Transfer complete; the bootloader starts the firmware");
+    markSerialActivity(); // the firmware's return is ours, not a device plugged in
   } catch (err) {
     failure = err;
     throw err;
   } finally {
-    markSerialActivity(); // the bootloader reboots into the firmware; its return is ours
     // Both are best effort: the port must always be closed so a retry can
     // reopen it, and neither may replace the error that ended the flash.
     try {

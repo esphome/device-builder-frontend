@@ -148,15 +148,29 @@ describe("flashSecureDfuPackage", () => {
 
   it("reads past frames left in the bootloader without pinging again", async () => {
     const bootloader = new FakeOpenDfuBootloader();
-    // An earlier session's CRC answer and an earlier ping's, ahead of ours.
+    // An earlier session's CRC answer, an earlier ping's, and a refused ping
+    // ahead of ours; a second answer to ours trailing it.
     bootloader.staleFrames = [
       [OP_RESPONSE, OP_CALC_CRC, RESULT_SUCCESS, 0, 0, 0, 0, 0, 0, 0, 0],
       [OP_RESPONSE, OP_PING, RESULT_SUCCESS, 0xee],
+      [OP_RESPONSE, OP_PING, 0x08],
     ];
+    bootloader.trailingFrames = [[OP_RESPONSE, OP_PING, RESULT_SUCCESS, 1]];
     const { port } = fakeOpenDfuPort(bootloader);
     await flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
     expect(bootloader.requests.filter((op) => op === OP_PING)).toHaveLength(1);
     expect([...bootloader.image]).toEqual([...app]);
+  });
+
+  it("fails when the bootloader takes objects of no size", async () => {
+    const bootloader = new FakeOpenDfuBootloader();
+    bootloader.maxDataSize = 0;
+    const { port } = fakeOpenDfuPort(bootloader);
+    await expect(
+      flashSecureDfuPackage(port, pkg, { onProgress: () => {} })
+    ).rejects.toThrow("The bootloader takes objects of 0 bytes");
+    expect(bootloader.requests.filter((op) => op === OP_CREATE)).toHaveLength(1);
+    expect(port.close).toHaveBeenCalledOnce();
   });
 
   it("gives up after three unanswered pings", async () => {
