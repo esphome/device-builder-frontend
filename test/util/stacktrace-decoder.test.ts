@@ -1,17 +1,18 @@
 /**
  * @vitest-environment happy-dom
- * @vitest-environment-options { "settings": { "fetch": { "virtualServers": [ { "url": "https://esphome.github.io/device-builder/esp-stacktrace-decoder/", "directory": "./test/fixtures/decoder-stub" } ] } } }
+ * @vitest-environment-options { "settings": { "enableIframePageLoading": true, "fetch": { "virtualServers": [ { "url": "https://esphome.github.io/device-builder/esp-stacktrace-decoder/", "directory": "./test/fixtures/decoder-stub" } ] } } }
  *
  * Pins the hosted decoder's contract: it frames the page once, authenticates
  * with a one-way nonce, and treats every failure as "no decode" rather than
  * letting it reach the log.
  *
- * The decoder URL is served from a local stub, because happy-dom really loads
- * an iframe's src and the src here is the production URL: without this, every
- * run would fetch esphome.github.io, which is slow, fails offline, and is the
- * exact coupling this design exists to avoid. Disabling iframe loading outright
- * would be simpler but leaves contentWindow null, and that window is what the
- * source check authenticates against. The real page is covered in the
+ * The decoder URL is served from a local stub, because happy-dom loads an
+ * iframe's src when asked to (``enableIframePageLoading``; off by default
+ * since happy-dom 21) and the src here is the production URL: without the
+ * stub, every run would fetch esphome.github.io, which is slow, fails offline,
+ * and is the exact coupling this design exists to avoid. Leaving iframe
+ * loading off would be simpler but leaves contentWindow null, and that window
+ * is what the source check authenticates against. The real page is covered in the
  * device-builder repo, in a real browser, against a real ELF.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
