@@ -26,6 +26,7 @@ vi.mock("../../../../src/platforms/nrf52/nrf-dfu.js", () => ({
   flashDfuPackageWithReconnect: mocks.flashDfuPackageWithReconnect,
 }));
 
+import { makeWebSerialPort } from "../../_make-web-serial-port.js";
 import { pickFile } from "../../_pick-file.js";
 import { argsLocalize } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
@@ -43,7 +44,7 @@ async function dialog(): Promise<any> {
 }
 
 beforeEach(() => {
-  mocks.requestSerialPort.mockResolvedValue({});
+  mocks.requestSerialPort.mockResolvedValue(makeWebSerialPort());
   mocks.touchIntoBootloader.mockResolvedValue(true);
   mocks.parseDfuPackage.mockReturnValue({ parts: [] });
   mocks.flashDfuPackageWithReconnect.mockResolvedValue(undefined);

@@ -7,10 +7,14 @@ import "../../../components/base-dialog.js";
 import { localizeContext } from "../../../context/index.js";
 import {
   type DfuPackage,
+  DONGLE_RESET_HINT_KEY,
+  isOpenDfuBootloaderPort,
   loadDfuEngine,
   loadDfuPackage,
+  loadSecureDfuEngine,
   withManualBootloaderHint,
 } from "../../../platforms/nrf52/index.js";
+import { secureDfuRefusal } from "../../../platforms/nrf52/secure-dfu-package.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { getErrorMessage } from "../../../util/error-message.js";
 import {
@@ -46,7 +50,10 @@ type InstallState = "idle" | "resetting" | "waiting" | "flashing" | "success" | 
 /**
  * Two-step nRF52 DFU install: 1200-baud reset, then flash over the
  * re-enumerated DFU port. Each requestPort() runs from its own button click
- * (user-gesture requirement).
+ * (user-gesture requirement). The port picked for the flash tells the
+ * bootloader apart: Nordic's nRF5 SDK bootloader (the nRF52840 Dongle) has
+ * USB ids of its own and takes Secure DFU; any other is Adafruit's, which
+ * takes legacy DFU.
  */
 @customElement("esphome-web-install-nrf-dialog")
 export class ESPHomeWebInstallNrfDialog extends LitElement {
@@ -188,24 +195,40 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     }
     if (!port) return;
 
+    const openDfu = isOpenDfuBootloaderPort(port);
+    const refusal = openDfu ? secureDfuRefusal(pkg) : undefined;
+    if (refusal) {
+      this._fail(`${this._localize("firmware.nrf_bad_package")}: ${refusal}`);
+      return;
+    }
     this._state = "flashing";
     this._progress = 0;
     this._reconnecting = false;
+    const hooks = {
+      onProgress: (percent: number) => {
+        this._progress = Math.round(percent);
+      },
+      onReconnecting: () => (this._reconnecting = true),
+      onLog: this._log,
+    };
     try {
-      // A cache hit: the engine loaded when the package was parsed.
-      const { flashDfuPackageWithReconnect } = await loadDfuEngine();
-      await flashDfuPackageWithReconnect(port, pkg, {
-        onProgress: (percent) => {
-          this._progress = Math.round(percent);
-        },
-        onReconnecting: () => (this._reconnecting = true),
-        onLog: this._log,
-      });
+      if (openDfu) {
+        const { flashSecureDfuPackage } = await loadSecureDfuEngine();
+        await flashSecureDfuPackage(port, pkg, hooks);
+      } else {
+        // A cache hit: the engine loaded when the package was parsed.
+        const { flashDfuPackageWithReconnect } = await loadDfuEngine();
+        await flashDfuPackageWithReconnect(port, pkg, hooks);
+      }
       this._state = "success";
     } catch (err) {
       this._fail(
         this._localize("web.nrf.install_error_flash", {
-          error: withManualBootloaderHint(err, this._localize),
+          error: withManualBootloaderHint(
+            err,
+            this._localize,
+            openDfu ? DONGLE_RESET_HINT_KEY : undefined
+          ),
         })
       );
     }
