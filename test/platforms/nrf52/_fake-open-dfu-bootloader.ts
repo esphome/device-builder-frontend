@@ -44,10 +44,14 @@ export class FakeOpenDfuBootloader {
   prn: number | null = null;
   /** Every request's opcode, in order. */
   readonly requests: number[] = [];
-  /** Replaces the reply to a request (the payload after ``0x60 <op>``); undefined to answer normally. */
-  onRequest?: (op: number, args: Uint8Array) => number[] | undefined;
-  /** Answer the first ping with a stale id, as a bootloader with a leftover frame. */
-  stalePingReply = false;
+  /**
+   * Replaces the reply to a request (the bytes after ``0x60``: the opcode
+   * answered, the result, the payload); null to leave it unanswered,
+   * undefined to answer normally.
+   */
+  onRequest?: (op: number, args: Uint8Array) => number[] | null | undefined;
+  /** Frames left in the bootloader, sent ahead of the first ping's answer. */
+  staleFrames: number[][] = [];
 
   private progress: Record<number, Progress> = {
     [OBJECT_COMMAND]: { committed: [], object: null, objectSize: 0 },
@@ -65,22 +69,26 @@ export class FakeOpenDfuBootloader {
     return new Uint8Array(this.progress[OBJECT_DATA].committed);
   }
 
+  /** The frames the bootloader sends for one decoded request; none for a write (no receipt asked for). */
+  replies(frame: Uint8Array): number[][] {
+    const stale = this.staleFrames;
+    this.staleFrames = [];
+    const reply = this.handle(frame);
+    return reply ? [...stale, reply] : stale;
+  }
+
   /** The reply to one decoded request frame; null for a write (no receipt asked for). */
   handle(frame: Uint8Array): number[] | null {
     const op = frame[0];
     const args = frame.subarray(1);
     this.requests.push(op);
     const override = this.onRequest?.(op, args);
-    if (override) return [OP_RESPONSE, op, ...override];
+    if (override === null) return null;
+    if (override) return [OP_RESPONSE, ...override];
     const ok = (...payload: number[]) => [OP_RESPONSE, op, RESULT_SUCCESS, ...payload];
     switch (op) {
-      case OP_PING: {
-        if (this.stalePingReply) {
-          this.stalePingReply = false;
-          return ok((args[0] - 1) & 0xff);
-        }
+      case OP_PING:
         return ok(args[0]);
-      }
       case OP_SET_PRN:
         this.prn = args[0] | (args[1] << 8);
         return ok();
@@ -165,8 +173,7 @@ export function fakeOpenDfuPort(bootloader = new FakeOpenDfuBootloader()) {
           const frame = slipDecode(new Uint8Array(pending));
           pending = [];
           if (frame.length === 0) continue;
-          const reply = bootloader.handle(frame);
-          if (reply)
+          for (const reply of bootloader.replies(frame))
             rx.enqueue(new Uint8Array([...slipEncode(new Uint8Array(reply)), 0xc0]));
         }
       },

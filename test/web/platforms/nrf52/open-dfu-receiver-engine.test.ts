@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  loadDfuPackage: vi.fn(),
+  loadSecureDfuPackage: vi.fn(),
   flashSecureDfuPackage: vi.fn(),
   touchIntoBootloader: vi.fn(),
   pickSerialPort: vi.fn(),
@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 const port = vi.hoisted(() => ({}) as SerialPort);
 vi.mock("../../../../src/platforms/nrf52/index.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  loadDfuPackage: mocks.loadDfuPackage,
+  loadSecureDfuPackage: mocks.loadSecureDfuPackage,
   loadSecureDfuEngine: async () => ({
     flashSecureDfuPackage: mocks.flashSecureDfuPackage,
   }),
@@ -46,7 +46,7 @@ async function prepared(): Promise<ReceiverPlan> {
 }
 
 beforeEach(() => {
-  mocks.loadDfuPackage.mockResolvedValue({ pkg });
+  mocks.loadSecureDfuPackage.mockResolvedValue({ pkg });
   mocks.touchIntoBootloader.mockResolvedValue(true);
   mocks.flashSecureDfuPackage.mockResolvedValue(undefined);
   mocks.pickSerialPort.mockResolvedValue(port);
@@ -61,11 +61,11 @@ describe("nrfOpenDfuReceiverEngine", () => {
       error: "firmware.nrf_bad_package (not a single package part)",
       retryable: false,
     });
-    expect(mocks.loadDfuPackage).not.toHaveBeenCalled();
+    expect(mocks.loadSecureDfuPackage).not.toHaveBeenCalled();
   });
 
   it("names a package that does not parse", async () => {
-    mocks.loadDfuPackage.mockResolvedValue({
+    mocks.loadSecureDfuPackage.mockResolvedValue({
       key: "firmware.nrf_bad_package",
       detail: "no manifest",
     });

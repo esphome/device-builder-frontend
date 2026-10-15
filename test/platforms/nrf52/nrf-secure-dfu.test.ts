@@ -18,12 +18,14 @@ import {
   OP_EXECUTE,
   OP_GET_MTU,
   OP_PING,
+  OP_RESPONSE,
   OP_SELECT,
   OP_SET_PRN,
   OP_WRITE,
   parseResponse,
   pingRequest,
   responseFailure,
+  RESULT_SUCCESS,
   selectRequest,
   setPrnRequest,
   writeChunkSize,
@@ -115,7 +117,7 @@ describe("flashSecureDfuPackage", () => {
     expect(log).toEqual([
       "Pinging the bootloader",
       "Serial MTU: 64 bytes",
-      "Image 1 of 1: application (6000 bytes)",
+      "Application image: 6000 bytes",
       "Sending the init packet (70 bytes)",
       "Transferring 6000 bytes in 2 objects of up to 4096 bytes",
       "Transferring: 50%",
@@ -144,18 +146,66 @@ describe("flashSecureDfuPackage", () => {
     expect(writes).toBe(3 + Math.ceil(4096 / 30) + Math.ceil(1904 / 30));
   });
 
-  it("pings past a stale answer left in the bootloader", async () => {
+  it("reads past frames left in the bootloader without pinging again", async () => {
     const bootloader = new FakeOpenDfuBootloader();
-    bootloader.stalePingReply = true;
+    // An earlier session's CRC answer and an earlier ping's, ahead of ours.
+    bootloader.staleFrames = [
+      [OP_RESPONSE, OP_CALC_CRC, RESULT_SUCCESS, 0, 0, 0, 0, 0, 0, 0, 0],
+      [OP_RESPONSE, OP_PING, RESULT_SUCCESS, 0xee],
+    ];
     const { port } = fakeOpenDfuPort(bootloader);
     await flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
-    expect(bootloader.requests.filter((op) => op === OP_PING)).toHaveLength(2);
+    expect(bootloader.requests.filter((op) => op === OP_PING)).toHaveLength(1);
     expect([...bootloader.image]).toEqual([...app]);
+  });
+
+  it("gives up after three unanswered pings", async () => {
+    vi.useFakeTimers();
+    try {
+      const bootloader = new FakeOpenDfuBootloader();
+      bootloader.onRequest = (op) => (op === OP_PING ? null : undefined);
+      const { port } = fakeOpenDfuPort(bootloader);
+      const flash = flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
+      const failed = expect(flash).rejects.toThrow(
+        "The bootloader did not answer the ping (3 attempts)"
+      );
+      await vi.advanceTimersByTimeAsync(3000);
+      await failed;
+      expect(bootloader.requests).toEqual([OP_PING, OP_PING, OP_PING]);
+      expect(port.close).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("fails a request the bootloader answers with another opcode", async () => {
+    const bootloader = new FakeOpenDfuBootloader();
+    bootloader.onRequest = (op) =>
+      op === OP_SET_PRN ? [OP_PING, RESULT_SUCCESS, 1] : undefined;
+    const { port } = fakeOpenDfuPort(bootloader);
+    const flash = flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
+    await expect(flash).rejects.toThrow(DfuResponseError);
+    await expect(flash).rejects.toThrow(
+      "Set receipt notification: the bootloader answered something else"
+    );
+    expect(port.close).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a package that is not one application image before touching the port", async () => {
+    const { port, bootloader } = fakeOpenDfuPort();
+    const twoImages = { parts: [{ ...pkg.parts[0], type: "softdevice" }, pkg.parts[0]] };
+    await expect(
+      flashSecureDfuPackage(port, twoImages as typeof pkg, { onProgress: () => {} })
+    ).rejects.toThrow(
+      "Not a package for this bootloader: the package holds softdevice + application; Secure DFU over USB takes one application image"
+    );
+    expect(bootloader.requests).toEqual([]);
+    expect(port.close).not.toHaveBeenCalled();
   });
 
   it("names the request the bootloader refused, with its reason", async () => {
     const bootloader = new FakeOpenDfuBootloader();
-    bootloader.onRequest = (op) => (op === OP_EXECUTE ? [0x0b, 0x05] : undefined);
+    bootloader.onRequest = (op) => (op === OP_EXECUTE ? [op, 0x0b, 0x05] : undefined);
     const { port } = fakeOpenDfuPort(bootloader);
     const flash = flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
     await expect(flash).rejects.toThrow(DfuResponseError);
@@ -169,7 +219,9 @@ describe("flashSecureDfuPackage", () => {
     const bootloader = new FakeOpenDfuBootloader();
     let checks = 0;
     bootloader.onRequest = (op) =>
-      op === OP_CALC_CRC && ++checks === 2 ? [0x01, 0, 0, 0, 0, 1, 2, 3, 4] : undefined;
+      op === OP_CALC_CRC && ++checks === 2
+        ? [op, 0x01, 0, 0, 0, 0, 1, 2, 3, 4]
+        : undefined;
     const { port } = fakeOpenDfuPort(bootloader);
     await expect(
       flashSecureDfuPackage(port, pkg, { onProgress: () => {} })

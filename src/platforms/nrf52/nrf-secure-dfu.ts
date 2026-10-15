@@ -18,6 +18,7 @@ import { tenthLogger } from "../../util/flash-log.js";
 import { markSerialActivity } from "../../util/serial-reacquire.js";
 import { DfuResponseError } from "./dfu-response-error.js";
 import type { DfuFlashHooks, DfuPackage } from "./nrf-dfu.js";
+import { secureDfuRefusal } from "./secure-dfu-package.js";
 import { SLIP_END, slipEncode, SlipFrameSession } from "./slip.js";
 
 export const OP_CREATE = 0x01;
@@ -149,6 +150,10 @@ const u32 = (payload: Uint8Array, at: number): number =>
     true
   );
 
+/** Whether ``res`` answers the ping ``id``; a refused ping still says the bootloader is up. */
+const answersPing = (res: DfuResponse | null, id: number): boolean =>
+  res?.op === OP_PING && (res.result !== RESULT_SUCCESS || res.payload[0] === id);
+
 // ── Session ──────────────────────────────────────────────────────────────────
 
 interface Pending {
@@ -159,6 +164,8 @@ interface Pending {
 
 class SecureDfuSession extends SlipFrameSession {
   private pending: Pending | null = null;
+  /** Frames nothing was waiting for, in order: the ping reads past them. */
+  private unclaimed: Uint8Array[] = [];
   private pingId = 0;
   private mtu = 0;
 
@@ -176,15 +183,29 @@ class SecureDfuSession extends SlipFrameSession {
 
   protected onFrame(frame: Uint8Array): void {
     const pending = this.pending;
-    if (!pending) return; // Nothing asked: leftovers from an earlier session.
+    if (!pending) {
+      // Nothing asked: a leftover from an earlier session, or the rest of a
+      // burst whose first frame answered the wait.
+      this.unclaimed.push(frame);
+      return;
+    }
     this.pending = null;
     clearTimeout(pending.timer);
     pending.resolve(frame);
   }
 
-  /** Send one request and take the next frame as its answer. */
-  private exchange(payload: Uint8Array, timeoutMs: number): Promise<Uint8Array> {
+  /**
+   * The next frame, as the answer to ``request`` once it went out, or to one
+   * sent before when there is none to send.
+   */
+  private nextFrame(timeoutMs: number, request?: Uint8Array): Promise<Uint8Array> {
     if (this.readEnded) return Promise.reject(this.readEnded);
+    const queued = this.unclaimed.shift();
+    if (queued) {
+      return request
+        ? this.race(this.writeBytes(frameRequest(request))).then(() => queued)
+        : Promise.resolve(queued);
+    }
     const reply = new Promise<Uint8Array>((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error(`No answer from the bootloader in ${timeoutMs} ms`)),
@@ -193,7 +214,9 @@ class SecureDfuSession extends SlipFrameSession {
       this.pending = { resolve, reject, timer };
     });
     reply.catch(() => {}); // A wait given up on (a failed write) is not unhandled.
-    const answered = this.writeBytes(frameRequest(payload)).then(() => reply);
+    const answered = request
+      ? this.writeBytes(frameRequest(request)).then(() => reply)
+      : reply;
     return this.race(answered).finally(() => {
       if (this.pending) clearTimeout(this.pending.timer);
       this.pending = null;
@@ -204,7 +227,7 @@ class SecureDfuSession extends SlipFrameSession {
   private async request(payload: Uint8Array): Promise<Uint8Array> {
     const op = payload[0];
     const name = OP_NAMES[op] ?? `opcode 0x${op.toString(16)}`;
-    const res = parseResponse(await this.exchange(payload, RESPONSE_TIMEOUT_MS));
+    const res = parseResponse(await this.nextFrame(RESPONSE_TIMEOUT_MS, payload));
     if (!res || res.op !== op) {
       throw new DfuResponseError(name, "the bootloader answered something else");
     }
@@ -213,24 +236,23 @@ class SecureDfuSession extends SlipFrameSession {
     return res.payload;
   }
 
-  /** The bootloader is up when it answers a ping at all; a stale frame is tried past. */
+  /**
+   * The bootloader is up when it answers a ping at all. A frame that is not
+   * this ping's answer (one left in the bootloader, or an earlier ping's that
+   * came late) is read past within the same attempt, so that the next ping
+   * is not sent while its answer is still on the way.
+   */
   async ping(): Promise<void> {
     for (let attempt = 1; attempt <= PING_ATTEMPTS; attempt++) {
       const id = (this.pingId = (this.pingId + 1) & 0xff);
-      let frame: Uint8Array;
       try {
-        frame = await this.exchange(pingRequest(id), PING_TIMEOUT_MS);
-      } catch (err) {
-        if (this.signal?.aborted || this.readEnded || attempt === PING_ATTEMPTS)
-          throw err;
-        continue;
-      }
-      const res = parseResponse(frame);
-      if (
-        res?.op === OP_PING &&
-        (res.result !== RESULT_SUCCESS || res.payload[0] === id)
-      ) {
+        let res = parseResponse(await this.nextFrame(PING_TIMEOUT_MS, pingRequest(id)));
+        while (!answersPing(res, id)) {
+          res = parseResponse(await this.nextFrame(PING_TIMEOUT_MS));
+        }
         return;
+      } catch (err) {
+        if (this.signal?.aborted || this.readEnded) throw err;
       }
     }
     throw new Error(`The bootloader did not answer the ping (${PING_ATTEMPTS} attempts)`);
@@ -327,7 +349,9 @@ class SecureDfuSession extends SlipFrameSession {
 
 /**
  * Run the Secure DFU sequence on a closed port (opened at 115200, closed
- * after). The bootloader starts the new firmware itself once the last object
+ * after) for a package of one application image (``secureDfuRefusal`` says
+ * why another is refused, before the port is touched). The bootloader
+ * starts the new firmware itself once the last object
  * executes, so the device re-enumerates as the application on its own. The
  * abort in ``options`` stops between frames and releases the port; the
  * bootloader stays in DFU mode for a retry.
@@ -337,6 +361,9 @@ export async function flashSecureDfuPackage(
   pkg: DfuPackage,
   { onProgress, onLog, signal }: DfuFlashHooks
 ): Promise<void> {
+  const refusal = secureDfuRefusal(pkg);
+  if (refusal) throw new Error(`Not a package for this bootloader: ${refusal}`);
+  const [part] = pkg.parts;
   const log = onLog ?? (() => {});
   if (!port.readable) {
     log("Opening the DFU port at 115200 baud");
@@ -350,19 +377,10 @@ export async function flashSecureDfuPackage(
     await session.ping();
     await session.setPrn(0);
     log(`Serial MTU: ${await session.getMtu()} bytes`);
-    for (let i = 0; i < pkg.parts.length; i++) {
-      const part = pkg.parts[i];
-      const base = (i / pkg.parts.length) * 100;
-      const range = 100 / pkg.parts.length;
-      onProgress(base);
-      log(
-        `Image ${i + 1} of ${pkg.parts.length}: ${part.type} (${part.bin.length} bytes)`
-      );
-      await session.sendInitPacket(part.dat);
-      await session.sendFirmware(part.bin, (pct) =>
-        onProgress(base + (pct * range) / 100)
-      );
-    }
+    onProgress(0);
+    log(`Application image: ${part.bin.length} bytes`);
+    await session.sendInitPacket(part.dat);
+    await session.sendFirmware(part.bin, onProgress);
     log("Transfer complete; the bootloader starts the firmware");
   } catch (err) {
     failure = err;

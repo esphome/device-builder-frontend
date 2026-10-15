@@ -24,7 +24,7 @@ import {
   FlashImageSlot,
   RESET_ACTION_KEY,
 } from "../platform-support.js";
-import { type DfuPackage, loadDfuPackage, loadSecureDfuEngine } from "./index.js";
+import { type DfuPackage, loadSecureDfuEngine, loadSecureDfuPackage } from "./index.js";
 import {
   DONGLE_RESET_HINT_KEY,
   touchFailureDetail,
@@ -50,13 +50,14 @@ const pickDfuPackage = (binaries: FirmwareBinary[]): FirmwareBinary | undefined 
   binaries.find((b) => b.file.endsWith(".zip"));
 
 // Handed whole to web.esphome.io's nrf-secure-dfu engine; parsed first so a
-// bad package is refused before a tab opens. DFU erases what it writes.
+// bad package, or one with more than the application image, is refused
+// before a tab opens. DFU erases what it writes.
 const NRF_SECURE_DFU_HANDOFF: HandoffSpec = {
   flasher: "nrf-secure-dfu",
   erase: false,
   pick: pickDfuPackage,
   noArtifactKey: NO_DFU_PACKAGE_KEY,
-  check: refusalOf(loadDfuPackage),
+  check: refusalOf(loadSecureDfuPackage),
 };
 
 /** The parsed DFU package, kept for Retry. */
@@ -65,8 +66,8 @@ export const nrfOpenPackage = new FlashImageSlot<DfuPackage>();
 /**
  * Compile, download and parse the DFU package, then hand off to the two
  * user-gesture steps. Only ESPHome's ``firmware.zip`` (``bootloader: nrf``
- * build) is flashable; MCUboot / hex builds fail here rather than guessing
- * at a raw image.
+ * build, one application image) is flashable; MCUboot / hex builds fail here
+ * rather than guessing at a raw image.
  */
 export async function startNrfOpenDfuInstall(
   host: ESPHomeFirmwareInstallDialog
@@ -82,7 +83,7 @@ export async function startNrfOpenDfuInstall(
   if (!artifact) return;
   const stale = () => host._device !== device;
 
-  const parsed = await loadDfuPackage(artifact.bytes);
+  const parsed = await loadSecureDfuPackage(artifact.bytes);
   if (stale()) return;
   if ("key" in parsed) {
     host._fail(host._localize(parsed.key), parsed.detail);
