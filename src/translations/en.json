@@ -2192,7 +2192,7 @@
       "install_flashing": "Installing firmware…",
       "install_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
       "install_error_flash": "Firmware update failed: {error}",
-    "manual_bootloader_hint": "{error}. Enter the bootloader by hand (double-press the board's reset button; on an nRF52840 Dongle, press its RESET button once), then retry and pick the new port.",
+      "manual_bootloader_hint": "{error}. Enter the bootloader by hand (double-press the board's reset button; on an nRF52840 Dongle, press its RESET button once), then retry and pick the new port.",
       "update": "MCUboot update",
       "update_title": "Update nRF52 firmware over mcumgr",
       "update_hint": "Sends an MCUboot update image to a device that is running ESPHome with the mcumgr OTA platform. A device with other firmware needs the DFU install first.",

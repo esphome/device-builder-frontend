@@ -216,6 +216,39 @@ describe("flashSecureDfuPackage", () => {
     }
   });
 
+  it("fails a data write the bootloader never takes, and releases the port", async () => {
+    vi.useFakeTimers();
+    try {
+      const { port, bootloader } = fakeOpenDfuPort();
+      // The handshake goes through; the first Write frame pends for good, as
+      // on a device that stopped reading its buffer but stays connected.
+      const inner = port.writable!.getWriter();
+      Object.assign(port, {
+        writable: new WritableStream<Uint8Array>({
+          write: (chunk) =>
+            chunk[0] === OP_WRITE ? new Promise(() => {}) : inner.write(chunk),
+        }),
+      });
+      const flash = flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
+      const failed = expect(flash).rejects.toThrow(
+        "The bootloader did not take the data in 5000 ms"
+      );
+      // The wait, then the bounded teardown of the writer the write holds.
+      await vi.advanceTimersByTimeAsync(7100);
+      await failed;
+      expect(bootloader.requests).toEqual([
+        OP_PING,
+        OP_SET_PRN,
+        OP_GET_MTU,
+        OP_SELECT,
+        OP_CREATE,
+      ]);
+      expect(port.close).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("runs a ping attempt out on a bootloader that keeps sending other frames", async () => {
     vi.useFakeTimers();
     try {

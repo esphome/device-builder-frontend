@@ -243,6 +243,28 @@ class SecureDfuSession extends SlipFrameSession {
   }
 
   /**
+   * A frame the bootloader does not answer (a Write with receipts off), given
+   * the wait a request gets: one it never takes fails the flash the same way.
+   */
+  private async send(frame: Uint8Array): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stalled = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(`The bootloader did not take the data in ${RESPONSE_TIMEOUT_MS} ms`)
+          ),
+        RESPONSE_TIMEOUT_MS
+      );
+    });
+    try {
+      await Promise.race([this.writeBytes(frame), stalled]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
    * A request the bootloader must answer with success; its payload. With
    * receipts off a Write is answered only when it failed, and that answer
    * comes while nothing is asked or in place of the next request's: either
@@ -326,7 +348,7 @@ class SecureDfuSession extends SlipFrameSession {
     const chunk = writeChunkSize(this.mtu);
     for (let at = 0; at < data.length; at += chunk) {
       const piece = data.subarray(at, at + chunk);
-      await this.writeBytes(frameRequest(writeRequest(piece)));
+      await this.send(frameRequest(writeRequest(piece)));
       crc = crc32(piece, crc);
     }
     const end = offset + data.length;
