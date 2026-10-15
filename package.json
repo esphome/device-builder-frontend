@@ -70,7 +70,7 @@
     "eslint-plugin-perfectionist": "^5.12.1",
     "happy-dom": "^20.14.5",
     "husky": "^9.1.7",
-    "prettier": "3.9.9",
+    "prettier": "3.9.10",
     "typescript": "7.0.2",
     "typescript-eslint": "^8.71.2",
     "vitest": "^5.0.4"
