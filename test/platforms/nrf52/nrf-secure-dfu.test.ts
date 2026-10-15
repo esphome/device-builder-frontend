@@ -192,6 +192,20 @@ describe("flashSecureDfuPackage", () => {
     }
   });
 
+  it("fails the ping on a write that fails, without trying again", async () => {
+    const { port, bootloader } = fakeOpenDfuPort();
+    Object.assign(port, {
+      writable: new WritableStream<Uint8Array>({
+        write: () => Promise.reject(new Error("USB write failed")),
+      }),
+    });
+    await expect(
+      flashSecureDfuPackage(port, pkg, { onProgress: () => {} })
+    ).rejects.toThrow("USB write failed");
+    expect(bootloader.requests).toEqual([]);
+    expect(port.close).toHaveBeenCalledOnce();
+  });
+
   it("fails a request the bootloader answers with another opcode", async () => {
     const bootloader = new FakeOpenDfuBootloader();
     bootloader.onRequest = (op) =>

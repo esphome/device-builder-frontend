@@ -162,6 +162,14 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/** No frame within the wait; the one failure a ping tries again on. */
+class ResponseTimeout extends Error {
+  constructor(timeoutMs: number) {
+    super(`No answer from the bootloader in ${timeoutMs} ms`);
+    this.name = "ResponseTimeout";
+  }
+}
+
 class SecureDfuSession extends SlipFrameSession {
   private pending: Pending | null = null;
   /** Frames nothing was waiting for, in order: the ping reads past them. */
@@ -195,22 +203,21 @@ class SecureDfuSession extends SlipFrameSession {
   }
 
   /**
-   * The next frame, as the answer to ``request`` once it went out, or to one
-   * sent before when there is none to send.
+   * The next frame, as the answer to ``request`` once it went out: a frame
+   * that arrived while nothing was asked cannot be it, so those are dropped
+   * first. With nothing to send (the ping reading past what is not its
+   * answer), a frame already arrived is the next one.
    */
   private nextFrame(timeoutMs: number, request?: Uint8Array): Promise<Uint8Array> {
     if (this.readEnded) return Promise.reject(this.readEnded);
-    const queued = this.unclaimed.shift();
-    if (queued) {
-      return request
-        ? this.race(this.writeBytes(frameRequest(request))).then(() => queued)
-        : Promise.resolve(queued);
+    if (request) {
+      this.unclaimed = [];
+    } else {
+      const queued = this.unclaimed.shift();
+      if (queued) return Promise.resolve(queued);
     }
     const reply = new Promise<Uint8Array>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`No answer from the bootloader in ${timeoutMs} ms`)),
-        timeoutMs
-      );
+      const timer = setTimeout(() => reject(new ResponseTimeout(timeoutMs)), timeoutMs);
       this.pending = { resolve, reject, timer };
     });
     reply.catch(() => {}); // A wait given up on (a failed write) is not unhandled.
@@ -240,8 +247,8 @@ class SecureDfuSession extends SlipFrameSession {
    * The bootloader is up when it answers a ping. A frame that is not this
    * ping's answer (one left in the bootloader, or an earlier ping's that came
    * late) is read past within the same attempt, so that the next ping is not
-   * sent while its answer is still on the way; whatever came after the
-   * answer is dropped, so the first request gets its own.
+   * sent while its answer is still on the way. Only silence is tried again;
+   * a failed write, an abort or a dropped port fail the ping as they are.
    */
   async ping(): Promise<void> {
     for (let attempt = 1; attempt <= PING_ATTEMPTS; attempt++) {
@@ -251,10 +258,9 @@ class SecureDfuSession extends SlipFrameSession {
         while (!answersPing(res, id)) {
           res = parseResponse(await this.nextFrame(PING_TIMEOUT_MS));
         }
-        this.unclaimed = [];
         return;
       } catch (err) {
-        if (this.signal?.aborted || this.readEnded) throw err;
+        if (!(err instanceof ResponseTimeout)) throw err;
       }
     }
     throw new Error(`The bootloader did not answer the ping (${PING_ATTEMPTS} attempts)`);
