@@ -26,7 +26,7 @@ export const nrfOpenDfuReceiverEngine = nrfDfuReceiverEngine({
     accept: isNrfAppCdcPort,
     refusedKey: "firmware.nrf_open_port_refused",
   },
-  pickFilters: [OPEN_DFU_PORT_FILTER],
+  pick: { filters: [OPEN_DFU_PORT_FILTER] },
   async flash(port, pkg, hooks) {
     const { flashSecureDfuPackage } = await loadSecureDfuEngine();
     await flashSecureDfuPackage(port, pkg, {

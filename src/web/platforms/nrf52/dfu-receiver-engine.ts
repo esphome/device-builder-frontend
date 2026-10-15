@@ -44,8 +44,8 @@ export interface NrfDfuReceiverSpec {
     accept: (port: SerialPort) => boolean;
     refusedKey: string;
   };
-  /** The flash's port, where the bootloader's USB ids are known. */
-  pickFilters?: SerialPortRequestOptions["filters"];
+  /** The flash's port picker, narrowed where the bootloader's USB ids are known. */
+  pick?: SerialPortRequestOptions;
   flash: (
     port: SerialPort,
     pkg: DfuPackage,
@@ -89,11 +89,7 @@ function dfuRun(
   localize: LocalizeFunc
 ): ReceiverRun {
   return async (hooks) => {
-    const port = await pickSerialPort(
-      localize,
-      hooks,
-      spec.pickFilters && { filters: spec.pickFilters }
-    );
+    const port = await pickSerialPort(localize, hooks, spec.pick);
     if (!port || port === "dismissed") return port;
     hooks.onState("installing", localize("firmware.status_flashing"));
     try {

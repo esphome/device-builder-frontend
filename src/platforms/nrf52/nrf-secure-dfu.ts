@@ -267,11 +267,9 @@ class SecureDfuSession extends SlipFrameSession {
     return this.mtu;
   }
 
-  async select(
-    objectType: number
-  ): Promise<{ maxSize: number; offset: number; crc: number }> {
-    const p = await this.request(selectRequest(objectType));
-    return { maxSize: u32(p, 0), offset: u32(p, 4), crc: u32(p, 8) };
+  /** The largest object of a type the bootloader takes (Select's first field). */
+  async selectMaxSize(objectType: number): Promise<number> {
+    return u32(await this.request(selectRequest(objectType)), 0);
   }
 
   async create(objectType: number, size: number): Promise<void> {
@@ -308,7 +306,7 @@ class SecureDfuSession extends SlipFrameSession {
 
   /** The init packet as the command object; its execute validates the update. */
   async sendInitPacket(dat: Uint8Array): Promise<void> {
-    const { maxSize } = await this.select(OBJECT_COMMAND);
+    const maxSize = await this.selectMaxSize(OBJECT_COMMAND);
     if (dat.length > maxSize) {
       throw new Error(
         `The init packet (${dat.length} bytes) is larger than the bootloader takes (${maxSize})`
@@ -324,7 +322,7 @@ class SecureDfuSession extends SlipFrameSession {
 
   /** The image as data objects of the size the bootloader names (a flash page). */
   async sendFirmware(bin: Uint8Array, onPercent: (p: number) => void): Promise<void> {
-    const { maxSize } = await this.select(OBJECT_DATA);
+    const maxSize = await this.selectMaxSize(OBJECT_DATA);
     const objects = Math.ceil(bin.length / maxSize);
     this.log(
       `Transferring ${bin.length} bytes in ${objects} objects of up to ${maxSize} bytes`

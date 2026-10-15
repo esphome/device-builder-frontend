@@ -54,29 +54,12 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe("nrfOpenDfuReceiverEngine", () => {
-  it("takes the package as one part at address 0 and rejects anything else unparsed", async () => {
-    expect(
-      await engine.prepare([{ address: 0x1000, data: parts[0].data }], false, localize)
-    ).toEqual({
-      error: "firmware.nrf_bad_package (not a single package part)",
-      retryable: false,
-    });
-    expect(mocks.loadSecureDfuPackage).not.toHaveBeenCalled();
-  });
-
-  it("names a package that does not parse", async () => {
-    mocks.loadSecureDfuPackage.mockResolvedValue({
-      key: "firmware.nrf_bad_package",
-      detail: "no manifest",
-    });
-    expect(await engine.prepare(parts, false, localize)).toEqual({
-      error: "firmware.nrf_bad_package (no manifest)",
-      retryable: false,
-    });
-  });
-
-  it("offers the reset and the flash, with the dongle's copy", async () => {
+  // The shared flow (one part, parse failures, a dismissed pick) is covered
+  // with the Adafruit engine in receiver-engine.test.ts; this is what the
+  // dongle's spec changes.
+  it("parses for Secure DFU and offers the reset and the flash with the dongle's copy", async () => {
     const plan = await prepared();
+    expect(mocks.loadSecureDfuPackage).toHaveBeenCalledWith(parts[0].data);
     expect(plan.before!.label).toBe("firmware.browser_flash_reset_action");
     expect(plan.primaryLabel).toBe("firmware.browser_flash_action");
     expect(plan.hint).toBe("firmware.nrf_open_step1_desc");

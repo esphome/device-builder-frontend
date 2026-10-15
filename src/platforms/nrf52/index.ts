@@ -6,13 +6,11 @@
 export * from "./ble-nus-picker.js";
 export * from "./ble-nus-stream.js";
 export * from "./ble-probe-controller.js";
-export * from "./dfu-response-error.js";
 export * from "./manual-bootloader-hint.js";
 export type * from "./nrf-dfu.js";
 export type * from "./nrf-secure-dfu.js";
 export * from "./nrf-logs-reset.js";
 export * from "./nrf-platform.js";
-export * from "./secure-dfu-package.js";
 export * from "./serial-logs.js";
 export * from "./smp-ble-service.js";
 export type * from "./smp-engine.js";

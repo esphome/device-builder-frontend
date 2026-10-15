@@ -5,7 +5,7 @@ import { SerialDeviceLostError } from "../../util/serial-open-error.js";
 import { DfuResponseError } from "./dfu-response-error.js";
 
 /** How to enter the bootloader by hand: the Adafruit bootloader's double-press. */
-export const DOUBLE_PRESS_HINT_KEY = "firmware.nrf_manual_bootloader_hint";
+const DOUBLE_PRESS_HINT_KEY = "firmware.nrf_manual_bootloader_hint";
 /** The nRF52840 Dongle's: its RESET button. */
 export const DONGLE_RESET_HINT_KEY = "firmware.nrf_open_manual_bootloader_hint";
 

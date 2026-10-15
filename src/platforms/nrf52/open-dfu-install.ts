@@ -98,7 +98,7 @@ export async function startNrfOpenDfuInstall(
 // in the bootloader or back in the app, and step 1 handles either.
 function showResetStep(host: ESPHomeFirmwareInstallDialog): void {
   host._step = "nrf-open-reset";
-  host._statusMessage = host._localize("firmware.nrf_open_step1_title");
+  host._statusMessage = host._localize("firmware.nrf_step1_title");
   void skipTouchIfInBootloader(host);
 }
 

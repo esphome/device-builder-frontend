@@ -555,7 +555,6 @@
     "nrf_manual_bootloader_hint": "{error}. Double-press the board's reset button to enter the bootloader by hand, then retry and pick the new port.",
     "nrf_reconnecting": "Device disconnected. Waiting for it to reconnect, then retrying…",
     "nrf_reset_needs_newer_esphome": "This device ignored the reset; update it to a newer ESPHome to reset it from the logs.",
-    "nrf_open_step1_title": "Ready to flash via DFU",
     "nrf_open_step1_desc": "Click Reset Device to put the board into its bootloader over USB. If it is already in the bootloader (the dongle's red LED pulses), click Flash directly.",
     "nrf_open_step2_title": "Device is entering the bootloader…",
     "nrf_open_step2_desc": "Wait a moment for the bootloader to appear, then click Flash and pick it. If no new port appears, the reset went to another board (click Reset Device again and pick the dongle's port) or the firmware did not act on it (it needs dfu: in its configuration): press the RESET button on the side of the dongle, then click Flash.",

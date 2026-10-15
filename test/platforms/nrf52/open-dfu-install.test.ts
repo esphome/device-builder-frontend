@@ -65,7 +65,7 @@ function readyHost() {
   nrfOpenPackage.set(asHost(host), pkg);
   // As the reset step leaves it.
   host._step = "nrf-open-reset";
-  host._statusMessage = "firmware.nrf_open_step1_title";
+  host._statusMessage = "firmware.nrf_step1_title";
   return host;
 }
 

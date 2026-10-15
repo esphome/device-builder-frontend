@@ -6,9 +6,9 @@
 import { SerialStreamSession } from "../../util/serial-stream-session.js";
 
 export const SLIP_END = 0xc0;
-export const SLIP_ESC = 0xdb;
-export const SLIP_ESC_END = 0xdc;
-export const SLIP_ESC_ESC = 0xdd;
+const SLIP_ESC = 0xdb;
+const SLIP_ESC_END = 0xdc;
+const SLIP_ESC_ESC = 0xdd;
 
 export function slipEncode(data: Uint8Array): Uint8Array {
   const out: number[] = [];
