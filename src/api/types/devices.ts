@@ -106,6 +106,14 @@ export interface ConfiguredDevice {
    * `null` where the platform needs no split or the chip is unknown.
    */
   mcu: string | null;
+  /**
+   * The bootloader the firmware is built for, on a platform whose boards
+   * ship more than one (ESPHome's `nrf52: bootloader:` value, resolved to
+   * the board's default when the YAML leaves it out: `adafruit`,
+   * `adafruit_nrf52_sd140_v6`, `nrf`, `mcuboot`, ...). `null` where the
+   * platform has one bootloader or the YAML could not be read.
+   */
+  bootloader: string | null;
   /** mDNS hostname from StorageJSON (e.g. "my_device.local"). */
   address: string;
   /** Primary resolved IP from mDNS — empty until the device is seen online.

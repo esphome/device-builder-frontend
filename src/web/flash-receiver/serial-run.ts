@@ -26,10 +26,12 @@ export type SerialReceiverRun = (
  */
 export async function pickSerialPort(
   localize: LocalizeFunc,
-  hooks: ReceiverRunHooks
+  hooks: ReceiverRunHooks,
+  /** Narrows the picker where the bootloader's USB ids are known. */
+  options?: SerialPortRequestOptions
 ): Promise<SerialPort | "dismissed" | null> {
   try {
-    return (await requestSerialPort()) ?? "dismissed";
+    return (await requestSerialPort(options)) ?? "dismissed";
   } catch (err) {
     hooks.onState("error", openFailureMessage(err, localize, "web.flash.no_port"));
     return null;

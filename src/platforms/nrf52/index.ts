@@ -6,8 +6,10 @@
 export * from "./ble-nus-picker.js";
 export * from "./ble-nus-stream.js";
 export * from "./ble-probe-controller.js";
+export * from "./dfu-response-error.js";
 export * from "./manual-bootloader-hint.js";
 export type * from "./nrf-dfu.js";
+export type * from "./nrf-secure-dfu.js";
 export * from "./nrf-logs-reset.js";
 export * from "./nrf-platform.js";
 export * from "./serial-logs.js";
@@ -19,6 +21,7 @@ import type { DfuPackage } from "./nrf-dfu.js";
 import type { McubootImage } from "./smp-engine.js";
 
 export const loadDfuEngine = () => import("./nrf-dfu.js");
+export const loadSecureDfuEngine = () => import("./nrf-secure-dfu.js");
 export const loadSmpEngine = () => import("./smp-engine.js");
 
 /** Why a DFU package could not be parsed: the copy for the user and the detail. */

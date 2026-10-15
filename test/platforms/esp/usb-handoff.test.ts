@@ -43,6 +43,7 @@ function makeHost() {
       friendly_name: "Dev",
       target_platform: "esp32",
       mcu: null as string | null,
+      bootloader: null as string | null,
     },
     _step: "download-ready",
     _statusMessage: "",
@@ -170,15 +171,19 @@ describe("handOffToFlasher", () => {
     });
   });
 
-  it("hands an nRF52's DFU package to the DFU flasher, without erase", () => {
-    const host = makeHost();
-    host._device.target_platform = "nrf52";
-    handOffToFlasher(asHost(host));
-    expect(openFlasher.mock.calls[0][3]).toMatchObject({
-      flasher: "nrf-dfu",
-      erase: false,
-    });
-  });
+  it.each([
+    ["an Adafruit bootloader's", "adafruit", "nrf-dfu"],
+    ["the nRF5 SDK bootloader's", "nrf", "nrf-secure-dfu"],
+  ])(
+    "hands %s nRF52 DFU package to its own DFU flasher, without erase",
+    (_n, bootloader, flasher) => {
+      const host = makeHost();
+      host._device.target_platform = "nrf52";
+      host._device.bootloader = bootloader;
+      handOffToFlasher(asHost(host));
+      expect(openFlasher.mock.calls[0][3]).toMatchObject({ flasher, erase: false });
+    }
+  );
 
   it.each(["bk7231", "bk7238", "bk7251"])(
     "hands the UF2 of a %s to the Beken flasher, without erase",
@@ -256,7 +261,11 @@ describe("download-ready detail (web-flash)", () => {
 });
 
 describe("startUsbFlash artifact", () => {
-  function flowHost(targetPlatform: string, mcu: string | null = null) {
+  function flowHost(
+    targetPlatform: string,
+    mcu: string | null = null,
+    bootloader: string | null = null
+  ) {
     return {
       ...makeHost(),
       _step: "compiling",
@@ -266,6 +275,7 @@ describe("startUsbFlash artifact", () => {
         friendly_name: "Dev",
         target_platform: targetPlatform,
         mcu,
+        bootloader,
       },
       _usbFirmware: null as ArrayBuffer | null,
       _usbFirmwareName: "",
@@ -393,7 +403,7 @@ describe("startUsbFlash artifact", () => {
   });
 
   it("sends the DFU package for an nRF52 through the shared download", async () => {
-    const host = flowHost("nrf52", null);
+    const host = flowHost("nrf52", null, "adafruit");
     const artifact = downloaded("firmware.zip");
     steps.downloadBuildArtifact.mockResolvedValue(artifact);
     await startUsbFlash(asHost(host));
@@ -407,7 +417,7 @@ describe("startUsbFlash artifact", () => {
   });
 
   it("refuses a bad DFU package in the dashboard, before any flasher tab is offered", async () => {
-    const host = flowHost("nrf52", null);
+    const host = flowHost("nrf52", null, "adafruit");
     steps.downloadBuildArtifact.mockResolvedValue(downloaded("firmware.zip"));
     nrf.loadDfuPackage.mockResolvedValueOnce({
       key: "firmware.nrf_bad_package",

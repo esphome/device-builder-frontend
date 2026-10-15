@@ -124,4 +124,7 @@ export const RECEIVER_ENGINES: Record<HandoffFlasher, () => Promise<ReceiverEngi
     (await import("../platforms/rtl87xx/ambz-receiver-engine.js")).rtlAmbzReceiverEngine,
   "rtl-ambd": async () =>
     (await import("../platforms/rtl87xx/ambd-receiver-engine.js")).rtlAmbdReceiverEngine,
+  "nrf-secure-dfu": async () =>
+    (await import("../platforms/nrf52/open-dfu-receiver-engine.js"))
+      .nrfOpenDfuReceiverEngine,
 };

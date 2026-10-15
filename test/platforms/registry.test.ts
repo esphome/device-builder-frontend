@@ -57,6 +57,19 @@ const CHIPS: Record<string, { takes: string[]; refuses?: string }> = {
   ln882x: { takes: ["ln882h"] },
 };
 
+// The bootloaders of each platform whose boards ship more than one, with
+// one no browser flasher speaks to.
+const BOOTLOADERS: Record<string, { takes: string[]; refuses: string }> = {
+  nrf52: { takes: ["adafruit", "adafruit_nrf52_sd140_v7", "nrf"], refuses: "mcuboot" },
+};
+
+/** What ``installOf`` matches: a chip and a bootloader, the platform's first where it has any. */
+const hardware = (
+  id: string,
+  mcu: string | null,
+  bootloader: string | null = BOOTLOADERS[id]?.takes[0] ?? null
+) => ({ mcu, bootloader });
+
 const byId = PLATFORMS.map((p) => [p.id, p] as const);
 
 describe("PLATFORMS", () => {
@@ -76,23 +89,43 @@ describe("PLATFORMS", () => {
     }
   });
 
-  it.each(byId)("%s offers its install by chip", (id, platform) => {
+  it.each(byId)("%s offers its install by chip and bootloader", (id, platform) => {
     const [install] = platform.installs ?? [];
     const chips = CHIPS[id];
-    // Every flasher of a platform that is more than one chip names its chips.
+    const bootloaders = BOOTLOADERS[id];
+    // Every flasher of a platform that is more than one chip names its
+    // chips, and every chip flasher of one with several bootloaders its
+    // bootloaders (an updater goes through the firmware, not a bootloader).
     for (const each of platform.installs ?? []) {
       expect(each.chips !== undefined).toBe(chips !== undefined);
+      if (!each.component) {
+        expect(each.bootloaders !== undefined).toBe(bootloaders !== undefined);
+      }
+    }
+    if (bootloaders) {
+      for (const bootloader of bootloaders.takes) {
+        expect(
+          installOf(platform, hardware(id, null, bootloader))?.bootloaders
+        ).toContain(bootloader);
+      }
+      expect(
+        installOf(platform, hardware(id, null, bootloaders.refuses))
+      ).toBeUndefined();
+      // Unknown is not offered: the bootloader has to be one a flasher speaks to.
+      expect(installOf(platform, hardware(id, null, null))).toBeUndefined();
     }
     if (!chips) {
-      expect(installOf(platform, null)).toBe(install);
-      expect(installOf(platform, "anything")).toBe(install);
+      expect(installOf(platform, hardware(id, null))).toBe(install);
+      expect(installOf(platform, hardware(id, "anything"))).toBe(install);
       return;
     }
     for (const chip of chips.takes)
-      expect(installOf(platform, chip)?.chips).toContain(chip);
-    if (chips.refuses) expect(installOf(platform, chips.refuses)).toBeUndefined();
+      expect(installOf(platform, hardware(id, chip))?.chips).toContain(chip);
+    if (chips.refuses) {
+      expect(installOf(platform, hardware(id, chips.refuses))).toBeUndefined();
+    }
     // Unknown is not offered: the chip has to be one a flasher writes.
-    expect(installOf(platform, null)).toBeUndefined();
+    expect(installOf(platform, hardware(id, null))).toBeUndefined();
   });
 
   it("picks the flasher that writes the chip where a platform has several", () => {
@@ -103,16 +136,22 @@ describe("PLATFORMS", () => {
       matches: () => true,
       installs: [first, second],
     };
-    expect(installOf(platform, "chip-a")).toBe(first);
-    expect(installOf(platform, "chip-b")).toBe(second);
-    expect(installOf(platform, "chip-c")).toBeUndefined();
-    expect(installOf(platform, null)).toBeUndefined();
+    expect(installOf(platform, { mcu: "chip-a", bootloader: null })).toBe(first);
+    expect(installOf(platform, { mcu: "chip-b", bootloader: null })).toBe(second);
+    expect(installOf(platform, { mcu: "chip-c", bootloader: null })).toBeUndefined();
+    expect(installOf(platform, { mcu: null, bootloader: null })).toBeUndefined();
   });
 
   it("offers a flasher its firmware has to support only once it is loaded", () => {
     const nrf = (loaded_platforms: string[]) =>
-      installsFor(makeConfiguredDevice({ target_platform: "nrf52", loaded_platforms }));
-    const dfu = installOf(platformFor("nrf52"), null);
+      installsFor(
+        makeConfiguredDevice({
+          target_platform: "nrf52",
+          bootloader: "adafruit",
+          loaded_platforms,
+        })
+      );
+    const dfu = installOf(platformFor("nrf52"), { mcu: null, bootloader: "adafruit" });
     expect(nrf([])).toEqual([dfu]);
     expect(nrf(["ota.esphome"])).toEqual([dfu]);
     expect(nrf(["ota.zephyr_mcumgr"]).map((i) => i.id)).toEqual([
@@ -120,6 +159,23 @@ describe("PLATFORMS", () => {
       "nrf-smp-ble",
       "nrf-smp-serial",
     ]);
+  });
+
+  it("offers an nRF52 the flasher of its bootloader", () => {
+    const nrf = (bootloader: string | null, loaded_platforms: string[] = []) =>
+      installsFor(
+        makeConfiguredDevice({ target_platform: "nrf52", bootloader, loaded_platforms })
+      ).map((i) => i.id);
+    expect(nrf("adafruit")).toEqual(["nrf-dfu"]);
+    expect(nrf("adafruit_nrf52_sd140_v6")).toEqual(["nrf-dfu"]);
+    expect(nrf("nrf")).toEqual(["nrf-open-dfu"]);
+    // MCUboot takes no DFU; its updaters come with the firmware.
+    expect(nrf("mcuboot")).toEqual([]);
+    expect(nrf("mcuboot", ["ota.zephyr_mcumgr"])).toEqual([
+      "nrf-smp-ble",
+      "nrf-smp-serial",
+    ]);
+    expect(nrf(null)).toEqual([]);
   });
 
   it("hands off only a flasher that needs nothing from the firmware", () => {
@@ -130,7 +186,7 @@ describe("PLATFORMS", () => {
       matches: () => true,
       installs: [updater, flasher],
     };
-    expect(installOf(platform, null)).toBe(flasher);
+    expect(installOf(platform, { mcu: null, bootloader: null })).toBe(flasher);
   });
 
   it("offers a chip only the flashers that write it", () => {
@@ -159,7 +215,9 @@ describe("PLATFORMS", () => {
       )
     ).toEqual([]);
     expect(installsFor(null)).toEqual([]);
-    expect(installOf(platformFor("esp32"), null)).toBeUndefined();
+    expect(
+      installOf(platformFor("esp32"), { mcu: null, bootloader: null })
+    ).toBeUndefined();
   });
 
   it.each(byId)(

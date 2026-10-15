@@ -11,9 +11,8 @@ import {
   flashDfuPackage,
   flashDfuPackageWithReconnect,
   parseDfuPackage,
-  slipDecode,
-  slipEncode,
 } from "../../../src/platforms/nrf52/nrf-dfu.js";
+import { slipDecode } from "../../../src/platforms/nrf52/slip.js";
 import {
   isRecentSerialActivity,
   openLiveSerialPort,
@@ -36,23 +35,6 @@ describe("crc16Nordic", () => {
 
   it("returns the initial value for empty input", () => {
     expect(crc16Nordic(bytes())).toBe(0xffff);
-  });
-});
-
-describe("SLIP framing", () => {
-  it("escapes END and ESC bytes", () => {
-    expect([...slipEncode(bytes(0x01, 0xc0, 0x02, 0xdb, 0x03))]).toEqual([
-      0x01, 0xdb, 0xdc, 0x02, 0xdb, 0xdd, 0x03,
-    ]);
-  });
-
-  it("round-trips arbitrary payloads", () => {
-    const payload = bytes(0xc0, 0xdb, 0xdc, 0xdd, 0x00, 0xff, 0xc0);
-    expect([...slipDecode(slipEncode(payload))]).toEqual([...payload]);
-  });
-
-  it("rejects a truncated escape sequence", () => {
-    expect(() => slipDecode(bytes(0x01, 0xdb))).toThrow(/Truncated/);
   });
 });
 

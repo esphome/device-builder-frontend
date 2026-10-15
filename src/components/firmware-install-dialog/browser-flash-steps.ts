@@ -154,16 +154,18 @@ export async function touchIntoBootloaderStep(
 }
 
 /**
- * The Web Serial picker from a footer click. Null when dismissed, when the
- * dialog moved on, or when the failure is already on the dialog.
+ * The Web Serial picker from a footer click, narrowed by ``options`` where
+ * the bootloader's USB ids are known. Null when dismissed, when the dialog
+ * moved on, or when the failure is already on the dialog.
  */
 export async function pickSerialPortOrFail(
   host: ESPHomeFirmwareInstallDialog,
-  stillCurrent: () => boolean
+  stillCurrent: () => boolean,
+  options?: SerialPortRequestOptions
 ): Promise<SerialPort | null> {
   host._flashBusy = true;
   try {
-    const port = await requestSerialPort();
+    const port = await requestSerialPort(options);
     return stillCurrent() ? port : null;
   } catch (err) {
     if (stillCurrent()) {

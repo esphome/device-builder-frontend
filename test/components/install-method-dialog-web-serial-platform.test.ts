@@ -58,6 +58,8 @@ async function mount(
     makeConfiguredDevice({
       target_platform: platform,
       mcu,
+      // An nRF52 with the Adafruit bootloader: the one browser DFU writes.
+      bootloader: platform === "nrf52" ? "adafruit" : null,
       loaded_platforms: loadedPlatforms,
     })
   );

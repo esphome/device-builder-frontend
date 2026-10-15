@@ -204,6 +204,7 @@ describe("esphome-web-flash-receiver engines", () => {
       "ln-uart",
       "rtl-ambz",
       "rtl-ambd",
+      "nrf-secure-dfu",
     ]);
   });
 

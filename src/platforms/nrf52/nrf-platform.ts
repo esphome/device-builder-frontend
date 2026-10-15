@@ -3,6 +3,12 @@ export const ZEPHYR_USB_VID = 0x2fe3;
 // ESPHome leaves Zephyr's default USB product id in place.
 const ESPHOME_ZEPHYR_USB_PID = 0x0100;
 
+/** The picker filter for ESPHome's own CDC ports on an nRF52 (both of them carry these ids). */
+export const NRF_APP_PORT_FILTER: SerialPortFilter = {
+  usbVendorId: ZEPHYR_USB_VID,
+  usbProductId: ESPHOME_ZEPHYR_USB_PID,
+};
+
 /**
  * ESPHome's own CDC on an nRF52 (Zephyr's default ids), as opposed to a UART
  * bridge on its console pins or another Zephyr device.
@@ -17,6 +23,21 @@ export const isNrfAppCdcPort = (port: SerialPort): boolean => {
 // nRF52840 products count (the bootloader's ids, and the application ids
 // other firmwares use).
 const NORDIC_USB_VID = 0x1915;
+// The nRF5 SDK's USB bootloader (the nRF52840 Dongle's factory "Open DFU"
+// bootloader): a USB device of its own, never the application's port.
+const OPEN_DFU_USB_PID = 0x521f;
+
+/** The picker filter for the Open DFU bootloader's CDC port. */
+export const OPEN_DFU_PORT_FILTER: SerialPortFilter = {
+  usbVendorId: NORDIC_USB_VID,
+  usbProductId: OPEN_DFU_USB_PID,
+};
+
+/** A Web Serial port that is the Open DFU bootloader. */
+export const isOpenDfuBootloaderPort = (port: SerialPort): boolean => {
+  const { usbVendorId, usbProductId } = port.getInfo();
+  return usbVendorId === NORDIC_USB_VID && usbProductId === OPEN_DFU_USB_PID;
+};
 const NRF52_USB_IDS = new Set([
   // Adafruit: Feather nRF52840 Express, Feather nRF52840 Sense, ItsyBitsy
   // nRF52840, CLUE, Circuit Playground Bluefruit, LED Glasses driver.

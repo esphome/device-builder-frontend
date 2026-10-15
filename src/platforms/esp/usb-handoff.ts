@@ -1,9 +1,10 @@
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
 import { downloadBuildArtifact } from "../../components/firmware-install-dialog/browser-flash-steps.js";
 import { resolveLogBaudRate } from "../../util/log-baud-rate.js";
 import { DEFAULT_HANDOFF_FLASHER, type HandoffSpec } from "../handoff.js";
-import { installOf, platformFor } from "../registry.js";
+import { type DeviceHardware, installOf, platformFor } from "../registry.js";
 import { openFlasher } from "./usb-flasher.js";
 
 /**
@@ -45,11 +46,15 @@ const ESP_HANDOFF: HandoffSpec = {
  */
 export function handoffFor(
   targetPlatform: string | null | undefined,
-  mcu: string | null
+  hardware: DeviceHardware
 ): HandoffSpec | undefined {
   const platform = platformFor(targetPlatform);
-  return platform ? installOf(platform, mcu)?.handoff : ESP_HANDOFF;
+  return platform ? installOf(platform, hardware)?.handoff : ESP_HANDOFF;
 }
+
+/** ``handoffFor`` a device, or none when the dialog shows no device. */
+const handoffForDevice = (device: ConfiguredDevice | null): HandoffSpec | undefined =>
+  device ? handoffFor(device.target_platform, device) : undefined;
 
 // "Flash via USB" through the external flasher: compile + download the image
 // HERE (logs/errors visible, like the download flow), then land on the
@@ -58,7 +63,7 @@ export function handoffFor(
 export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const handoff = handoffFor(device.target_platform, device.mcu);
+  const handoff = handoffForDevice(device);
   if (!handoff) {
     host._fail(host._localize("firmware.no_flashable_binary"));
     return;
@@ -89,7 +94,7 @@ export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise
 export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   const firmware = host._usbFirmware;
   // startUsbFlash only stages firmware for a platform that can hand off.
-  const handoff = handoffFor(host._device?.target_platform, host._device?.mcu ?? null);
+  const handoff = handoffForDevice(host._device);
   if (!firmware || !handoff) return;
   host._step = "flashing";
   host._flashPercent = 0;
