@@ -230,11 +230,21 @@ class SecureDfuSession extends SlipFrameSession {
     });
   }
 
-  /** A request the bootloader must answer with success; its payload. */
+  /**
+   * A request the bootloader must answer with success; its payload. With
+   * receipts off a Write is answered only when it failed, and that answer
+   * comes while nothing is asked or in place of the next request's: either
+   * way it is the failure the user should see, by its reason.
+   */
   private async request(payload: Uint8Array): Promise<Uint8Array> {
     const op = payload[0];
     const name = OP_NAMES[op] ?? `opcode 0x${op.toString(16)}`;
+    const earlier = this.unclaimed.map(parseResponse).find((r) => r?.op === OP_WRITE);
+    if (earlier) throw new DfuResponseError(OP_NAMES[OP_WRITE], responseFailure(earlier));
     const res = parseResponse(await this.nextFrame(RESPONSE_TIMEOUT_MS, payload));
+    if (res?.op === OP_WRITE) {
+      throw new DfuResponseError(OP_NAMES[OP_WRITE], responseFailure(res));
+    }
     if (!res || res.op !== op) {
       throw new DfuResponseError(name, "the bootloader answered something else");
     }
@@ -304,10 +314,6 @@ class SecureDfuSession extends SlipFrameSession {
       await this.writeBytes(frameRequest(writeRequest(piece)));
       crc = crc32(piece, crc);
     }
-    // With receipts off a Write is answered only when it failed; the answer
-    // waits here, as the next request would drop it with its reason.
-    const refused = this.unclaimed.map(parseResponse).find((r) => r?.op === OP_WRITE);
-    if (refused) throw new DfuResponseError(OP_NAMES[OP_WRITE], responseFailure(refused));
     const end = offset + data.length;
     const p = await this.request(calcCrcRequest());
     const got = { offset: u32(p, 0), crc: u32(p, 4) };

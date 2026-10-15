@@ -257,6 +257,16 @@ describe("flashSecureDfuPackage", () => {
     expect(port.close).toHaveBeenCalledOnce();
   });
 
+  it("names a Write refusal that arrives in place of the CRC answer", async () => {
+    const bootloader = new FakeOpenDfuBootloader();
+    bootloader.onRequest = (op) => (op === OP_CALC_CRC ? [OP_WRITE, 0x05] : undefined);
+    const { port } = fakeOpenDfuPort(bootloader);
+    await expect(
+      flashSecureDfuPackage(port, pkg, { onProgress: () => {} })
+    ).rejects.toThrow("Write object: the bootloader answered invalid object");
+    expect(port.close).toHaveBeenCalledOnce();
+  });
+
   it("fails when the bootloader's CRC does not match what was sent", async () => {
     const bootloader = new FakeOpenDfuBootloader();
     let checks = 0;
