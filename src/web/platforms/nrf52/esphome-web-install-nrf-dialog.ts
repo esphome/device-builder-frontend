@@ -47,6 +47,9 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 
 type InstallState = "idle" | "resetting" | "waiting" | "flashing" | "success" | "error";
 
+/** How to enter the bootloader by hand, before the flash port says which one it is. */
+const EITHER_BOOTLOADER_HINT_KEY = "web.nrf.manual_bootloader_hint";
+
 /**
  * Two-step nRF52 DFU install: 1200-baud reset, then flash over the
  * re-enumerated DFU port. Each requestPort() runs from its own button click
@@ -167,11 +170,16 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       this._state = touched ? "waiting" : "idle";
     } catch (err) {
       // A failed pick has nothing to do with the board; only the touch earns
-      // the manual-bootloader hint.
+      // the manual-bootloader hint, for either bootloader: the port picked
+      // for the flash is what tells them apart, and that is still to come.
       this._fail(
         err instanceof BootloaderTouchError
           ? this._localize("web.connect.failed", {
-              error: withManualBootloaderHint(err, this._localize),
+              error: withManualBootloaderHint(
+                err,
+                this._localize,
+                EITHER_BOOTLOADER_HINT_KEY
+              ),
             })
           : openFailureMessage(err, this._localize, "web.connect.failed")
       );

@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { disconnectEvents } from "../../_web-serial.js";
 import { DfuResponseError } from "../../../src/platforms/nrf52/dfu-response-error.js";
+import { slipEncode } from "../../../src/platforms/nrf52/slip.js";
 import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
+import { makeWebSerialPort } from "../../web/_make-web-serial-port.js";
 import { FakeOpenDfuBootloader, fakeOpenDfuPort } from "./_fake-open-dfu-bootloader.js";
 
 import {
@@ -192,6 +194,60 @@ describe("flashSecureDfuPackage", () => {
     }
   });
 
+  it("fails a ping whose write the bootloader never takes, without trying again", async () => {
+    vi.useFakeTimers();
+    try {
+      const { port, bootloader } = fakeOpenDfuPort();
+      Object.assign(port, {
+        // The device's buffer is full and nothing reads it: the write pends.
+        writable: new WritableStream<Uint8Array>({ write: () => new Promise(() => {}) }),
+      });
+      const flash = flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
+      const failed = expect(flash).rejects.toThrow(
+        "The bootloader did not take the request in 1000 ms"
+      );
+      // The wait, then the bounded teardown of the writer the write holds.
+      await vi.advanceTimersByTimeAsync(3100);
+      await failed;
+      expect(bootloader.requests).toEqual([]);
+      expect(port.close).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("runs a ping attempt out on a bootloader that keeps sending other frames", async () => {
+    vi.useFakeTimers();
+    try {
+      let rx!: ReadableStreamDefaultController<Uint8Array>;
+      const other = bytes(
+        ...slipEncode(bytes(OP_RESPONSE, OP_PING, RESULT_SUCCESS, 0xff)),
+        0xc0
+      );
+      let chatter: ReturnType<typeof setInterval> | undefined;
+      const port = makeWebSerialPort({
+        ...disconnectEvents(),
+        close: vi.fn(async () => {
+          clearInterval(chatter);
+          rx.close();
+        }),
+        readable: new ReadableStream<Uint8Array>({ start: (c) => (rx = c) }),
+        writable: new WritableStream<Uint8Array>(),
+      });
+      // Another ping's answer every 100 ms: each is read past, within the wait.
+      chatter = setInterval(() => rx.enqueue(other), 100);
+      const flash = flashSecureDfuPackage(port, pkg, { onProgress: () => {} });
+      const failed = expect(flash).rejects.toThrow(
+        "The bootloader did not answer the ping (3 attempts)"
+      );
+      await vi.advanceTimersByTimeAsync(3100);
+      await failed;
+      expect(port.close).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("fails the ping on a write that fails, without trying again", async () => {
     const { port, bootloader } = fakeOpenDfuPort();
     Object.assign(port, {
@@ -282,13 +338,30 @@ describe("flashSecureDfuPackage", () => {
   });
 
   it("stops on abort and releases the port", async () => {
+    const { port, bootloader } = fakeOpenDfuPort();
+    const abort = new AbortController();
+    await expect(
+      flashSecureDfuPackage(port, pkg, {
+        // The bootloader answered the ping and the MTU: aborted before the init packet.
+        onProgress: () => abort.abort(),
+        signal: abort.signal,
+      })
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(bootloader.requests).not.toContain(OP_CREATE);
+    expect(port.close).toHaveBeenCalledOnce();
+  });
+
+  it("opens nothing for an install aborted while the engine loaded", async () => {
     const { port } = fakeOpenDfuPort();
+    const open = vi.fn(async () => {});
+    Object.assign(port, { readable: null, writable: null, open });
     const abort = new AbortController();
     abort.abort();
     await expect(
       flashSecureDfuPackage(port, pkg, { onProgress: () => {}, signal: abort.signal })
     ).rejects.toMatchObject({ name: "AbortError" });
-    expect(port.close).toHaveBeenCalledOnce();
+    expect(open).not.toHaveBeenCalled();
+    expect(port.close).not.toHaveBeenCalled();
   });
 
   it("fails fast when the port drops mid-flash", async () => {

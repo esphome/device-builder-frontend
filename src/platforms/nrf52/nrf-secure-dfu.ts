@@ -206,7 +206,9 @@ class SecureDfuSession extends SlipFrameSession {
    * The next frame, as the answer to ``request`` once it went out: a frame
    * that arrived while nothing was asked cannot be it, so those are dropped
    * first. With nothing to send (the ping reading past what is not its
-   * answer), a frame already arrived is the next one.
+   * answer), a frame already arrived is the next one. The wait bounds the
+   * write too: a device that never takes it (nothing reads its buffer) is
+   * not a silence to try again on.
    */
   private nextFrame(timeoutMs: number, request?: Uint8Array): Promise<Uint8Array> {
     if (this.readEnded) return Promise.reject(this.readEnded);
@@ -221,9 +223,19 @@ class SecureDfuSession extends SlipFrameSession {
       this.pending = { resolve, reject, timer };
     });
     reply.catch(() => {}); // A wait given up on (a failed write) is not unhandled.
-    const answered = request
-      ? this.writeBytes(frameRequest(request)).then(() => reply)
-      : reply;
+    let answered = reply;
+    if (request) {
+      let written = false;
+      const sent = this.writeBytes(frameRequest(request)).then(() => {
+        written = true;
+        return reply;
+      });
+      const stalled = reply.catch((err: unknown) => {
+        if (written || !(err instanceof ResponseTimeout)) throw err;
+        throw new Error(`The bootloader did not take the request in ${timeoutMs} ms`);
+      });
+      answered = Promise.race([sent, stalled]);
+    }
     return this.race(answered).finally(() => {
       if (this.pending) clearTimeout(this.pending.timer);
       this.pending = null;
@@ -256,17 +268,20 @@ class SecureDfuSession extends SlipFrameSession {
   /**
    * The bootloader is up when it answers a ping. A frame that is not this
    * ping's answer (one left in the bootloader, or an earlier ping's that came
-   * late) is read past within the same attempt, so that the next ping is not
-   * sent while its answer is still on the way. Only silence is tried again;
-   * a failed write, an abort or a dropped port fail the ping as they are.
+   * late) is read past within the same attempt's wait, so that the next ping
+   * is not sent while its answer is still on the way, and a device that
+   * keeps sending other frames runs the attempt out. Only silence is tried
+   * again; a failed write, an abort or a dropped port fail the ping as they
+   * are.
    */
   async ping(): Promise<void> {
     for (let attempt = 1; attempt <= PING_ATTEMPTS; attempt++) {
       const id = (this.pingId = (this.pingId + 1) & 0xff);
+      const deadline = Date.now() + PING_TIMEOUT_MS;
       try {
         let res = parseResponse(await this.nextFrame(PING_TIMEOUT_MS, pingRequest(id)));
         while (!answersPing(res, id)) {
-          res = parseResponse(await this.nextFrame(PING_TIMEOUT_MS));
+          res = parseResponse(await this.nextFrame(Math.max(0, deadline - Date.now())));
         }
         return;
       } catch (err) {
@@ -383,6 +398,8 @@ export async function flashSecureDfuPackage(
 ): Promise<void> {
   const refusal = secureDfuRefusal(pkg);
   if (refusal) throw new Error(`Not a package for this bootloader: ${refusal}`);
+  // An install torn down while this engine loaded has no port to open.
+  signal?.throwIfAborted();
   const [part] = pkg.parts;
   const log = onLog ?? (() => {});
   if (!port.readable) {

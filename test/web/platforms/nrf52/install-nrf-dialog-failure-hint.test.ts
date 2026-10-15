@@ -69,7 +69,7 @@ describe("web nRF52 install dialog failure hints", () => {
     );
   });
 
-  it("adds the same hint when the touch itself fails", async () => {
+  it("names both bootloaders' way in when the touch itself fails", async () => {
     const el = await dialog();
     mocks.touchIntoBootloader.mockRejectedValue(
       new BootloaderTouchError(new DOMException("refused", "NetworkError"))
@@ -77,7 +77,7 @@ describe("web nRF52 install dialog failure hints", () => {
     await el._startInstall();
     expect(el._state).toBe("error");
     expect(el._errorMessage).toBe(
-      "web.connect.failed | firmware.nrf_manual_bootloader_hint | refused"
+      "web.connect.failed | web.nrf.manual_bootloader_hint | refused"
     );
   });
 
