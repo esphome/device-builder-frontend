@@ -36,7 +36,7 @@
     "@codemirror/language": "^6.13.1",
     "@codemirror/lint": "^6.9.7",
     "@codemirror/state": "^6.7.6",
-    "@codemirror/view": "^6.43.13",
+    "@codemirror/view": "^6.43.14",
     "@home-assistant/webawesome": "3.7.0",
     "@lezer/common": "^1.5.3",
     "@lezer/highlight": "^1.2.5",
