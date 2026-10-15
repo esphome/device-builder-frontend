@@ -26,6 +26,7 @@ vi.mock("../../../../src/platforms/nrf52/nrf-dfu.js", () => ({
   flashDfuPackageWithReconnect: mocks.flashDfuPackageWithReconnect,
 }));
 
+import { makeWebSerialPort } from "../../_make-web-serial-port.js";
 import { pickFile } from "../../_pick-file.js";
 import { argsLocalize } from "../../../_dom.js";
 import { lapsedPick } from "../../../_web-serial.js";
@@ -43,7 +44,7 @@ async function dialog(): Promise<any> {
 }
 
 beforeEach(() => {
-  mocks.requestSerialPort.mockResolvedValue({});
+  mocks.requestSerialPort.mockResolvedValue(makeWebSerialPort());
   mocks.touchIntoBootloader.mockResolvedValue(true);
   mocks.parseDfuPackage.mockReturnValue({ parts: [] });
   mocks.flashDfuPackageWithReconnect.mockResolvedValue(undefined);
@@ -68,7 +69,7 @@ describe("web nRF52 install dialog failure hints", () => {
     );
   });
 
-  it("adds the same hint when the touch itself fails", async () => {
+  it("names both bootloaders' way in when the touch itself fails", async () => {
     const el = await dialog();
     mocks.touchIntoBootloader.mockRejectedValue(
       new BootloaderTouchError(new DOMException("refused", "NetworkError"))
@@ -76,7 +77,7 @@ describe("web nRF52 install dialog failure hints", () => {
     await el._startInstall();
     expect(el._state).toBe("error");
     expect(el._errorMessage).toBe(
-      "web.connect.failed | firmware.nrf_manual_bootloader_hint | refused"
+      "web.connect.failed | web.nrf.manual_bootloader_hint | refused"
     );
   });
 

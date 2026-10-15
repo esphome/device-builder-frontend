@@ -80,6 +80,14 @@ export interface BrowserInstall<Id extends FlasherId> {
    */
   readonly chips?: readonly string[];
   /**
+   * The bootloaders this flasher speaks to, as the device's ``bootloader``
+   * names them (ESPHome's ``nrf52: bootloader:`` values), on a platform
+   * whose boards ship more than one. It is offered only to a device whose
+   * bootloader is one of them, so not to one that is unknown. Absent: the
+   * platform has one bootloader, or the flasher needs none.
+   */
+  readonly bootloaders?: readonly string[];
+  /**
    * The ``domain.platform`` the device's last compile must have loaded
    * (``ota.zephyr_mcumgr``): an update over a service only that component
    * puts on the device. Absent: the flasher needs nothing from the firmware.

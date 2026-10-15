@@ -46,19 +46,32 @@ export function serialLogsFor(
   return serialLogsOf(platformFor(targetPlatform));
 }
 
+/** What a flasher is matched against: the device's chip and its bootloader. */
+export type DeviceHardware = Pick<ConfiguredDevice, "mcu" | "bootloader">;
+
 const writesChip = (install: AnyBrowserInstall, mcu: string | null): boolean =>
   !install.chips || (mcu !== null && install.chips.includes(mcu));
 
+const speaksBootloader = (
+  install: AnyBrowserInstall,
+  bootloader: string | null
+): boolean =>
+  !install.bootloaders ||
+  (bootloader !== null && install.bootloaders.includes(bootloader));
+
+const writesDevice = (install: AnyBrowserInstall, hardware: DeviceHardware): boolean =>
+  writesChip(install, hardware.mcu) && speaksBootloader(install, hardware.bootloader);
+
 /**
- * The flasher of ``platform`` that writes a device's chip whatever firmware
- * it runs, if one does.
+ * The flasher of ``platform`` that writes a device's chip, through its
+ * bootloader, whatever firmware it runs, if one does.
  */
 export function installOf(
   platform: PlatformSupport | undefined,
-  mcu: string | null
+  hardware: DeviceHardware
 ): AnyBrowserInstall | undefined {
   return platform?.installs?.find(
-    (install) => !install.component && writesChip(install, mcu)
+    (install) => !install.component && writesDevice(install, hardware)
   );
 }
 
@@ -69,7 +82,7 @@ export function installsFor(
   if (!device) return [];
   return (platformFor(device.target_platform)?.installs ?? []).filter(
     (install) =>
-      writesChip(install, device.mcu) &&
+      writesDevice(install, device) &&
       (!install.component || device.loaded_platforms.includes(install.component))
   );
 }

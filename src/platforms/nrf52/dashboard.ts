@@ -12,15 +12,17 @@ import {
 } from "./ble-nus-stream.js";
 import { nrfDfuInstall } from "./dfu-install.js";
 import { isNrfPlatform } from "./nrf-platform.js";
+import { nrfOpenDfuInstall } from "./open-dfu-install.js";
 import { NRF52_SERIAL_LOGS } from "./serial-logs.js";
 import { nrfSmpBleInstall, nrfSmpSerialInstall } from "./smp-install.js";
 
 export * from "./dfu-install.js";
+export * from "./open-dfu-install.js";
 
 export const nrf52Platform: PlatformSupport = {
   id: "nrf52",
   matches: isNrfPlatform,
-  installs: [nrfDfuInstall, nrfSmpBleInstall, nrfSmpSerialInstall],
+  installs: [nrfDfuInstall, nrfOpenDfuInstall, nrfSmpBleInstall, nrfSmpSerialInstall],
   logs: {
     serial: NRF52_SERIAL_LOGS,
     ble: {

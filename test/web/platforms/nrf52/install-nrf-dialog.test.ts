@@ -25,6 +25,7 @@ vi.mock("../../../../src/platforms/nrf52/nrf-dfu.js", () => ({
   flashDfuPackageWithReconnect: mocks.flashDfuPackageWithReconnect,
 }));
 
+import { makeWebSerialPort } from "../../_make-web-serial-port.js";
 import { pickerText, pickFile, slowFile, watchFileInput } from "../../_pick-file.js";
 import { identityLocalize, mount } from "../../../_dom.js";
 import { ESPHomeWebInstallNrfDialog } from "../../../../src/web/platforms/nrf52/esphome-web-install-nrf-dialog.js";
@@ -44,7 +45,7 @@ const logLines = (el: any): string[] | undefined =>
   (el.shadowRoot!.querySelector("esphome-install-details-log") as any)?.lines;
 
 beforeEach(() => {
-  mocks.requestSerialPort.mockResolvedValue({});
+  mocks.requestSerialPort.mockResolvedValue(makeWebSerialPort());
   mocks.parseDfuPackage.mockReturnValue({ parts: [] });
   mocks.touchIntoBootloader.mockImplementation(async ({ onLog }) => {
     onLog?.("Touching the port at 1200 baud");

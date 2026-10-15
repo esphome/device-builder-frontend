@@ -40,6 +40,8 @@ async function mount(opts: {
     makeConfiguredDevice({
       target_platform: dialog.deviceTargetPlatform,
       mcu: opts.mcu,
+      // An nRF52 with the Adafruit bootloader: the one browser DFU writes.
+      bootloader: dialog.deviceTargetPlatform === "nrf52" ? "adafruit" : null,
       loaded_platforms: opts.loadedPlatforms ?? [],
     })
   );

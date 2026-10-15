@@ -1,3 +1,4 @@
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../components/firmware-install-dialog.js";
 import { downloadBuildArtifact } from "../../components/firmware-install-dialog/browser-flash-steps.js";
@@ -41,14 +42,13 @@ const ESP_HANDOFF: HandoffSpec = {
 /**
  * What the hand-off for a device sends and to which flasher: its platform
  * descriptor's, ESP's for a device with no descriptor (ESP has none), and
- * nothing for a platform that cannot hand off or a chip no flasher writes.
+ * nothing for a platform that cannot hand off, a chip or bootloader no
+ * flasher writes, or no device at all.
  */
-export function handoffFor(
-  targetPlatform: string | null | undefined,
-  mcu: string | null
-): HandoffSpec | undefined {
-  const platform = platformFor(targetPlatform);
-  return platform ? installOf(platform, mcu)?.handoff : ESP_HANDOFF;
+export function handoffFor(device: ConfiguredDevice | null): HandoffSpec | undefined {
+  if (!device) return undefined;
+  const platform = platformFor(device.target_platform);
+  return platform ? installOf(platform, device)?.handoff : ESP_HANDOFF;
 }
 
 // "Flash via USB" through the external flasher: compile + download the image
@@ -58,7 +58,7 @@ export function handoffFor(
 export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const device = host._device;
   if (!device) return;
-  const handoff = handoffFor(device.target_platform, device.mcu);
+  const handoff = handoffFor(device);
   if (!handoff) {
     host._fail(host._localize("firmware.no_flashable_binary"));
     return;
@@ -89,7 +89,7 @@ export async function startUsbFlash(host: ESPHomeFirmwareInstallDialog): Promise
 export function handOffToFlasher(host: ESPHomeFirmwareInstallDialog): void {
   const firmware = host._usbFirmware;
   // startUsbFlash only stages firmware for a platform that can hand off.
-  const handoff = handoffFor(host._device?.target_platform, host._device?.mcu ?? null);
+  const handoff = handoffFor(host._device);
   if (!firmware || !handoff) return;
   host._step = "flashing";
   host._flashPercent = 0;

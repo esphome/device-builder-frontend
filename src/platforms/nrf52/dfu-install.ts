@@ -154,6 +154,14 @@ export async function nrfDoFlash(host: ESPHomeFirmwareInstallDialog): Promise<vo
 export const nrfDfuInstall: BrowserInstall<"nrf-dfu"> = {
   id: "nrf-dfu",
   methodKey: "nrf_dfu",
+  // The Adafruit bootloaders, by ESPHome's names; the nRF5 SDK bootloader
+  // (``nrf``) takes Secure DFU, and MCUboot takes mcumgr updates.
+  bootloaders: [
+    "adafruit",
+    "adafruit_nrf52_sd132",
+    "adafruit_nrf52_sd140_v6",
+    "adafruit_nrf52_sd140_v7",
+  ],
   holdsPort: () => false,
   image: nrfPackage,
   start: startNrfDfuInstall,

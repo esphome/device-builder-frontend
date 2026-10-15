@@ -6,8 +6,12 @@ for (let n = 0; n < 256; n++) {
   TABLE[n] = c >>> 0;
 }
 
-export function crc32(data: Uint8Array): number {
-  let crc = 0xffffffff;
+/**
+ * The CRC of ``data``, continued from ``seed`` (the CRC of what came before
+ * it, as ``zlib.crc32(data, seed)``), so a stream can be checked piecewise.
+ */
+export function crc32(data: Uint8Array, seed = 0): number {
+  let crc = (seed ^ 0xffffffff) >>> 0;
   for (const byte of data) crc = TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
 }

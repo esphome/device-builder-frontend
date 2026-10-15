@@ -8,8 +8,8 @@ import {
   openLiveSerialPort,
   SERIAL_REOPEN_TIMEOUT_MS,
 } from "../../util/serial-reacquire.js";
-import { SerialStreamSession } from "../../util/serial-stream-session.js";
 import { sleep } from "../../util/sleep.js";
+import { SLIP_END, slipEncode, SlipFrameSession } from "./slip.js";
 
 export interface DfuFirmwarePart {
   type: "application" | "bootloader" | "softdevice" | "softdevice+bootloader";
@@ -106,41 +106,6 @@ export function parseDfuPackage(zipBytes: Uint8Array): DfuPackage {
   return { parts };
 }
 
-// ── SLIP framing ─────────────────────────────────────────────────────────────
-
-const SLIP_END = 0xc0;
-const SLIP_ESC = 0xdb;
-const SLIP_ESC_END = 0xdc;
-const SLIP_ESC_ESC = 0xdd;
-
-export function slipEncode(data: Uint8Array): Uint8Array {
-  const out: number[] = [];
-  for (const b of data) {
-    if (b === SLIP_END) {
-      out.push(SLIP_ESC, SLIP_ESC_END);
-    } else if (b === SLIP_ESC) {
-      out.push(SLIP_ESC, SLIP_ESC_ESC);
-    } else {
-      out.push(b);
-    }
-  }
-  return new Uint8Array(out);
-}
-
-export function slipDecode(data: Uint8Array): Uint8Array {
-  const result: number[] = [];
-  for (let i = 0; i < data.length; i++) {
-    if (data[i] === SLIP_ESC) {
-      i++;
-      if (i >= data.length) throw new Error("Truncated SLIP escape sequence");
-      result.push(data[i] === SLIP_ESC_END ? SLIP_END : SLIP_ESC);
-    } else {
-      result.push(data[i]);
-    }
-  }
-  return new Uint8Array(result);
-}
-
 // ── CRC-16 (Nordic variant) ───────────────────────────────────────────────────
 
 export function crc16Nordic(data: Uint8Array): number {
@@ -194,8 +159,7 @@ export function buildHciPacket(data: Uint8Array, seq: number): Uint8Array {
 
 // ── DFU session ───────────────────────────────────────────────────────────────
 
-class DfuSession extends SerialStreamSession {
-  private rxBuf: number[] = [];
+class DfuSession extends SlipFrameSession {
   private seqNum = 0;
   private resolveAck: ((ack: number) => void) | null = null;
   private rejectAck: ((err: Error) => void) | null = null;
@@ -209,34 +173,17 @@ class DfuSession extends SerialStreamSession {
     super(port, signal);
   }
 
-  protected onBytes(bytes: Uint8Array): void {
-    for (const b of bytes) {
-      if (b !== SLIP_END) {
-        this.rxBuf.push(b);
-        continue;
-      }
-      this.onFrame(this.rxBuf);
-      this.rxBuf = [];
-    }
-  }
-
   // Fails the pending and later ACK waits right away instead of timing
   // each one out.
   protected onEnded(err: Error): void {
     this.rejectAck?.(err);
   }
 
-  private onFrame(raw: number[]): void {
-    if (raw.length < 2 || !this.resolveAck) return;
-    let decoded: Uint8Array;
-    try {
-      decoded = slipDecode(new Uint8Array(raw));
-    } catch {
-      return; // Malformed frame; keep waiting.
-    }
-    if (decoded.length === 0) return;
+  // An ACK is a two-byte frame; a shorter one is noise.
+  protected onFrame(frame: Uint8Array): void {
+    if (frame.length < 2 || !this.resolveAck) return;
     if (this.ackTimer !== null) clearTimeout(this.ackTimer);
-    this.resolveAck((decoded[0] >> 3) & 0x07);
+    this.resolveAck((frame[0] >> 3) & 0x07);
     this.resolveAck = null;
   }
 

@@ -7,8 +7,12 @@ import "../../../components/base-dialog.js";
 import { localizeContext } from "../../../context/index.js";
 import {
   type DfuPackage,
+  DONGLE_RESET_HINT_KEY,
+  isOpenDfuBootloaderPort,
   loadDfuEngine,
   loadDfuPackage,
+  loadSecureDfuEngine,
+  secureDfuRefusal,
   withManualBootloaderHint,
 } from "../../../platforms/nrf52/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
@@ -43,10 +47,16 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 
 type InstallState = "idle" | "resetting" | "waiting" | "flashing" | "success" | "error";
 
+/** How to enter the bootloader by hand, before the flash port says which one it is. */
+const EITHER_BOOTLOADER_HINT_KEY = "web.nrf.manual_bootloader_hint";
+
 /**
  * Two-step nRF52 DFU install: 1200-baud reset, then flash over the
  * re-enumerated DFU port. Each requestPort() runs from its own button click
- * (user-gesture requirement).
+ * (user-gesture requirement). The port picked for the flash tells the
+ * bootloader apart: Nordic's nRF5 SDK bootloader (the nRF52840 Dongle) has
+ * USB ids of its own and takes Secure DFU; any other is Adafruit's, which
+ * takes legacy DFU.
  */
 @customElement("esphome-web-install-nrf-dialog")
 export class ESPHomeWebInstallNrfDialog extends LitElement {
@@ -160,11 +170,16 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
       this._state = touched ? "waiting" : "idle";
     } catch (err) {
       // A failed pick has nothing to do with the board; only the touch earns
-      // the manual-bootloader hint.
+      // the manual-bootloader hint, for either bootloader: the port picked
+      // for the flash is what tells them apart, and that is still to come.
       this._fail(
         err instanceof BootloaderTouchError
           ? this._localize("web.connect.failed", {
-              error: withManualBootloaderHint(err, this._localize),
+              error: withManualBootloaderHint(
+                err,
+                this._localize,
+                EITHER_BOOTLOADER_HINT_KEY
+              ),
             })
           : openFailureMessage(err, this._localize, "web.connect.failed")
       );
@@ -188,24 +203,40 @@ export class ESPHomeWebInstallNrfDialog extends LitElement {
     }
     if (!port) return;
 
+    const openDfu = isOpenDfuBootloaderPort(port);
+    const refusal = openDfu ? secureDfuRefusal(pkg) : undefined;
+    if (refusal) {
+      this._fail(`${this._localize("firmware.nrf_bad_package")}: ${refusal}`);
+      return;
+    }
     this._state = "flashing";
     this._progress = 0;
     this._reconnecting = false;
+    const hooks = {
+      onProgress: (percent: number) => {
+        this._progress = Math.round(percent);
+      },
+      onReconnecting: () => (this._reconnecting = true),
+      onLog: this._log,
+    };
     try {
-      // A cache hit: the engine loaded when the package was parsed.
-      const { flashDfuPackageWithReconnect } = await loadDfuEngine();
-      await flashDfuPackageWithReconnect(port, pkg, {
-        onProgress: (percent) => {
-          this._progress = Math.round(percent);
-        },
-        onReconnecting: () => (this._reconnecting = true),
-        onLog: this._log,
-      });
+      if (openDfu) {
+        const { flashSecureDfuPackage } = await loadSecureDfuEngine();
+        await flashSecureDfuPackage(port, pkg, hooks);
+      } else {
+        // A cache hit: the engine loaded when the package was parsed.
+        const { flashDfuPackageWithReconnect } = await loadDfuEngine();
+        await flashDfuPackageWithReconnect(port, pkg, hooks);
+      }
       this._state = "success";
     } catch (err) {
       this._fail(
         this._localize("web.nrf.install_error_flash", {
-          error: withManualBootloaderHint(err, this._localize),
+          error: withManualBootloaderHint(
+            err,
+            this._localize,
+            openDfu ? DONGLE_RESET_HINT_KEY : undefined
+          ),
         })
       );
     }

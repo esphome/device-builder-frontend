@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { argsLocalize } from "../../_dom.js";
+import { DfuResponseError } from "../../../src/platforms/nrf52/dfu-response-error.js";
 import { withManualBootloaderHint } from "../../../src/platforms/nrf52/manual-bootloader-hint.js";
 import { SerialDeviceLostError } from "../../../src/util/serial-open-error.js";
 
@@ -31,5 +32,27 @@ describe("withManualBootloaderHint", () => {
     expect(
       withManualBootloaderHint(new DOMException("aborted", "AbortError"), argsLocalize)
     ).toBe("aborted");
+  });
+});
+
+describe("withManualBootloaderHint for another bootloader", () => {
+  it("joins the error with that bootloader's own way in", () => {
+    expect(
+      withManualBootloaderHint(
+        new Error("No answer from the bootloader"),
+        argsLocalize,
+        "firmware.nrf_open_manual_bootloader_hint"
+      )
+    ).toBe("firmware.nrf_open_manual_bootloader_hint | No answer from the bootloader");
+  });
+
+  it("keeps a refusal from the bootloader bare: it was entered", () => {
+    expect(
+      withManualBootloaderHint(
+        new DfuResponseError("Execute object", "the bootloader refused it"),
+        argsLocalize,
+        "firmware.nrf_open_manual_bootloader_hint"
+      )
+    ).toBe("Execute object: the bootloader refused it");
   });
 });
