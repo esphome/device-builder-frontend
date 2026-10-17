@@ -414,6 +414,39 @@ describe("focus helpers", () => {
   });
 });
 
+describe("resolveAutomationFocus — all / any gates", () => {
+  const anyGate = tree([
+    action("if", {
+      conditions: [
+        condition("any", {
+          children: [
+            condition("switch.is_on", { params: { id: "r1" } }),
+            condition("switch.is_on", { params: { id: "r2" } }),
+          ],
+        }),
+      ],
+      children: { then: [] },
+    }),
+  ]);
+
+  it("reaches the second condition of an any gate through the combinator node", () => {
+    expect(
+      resolveAutomationFocus(anyGate, ["then", 0, "if", "any", 1, "switch.is_on", "id"])
+    ).toEqual({ node: [0, "conditions", 0, 1], field: ["id"] });
+  });
+
+  it("lands on the combinator for the gate key itself", () => {
+    expect(resolveAutomationFocus(anyGate, ["then", 0, "if", "all"])).toEqual({
+      node: [0],
+      field: [],
+    });
+    expect(resolveAutomationFocus(anyGate, ["then", 0, "if", "any"])).toEqual({
+      node: [0, "conditions", 0],
+      field: [],
+    });
+  });
+});
+
 describe("resolveAutomationFocus — choose branches", () => {
   const choose = action("choose", {
     branches: [
@@ -465,6 +498,18 @@ describe("resolveAutomationFocus — choose branches", () => {
       node: [0, "branches", 0],
       field: [],
     });
+  });
+
+  it("routes an else-only choose body's indexed else entry", () => {
+    const elseOnly = tree([
+      action("choose", {
+        branches: [],
+        children: { else: [action("logger.log", { params: { format: "c" } })] },
+      }),
+    ]);
+    expect(
+      resolveAutomationFocus(elseOnly, ["then", 0, "choose", 0, "else", 0, "logger.log"])
+    ).toEqual({ node: [0, "else", 0], field: [] });
   });
 
   it("reads a single-mapping body as branch 0", () => {

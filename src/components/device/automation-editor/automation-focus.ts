@@ -241,15 +241,20 @@ function actionBodyFocus(
 ): AutomationFocus {
   const here: AutomationFocus = { node: at, field: [] };
   if (path.length === 0) return here;
-  if (a.branches?.length) return branchesFocus(a, path, at, here);
   const head = path[0];
+  // A list body (choose) indexes its entries; an else-only body has no branches.
+  if (a.branches?.length || (a.branches && typeof head === "number")) {
+    return branchesFocus(a, path, at, here);
+  }
   if (typeof head === "string") {
     if (CONDITION_GATE_KEYS.has(head)) {
+      // An all / any gate is itself the combinator node, so its key stays on
+      // the path as that node's id; a condition: key only wraps the list.
       return listFocus(
         a.conditions ?? [],
         conditionId,
         conditionBodyFocus,
-        path.slice(1),
+        head === "condition" ? path.slice(1) : path,
         [...at, "conditions"],
         here
       );

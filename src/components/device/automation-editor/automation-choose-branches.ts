@@ -90,6 +90,12 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
   /** Branch-level scroll spent on the current target; see the action node. */
   private _focusScrolled = false;
 
+  /** The control that asked for a reorder; see the action list. */
+  private _refocus: HTMLElement | null = null;
+
+  /** Key of the branch the caret's target was handed to; see the action list. */
+  private _focusRow: number | undefined;
+
   static styles = [
     espHomeStyles,
     automationEditorStyles,
@@ -108,10 +114,16 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
   ];
 
   protected willUpdate(changed: PropertyValues<this>): void {
-    if (changed.has("focusTarget")) this._focusScrolled = false;
+    if (!changed.has("focusTarget")) return;
+    this._focusScrolled = false;
+    const at = this.focusTarget?.node[0];
+    this._focusRow =
+      typeof at === "number" ? this._rows.keysFor(this.branches)[at] : undefined;
   }
 
-  protected updated(): void {
+  protected updated(changed: PropertyValues<this>): void {
+    if (changed.has("branches")) this._refocus?.focus();
+    this._refocus = null;
     const t = this.focusTarget;
     if (!t || this._focusScrolled) return;
     this._focusScrolled = true;
@@ -128,7 +140,7 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
       ${repeat(
         this.branches,
         (_branch, idx) => keys[idx],
-        (branch, idx) => this._renderBranch(branch, idx)
+        (branch, idx) => this._renderBranch(branch, idx, keys[idx])
       )}
       <button
         type="button"
@@ -142,8 +154,11 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
     `;
   }
 
-  private _renderBranch(branch: ChooseBranch, idx: number) {
-    const focus = this.focusTarget?.node[0] === idx ? childFocus(this.focusTarget) : null;
+  private _renderBranch(branch: ChooseBranch, idx: number, key: number) {
+    const focus =
+      this.focusTarget?.node[0] === idx && key === this._focusRow
+        ? childFocus(this.focusTarget)
+        : null;
     return html`<div class="ae-nested">
       <div class="ae-branch-header">
         <p class="ae-nested-label">
@@ -154,7 +169,7 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
             type="button"
             ?disabled=${this.disabled || idx === 0}
             aria-label=${this._localize("device.automation_move_up")}
-            @click=${() => this._emit(swap(this.branches, idx, idx - 1))}
+            @click=${(e: Event) => this._move(e, idx, -1)}
           >
             <wa-icon library="mdi" name="arrow-up"></wa-icon>
           </button>
@@ -162,7 +177,7 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
             type="button"
             ?disabled=${this.disabled || idx === this.branches.length - 1}
             aria-label=${this._localize("device.automation_move_down")}
-            @click=${() => this._emit(swap(this.branches, idx, idx + 1))}
+            @click=${(e: Event) => this._move(e, idx, +1)}
           >
             <wa-icon library="mdi" name="arrow-down"></wa-icon>
           </button>
@@ -212,6 +227,11 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
         }}
       ></esphome-automation-action-list>
     </div>`;
+  }
+
+  private _move(e: Event, idx: number, delta: number) {
+    this._refocus = e.currentTarget as HTMLElement;
+    this._emit(swap(this.branches, idx, idx + delta));
   }
 
   private _patch(idx: number, patch: Partial<ChooseBranch>) {

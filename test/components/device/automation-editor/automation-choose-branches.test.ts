@@ -89,6 +89,31 @@ describe("automation-choose-branches", () => {
     expect(rows[0].classList.contains(FIELD_FLASH_CLASS)).toBe(false);
   });
 
+  it("hands a focus target to the branch by key, not by index after a move", async () => {
+    const { el } = await mount([cold, warm]);
+    el.focusTarget = { node: [0, "then", 0], field: [] };
+    await el.updateComplete;
+    expect(lists(el)[0].focusTarget).toEqual({ node: [0], field: [] });
+    el.branches = [warm, cold];
+    await el.updateComplete;
+    expect(lists(el)[0].focusTarget).toBeNull();
+    expect(lists(el)[1].focusTarget).toBeNull();
+  });
+
+  it("refocuses the move button after the branches swap", async () => {
+    const hot: ChooseBranch = { conditions: [], actions: [] };
+    const { el, seen } = await mount([cold, warm, hot]);
+    const down = el.shadowRoot!.querySelectorAll<HTMLButtonElement>(
+      ".ae-row-controls button"
+    )[1];
+    down.focus();
+    down.click();
+    el.branches = seen[seen.length - 1];
+    await el.updateComplete;
+    expect(el.branches).toEqual([warm, cold, hot]);
+    expect(el.shadowRoot!.activeElement).toBe(down);
+  });
+
   it("removes and reorders branches", async () => {
     const { el, seen } = await mount([cold, warm]);
     el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".ae-row-delete")[0].click();
