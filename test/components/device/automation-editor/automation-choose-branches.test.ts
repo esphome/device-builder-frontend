@@ -20,6 +20,7 @@ import type {
 import type { ESPHomeAutomationActionList } from "../../../../src/components/device/automation-editor/automation-action-list.js";
 import { ESPHomeAutomationChooseBranches } from "../../../../src/components/device/automation-editor/automation-choose-branches.js";
 import type { ESPHomeAutomationConditionTree } from "../../../../src/components/device/automation-editor/automation-condition-tree.js";
+import { FIELD_FLASH_CLASS } from "../../../../src/components/device/field-highlight.js";
 
 const cold: ChooseBranch = {
   conditions: [{ condition_id: "sensor.in_range", params: { id: "t", below: 10 } }],
@@ -67,6 +68,25 @@ describe("automation-choose-branches", () => {
     const { el, seen } = await mount([cold]);
     el.shadowRoot!.querySelector<HTMLButtonElement>(".ae-add")!.click();
     expect(seen).toEqual([[cold, { conditions: [], actions: [] }]]);
+  });
+
+  it("keeps the last branch", async () => {
+    const { el } = await mount([cold]);
+    expect(
+      el.shadowRoot!.querySelector<HTMLButtonElement>(".ae-row-delete")!.disabled
+    ).toBe(true);
+  });
+
+  it("flashes the branch a terminal focus target names", async () => {
+    const { el } = await mount([cold, warm]);
+    const rows = el.shadowRoot!.querySelectorAll<HTMLElement>(".ae-nested");
+    rows.forEach((row) => {
+      row.scrollIntoView = () => {};
+    });
+    el.focusTarget = { node: [1], field: [] };
+    await el.updateComplete;
+    expect(rows[1].classList.contains(FIELD_FLASH_CLASS)).toBe(true);
+    expect(rows[0].classList.contains(FIELD_FLASH_CLASS)).toBe(false);
   });
 
   it("removes and reorders branches", async () => {

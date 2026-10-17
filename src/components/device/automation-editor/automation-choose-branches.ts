@@ -11,7 +11,7 @@
  */
 import { consume } from "@lit/context";
 import { mdiArrowDown, mdiArrowUp, mdiDelete, mdiPlus } from "@mdi/js";
-import { css, html, LitElement } from "lit";
+import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
@@ -30,6 +30,8 @@ import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { fireEvent } from "../../../util/fire-event.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { scrollFlashRow } from "../field-highlight.js";
+import { fieldHighlightStyles } from "../field-highlight.styles.js";
 import "./automation-condition-tree.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
@@ -85,9 +87,13 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
 
   private readonly _rows = new RowKeys<ChooseBranch>();
 
+  /** Branch-level scroll spent on the current target; see the action node. */
+  private _focusScrolled = false;
+
   static styles = [
     espHomeStyles,
     automationEditorStyles,
+    fieldHighlightStyles,
     css`
       .ae-branch-header {
         display: flex;
@@ -100,6 +106,21 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
       }
     `,
   ];
+
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has("focusTarget")) this._focusScrolled = false;
+  }
+
+  protected updated(): void {
+    const t = this.focusTarget;
+    if (!t || this._focusScrolled) return;
+    this._focusScrolled = true;
+    // A target that ends on the branch itself (no gate or list below it)
+    // is flashed here; deeper targets are forwarded to the child trees.
+    if (t.node.length !== 1 || typeof t.node[0] !== "number") return;
+    const row = this.shadowRoot?.querySelectorAll<HTMLElement>(".ae-nested")[t.node[0]];
+    if (row) scrollFlashRow(row);
+  }
 
   protected render() {
     const keys = this._rows.keysFor(this.branches);
@@ -148,7 +169,7 @@ export class ESPHomeAutomationChooseBranches extends LitElement {
           <button
             type="button"
             class="ae-row-delete"
-            ?disabled=${this.disabled}
+            ?disabled=${this.disabled || this.branches.length === 1}
             aria-label=${this._localize("device.automation_remove_branch")}
             @click=${() => this._emit(removeAt(this.branches, idx))}
           >
