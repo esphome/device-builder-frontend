@@ -26,13 +26,13 @@ describe("emptyAutomationTree", () => {
 });
 
 describe("emptyActionNode", () => {
-  it("carries the action id and empty params / children / conditions / branches", () => {
+  it("carries the action id and empty params / children / conditions", () => {
     const node = emptyActionNode("light.turn_on");
     expect(node.action_id).toBe("light.turn_on");
     expect(node.params).toEqual({});
     expect(node.children).toEqual({});
     expect(node.conditions).toEqual([]);
-    expect(node.branches).toEqual([]);
+    expect(node.branches).toBeUndefined();
   });
 
   it("seeds one blank branch for a branch-list action", () => {

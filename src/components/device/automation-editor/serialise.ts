@@ -39,7 +39,7 @@ export function emptyActionNode(
     params: { ...params },
     children: {},
     conditions: [],
-    branches: def?.has_branches ? [emptyChooseBranch()] : [],
+    ...(def?.has_branches ? { branches: [emptyChooseBranch()] } : {}),
   };
 }
 

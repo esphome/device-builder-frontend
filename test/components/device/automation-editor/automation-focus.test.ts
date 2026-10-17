@@ -500,6 +500,14 @@ describe("resolveAutomationFocus — choose branches", () => {
     });
   });
 
+  it("keeps a list-bodied plain action's index as a field path", () => {
+    const t = tree([action("uart.write", { params: { id: [1, 2] }, branches: [] })]);
+    expect(resolveAutomationFocus(t, ["then", 0, "uart.write", 1])).toEqual({
+      node: [0],
+      field: ["1"],
+    });
+  });
+
   it("routes an else-only choose body's indexed else entry", () => {
     const elseOnly = tree([
       action("choose", {

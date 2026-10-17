@@ -242,10 +242,13 @@ function actionBodyFocus(
   const here: AutomationFocus = { node: at, field: [] };
   if (path.length === 0) return here;
   const head = path[0];
-  // A list body (choose) indexes its entries; an else-only body has no branches.
-  if (a.branches?.length || (a.branches && typeof head === "number")) {
-    return branchesFocus(a, path, at, here);
-  }
+  // A list body (choose) indexes its entries; an else-only one has no
+  // branches, only the else list, which no other indexed body carries.
+  const elseOnly =
+    typeof head === "number" &&
+    !!a.children &&
+    Object.prototype.hasOwnProperty.call(a.children, "else");
+  if (a.branches?.length || elseOnly) return branchesFocus(a, path, at, here);
   if (typeof head === "string") {
     if (CONDITION_GATE_KEYS.has(head)) {
       // An all / any gate is itself the combinator node, so its key stays on
