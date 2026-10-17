@@ -9,8 +9,10 @@
  */
 import type {
   ActionNode,
+  AutomationAction,
   AutomationLocation,
   AutomationTree,
+  ChooseBranch,
   ConditionNode,
   YamlDiff,
 } from "../../../api/types/automations.js";
@@ -25,14 +27,21 @@ export function emptyAutomationTree(): AutomationTree {
   };
 }
 
-/** Build a fresh empty action node for a given action id. */
-export function emptyActionNode(actionId: string): ActionNode {
+/** Build a fresh empty action node for a given action id; a branch-list
+ *  action (``choose``) starts with one blank branch to fill in. */
+export function emptyActionNode(actionId: string, def?: AutomationAction): ActionNode {
   return {
     action_id: actionId,
     params: {},
     children: {},
     conditions: [],
+    branches: def?.has_branches ? [emptyChooseBranch()] : [],
   };
+}
+
+/** Build a fresh empty ``choose`` branch. */
+export function emptyChooseBranch(): ChooseBranch {
+  return { conditions: [], actions: [] };
 }
 
 /** Build a fresh empty condition node for a given condition id. */

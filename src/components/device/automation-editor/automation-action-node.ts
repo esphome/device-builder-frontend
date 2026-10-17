@@ -30,6 +30,7 @@ import type {
   AutomationCondition,
   AvailableComponentInstance,
   AvailableScript,
+  ChooseBranch,
   ConditionNode,
 } from "../../../api/types/automations.js";
 import type { BoardCatalogEntry } from "../../../api/types/boards.js";
@@ -47,6 +48,7 @@ import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import { paramEntriesOf } from "../config-entry-renderers/scalar-value-entry.js";
 import { scrollFlashRow } from "../field-highlight.js";
 import { fieldHighlightStyles } from "../field-highlight.styles.js";
+import "./automation-choose-branches.js";
 import "./automation-condition-tree.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
@@ -56,7 +58,7 @@ import {
 } from "./automation-focus.js";
 import type { CatalogPickedDetail } from "./catalog-picker-dialog.js";
 import { requestCatalogPick } from "./catalog-picker-host.js";
-import { applyParamChange } from "./serialise.js";
+import { applyParamChange, emptyActionNode } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -196,6 +198,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
     const def = this.catalog.find((a) => a.id === this.value.action_id);
     const head = t.node[0];
     if (head === "conditions") return !hasConditionGate(def);
+    if (head === "branches") return !def?.has_branches;
     if (typeof head === "string") {
       return !(def?.accepts_action_list ?? []).includes(head);
     }
@@ -287,7 +290,8 @@ export class ESPHomeAutomationActionNode extends LitElement {
                     : nothing
                 }
                 ${this._renderActionParams(def)} ${this._renderScriptParams(def)}
-                ${this._renderConditionGate(def)} ${this._renderNestedLists(def)}
+                ${this._renderConditionGate(def)} ${this._renderBranches(def)}
+                ${this._renderNestedLists(def)}
               </div>`
         }
       </div>
@@ -349,6 +353,26 @@ export class ESPHomeAutomationActionNode extends LitElement {
         @conditions-change=${this._onConditionsChange}
       ></esphome-automation-condition-tree>
     </div>`;
+  }
+
+  /** Render the ``{if, then}`` choices of a branch-list action (``choose``);
+   *  its ``else`` list follows through ``_renderNestedLists``. */
+  private _renderBranches(def: AutomationAction | undefined) {
+    if (!def?.has_branches) return nothing;
+    return html`<esphome-automation-choose-branches
+      .branches=${this.value.branches ?? []}
+      .focusTarget=${
+        this.focusTarget?.node[0] === "branches" ? childFocus(this.focusTarget) : null
+      }
+      .catalog=${this.catalog}
+      .conditionCatalog=${this.conditionCatalog}
+      .scripts=${this.scripts}
+      .devices=${this.devices}
+      .board=${this.board}
+      .yaml=${this.yaml}
+      ?disabled=${this.disabled}
+      @branches-change=${this._onBranchesChange}
+    ></esphome-automation-choose-branches>`;
   }
 
   /** Label a nested action list: ``then`` / ``else`` keep their
@@ -460,12 +484,12 @@ export class ESPHomeAutomationActionNode extends LitElement {
     // schemas, parallel state would surface fields the renderer
     // wouldn't paint. Pre-filled params from the "By target" tab
     // are seeded on top of the reset.
-    this._emit({
-      action_id: detail.id,
-      params: { ...(detail.preFilledParams ?? {}) },
-      children: {},
-      conditions: [],
-    });
+    const node = emptyActionNode(
+      detail.id,
+      this.catalog.find((a) => a.id === detail.id)
+    );
+    node.params = { ...(detail.preFilledParams ?? {}) };
+    this._emit(node);
   };
 
   private _onParamChange = (e: CustomEvent<ConfigEntryValueChange>) => {
@@ -481,6 +505,11 @@ export class ESPHomeAutomationActionNode extends LitElement {
   private _onConditionsChange = (e: CustomEvent<{ conditions: ConditionNode[] }>) => {
     e.stopPropagation();
     this._emit({ ...this.value, conditions: e.detail.conditions });
+  };
+
+  private _onBranchesChange = (e: CustomEvent<{ branches: ChooseBranch[] }>) => {
+    e.stopPropagation();
+    this._emit({ ...this.value, branches: e.detail.branches });
   };
 
   private _onChildrenChange(key: string, actions: ActionNode[]) {

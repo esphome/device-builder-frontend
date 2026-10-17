@@ -186,7 +186,10 @@ export class ESPHomeAutomationActionList extends LitElement {
   }
 
   private _onActionPicked = (detail: CatalogPickedDetail) => {
-    const node = emptyActionNode(detail.id);
+    const node = emptyActionNode(
+      detail.id,
+      this.catalog.find((a) => a.id === detail.id)
+    );
     if (detail.preFilledParams) {
       node.params = { ...node.params, ...detail.preFilledParams };
     }

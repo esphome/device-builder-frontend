@@ -413,3 +413,63 @@ describe("focus helpers", () => {
     expect(focusKey(null)).toBeUndefined();
   });
 });
+
+describe("resolveAutomationFocus — choose branches", () => {
+  const choose = action("choose", {
+    branches: [
+      {
+        conditions: [condition("api.connected")],
+        actions: [action("logger.log", { params: { format: "a" } })],
+      },
+      {
+        conditions: [condition("lambda", { params: { lambda: "return true;" } })],
+        actions: [action("delay", { params: { id: "1s" } })],
+      },
+    ],
+    children: { else: [action("logger.log", { params: { format: "c" } })] },
+  });
+  const t = tree([choose]);
+
+  it("routes a branch's then list through branches / index / then", () => {
+    expect(
+      resolveAutomationFocus(t, ["then", 0, "choose", 1, "then", 0, "delay"])
+    ).toEqual({
+      node: [0, "branches", 1, "then", 0],
+      field: [],
+    });
+  });
+
+  it("routes a branch's dict-form if condition into its gate", () => {
+    expect(
+      resolveAutomationFocus(t, ["then", 0, "choose", 1, "if", "lambda", "lambda"])
+    ).toEqual({ node: [0, "branches", 1, "conditions", 0], field: ["lambda"] });
+  });
+
+  it("routes the trailing else entry to the else child list", () => {
+    expect(
+      resolveAutomationFocus(t, [
+        "then",
+        0,
+        "choose",
+        2,
+        "else",
+        0,
+        "logger.log",
+        "format",
+      ])
+    ).toEqual({ node: [0, "else", 0], field: ["format"] });
+  });
+
+  it("lands on the branch row for an entry with no key", () => {
+    expect(resolveAutomationFocus(t, ["then", 0, "choose", 0])).toEqual({
+      node: [0, "branches", 0],
+      field: [],
+    });
+  });
+
+  it("reads a single-mapping body as branch 0", () => {
+    expect(
+      resolveAutomationFocus(t, ["then", 0, "choose", "then", 0, "logger.log"])
+    ).toEqual({ node: [0, "branches", 0, "then", 0], field: [] });
+  });
+});

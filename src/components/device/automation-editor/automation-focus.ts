@@ -30,7 +30,9 @@ export interface AutomationFocus {
   /** Path through the tree. ``[]`` = the trigger-params form. A number
    *  indexes the current action/condition list; ``"conditions"`` enters
    *  an ``ActionNode``'s boolean gate (reserved — YAML gate keys are
-   *  ``condition``/``all``/``any``, never a child-list key); any other
+   *  ``condition``/``all``/``any``, never a child-list key);
+   *  ``"branches"`` then a branch index enters a ``choose`` branch, whose
+   *  own ``"conditions"`` / ``"then"`` follow; any other
    *  string is an ``accepts_action_list`` child key (``then``/``else``). */
   node: YamlPathSegment[];
   /** Params-form-relative field path; ``[]`` = highlight the node row. */
@@ -239,6 +241,7 @@ function actionBodyFocus(
 ): AutomationFocus {
   const here: AutomationFocus = { node: at, field: [] };
   if (path.length === 0) return here;
+  if (a.branches?.length) return branchesFocus(a, path, at);
   const head = path[0];
   if (typeof head === "string") {
     if (CONDITION_GATE_KEYS.has(head)) {
@@ -278,6 +281,57 @@ function actionBodyFocus(
     }
   }
   return { node: at, field: path.map(String) };
+}
+
+/**
+ * A ``choose`` body: ``[n, "if" | "then", …]`` addresses a branch,
+ * ``[n, "else", …]`` the trailing else entry; a single-mapping body
+ * (``choose: {if:, then:}``) is branch 0.
+ */
+function branchesFocus(
+  a: ActionNode,
+  path: readonly YamlPathSegment[],
+  at: YamlPathSegment[]
+): AutomationFocus {
+  const here: AutomationFocus = { node: at, field: [] };
+  const branches = a.branches ?? [];
+  const [head, key, ...rest] = typeof path[0] === "number" ? path : [0, ...path];
+  if (typeof head !== "number") return here;
+  if (key === "else" && a.children?.else) {
+    return listFocus(
+      a.children.else,
+      actionId,
+      actionBodyFocus,
+      rest,
+      [...at, "else"],
+      here
+    );
+  }
+  const branch = branches[head];
+  if (!branch) return here;
+  const branchAt = [...at, "branches", head];
+  const inBranch: AutomationFocus = { node: branchAt, field: [] };
+  if (key === "if") {
+    return listFocus(
+      branch.conditions,
+      conditionId,
+      conditionBodyFocus,
+      rest,
+      [...branchAt, "conditions"],
+      inBranch
+    );
+  }
+  if (key === "then") {
+    return listFocus(
+      branch.actions,
+      actionId,
+      actionBodyFocus,
+      rest,
+      [...branchAt, "then"],
+      inBranch
+    );
+  }
+  return inBranch;
 }
 
 function conditionBodyFocus(
