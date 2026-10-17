@@ -208,11 +208,10 @@ export interface ChooseBranch {
  *  (the boolean gate of ``if`` / ``while`` / ``wait_until``); an
  *  ``all`` / ``any`` gate arrives as one combinator node. ``branches``
  *  holds a ``has_branches`` action's choices; its ``else`` list rides in
- *  ``children``. ``unknown``
- *  marks an uncatalogued action (from an ``external_components`` source,
- *  or a typo): it's
- *  shown read-only, and ``raw_body`` is round-tripped verbatim so the
- *  sibling actions stay editable. */
+ *  ``children``. ``unknown`` marks an uncatalogued action (from an
+ *  ``external_components`` source, or a typo): it's shown read-only, and
+ *  ``raw_body`` is round-tripped verbatim so the sibling actions stay
+ *  editable. */
 export interface ActionNode {
   action_id: string;
   params: Record<string, unknown>;

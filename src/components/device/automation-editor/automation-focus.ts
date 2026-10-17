@@ -241,7 +241,7 @@ function actionBodyFocus(
 ): AutomationFocus {
   const here: AutomationFocus = { node: at, field: [] };
   if (path.length === 0) return here;
-  if (a.branches?.length) return branchesFocus(a, path, at);
+  if (a.branches?.length) return branchesFocus(a, path, at, here);
   const head = path[0];
   if (typeof head === "string") {
     if (CONDITION_GATE_KEYS.has(head)) {
@@ -291,12 +291,12 @@ function actionBodyFocus(
 function branchesFocus(
   a: ActionNode,
   path: readonly YamlPathSegment[],
-  at: YamlPathSegment[]
+  at: YamlPathSegment[],
+  here: AutomationFocus
 ): AutomationFocus {
-  const here: AutomationFocus = { node: at, field: [] };
-  const branches = a.branches ?? [];
-  const [head, key, ...rest] = typeof path[0] === "number" ? path : [0, ...path];
-  if (typeof head !== "number") return here;
+  const head = path[0];
+  const idx = typeof head === "number" ? head : 0;
+  const [key, ...rest] = typeof head === "number" ? path.slice(1) : path;
   if (key === "else" && a.children?.else) {
     return listFocus(
       a.children.else,
@@ -307,9 +307,9 @@ function branchesFocus(
       here
     );
   }
-  const branch = branches[head];
+  const branch = a.branches?.[idx];
   if (!branch) return here;
-  const branchAt = [...at, "branches", head];
+  const branchAt = [...at, "branches", idx];
   const inBranch: AutomationFocus = { node: branchAt, field: [] };
   if (key === "if") {
     return listFocus(

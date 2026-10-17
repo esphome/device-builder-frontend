@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { AutomationAction } from "../../../../src/api/types/automations.js";
+import { makeAutomationAction } from "../../../_make-automation-action.js";
 import {
   applyParamChange,
   emptyActionNode,
@@ -36,10 +36,10 @@ describe("emptyActionNode", () => {
   });
 
   it("seeds one blank branch for a branch-list action", () => {
-    const node = emptyActionNode("choose", {
-      id: "choose",
-      has_branches: true,
-    } as unknown as AutomationAction);
+    const node = emptyActionNode(
+      "choose",
+      makeAutomationAction({ id: "choose", has_branches: true })
+    );
     expect(node.branches).toEqual([{ conditions: [], actions: [] }]);
   });
 });

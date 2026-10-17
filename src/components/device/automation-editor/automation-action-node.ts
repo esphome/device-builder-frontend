@@ -484,12 +484,13 @@ export class ESPHomeAutomationActionNode extends LitElement {
     // schemas, parallel state would surface fields the renderer
     // wouldn't paint. Pre-filled params from the "By target" tab
     // are seeded on top of the reset.
-    const node = emptyActionNode(
-      detail.id,
-      this.catalog.find((a) => a.id === detail.id)
+    this._emit(
+      emptyActionNode(
+        detail.id,
+        this.catalog.find((a) => a.id === detail.id),
+        detail.preFilledParams
+      )
     );
-    node.params = { ...(detail.preFilledParams ?? {}) };
-    this._emit(node);
   };
 
   private _onParamChange = (e: CustomEvent<ConfigEntryValueChange>) => {

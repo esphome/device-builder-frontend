@@ -29,10 +29,14 @@ export function emptyAutomationTree(): AutomationTree {
 
 /** Build a fresh empty action node for a given action id; a branch-list
  *  action (``choose``) starts with one blank branch to fill in. */
-export function emptyActionNode(actionId: string, def?: AutomationAction): ActionNode {
+export function emptyActionNode(
+  actionId: string,
+  def?: AutomationAction,
+  params?: Record<string, unknown>
+): ActionNode {
   return {
     action_id: actionId,
-    params: {},
+    params: { ...params },
     children: {},
     conditions: [],
     branches: def?.has_branches ? [emptyChooseBranch()] : [],
