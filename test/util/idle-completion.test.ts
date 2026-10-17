@@ -66,12 +66,21 @@ describe("idleCompletion (timer)", () => {
   const spy = vi.mocked(startCompletion);
   const status = vi.mocked(completionStatus);
   const realStatus = status.getMockImplementation()!;
+  // happy-dom fires ``selectionchange`` synchronously from
+  // ``Selection.collapse()``, which the view calls while writing a
+  // transaction's selection to the DOM; @codemirror/view (6.43.14) answers
+  // the event with an update of its own, nested in the one under way, which
+  // throws. A browser queues the event as a task, after the update. These
+  // tests drive the editor through transactions, so the DOM event is dropped.
+  const dropSelectionChange = (e: Event) => e.stopImmediatePropagation();
   beforeEach(() => {
     vi.useFakeTimers();
     spy.mockClear();
     status.mockImplementation(realStatus);
+    document.addEventListener("selectionchange", dropSelectionChange, true);
   });
   afterEach(() => {
+    document.removeEventListener("selectionchange", dropSelectionChange, true);
     vi.useRealTimers();
     // ``view.destroy()`` leaves the mounted DOM node in ``document.body``;
     // clear it so editors don't accumulate and ``activeElement`` can't stay
