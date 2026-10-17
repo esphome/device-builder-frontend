@@ -402,3 +402,27 @@ describe("parseYamlAutomations — many-instance sweep", () => {
     );
   });
 });
+
+describe("parseYamlAutomations — script on_stop", () => {
+  it("lists a script's on_stop as a component_on row keyed on the script id", () => {
+    const yaml = [
+      "script:",
+      "  - id: my_script",
+      "    on_stop:",
+      "      - logger.log: stopped",
+      "    then:",
+      "      - delay: 1s",
+      "",
+    ].join("\n");
+    const rows = parseYamlAutomations(yaml);
+    expect(rows.map((r) => r.key)).toEqual([
+      "automation:component_on:my_script:on_stop",
+      "automation:script:my_script",
+    ]);
+    const stop = rows[0];
+    expect(stop.parentKey).toBe("script");
+    expect(stop.eventKey).toBe("on_stop");
+    expect(stop.fromLine).toBe(3);
+    expect(stop.toLine).toBe(4);
+  });
+});

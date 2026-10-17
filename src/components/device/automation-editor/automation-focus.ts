@@ -30,7 +30,9 @@ export interface AutomationFocus {
   /** Path through the tree. ``[]`` = the trigger-params form. A number
    *  indexes the current action/condition list; ``"conditions"`` enters
    *  an ``ActionNode``'s boolean gate (reserved — YAML gate keys are
-   *  ``condition``/``all``/``any``, never a child-list key); any other
+   *  ``condition``/``all``/``any``, never a child-list key);
+   *  ``"branches"`` then a branch index enters a ``choose`` branch, whose
+   *  own ``"conditions"`` / ``"then"`` follow; any other
    *  string is an ``accepts_action_list`` child key (``then``/``else``). */
   node: YamlPathSegment[];
   /** Params-form-relative field path; ``[]`` = highlight the node row. */
@@ -240,13 +242,22 @@ function actionBodyFocus(
   const here: AutomationFocus = { node: at, field: [] };
   if (path.length === 0) return here;
   const head = path[0];
+  // A list body (choose) indexes its entries; an else-only one has no
+  // branches, only the else list, which no other indexed body carries.
+  const elseOnly =
+    typeof head === "number" &&
+    !!a.children &&
+    Object.prototype.hasOwnProperty.call(a.children, "else");
+  if (a.branches?.length || elseOnly) return branchesFocus(a, path, at, here);
   if (typeof head === "string") {
     if (CONDITION_GATE_KEYS.has(head)) {
+      // An all / any gate is itself the combinator node, so its key stays on
+      // the path as that node's id; a condition: key only wraps the list.
       return listFocus(
         a.conditions ?? [],
         conditionId,
         conditionBodyFocus,
-        path.slice(1),
+        head === "condition" ? path.slice(1) : path,
         [...at, "conditions"],
         here
       );
@@ -278,6 +289,57 @@ function actionBodyFocus(
     }
   }
   return { node: at, field: path.map(String) };
+}
+
+/**
+ * A ``choose`` body: ``[n, "if" | "then", …]`` addresses a branch,
+ * ``[n, "else", …]`` the trailing else entry; a single-mapping body
+ * (``choose: {if:, then:}``) is branch 0.
+ */
+function branchesFocus(
+  a: ActionNode,
+  path: readonly YamlPathSegment[],
+  at: YamlPathSegment[],
+  here: AutomationFocus
+): AutomationFocus {
+  const head = path[0];
+  const idx = typeof head === "number" ? head : 0;
+  const [key, ...rest] = typeof head === "number" ? path.slice(1) : path;
+  if (key === "else" && a.children?.else) {
+    return listFocus(
+      a.children.else,
+      actionId,
+      actionBodyFocus,
+      rest,
+      [...at, "else"],
+      here
+    );
+  }
+  const branch = a.branches?.[idx];
+  if (!branch) return here;
+  const branchAt = [...at, "branches", idx];
+  const inBranch: AutomationFocus = { node: branchAt, field: [] };
+  if (key === "if") {
+    return listFocus(
+      branch.conditions,
+      conditionId,
+      conditionBodyFocus,
+      rest,
+      [...branchAt, "conditions"],
+      inBranch
+    );
+  }
+  if (key === "then") {
+    return listFocus(
+      branch.actions,
+      actionId,
+      actionBodyFocus,
+      rest,
+      [...branchAt, "then"],
+      inBranch
+    );
+  }
+  return inBranch;
 }
 
 function conditionBodyFocus(

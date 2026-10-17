@@ -116,8 +116,9 @@ function automationLabels(
   raw: string,
   ctx: LabelContext
 ): NavItemLabels {
-  // Script: line 1 = "Script", line 2 = id.
-  if (item.parentKey === "script") {
+  // Script: line 1 = "Script", line 2 = id. Its on_stop handler is a
+  // component-bound row below, not the script itself.
+  if (item.parentKey === "script" && !item.eventKey) {
     const primary = ctx.localize("device.script_header_title_static");
     const secondary = resolveSubstitutions(item.id ?? raw, ctx.substitutions);
     return { primary, secondary: secondary !== primary ? secondary : undefined };

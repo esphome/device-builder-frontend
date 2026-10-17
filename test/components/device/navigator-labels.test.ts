@@ -133,3 +133,34 @@ describe("resolveNavItemLabels trigger scopes", () => {
     );
   });
 });
+
+describe("resolveNavItemLabels script rows", () => {
+  it("labels a script's on_stop handler by its trigger, not as the script", () => {
+    const resolveName = vi.fn(() => "Script → On Stop");
+    const scoped: LabelContext = {
+      ...ctx,
+      triggerCatalog: { resolveName } as unknown as LabelContext["triggerCatalog"],
+    };
+    const row = {
+      key: "automation:component_on:set_comfort:on_stop",
+      id: "set_comfort",
+      parentKey: "script",
+      eventKey: "on_stop",
+    } as unknown as YamlSection;
+    const labels = resolveNavItemLabels(row, "automation", scoped);
+    expect(labels.primary).toBe("On Stop");
+    expect(labels.secondary).toBe("set_comfort");
+    expect(resolveName).toHaveBeenCalledWith(["script"], "on_stop", "On Stop");
+  });
+
+  it("keeps the script row itself as Script / id", () => {
+    const row = {
+      key: "automation:script:set_comfort",
+      id: "set_comfort",
+      parentKey: "script",
+    } as unknown as YamlSection;
+    const labels = resolveNavItemLabels(row, "automation", ctx);
+    expect(labels.primary).toBe("device.script_header_title_static");
+    expect(labels.secondary).toBe("set_comfort");
+  });
+});

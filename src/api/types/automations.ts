@@ -61,6 +61,12 @@ export interface AutomationAction {
   /** True when the action takes a condition / all / any boolean gate
    *  (if, while, wait_until). Absent on the wire when false. */
   has_condition_gate?: boolean;
+  /** The gate keys the schema takes (``if`` all three, ``while`` /
+   *  ``wait_until`` only ``condition``). Absent when empty. */
+  condition_gate_keys?: string[];
+  /** True when the body is a list of ``{if, then}`` choices plus an
+   *  optional trailing ``{else}`` (``choose``); see ``ActionNode.branches``. */
+  has_branches?: boolean;
   /** Names of fields whose value is itself a list of actions
    *  (``["then"]`` for ``while``, ``["then", "else"]`` for ``if``).
    *  These are stripped from ``config_entries`` server-side so the
@@ -188,21 +194,30 @@ export type AutomationLocation =
   | { kind: "light_effect"; component_id: string; index: number }
   | { kind: "api_action"; action_name: string };
 
+/** One ``{if, then}`` choice of a ``choose`` action. */
+export interface ChooseBranch {
+  conditions: ConditionNode[];
+  actions: ActionNode[];
+}
+
 /** A single action inside an automation tree. ``children`` carries
  *  nested action lists for control-flow actions, keyed by the
  *  action's ``accepts_action_list`` entries (e.g.
  *  ``{ then: [...], else: [...] }`` for ``if``). ``conditions`` is
  *  populated for actions whose catalog entry has ``has_condition_gate``
- *  (the boolean gate of ``if`` / ``while`` / ``wait_until``). ``unknown``
- *  marks an uncatalogued action (from an ``external_components`` source,
- *  or a typo): it's
- *  shown read-only, and ``raw_body`` is round-tripped verbatim so the
- *  sibling actions stay editable. */
+ *  (the boolean gate of ``if`` / ``while`` / ``wait_until``); an
+ *  ``all`` / ``any`` gate arrives as one combinator node. ``branches``
+ *  holds a ``has_branches`` action's choices; its ``else`` list rides in
+ *  ``children``. ``unknown`` marks an uncatalogued action (from an
+ *  ``external_components`` source, or a typo): it's shown read-only, and
+ *  ``raw_body`` is round-tripped verbatim so the sibling actions stay
+ *  editable. */
 export interface ActionNode {
   action_id: string;
   params: Record<string, unknown>;
   children?: Record<string, ActionNode[]>;
   conditions?: ConditionNode[];
+  branches?: ChooseBranch[];
   unknown?: boolean;
   raw_body?: unknown;
 }
