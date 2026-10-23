@@ -30,7 +30,9 @@ describe("device-navigator section header icons", () => {
   it("renders the shared section icons in header order", async () => {
     const nav = await mountNavigator();
     const icons = [
-      ...(nav.shadowRoot?.querySelectorAll(".nav-content-label wa-icon") ?? []),
+      ...(nav.shadowRoot?.querySelectorAll(
+        ".nav-content:not(.package-section) .nav-content-label wa-icon"
+      ) ?? []),
     ].map((el) => el.getAttribute("name"));
     expect(icons).toEqual([
       SECTION_ICON.core,
@@ -41,7 +43,9 @@ describe("device-navigator section header icons", () => {
 
   it("reports whether each keyboard-operable section is expanded", async () => {
     const nav = await mountNavigator();
-    const firstHeader = nav.shadowRoot!.querySelector<HTMLElement>(".nav-content")!;
+    const firstHeader = nav.shadowRoot!.querySelector<HTMLElement>(
+      ".nav-content:not(.package-section)"
+    )!;
     expect(firstHeader.getAttribute("role")).toBe("button");
     expect(firstHeader.getAttribute("aria-expanded")).toBe("false");
 
@@ -49,7 +53,9 @@ describe("device-navigator section header icons", () => {
     await nav.updateComplete;
 
     expect(
-      nav.shadowRoot!.querySelector(".nav-content")?.getAttribute("aria-expanded")
+      nav
+        .shadowRoot!.querySelector(".nav-content:not(.package-section)")
+        ?.getAttribute("aria-expanded")
     ).toBe("true");
   });
 });

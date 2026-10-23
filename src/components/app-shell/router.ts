@@ -167,5 +167,11 @@ export function createRouter(
       render: ({ id }) =>
         html`<esphome-page-device .id=${decodeIdParam(id)}></esphome-page-device>`,
     },
+    {
+      path: withBase("/package/:id"),
+      enter: () => lazyEnter(() => import("../../pages/package.js"), hooks),
+      render: ({ id }) =>
+        html`<esphome-page-package .path=${decodeIdParam(id)}></esphome-page-package>`,
+    },
   ]);
 }

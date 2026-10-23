@@ -419,6 +419,9 @@ export class ESPHomePageDevice extends LitElement {
   private _savedYaml = "";
 
   @state()
+  private _packageRefs: string[] = [];
+
+  @state()
   private _saving = false;
 
   @query("esphome-unsaved-changes-dialog")
@@ -725,7 +728,9 @@ export class ESPHomePageDevice extends LitElement {
       // YAML rides the reused element and Save writes it to this file.
       this._yaml = "";
       this._savedYaml = "";
+      this._packageRefs = [];
       void this._load.start();
+      this._refreshPackageRefs(this.id, "load");
     }
     // Devices context arrives async after connect; kick off the board
     // fetch as soon as we have a `board_id` (and re-fetch only when it
@@ -898,6 +903,9 @@ export class ESPHomePageDevice extends LitElement {
    *  isn't done editing). */
   private _pendingValidationResolve: ((saved: boolean) => void) | null = null;
 
+  /** The just-added package reference may point at a file created by the next editor save. */
+  private _skipNextSaveValidation = false;
+
   /**
    * Save the YAML buffer to the backend, gated by a save-time
    * validation prompt when the backend reports errors.
@@ -980,7 +988,7 @@ export class ESPHomePageDevice extends LitElement {
       // ``toast.error`` here): the actual ``updateConfig`` call
       // below is the authority on whether the save worked, and a
       // toast at this layer would shout-down its result.
-      if (this.id) {
+      if (this.id && !this._skipNextSaveValidation) {
         try {
           // Reuse the linter's last result when it matches the
           // current buffer exactly — saves a WS round-trip and an
@@ -1074,8 +1082,20 @@ export class ESPHomePageDevice extends LitElement {
     const variant = saved ? notifySuccess : notifyError;
     variant(this._localize(message));
     if (saved) void this._maybePromptBoardReselect();
+    if (saved) this._refreshPackageRefs(this.id, "refresh");
     return saved;
   };
+
+  private _refreshPackageRefs(configuration: string, reason: "load" | "refresh") {
+    const listDevicePackages = this._api?.listDevicePackages;
+    if (typeof listDevicePackages !== "function") return;
+    void listDevicePackages
+      .call(this._api, configuration)
+      .then((refs) => {
+        if (configuration === this.id) this._packageRefs = refs;
+      })
+      .catch((error) => console.warn(`Unable to ${reason} package references`, error));
+  }
 
   /** The parsed YAML platform block when it names a different board than
    *  the selected one, else null. */
@@ -1322,6 +1342,8 @@ export class ESPHomePageDevice extends LitElement {
         @section-toggle=${this._onSectionToggle}
         @section-reveal=${this._onSectionReveal}
         @section-select=${this._onSectionSelect}
+        @package-open=${this._onPackageOpen}
+        @package-selected=${this._onPackageAdd}
         @yaml-highlight=${this._onYamlHighlight}
         @yaml-updated=${this._onYamlUpdated}
         @yaml-draft=${this._onYamlDraft}
@@ -1352,6 +1374,8 @@ export class ESPHomePageDevice extends LitElement {
           @yaml-updated=${this._onYamlUpdated}
           @yaml-draft=${this._onYamlDraft}
           @section-select=${this._onSectionSelect}
+          @package-open=${this._onPackageOpen}
+          @package-selected=${this._onPackageAdd}
           @section-mount=${this._onSectionMount}
           @section-unmount=${this._onSectionUnmount}
           @field-focus=${this._onFieldFocus}
@@ -1556,6 +1580,7 @@ export class ESPHomePageDevice extends LitElement {
       .board=${this._board}
       .boardName=${this._board?.name ?? ""}
       .configuration=${this.id}
+      .packageRefs=${this._packageRefs}
       .deviceName=${this._device?.name ?? ""}
       .platform=${this._board?.esphome.platform ?? ""}
       .platformReady=${this._platformReady}
@@ -1565,7 +1590,70 @@ export class ESPHomePageDevice extends LitElement {
     ></esphome-device-navigator>`;
   }
 
+  private _onPackageOpen = (
+    event: CustomEvent<{ path: string; configuration: string }>
+  ) => {
+    const { path, configuration } = event.detail;
+    void navigate(
+      `/package/${encodeURIComponent(path)}?from=${encodeURIComponent(configuration)}`
+    );
+  };
+
+  private _onPackageAdd = (event: CustomEvent<{ path: string; create: boolean }>) => {
+    const { path, create } = event.detail;
+    if (
+      !path.startsWith("packages/") ||
+      path.split("/").includes("..") ||
+      !/\.ya?ml$/i.test(path)
+    ) {
+      notifyError("Choose a YAML file inside packages/.");
+      return;
+    }
+    const key =
+      path
+        .split("/")
+        .pop()
+        ?.replace(/\.ya?ml$/i, "") || "package";
+    if (this._packageRefs.includes(path)) return;
+    const lines = this._yaml.split("\n");
+    const index = lines.findIndex((line) => /^packages\s*:\s*(?:#.*)?$/.test(line));
+    if (lines.some((line) => /^packages\s*:\s*!include\b/.test(line))) {
+      notifyInfo("Edit the included packages mapping to add another package.");
+      return;
+    }
+    const aliases = new Set(
+      lines.map((line) => line.match(/^\s+([^:#\s]+)\s*:/)?.[1]).filter(Boolean)
+    );
+    let alias = key;
+    let suffix = 2;
+    while (aliases.has(alias)) alias = `${key}_${suffix++}`;
+    if (index < 0) lines.push("", "packages:", `  ${alias}: !include ${path}`);
+    else lines.splice(index + 1, 0, `  ${alias}: !include ${path}`);
+    this._setYaml(lines.join("\n"));
+    if (!this._packageRefs.includes(path))
+      this._packageRefs = [...this._packageRefs, path];
+    if (create) {
+      this._skipNextSaveValidation = true;
+      void this._saveYaml()
+        .then((saved) => {
+          if (saved)
+            void navigate(
+              `/package/${encodeURIComponent(path)}?from=${encodeURIComponent(this.id)}`
+            );
+        })
+        .catch((error) =>
+          notifyError(error instanceof Error ? error.message : String(error))
+        )
+        .finally(() => {
+          this._skipNextSaveValidation = false;
+        });
+    }
+  };
+
   private _renderEditor(deviceTitle: string, showEdgeTab: boolean, backLabel: string) {
+    const returnPackage = new URLSearchParams(window.location.search).get(
+      "returnPackage"
+    );
     return html` ${!this._isMobile ? this._renderNavigator("desktop-nav") : nothing}
       <esphome-device-editor
         .yaml=${this._yaml}
@@ -1608,7 +1696,7 @@ export class ESPHomePageDevice extends LitElement {
         ?busy=${this._activeJobs.has(this.id)}
       >
         ${
-          showEdgeTab || this._selectedSection
+          showEdgeTab || this._selectedSection || returnPackage
             ? html`<div slot="header-start" class="header-start-group">
                 ${
                   showEdgeTab
@@ -1636,6 +1724,7 @@ export class ESPHomePageDevice extends LitElement {
                       </button>`
                     : nothing
                 }
+                ${returnPackage ? html`<button class="ghost-icon-btn" @click=${() => void navigate(`/package/${encodeURIComponent(returnPackage)}?from=${encodeURIComponent(this.id)}`)} title="Return to package">Package</button>` : nothing}
               </div>`
             : nothing
         }
@@ -1734,6 +1823,19 @@ export class ESPHomePageDevice extends LitElement {
     // to no section.
     this._cancelCursorSwitch();
     const detail = e.detail;
+    if (detail.pointer) {
+      const line = this._yaml.split("\n")[detail.line - 1] ?? "";
+      const include = line.match(/!include\s+['\"]?([^\s'\"]+)/);
+      if (include?.[1]) {
+        const path = include[1].replace(/^\.\//, "");
+        if (path.startsWith("packages/") && /\.ya?ml$/i.test(path)) {
+          void navigate(
+            `/package/${encodeURIComponent(path)}?from=${encodeURIComponent(this.id)}`
+          );
+          return;
+        }
+      }
+    }
     const match = sectionForCursor(this._yaml, detail.line, detail.path ?? []);
     if (!match) return;
     // A click or an edit switches at once; a move within the current

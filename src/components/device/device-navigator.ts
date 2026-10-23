@@ -50,7 +50,9 @@ import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import "./add-component-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import "./add-config-dialog.js";
+import "./add-package-dialog.js";
 import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
+import type { ESPHomeAddPackageDialog } from "./add-package-dialog.js";
 import "./add-script-dialog.js";
 import type { ESPHomeAddScriptDialog } from "./add-script-dialog.js";
 import "./device-navigator-search.js";
@@ -157,6 +159,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @property()
   configuration = "";
 
+  @property({ attribute: false })
+  packageRefs: string[] = [];
+
   /** Backend-resolved node name (esphome.name with substitutions
    *  expanded). Preferred over the raw YAML scalar for the esphome
    *  core section's subtitle so a `name: $devicename` doesn't leak
@@ -179,6 +184,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   @query("esphome-add-config-dialog")
   private _addConfigDialog!: ESPHomeAddConfigDialog;
+
+  @query("esphome-add-package-dialog")
+  private _addPackageDialog!: ESPHomeAddPackageDialog;
 
   @query("esphome-add-component-dialog")
   private _addComponentDialog!: ESPHomeAddComponentDialog;
@@ -397,6 +405,13 @@ export class ESPHomeDeviceNavigator extends LitElement {
           .board=${this.board}
           .yaml=${this.yaml}
         ></esphome-add-config-dialog>
+        <esphome-add-package-dialog
+          .configuration=${this.configuration}
+          @package-selected=${(event: CustomEvent) => {
+            event.stopPropagation();
+            fireEvent(this, "package-selected", event.detail);
+          }}
+        ></esphome-add-package-dialog>
         <esphome-add-component-dialog
           .boardName=${this.boardName}
           .configuration=${this.configuration}
@@ -457,6 +472,40 @@ export class ESPHomeDeviceNavigator extends LitElement {
             filtering
               ? nothing
               : html`<p class="italic">${this._localize("device.navigator_desc")}</p>`
+          }
+          <div class="nav-content package-section">
+            <div class="nav-content-label">
+              <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+              <p>${this._localize("device.section_packages")}</p>
+            </div>
+            <button
+              type="button"
+              @click=${(event: Event) => {
+                event.stopPropagation();
+                this._addPackageDialog.open();
+              }}
+            >
+              ${this._localize("device.add_config")}
+            </button>
+          </div>
+          ${!filtering ? html`<p class="italic">${this._localize("device.section_packages_desc")}</p>` : nothing}
+          ${
+            this.packageRefs.length
+              ? html`<div class="nav-items">
+                  ${this.packageRefs.map(
+                    (path) =>
+                      html`<div
+                        class="nav-item"
+                        @click=${() => fireEvent(this, "package-open", { path, configuration: this.configuration })}
+                      >
+                        <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+                        <div class="nav-item-content">
+                          <p class="truncate">${path}</p>
+                        </div>
+                      </div>`
+                  )}
+                </div>`
+              : nothing
           }
           <div class="separator"></div>
           ${

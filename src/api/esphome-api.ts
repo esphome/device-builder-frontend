@@ -1170,6 +1170,35 @@ export class ESPHomeAPI {
     return this.sendCommand<string>("devices/get_config", { configuration }, timeout);
   }
 
+  async getPackage(path: string): Promise<string> {
+    return this.sendCommand<string>("editor/get_package", { path });
+  }
+
+  async savePackage(
+    path: string,
+    content: string
+  ): Promise<{
+    path: string;
+    results: { configuration: string; valid: boolean; errors: unknown[] }[];
+  }> {
+    return this.sendCommand<{
+      path: string;
+      results: { configuration: string; valid: boolean; errors: unknown[] }[];
+    }>("editor/save_package", { path, content });
+  }
+
+  async listDevicePackages(configuration: string): Promise<string[]> {
+    return this.sendCommand<string[]>("editor/list_device_packages", { configuration });
+  }
+
+  async listPackages(): Promise<string[]> {
+    return this.sendCommand<string[]>("editor/list_packages");
+  }
+
+  async listPackageDevices(path: string): Promise<string[]> {
+    return this.sendCommand<string[]>("editor/list_package_devices", { path });
+  }
+
   /** Save device YAML config. `allowWipe` confirms clearing secrets.yaml. */
   async updateConfig(
     configuration: string,

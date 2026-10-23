@@ -57,7 +57,7 @@ async function mountNavigator(query = ""): Promise<ESPHomeDeviceNavigator> {
 }
 
 const sectionHeaders = (nav: ESPHomeDeviceNavigator) =>
-  nav.shadowRoot?.querySelectorAll(".nav-content") ?? [];
+  nav.shadowRoot?.querySelectorAll(".nav-content:not(.package-section)") ?? [];
 const rowSubtitles = (nav: ESPHomeDeviceNavigator) =>
   [...(nav.shadowRoot?.querySelectorAll(".nav-item-subtitle") ?? [])].map((el) =>
     el.textContent?.trim()
