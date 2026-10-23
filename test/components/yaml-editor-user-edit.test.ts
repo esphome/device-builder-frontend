@@ -7,7 +7,7 @@
  */
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
 
@@ -105,5 +105,33 @@ describe("yaml-editor yaml-user-edit emission", () => {
     typeAtEnd(viewOf(el), "x");
 
     expect(seen.count).toBe(0);
+  });
+});
+
+describe("yaml-editor yaml-user-change emission", () => {
+  it("emits the changed YAML for user input", async () => {
+    const el = await mount("logger:\n");
+    const seen = vi.fn();
+    el.addEventListener("yaml-user-change", seen);
+
+    typeAtEnd(viewOf(el), "  level: DEBUG\n");
+
+    expect(seen).toHaveBeenCalledOnce();
+    expect((seen.mock.calls[0][0] as CustomEvent<{ value: string }>).detail.value).toBe(
+      "logger:\n  level: DEBUG\n"
+    );
+  });
+
+  it("ignores programmatic document synchronization", async () => {
+    const el = await mount("logger:\n");
+    const seen = vi.fn();
+    el.addEventListener("yaml-user-change", seen);
+    const view = viewOf(el);
+
+    view.dispatch({
+      changes: { from: view.state.doc.length, insert: "  level: DEBUG\n" },
+    });
+
+    expect(seen).not.toHaveBeenCalled();
   });
 });

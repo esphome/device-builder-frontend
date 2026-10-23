@@ -32,7 +32,8 @@ export class ESPHomePagePackage extends LitElement {
   });
   protected readonly _leaveGuard = new PopLeaveGuardController(this, {
     isDirty: () => this._yaml !== this._saved,
-    confirmLeave: async () => window.confirm("Discard unsaved package changes?"),
+    confirmLeave: async () =>
+      this._yaml === this._saved || window.confirm("Discard unsaved package changes?"),
     url: () => `/package/${encodeURIComponent(this.path)}`,
   });
 
@@ -129,7 +130,7 @@ export class ESPHomePagePackage extends LitElement {
           }
         </aside>
         <section>
-          ${this._loading ? html`<p>Loading…</p>` : html`<esphome-yaml-editor .value=${this._yaml} .configuration=${this.path} @yaml-change=${this._onYamlChange}></esphome-yaml-editor>`}
+          ${this._loading ? html`<p>Loading…</p>` : html`<esphome-yaml-editor .value=${this._yaml} .configuration=${this.path} @yaml-user-change=${this._onYamlChange}></esphome-yaml-editor>`}
           ${
             this._results.length
               ? html`<section class="results">
@@ -171,8 +172,10 @@ export class ESPHomePagePackage extends LitElement {
     .layout {
       display: grid;
       grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
       flex: 1;
       min-height: 0;
+      min-width: 0;
     }
     aside {
       padding: 1rem;
@@ -189,16 +192,20 @@ export class ESPHomePagePackage extends LitElement {
       text-align: left;
       margin: 0.3rem 0;
     }
-    section {
+    .layout > section {
+      display: flex;
+      flex-direction: column;
       min-height: 0;
-      overflow: auto;
+      min-width: 0;
+      overflow: hidden;
     }
     esphome-yaml-editor {
-      display: block;
-      height: 100%;
+      display: flex;
+      flex: 1 1 0;
       min-height: 320px;
     }
     .results {
+      flex: 0 1 auto;
       padding: 0.5rem 1rem;
       max-height: 35vh;
       overflow: auto;

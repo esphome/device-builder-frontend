@@ -464,6 +464,17 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         // matching mention of this invariant.)
         if (update.docChanged) {
           fireEvent(this, "yaml-change", { value: update.state.doc.toString() });
+          // Hosts that track unsaved user work must not treat external
+          // `value`-prop synchronization as an edit. Keep the traditional
+          // yaml-change event for consumers that mirror every document
+          // update, and expose a user-only signal for dirty-state tracking.
+          if (
+            update.transactions.some(
+              (tr) => tr.docChanged && tr.annotation(Transaction.userEvent) !== undefined
+            )
+          ) {
+            fireEvent(this, "yaml-user-change", { value: update.state.doc.toString() });
+          }
           // A hand edit invalidates a block highlight: the stored
           // range is a static line snapshot and the mark decoration
           // only position-maps, so lines typed inside the section

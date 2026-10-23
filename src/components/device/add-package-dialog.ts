@@ -27,7 +27,10 @@ export class ESPHomeAddPackageDialog extends LitElement {
     event.preventDefault();
     const entered = this._path.trim();
     if (!entered) return;
-    const path = entered.startsWith("packages/") ? entered : `packages/${entered}`;
+    const path =
+      entered.startsWith("packages/") || entered.includes("/")
+        ? entered
+        : `packages/${entered}`;
     fireEvent(this, "package-selected", {
       configuration: this.configuration,
       path,

@@ -1602,11 +1602,12 @@ export class ESPHomePageDevice extends LitElement {
   private _onPackageAdd = (event: CustomEvent<{ path: string; create: boolean }>) => {
     const { path, create } = event.detail;
     if (
-      !path.startsWith("packages/") ||
-      path.split("/").includes("..") ||
+      path.startsWith("/") ||
+      path.includes("\\") ||
+      path.split("/").some((part) => !part || part === "." || part === "..") ||
       !/\.ya?ml$/i.test(path)
     ) {
-      notifyError("Choose a YAML file inside packages/.");
+      notifyError("Choose a YAML file inside the ESPHome config directory.");
       return;
     }
     const key =
@@ -1828,7 +1829,12 @@ export class ESPHomePageDevice extends LitElement {
       const include = line.match(/!include\s+['\"]?([^\s'\"]+)/);
       if (include?.[1]) {
         const path = include[1].replace(/^\.\//, "");
-        if (path.startsWith("packages/") && /\.ya?ml$/i.test(path)) {
+        if (
+          !path.startsWith("/") &&
+          !path.includes("\\") &&
+          !path.split("/").some((part) => part === "..") &&
+          /\.ya?ml$/i.test(path)
+        ) {
           void navigate(
             `/package/${encodeURIComponent(path)}?from=${encodeURIComponent(this.id)}`
           );
