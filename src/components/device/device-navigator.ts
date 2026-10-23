@@ -232,6 +232,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @state()
   private _searchOpen = false;
 
+  /** Packages have their own section because the rows are included files,
+   * not top-level YAML blocks, but use the same collapsible navigator UI. */
+  @state()
+  private _packageSectionOpen = true;
+
   /** Domains collapsed by hand in the grouped Components list. */
   @state()
   private _collapsedGroups = new Set<string>();
@@ -395,6 +400,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
             total: totalItems,
           })
         : "";
+    const packageRows: NavRow[] = this.packageRefs.map((path) => ({
+      item: { key: "packages", displayLabel: path, fromLine: 0, toLine: 0 },
+      labels: { primary: path },
+    }));
 
     return html`
       <section class="card" ${tourAnchor(this.tourAnchorId)}>
@@ -473,41 +482,38 @@ export class ESPHomeDeviceNavigator extends LitElement {
               ? nothing
               : html`<p class="italic">${this._localize("device.navigator_desc")}</p>`
           }
-          <div class="nav-content package-section">
-            <div class="nav-content-label">
-              <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
-              <p>${this._localize("device.section_packages")}</p>
-            </div>
-            <button
-              type="button"
-              @click=${(event: Event) => {
-                event.stopPropagation();
-                this._addPackageDialog.open();
-              }}
-            >
-              ${this._localize("device.add_config")}
-            </button>
-          </div>
-          ${!filtering ? html`<p class="italic">${this._localize("device.section_packages_desc")}</p>` : nothing}
-          ${
-            this.packageRefs.length
-              ? html`<div class="nav-items">
-                  ${this.packageRefs.map(
-                    (path) =>
-                      html`<div
-                        class="nav-item"
-                        @click=${() => fireEvent(this, "package-open", { path, configuration: this.configuration })}
-                      >
-                        <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
-                        <div class="nav-item-content">
-                          <p class="truncate">${path}</p>
-                        </div>
-                      </div>`
-                  )}
-                </div>`
-              : nothing
-          }
-          <div class="separator"></div>
+          ${renderNavSection({
+            label: this._localize("device.section_packages"),
+            desc: this._localize("device.section_packages_desc"),
+            icon: "package-variant-closed",
+            headerClass: "package-section",
+            actions: [
+              {
+                label: this._localize("device.add_config"),
+                icon: "plus-circle-outline",
+                onClick: () => this._addPackageDialog.open(),
+              },
+            ],
+            rows: packageRows,
+            open: this._packageSectionOpen,
+            filtering: false,
+            selectedLine: null,
+            hoveredLine: null,
+            isGroupOpen: () => true,
+            onSetGroupOpen: () => {},
+            onToggle: () => {
+              this._packageSectionOpen = !this._packageSectionOpen;
+            },
+            onItemEnter: () => {},
+            onItemLeave: () => {},
+            onItemClick: (item) =>
+              fireEvent(this, "package-open", {
+                path: item.displayLabel,
+                configuration: this.configuration,
+              }),
+            errorLabel: (count) =>
+              this._localize("device.navigator_error_count", { count }),
+          })}
           ${
             filtering && matchCount === 0
               ? html`<p class="nav-empty" role="status">

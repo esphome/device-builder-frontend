@@ -20,6 +20,8 @@ export interface NavAction {
 export interface NavSectionView {
   label: string;
   icon: string;
+  /** Optional extra class on the common section header. */
+  headerClass?: string;
   desc: string;
   actions: NavAction[];
   rows: NavRow[];
@@ -199,7 +201,7 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
   if (v.filtering && v.rows.length === 0) return nothing;
   return html`
     <div
-      class="nav-content"
+      class="nav-content ${v.headerClass ?? ""}"
       role=${ifDefined(v.filtering ? undefined : "button")}
       tabindex=${ifDefined(v.filtering ? undefined : "0")}
       aria-expanded=${ifDefined(v.filtering ? undefined : v.open ? "true" : "false")}
