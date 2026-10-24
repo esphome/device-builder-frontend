@@ -144,6 +144,7 @@ export interface FirmwareJobResult {
 export interface FirmwareBinary {
   title: string;
   file: string;
+  md5?: string;
   // Optional subtext from ESPHome's get_download_types; not every platform supplies one.
   description?: string;
   // Stable artifact tag (``factory`` / ``ota`` / ``elf`` / ``bin`` / ``uf2``)

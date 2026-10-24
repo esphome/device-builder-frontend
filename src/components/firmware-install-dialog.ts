@@ -3,6 +3,8 @@ import {
   mdiArrowCollapse,
   mdiArrowExpand,
   mdiClose,
+  mdiContentCopy,
+  mdiDownload,
   mdiOpenInNew,
   mdiTextBoxOutline,
 } from "@mdi/js";
@@ -33,11 +35,17 @@ import type { DetectedChip } from "../platforms/esp/index.js";
 import type { AnyBrowserInstall } from "../platforms/platform-support.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { LogBuffer } from "../util/log-buffer.js";
-import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
+import {
+  LONG_TOAST_DURATION_MS,
+  notifyError,
+  notifyInfo,
+  notifySuccess,
+} from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import { resetForRetry } from "./firmware-install-dialog/browser-flash-steps.js";
@@ -75,6 +83,8 @@ registerMdiIcons({
   "arrow-expand": mdiArrowExpand,
   "arrow-collapse": mdiArrowCollapse,
   close: mdiClose,
+  "content-copy": mdiContentCopy,
+  download: mdiDownload,
   "open-in-new": mdiOpenInNew,
   "text-box-outline": mdiTextBoxOutline,
 });
@@ -280,6 +290,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Picked a format in the choose-binary step.
   _onChooseBinary(file: string) {
     void downloadSelectedBinary(this, file);
+  }
+
+  async _copyMd5(digest: string) {
+    if (await copyToClipboard(digest)) {
+      notifySuccess(this._localize("firmware.md5_copied"));
+    } else {
+      notifyError(this._localize("firmware.md5_copy_failed"));
+    }
   }
 
   // Reopen without clearing state. Used by logs-dialog's "Back to install"
