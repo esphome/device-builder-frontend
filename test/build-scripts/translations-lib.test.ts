@@ -11,6 +11,7 @@ import {
   projectIdMismatch,
   resolveDownloadSource,
   toBcp47,
+  translationReleaseNotes,
 } from "../../build-scripts/translations-lib.js";
 
 describe("toBcp47", () => {
@@ -305,5 +306,86 @@ describe("localeCompleteness", () => {
     for (let i = 0; i < 1000; i++) en[`k${i}`] = "v";
     for (let i = 0; i < 850; i++) locale[`k${i}`] = "v";
     expect(localeCompleteness(en, locale)).toBe(85);
+  });
+});
+
+describe("translationReleaseNotes", () => {
+  const en = { a: "A", b: "B" };
+  const header =
+    "## 🌍 Translations\n\n" +
+    "Thank you to our translators on [Lokalise](https://lokalise.com/) for the translation updates in this release:\n\n";
+
+  it("returns an empty string when nothing changed", () => {
+    const de = { language: "Deutsch", a: "x" };
+    expect(translationReleaseNotes(en, { de }, { de: { ...de } })).toBe("");
+  });
+
+  it("returns an empty string when there are no locales", () => {
+    expect(translationReleaseNotes(en, {}, {})).toBe("");
+  });
+
+  it("marks a locale absent from previous as new", () => {
+    expect(translationReleaseNotes(en, {}, { ja: { language: "日本語", a: "x" } })).toBe(
+      `${header}- 日本語 (new): 50%\n`
+    );
+  });
+
+  it("shows the percentage move for a changed locale", () => {
+    expect(
+      translationReleaseNotes(
+        en,
+        { de: { language: "Deutsch", a: "x" } },
+        { de: { language: "Deutsch", a: "x", b: "y" } }
+      )
+    ).toBe(`${header}- Deutsch: 50% → 100%\n`);
+  });
+
+  it("prints a single percentage when it did not move", () => {
+    expect(
+      translationReleaseNotes(
+        en,
+        { de: { language: "Deutsch", a: "x", b: "y" } },
+        { de: { language: "Deutsch", a: "x2", b: "y" } }
+      )
+    ).toBe(`${header}- Deutsch: 100%\n`);
+  });
+
+  it("detects a removed leaf (size differs)", () => {
+    expect(
+      translationReleaseNotes(
+        en,
+        { de: { language: "Deutsch", a: "x", b: "y" } },
+        { de: { language: "Deutsch", a: "x" } }
+      )
+    ).toBe(`${header}- Deutsch: 100% → 50%\n`);
+  });
+
+  it("detects a swapped key with the same leaf count", () => {
+    expect(
+      translationReleaseNotes(
+        en,
+        { de: { language: "Deutsch", a: "x" } },
+        { de: { language: "Deutsch", b: "x" } }
+      )
+    ).toBe(`${header}- Deutsch: 50%\n`);
+  });
+
+  it("ignores locales only in previous", () => {
+    expect(translationReleaseNotes(en, { fr: { a: "x" } }, {})).toBe("");
+  });
+
+  it("falls back to the code when language is not a string", () => {
+    expect(translationReleaseNotes(en, {}, { fr: { a: "x" }, nl: { language: 5 } })).toBe(
+      `${header}- fr (new): 50%\n- nl (new): 0%\n`
+    );
+  });
+
+  it("sorts by locale code", () => {
+    const out = translationReleaseNotes(
+      en,
+      {},
+      { "zh-CN": { language: "Z", a: "x" }, de: { language: "D", a: "x" } }
+    );
+    expect(out.indexOf("- D (new)")).toBeLessThan(out.indexOf("- Z (new)"));
   });
 });

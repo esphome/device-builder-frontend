@@ -1,8 +1,9 @@
 name: Auto Release
 
 # Nightly cron at 01:00 UTC. If at least 2 commits have landed on
-# main since the last published release, bump the patch version and
-# trigger release.yml.
+# main since the last published release, or the translations in
+# Lokalise differ from the ones the last release shipped, bump the
+# patch version and trigger release.yml.
 
 on:
   schedule:
@@ -18,6 +19,7 @@ jobs:
     outputs:
       version: ${{ steps.next.outputs.version }}
       should_release: ${{ steps.check.outputs.go }}
+      last_tag: ${{ steps.check.outputs.last_tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,9 +55,10 @@ jobs:
             echo "Only $COUNT commit(s) — skipping."
           fi
 
+      # Computed even when the commit check says no: the translations
+      # check below can still decide to release.
       - name: Compute next patch version
         id: next
-        if: steps.check.outputs.go == 'true'
         run: |
           LAST="${{ steps.check.outputs.last_tag }}"
           if [ -z "$LAST" ]; then
@@ -71,9 +74,88 @@ jobs:
           echo "version=$NEW" >> "$GITHUB_OUTPUT"
           echo "Next version: $NEW"
 
-  trigger-release:
+  check-translations:
+    # Translators keep working after a release is cut, and a release
+    # bundles the Lokalise snapshot taken at build time, so a quiet week
+    # on main would otherwise leave finished translations unshipped.
+    # Only runs when the commit check didn't already decide to release.
     needs: check-and-release
-    if: needs.check-and-release.outputs.should_release == 'true'
+    if: >-
+      needs.check-and-release.outputs.should_release != 'true' &&
+      needs.check-and-release.outputs.last_tag != ''
+    runs-on: ubuntu-latest
+    # The Lokalise credentials live in the `lokalise` environment.
+    environment: lokalise
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compare Lokalise against the last release
+        id: compare
+        # Both downloads go through the same writer, so identical
+        # content produces byte-identical files and a plain diff is
+        # enough. Downloads never delete stale locale files, so each
+        # set is moved out of src/translations before the next one
+        # lands. en.json is the checked-in source and is excluded.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LOKALISE_API_TOKEN: ${{ secrets.LOKALISE_API_TOKEN }}
+          LOKALISE_PROJECT_ID: ${{ secrets.LOKALISE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          released="$RUNNER_TEMP/released"
+          current="$RUNNER_TEMP/lokalise"
+          mkdir -p "$released" "$current"
+
+          pnpm run translations:download --source release
+          find src/translations -name '*.json' ! -name en.json -exec mv -t "$released" {} +
+
+          pnpm run translations:download
+          find src/translations -name '*.json' ! -name en.json -exec mv -t "$current" {} +
+
+          status=0
+          diff -rq "$released" "$current" || status=$?
+          case "$status" in
+            0)
+              echo "Translations unchanged since ${{ needs.check-and-release.outputs.last_tag }}."
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              ;;
+            1)
+              echo "Translations changed since ${{ needs.check-and-release.outputs.last_tag }}."
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::diff failed comparing translations (exit $status)."
+              exit 1
+              ;;
+          esac
+
+  trigger-release:
+    needs: [check-and-release, check-translations]
+    # always() so a skipped check-translations (commits alone already
+    # decided) doesn't skip this job; a failed check-and-release still
+    # stops it.
+    if: >-
+      always() &&
+      needs.check-and-release.result == 'success' &&
+      (needs.check-and-release.outputs.should_release == 'true' ||
+       needs.check-translations.outputs.changed == 'true')
     runs-on: ubuntu-latest
     steps:
       # Dispatch via an app token rather than calling release.yml as a
@@ -92,8 +174,12 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
           VERSION: ${{ needs.check-and-release.outputs.version }}
+          # Commits alone didn't warrant a release, so only the
+          # translations did: release.yml says so in the notes.
+          TRANSLATION_UPDATE: ${{ needs.check-and-release.outputs.should_release != 'true' }}
         run: |
           gh workflow run release.yml \
             --repo "${{ github.repository }}" \
             --ref "${{ github.ref_name }}" \
-            -f version="$VERSION"
+            -f version="$VERSION" \
+            -f translation_update="$TRANSLATION_UPDATE"

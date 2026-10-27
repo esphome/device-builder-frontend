@@ -277,3 +277,67 @@ export function resolveDownloadSource(args: string[]): DownloadSource {
     `--source must be 'lokalise' or 'release' (${value ? `got '${value}'` : "no value given"}).`
   );
 }
+
+// Display name for a locale in the release notes: its top-level `language`
+// autonym when that is a string, otherwise the bare locale code.
+function languageName(code: string, locale: Messages): string {
+  const name = locale.language;
+  return typeof name === "string" ? name : code;
+}
+
+// True when two locale files differ in any translatable (string) leaf: a
+// leaf added, removed or changed. Non-string leaves never count.
+function localeChanged(a: Messages, b: Messages): boolean {
+  const left = flattenMessages(a);
+  const right = flattenMessages(b);
+  if (left.size !== right.size) {
+    return true;
+  }
+  for (const [key, value] of left) {
+    if (right.get(key) !== value) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Markdown "Translations" section for GitHub release notes, thanking the
+// translators and listing each language whose translations changed since the
+// previous release. `base` is en.json; `previous` / `current` map a BCP 47
+// locale code to its parsed locale JSON (never containing the base
+// language). A locale is changed when it is new or its string leaves differ;
+// locales only in `previous` (dropped) are ignored. Returns "" when nothing
+// changed so the caller can omit the section entirely.
+export function translationReleaseNotes(
+  base: Messages,
+  previous: Record<string, Messages>,
+  current: Record<string, Messages>
+): string {
+  const lines: string[] = [];
+  for (const code of Object.keys(current).sort()) {
+    const locale = current[code];
+    const before = previous[code];
+    if (before !== undefined && !localeChanged(before, locale)) {
+      continue;
+    }
+    const name = languageName(code, locale);
+    const now = localeCompleteness(base, locale);
+    if (before === undefined) {
+      lines.push(`- ${name} (new): ${now}%`);
+      continue;
+    }
+    const was = localeCompleteness(base, before);
+    lines.push(was === now ? `- ${name}: ${now}%` : `- ${name}: ${was}% \u2192 ${now}%`);
+  }
+  if (lines.length === 0) {
+    return "";
+  }
+  return [
+    "## \u{1F30D} Translations",
+    "",
+    "Thank you to our translators on [Lokalise](https://lokalise.com/) for the translation updates in this release:",
+    "",
+    ...lines,
+    "",
+  ].join("\n");
+}
