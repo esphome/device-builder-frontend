@@ -4,7 +4,11 @@ import "../../_mock-webawesome.js";
 import { describe, expect, it, vi } from "vitest";
 import { baseDialogSettled, dialogOpen, stubDialogRequestClose } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
+import { APIError } from "../../../src/api/api-error.js";
 import { ESPHomeRenameFileDialog } from "../../../src/components/packages/rename-file-dialog.js";
+
+vi.mock("../../../src/util/notify.js", () => ({ notifyError: vi.fn() }));
+const { notifyError } = await import("../../../src/util/notify.js");
 
 async function openDialog(
   used_by: string[] = [],
@@ -12,13 +16,14 @@ async function openDialog(
 ): Promise<ESPHomeRenameFileDialog> {
   const el = new ESPHomeRenameFileDialog();
   Object.assign(el, {
+    _api: { getFileUsage: vi.fn().mockResolvedValue({ used_by, unknown }) },
     _devices: [
       makeConfiguredDevice({ configuration: "kitchen.yaml", friendly_name: "Kitchen" }),
     ],
   });
   document.body.appendChild(el);
   await baseDialogSettled(el);
-  el.open("common/base.yaml", { used_by, unknown });
+  await el.open("common/base.yaml");
   await baseDialogSettled(el);
   stubDialogRequestClose(el);
   return el;
@@ -87,5 +92,23 @@ describe("rename-file-dialog", () => {
       newPath: "shared/base.yaml",
     });
     expect(dialogOpen(el)).toBe(false);
+  });
+});
+
+describe("rename-file-dialog usage lookup", () => {
+  it("stays closed and toasts when the lookup fails", async () => {
+    const el = new ESPHomeRenameFileDialog();
+    Object.assign(el, {
+      _api: {
+        getFileUsage: vi.fn().mockRejectedValue(new APIError("internal_error", "x")),
+      },
+    });
+    document.body.appendChild(el);
+    await baseDialogSettled(el);
+
+    await el.open("common/base.yaml");
+
+    expect(dialogOpen(el)).toBe(false);
+    expect(notifyError).toHaveBeenCalledWith("packages.usage_failed: x");
   });
 });

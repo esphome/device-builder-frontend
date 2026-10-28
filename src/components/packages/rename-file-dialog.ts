@@ -6,10 +6,11 @@
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { FileUsage } from "../../api/types/files.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { devicesContext, localizeContext } from "../../context/index.js";
+import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import {
   dialogActionButtonStyles,
   dialogActionsRowStyles,
@@ -21,6 +22,7 @@ import { newPackagePathProblem } from "../../util/file-paths.js";
 import { navigate } from "../../util/navigation.js";
 import { linkListStyles } from "./link-list.js";
 import { NO_USAGE, renderUsageSummary, usageSummaryStyles } from "./usage-summary.js";
+import { notifyFailure } from "./usage.js";
 
 import "../base-dialog.js";
 
@@ -34,6 +36,9 @@ export class ESPHomeRenameFileDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: apiContext })
+  private _api!: ESPHomeAPI;
 
   @consume({ context: devicesContext, subscribe: true })
   @state()
@@ -80,8 +85,15 @@ export class ESPHomeRenameFileDialog extends LitElement {
     `,
   ];
 
-  /** Open for *path* with the devices that include it. */
-  open(path: string, usage: FileUsage) {
+  /** Fetch the devices using *path*, then open; a toast instead when that fails. */
+  async open(path: string): Promise<void> {
+    let usage: FileUsage;
+    try {
+      usage = await this._api.getFileUsage(path);
+    } catch (err) {
+      notifyFailure(this._localize, "packages.usage_failed", err);
+      return;
+    }
     this._path = path;
     this._newPath = path;
     this._usage = usage;

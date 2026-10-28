@@ -13,16 +13,12 @@ export function fileEditorUrl(path: string): string {
   return `/file/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-/** Where to open *path*: the device editor for a known device YAML, the
- *  file editor for any other config-relative file, null for a path
- *  outside the config dir. */
-export function openTargetUrl(
-  path: string,
-  deviceConfigurations: ReadonlySet<string>
-): string | null {
-  if (path.startsWith("/") || /^[a-z]:/i.test(path)) return null;
-  if (deviceConfigurations.has(path)) return `/device/${encodeURIComponent(path)}`;
-  return fileEditorUrl(path);
+/** Where to open config-relative *path*: the device editor for a top-level
+ *  YAML (the scanner's device rule), the file editor for anything deeper. */
+export function openTargetUrl(path: string): string {
+  return folderOf(path) === ""
+    ? `/device/${encodeURIComponent(path)}`
+    : fileEditorUrl(path);
 }
 
 /** Folder part of *path* ("" for a top-level file). */

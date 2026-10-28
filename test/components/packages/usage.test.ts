@@ -2,17 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { APIError } from "../../../src/api/api-error.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-import type {
-  ESPHomeFileListDialog,
-  FileListDialogContent,
-} from "../../../src/components/packages/file-list-dialog.js";
 import { deviceItems, fileItems } from "../../../src/components/packages/link-list.js";
-import {
-  fetchUsers,
-  renameFile,
-  showDependencies,
-  showUsage,
-} from "../../../src/components/packages/usage.js";
+import { renameFile } from "../../../src/components/packages/usage.js";
 
 vi.mock("../../../src/util/notify.js", () => ({
   LONG_TOAST_DURATION_MS: 8000,
@@ -39,17 +30,6 @@ const devices = [
   }),
 ];
 
-function fakeDialog(): {
-  dialog: ESPHomeFileListDialog;
-  opened: FileListDialogContent[];
-} {
-  const opened: FileListDialogContent[] = [];
-  const dialog = {
-    open: (c: FileListDialogContent) => opened.push(c),
-  } as unknown as ESPHomeFileListDialog;
-  return { dialog, opened };
-}
-
 describe("link-list items", () => {
   it("labels devices with their friendly name and links the device editor", () => {
     expect(deviceItems(["kitchen.yaml", "bare.yaml", "gone.yaml"], devices)).toEqual([
@@ -59,73 +39,15 @@ describe("link-list items", () => {
     ]);
   });
 
-  it("links files to the right editor and leaves outside paths unlinked", () => {
-    expect(fileItems(["common/a.yaml", "kitchen.yaml", "/abs/x.yaml"], devices)).toEqual([
+  it("links top-level files to the device editor and the rest to the file editor", () => {
+    expect(fileItems(["common/a.yaml", "kitchen.yaml"])).toEqual([
       { label: "common/a.yaml", url: "/file/common/a.yaml" },
       { label: "kitchen.yaml", url: "/device/kitchen.yaml" },
-      { label: "/abs/x.yaml", url: null },
     ]);
   });
 });
 
-describe("showUsage / showDependencies", () => {
-  it("lists the using devices and notes unknown ones", async () => {
-    const api = {
-      getFileUsage: vi
-        .fn()
-        .mockResolvedValue({ used_by: ["kitchen.yaml"], unknown: ["broken.yaml"] }),
-    } as unknown as ESPHomeAPI;
-    const { dialog, opened } = fakeDialog();
-
-    await showUsage(api, localize, devices, dialog, "common/a.yaml");
-
-    expect(api.getFileUsage).toHaveBeenCalledWith("common/a.yaml");
-    expect(opened).toHaveLength(1);
-    expect(opened[0].message).toBe('packages.usage_message {"count":1}');
-    expect(opened[0].items.map((i) => i.label)).toEqual(["Kitchen"]);
-    expect(opened[0].note).toBe('packages.usage_unknown {"names":"broken.yaml"}');
-  });
-
-  it("doesn't claim nobody uses the file while devices are unchecked", async () => {
-    const api = {
-      getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: ["broken.yaml"] }),
-    } as unknown as ESPHomeAPI;
-    const { dialog, opened } = fakeDialog();
-
-    await showUsage(api, localize, devices, dialog, "common/a.yaml");
-
-    expect(opened[0].message).toBe("");
-    expect(opened[0].note).toBe('packages.usage_unknown {"names":"broken.yaml"}');
-  });
-
-  it("toasts with the backend detail when the lookup fails", async () => {
-    const api = {
-      getFileUsage: vi
-        .fn()
-        .mockRejectedValue(new APIError("invalid_args", "invalid file path")),
-    } as unknown as ESPHomeAPI;
-    const { dialog, opened } = fakeDialog();
-
-    await showUsage(api, localize, devices, dialog, "x.txt");
-
-    expect(opened).toEqual([]);
-    expect(notifyError).toHaveBeenCalledWith("packages.usage_failed: invalid file path");
-  });
-
-  it("flags an incomplete dependency list", async () => {
-    const api = {
-      getDeviceDependencies: vi.fn().mockResolvedValue({ files: [], complete: false }),
-    } as unknown as ESPHomeAPI;
-    const { dialog, opened } = fakeDialog();
-
-    await showDependencies(api, localize, devices, dialog, "kitchen.yaml");
-
-    expect(opened[0].message).toBe('packages.dependencies_none {"count":0}');
-    expect(opened[0].note).toBe("packages.dependencies_incomplete");
-  });
-});
-
-describe("renameFile / fetchUsers", () => {
+describe("renameFile", () => {
   const detail = { path: "common/a.yaml", newPath: "shared/a.yaml" };
 
   it("reports rewritten files and warns about unresolved devices", async () => {
@@ -156,20 +78,5 @@ describe("renameFile / fetchUsers", () => {
     expect(await renameFile(api, localize, detail)).toBeNull();
     expect(notifyError).toHaveBeenCalledWith("packages.rename_failed: taken");
     expect(notifyWarning).not.toHaveBeenCalled();
-  });
-
-  it("fetchUsers returns the users, or null after a toast", async () => {
-    const ok = {
-      getFileUsage: vi.fn().mockResolvedValue({ used_by: ["a.yaml"], unknown: [] }),
-    } as unknown as ESPHomeAPI;
-    expect(await fetchUsers(ok, localize, "common/a.yaml")).toEqual({
-      used_by: ["a.yaml"],
-      unknown: [],
-    });
-
-    const bad = {
-      getFileUsage: vi.fn().mockRejectedValue(new APIError("internal_error", "x")),
-    } as unknown as ESPHomeAPI;
-    expect(await fetchUsers(bad, localize, "common/a.yaml")).toBeNull();
   });
 });

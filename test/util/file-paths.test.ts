@@ -14,13 +14,10 @@ describe("file-paths", () => {
     expect(fileEditorUrl("my dir/a#b.yaml")).toBe("/file/my%20dir/a%23b.yaml");
   });
 
-  it("routes device YAMLs to the device editor and others to the file editor", () => {
-    const devices = new Set(["kitchen.yaml"]);
-    expect(openTargetUrl("kitchen.yaml", devices)).toBe("/device/kitchen.yaml");
-    expect(openTargetUrl("_shared.yaml", devices)).toBe("/file/_shared.yaml");
-    expect(openTargetUrl("common/a.yaml", devices)).toBe("/file/common/a.yaml");
-    expect(openTargetUrl("/abs/a.yaml", devices)).toBeNull();
-    expect(openTargetUrl("C:/abs/a.yaml", devices)).toBeNull();
+  it("routes top-level YAMLs to the device editor and the rest to the file editor", () => {
+    expect(openTargetUrl("kitchen.yaml")).toBe("/device/kitchen.yaml");
+    expect(openTargetUrl("common/a.yaml")).toBe("/file/common/a.yaml");
+    expect(openTargetUrl("a/b c.yaml")).toBe("/file/a/b%20c.yaml");
   });
 
   it("splits folder and file name", () => {

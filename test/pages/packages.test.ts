@@ -19,7 +19,7 @@ import { ESPHomePagePackages } from "../../src/pages/packages.js";
 import { navigate } from "../../src/util/navigation.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
-vi.mock("../../src/components/confirm-dialog.js", () => ({}));
+vi.mock("../../src/components/packages/delete-file-dialog.js", () => ({}));
 vi.mock("../../src/components/packages/file-list-dialog.js", () => ({}));
 vi.mock("../../src/components/packages/rename-file-dialog.js", () => ({}));
 
@@ -149,61 +149,44 @@ describe("esphome-page-packages create", () => {
 });
 
 describe("esphome-page-packages delete", () => {
-  test("asks with the users listed, then deletes and reloads", async () => {
+  test("hands the row to the delete dialog and reloads once it's deleted", async () => {
     const listPackages = vi.fn().mockResolvedValue([{ path: "common/base.yaml" }]);
-    const deleteFile = vi.fn().mockResolvedValue(undefined);
-    const getFileUsage = vi
-      .fn()
-      .mockResolvedValue({ used_by: ["kitchen.yaml"], unknown: [] });
-    const page = await mountWith({ listPackages, deleteFile, getFileUsage });
+    const page = await mountWith({ listPackages });
     const open = vi.fn();
-    Object.defineProperty(page, "_deleteDialog", { value: { open, close: vi.fn() } });
+    Object.defineProperty(page, "_deleteDialog", { value: { open } });
 
     root(page)
       .querySelector<HTMLButtonElement>('[aria-label="packages.delete_named"]')!
       .click();
-    await flushMicrotasks(4);
-    await page.updateComplete;
-
-    expect(getFileUsage).toHaveBeenCalledWith("common/base.yaml");
-    expect(open).toHaveBeenCalledOnce();
-    expect(root(page).querySelector('[slot="body"]')?.textContent).toContain(
-      "packages.delete_used_message"
-    );
+    expect(open).toHaveBeenCalledWith("common/base.yaml");
 
     root(page)
-      .querySelector("esphome-confirm-dialog")!
-      .dispatchEvent(new CustomEvent("confirm"));
+      .querySelector("esphome-delete-file-dialog")!
+      .dispatchEvent(
+        new CustomEvent("file-deleted", { detail: { path: "common/base.yaml" } })
+      );
     await flushMicrotasks(4);
 
-    expect(deleteFile).toHaveBeenCalledWith("common/base.yaml");
     expect(listPackages).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("esphome-page-packages rename", () => {
-  test("opens the dialog with the users, renames and reloads", async () => {
+  test("opens the dialog for the row, renames and reloads", async () => {
     const listPackages = vi.fn().mockResolvedValue([{ path: "common/base.yaml" }]);
-    const getFileUsage = vi
-      .fn()
-      .mockResolvedValue({ used_by: ["kitchen.yaml"], unknown: [] });
     const renameFile = vi.fn().mockResolvedValue({
       path: "shared/base.yaml",
       rewritten: ["kitchen.yaml"],
       unresolved: [],
     });
-    const page = await mountWith({ listPackages, getFileUsage, renameFile });
+    const page = await mountWith({ listPackages, renameFile });
     const open = vi.fn();
     Object.defineProperty(page, "_renameDialog", { value: { open } });
 
     root(page)
       .querySelector<HTMLButtonElement>('[aria-label="packages.rename_named"]')!
       .click();
-    await flushMicrotasks(4);
-    expect(open).toHaveBeenCalledWith("common/base.yaml", {
-      used_by: ["kitchen.yaml"],
-      unknown: [],
-    });
+    expect(open).toHaveBeenCalledWith("common/base.yaml");
 
     root(page)
       .querySelector("esphome-rename-file-dialog")!

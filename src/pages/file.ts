@@ -16,36 +16,22 @@ import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice } from "../api/types/devices.js";
-import type { FileUsage } from "../api/types/files.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
+import type { ESPHomeDeleteFileDialog } from "../components/packages/delete-file-dialog.js";
 import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
-import { linkListStyles } from "../components/packages/link-list.js";
 import type {
   ESPHomeRenameFileDialog,
   RenameFileDetail,
 } from "../components/packages/rename-file-dialog.js";
-import {
-  NO_USAGE,
-  renderUsageSummary,
-  usageSummaryStyles,
-} from "../components/packages/usage-summary.js";
-import {
-  fetchUsers,
-  notifyFailure,
-  renameFile,
-  showUsage,
-} from "../components/packages/usage.js";
+import { notifyFailure, renameFile } from "../components/packages/usage.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
 import {
   apiConnectedContext,
   apiContext,
   buildOffloadPairingsContext,
-  devicesContext,
   localizeContext,
   versionContext,
 } from "../context/index.js";
@@ -65,8 +51,8 @@ import { secretsStyles } from "./secrets.styles.js";
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "../components/confirm-dialog.js";
 import "../components/device/device-navigator.js";
+import "../components/packages/delete-file-dialog.js";
 import "../components/packages/file-list-dialog.js";
 import "../components/packages/rename-file-dialog.js";
 import "../components/unsaved-changes-dialog.js";
@@ -93,10 +79,6 @@ export class ESPHomePageFile extends LitElement {
   @state()
   private _apiConnected = false;
 
-  @consume({ context: devicesContext, subscribe: true })
-  @state()
-  private _devices: ConfiguredDevice[] = [];
-
   @consume({ context: versionContext, subscribe: true })
   @state()
   private _appVersion = "";
@@ -119,8 +101,6 @@ export class ESPHomePageFile extends LitElement {
   @state() private _navCollapsed = false;
   /** Navigator accordion: one section open at a time, Components first. */
   @state() private _openSections = new Set<number>([1]);
-  /** Users shown in the delete confirm, fetched when it opens. */
-  @state() private _deleteUsage: FileUsage = NO_USAGE;
 
   protected readonly _load = new ConfigLoadController(this, {
     api: () => this._api,
@@ -138,8 +118,8 @@ export class ESPHomePageFile extends LitElement {
   @query("esphome-unsaved-changes-dialog")
   private _unsavedDialog?: ESPHomeUnsavedChangesDialog;
 
-  @query("esphome-confirm-dialog")
-  private _deleteDialog?: ESPHomeConfirmDialog;
+  @query("esphome-delete-file-dialog")
+  private _deleteDialog?: ESPHomeDeleteFileDialog;
 
   @query("esphome-file-list-dialog")
   private _usageDialog?: ESPHomeFileListDialog;
@@ -199,8 +179,6 @@ export class ESPHomePageFile extends LitElement {
     espHomeStyles,
     loadMessageStyles,
     secretsStyles,
-    linkListStyles,
-    usageSummaryStyles,
     css`
       .page-title p {
         font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -374,25 +352,9 @@ export class ESPHomePageFile extends LitElement {
         @save=${() => this._unsavedGuard.onSave()}
         @cancel=${() => this._unsavedGuard.onCancel()}
       ></esphome-unsaved-changes-dialog>
-      <esphome-confirm-dialog
-        ?destructive=${true}
-        heading=${this._localize("packages.delete_title", { path: this.path })}
-        confirm-label=${this._localize("packages.delete")}
-        @confirm=${this._delete}
-      >
-        <div slot="body">
-          ${renderUsageSummary(this._deleteUsage, {
-            localize: this._localize,
-            devices: this._devices,
-            usedKey: "packages.delete_used_message",
-            unusedKey: "packages.delete_unused_message",
-            open: (url) => {
-              this._deleteDialog?.close();
-              void navigate(url);
-            },
-          })}
-        </div>
-      </esphome-confirm-dialog>
+      <esphome-delete-file-dialog
+        @file-deleted=${this._onDeleted}
+      ></esphome-delete-file-dialog>
       <esphome-file-list-dialog></esphome-file-list-dialog>
       <esphome-rename-file-dialog
         @rename-file=${this._rename}
@@ -475,42 +437,20 @@ export class ESPHomePageFile extends LitElement {
     });
   }
 
-  private _showUsage = () =>
-    void showUsage(
-      this._api,
-      this._localize,
-      this._devices,
-      this._usageDialog,
-      this.path
-    );
+  private _showUsage = () => void this._usageDialog?.showUsage(this.path);
 
-  private _openRename = async () => {
-    const usage = await fetchUsers(this._api, this._localize, this.path);
-    if (usage !== null) this._renameDialog?.open(this.path, usage);
-  };
+  private _openRename = () => void this._renameDialog?.open(this.path);
 
   private _rename = async (e: CustomEvent<RenameFileDetail>) => {
     const newPath = await renameFile(this._api, this._localize, e.detail);
     if (newPath !== null) void navigate(fileEditorUrl(newPath));
   };
 
-  private _confirmDelete = async () => {
-    const usage = await fetchUsers(this._api, this._localize, this.path);
-    if (usage === null) return;
-    this._deleteUsage = usage;
-    this._deleteDialog?.open();
-  };
+  private _confirmDelete = () => void this._deleteDialog?.open(this.path);
 
-  private _delete = async () => {
-    try {
-      await this._api.deleteFile(this.path);
-    } catch (err) {
-      notifyFailure(this._localize, "packages.delete_failed", err);
-      return;
-    }
+  private _onDeleted = () => {
     // The file is gone; leaving must not prompt to save it back.
     this._savedYaml = this._yaml;
-    notifySuccess(this._localize("packages.deleted", { path: this.path }));
     void navigate("/packages");
   };
 }

@@ -1,13 +1,15 @@
 /**
  * Read-only list of devices or files, each row opening its editor.
- * Backs "Show usage" (devices using a package) and "Show dependencies"
- * (files a device pulls in).
+ * ``showUsage`` lists the devices using a package, ``showDependencies``
+ * the files a device pulls in; each fetches, then opens.
  */
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { apiContext, devicesContext, localizeContext } from "../../context/index.js";
 import {
   dialogActionButtonStyles,
   dialogActionsRowStyles,
@@ -16,7 +18,14 @@ import { dialogChromeStyles } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { navigate } from "../../util/navigation.js";
-import { type LinkItem, linkListStyles, renderLinkList } from "./link-list.js";
+import {
+  deviceItems,
+  fileItems,
+  type LinkItem,
+  linkListStyles,
+  renderLinkList,
+} from "./link-list.js";
+import { notifyFailure } from "./usage.js";
 
 import "../base-dialog.js";
 
@@ -34,6 +43,13 @@ export class ESPHomeFileListDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: apiContext })
+  private _api!: ESPHomeAPI;
+
+  /** Friendly names for the device rows. */
+  @consume({ context: devicesContext, subscribe: true })
+  private _devices: ConfiguredDevice[] = [];
 
   @state()
   private _content: FileListDialogContent | null = null;
@@ -69,6 +85,51 @@ export class ESPHomeFileListDialog extends LitElement {
   open(content: FileListDialogContent) {
     this._content = content;
     this._dialog.open = true;
+  }
+
+  /** List the devices using *path*; a toast instead when the lookup fails. */
+  async showUsage(path: string): Promise<void> {
+    const localize = this._localize;
+    try {
+      const usage = await this._api.getFileUsage(path);
+      this.open({
+        heading: localize("packages.usage_title", { path }),
+        message:
+          usage.used_by.length > 0
+            ? localize("packages.usage_message", { count: usage.used_by.length })
+            : usage.unknown.length === 0
+              ? localize("packages.usage_none")
+              : "",
+        items: deviceItems(usage.used_by, this._devices),
+        note:
+          usage.unknown.length > 0
+            ? localize("packages.usage_unknown", { names: usage.unknown.join(", ") })
+            : undefined,
+      });
+    } catch (err) {
+      notifyFailure(localize, "packages.usage_failed", err);
+    }
+  }
+
+  /** List the files *configuration* pulls in; a toast instead when the lookup fails. */
+  async showDependencies(configuration: string): Promise<void> {
+    const localize = this._localize;
+    try {
+      const deps = await this._api.getDeviceDependencies(configuration);
+      this.open({
+        heading: localize("packages.dependencies_title", { name: configuration }),
+        message: localize(
+          deps.files.length > 0
+            ? "packages.dependencies_message"
+            : "packages.dependencies_none",
+          { count: deps.files.length }
+        ),
+        items: fileItems(deps.files),
+        note: deps.complete ? undefined : localize("packages.dependencies_incomplete"),
+      });
+    } catch (err) {
+      notifyFailure(localize, "packages.dependencies_failed", err);
+    }
   }
 
   protected render() {

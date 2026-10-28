@@ -15,34 +15,16 @@ import { css, html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice } from "../api/types/devices.js";
-import type { FileUsage } from "../api/types/files.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
+import type { ESPHomeDeleteFileDialog } from "../components/packages/delete-file-dialog.js";
 import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
-import { linkListStyles } from "../components/packages/link-list.js";
 import type {
   ESPHomeRenameFileDialog,
   RenameFileDetail,
 } from "../components/packages/rename-file-dialog.js";
-import {
-  NO_USAGE,
-  renderUsageSummary,
-  usageSummaryStyles,
-} from "../components/packages/usage-summary.js";
-import {
-  fetchUsers,
-  notifyFailure,
-  renameFile,
-  showUsage,
-} from "../components/packages/usage.js";
-import {
-  apiConnectedContext,
-  apiContext,
-  devicesContext,
-  localizeContext,
-} from "../context/index.js";
+import { notifyFailure, renameFile } from "../components/packages/usage.js";
+import { apiConnectedContext, apiContext, localizeContext } from "../context/index.js";
 import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
 import {
@@ -52,14 +34,13 @@ import {
   newPackagePathProblem,
 } from "../util/file-paths.js";
 import { navigate } from "../util/navigation.js";
-import { notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { renderAsyncState } from "../util/render-async-state.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "../components/confirm-dialog.js";
+import "../components/packages/delete-file-dialog.js";
 import "../components/packages/file-list-dialog.js";
 import "../components/packages/rename-file-dialog.js";
 
@@ -87,19 +68,12 @@ export class ESPHomePagePackages extends LitElement {
   @state()
   private _apiConnected = false;
 
-  @consume({ context: devicesContext, subscribe: true })
-  @state()
-  private _devices: ConfiguredDevice[] = [];
-
   @state() private _state: LoadState = "loading";
   @state() private _paths: string[] = [];
   @state() private _newPath = "";
   @state() private _creating = false;
-  /** The package the delete confirm is about, and the devices using it. */
-  @state() private _pendingDelete: { path: string; usage: FileUsage } | null = null;
-
-  @query("esphome-confirm-dialog")
-  private _deleteDialog?: ESPHomeConfirmDialog;
+  @query("esphome-delete-file-dialog")
+  private _deleteDialog?: ESPHomeDeleteFileDialog;
 
   @query("esphome-file-list-dialog")
   private _usageDialog?: ESPHomeFileListDialog;
@@ -112,8 +86,6 @@ export class ESPHomePagePackages extends LitElement {
   static styles = [
     espHomeStyles,
     loadMessageStyles,
-    linkListStyles,
-    usageSummaryStyles,
     css`
       .page {
         max-width: 960px;
@@ -237,9 +209,6 @@ export class ESPHomePagePackages extends LitElement {
       .empty wa-icon {
         font-size: 40px;
       }
-      .delete-users {
-        margin-top: var(--wa-space-s);
-      }
     `,
   ];
 
@@ -297,16 +266,9 @@ export class ESPHomePagePackages extends LitElement {
           content: () => this._renderList(),
         })}
       </div>
-      <esphome-confirm-dialog
-        ?destructive=${true}
-        heading=${this._localize("packages.delete_title", {
-          path: this._pendingDelete?.path ?? "",
-        })}
-        confirm-label=${this._localize("packages.delete")}
-        @confirm=${this._delete}
-      >
-        <div slot="body">${this._renderDeleteBody()}</div>
-      </esphome-confirm-dialog>
+      <esphome-delete-file-dialog
+        @file-deleted=${this._reload}
+      ></esphome-delete-file-dialog>
       <esphome-file-list-dialog></esphome-file-list-dialog>
       <esphome-rename-file-dialog
         @rename-file=${this._rename}
@@ -338,7 +300,7 @@ export class ESPHomePagePackages extends LitElement {
                 <button
                   type="button"
                   class="row-action"
-                  @click=${() => this._showUsage(path)}
+                  @click=${() => this._usageDialog?.showUsage(path)}
                 >
                   <wa-icon library="mdi" name="devices"></wa-icon>
                   ${this._localize("packages.show_usage")}
@@ -348,7 +310,7 @@ export class ESPHomePagePackages extends LitElement {
                   class="row-action"
                   aria-label=${this._localize("packages.rename_named", { path })}
                   title=${this._localize("packages.rename")}
-                  @click=${() => this._openRename(path)}
+                  @click=${() => this._renameDialog?.open(path)}
                 >
                   <wa-icon library="mdi" name="rename-outline"></wa-icon>
                 </button>
@@ -357,7 +319,7 @@ export class ESPHomePagePackages extends LitElement {
                   class="row-action"
                   aria-label=${this._localize("packages.delete_named", { path })}
                   title=${this._localize("packages.delete")}
-                  @click=${() => this._confirmDelete(path)}
+                  @click=${() => this._deleteDialog?.open(path)}
                 >
                   <wa-icon library="mdi" name="delete-outline"></wa-icon>
                 </button>
@@ -365,19 +327,6 @@ export class ESPHomePagePackages extends LitElement {
           )}
         </section>`
     )}`;
-  }
-
-  private _renderDeleteBody() {
-    return renderUsageSummary(this._pendingDelete?.usage ?? NO_USAGE, {
-      localize: this._localize,
-      devices: this._devices,
-      usedKey: "packages.delete_used_message",
-      unusedKey: "packages.delete_unused_message",
-      open: (url) => {
-        this._deleteDialog?.close();
-        void navigate(url);
-      },
-    });
   }
 
   private _reload = async () => {
@@ -390,11 +339,6 @@ export class ESPHomePagePackages extends LitElement {
       this._state = "error";
     }
   };
-
-  private async _openRename(path: string) {
-    const usage = await fetchUsers(this._api, this._localize, path);
-    if (usage !== null) this._renameDialog?.open(path, usage);
-  }
 
   private _rename = async (e: CustomEvent<RenameFileDetail>) => {
     await renameFile(this._api, this._localize, e.detail);
@@ -423,29 +367,6 @@ export class ESPHomePagePackages extends LitElement {
     }
     this._newPath = "";
     void navigate(fileEditorUrl(path));
-  };
-
-  private _showUsage(path: string) {
-    void showUsage(this._api, this._localize, this._devices, this._usageDialog, path);
-  }
-
-  private async _confirmDelete(path: string) {
-    const usage = await fetchUsers(this._api, this._localize, path);
-    if (usage === null) return;
-    this._pendingDelete = { path, usage };
-    this._deleteDialog?.open();
-  }
-
-  private _delete = async () => {
-    const path = this._pendingDelete?.path;
-    if (!path) return;
-    try {
-      await this._api.deleteFile(path);
-      notifySuccess(this._localize("packages.deleted", { path }));
-    } catch (err) {
-      this._fail("packages.delete_failed", err);
-    }
-    void this._reload();
   };
 
   private _fail(key: string, err: unknown) {

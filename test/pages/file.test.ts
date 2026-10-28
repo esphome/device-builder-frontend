@@ -22,7 +22,7 @@ import { runBulkUpdate } from "../../src/util/bulk-update.js";
 import { navigate } from "../../src/util/navigation.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
-vi.mock("../../src/components/confirm-dialog.js", () => ({}));
+vi.mock("../../src/components/packages/delete-file-dialog.js", () => ({}));
 vi.mock("../../src/components/device/device-navigator.js", () => ({}));
 vi.mock("../../src/components/packages/file-list-dialog.js", () => ({}));
 vi.mock("../../src/components/packages/rename-file-dialog.js", () => ({}));
@@ -36,11 +36,11 @@ interface PageView {
   _savedYaml: string;
   _api: ESPHomeAPI;
   _localize: typeof argsLocalize;
-  _deleteDialog?: { open(): void; close(): void };
+  _deleteDialog?: { open(path: string): void };
   _save(): Promise<boolean>;
   _announceSaved(): Promise<void>;
-  _confirmDelete(): Promise<void>;
-  _delete(): Promise<void>;
+  _confirmDelete(): void;
+  _onDeleted(): void;
   render(): unknown;
 }
 
@@ -155,48 +155,24 @@ describe("esphome-page-file save", () => {
 });
 
 describe("esphome-page-file delete", () => {
-  test("lists the users before confirming", async () => {
+  test("hands the current path to the delete dialog", () => {
     const open = vi.fn();
     const page = makePage();
     // ``@query`` installs a getter; shadow it on the instance.
-    Object.defineProperty(page, "_deleteDialog", { value: { open, close: vi.fn() } });
-    page._api = {
-      getFileUsage: vi.fn().mockResolvedValue({ used_by: ["a.yaml"], unknown: [] }),
-    } as unknown as ESPHomeAPI;
+    Object.defineProperty(page, "_deleteDialog", { value: { open } });
 
-    await page._confirmDelete();
+    page._confirmDelete();
 
-    expect((page as unknown as { _deleteUsage: unknown })._deleteUsage).toEqual({
-      used_by: ["a.yaml"],
-      unknown: [],
-    });
-    expect(open).toHaveBeenCalledOnce();
+    expect(open).toHaveBeenCalledWith("common/base.yaml");
   });
 
-  test("deletes and returns to the packages list without a save prompt", async () => {
-    const deleteFile = vi.fn().mockResolvedValue(undefined);
+  test("after the delete, returns to the packages list without a save prompt", () => {
     const page = makePage({ _yaml: "unsaved: 1\n" });
-    page._api = { deleteFile } as unknown as ESPHomeAPI;
 
-    await page._delete();
+    page._onDeleted();
 
-    expect(deleteFile).toHaveBeenCalledWith("common/base.yaml");
     expect(page._savedYaml).toBe(page._yaml);
     expect(navigate).toHaveBeenCalledWith("/packages");
-  });
-
-  test("a failed delete stays on the page", async () => {
-    const page = makePage();
-    page._api = {
-      deleteFile: vi.fn().mockRejectedValue(new APIError("not_found", "gone")),
-    } as unknown as ESPHomeAPI;
-
-    await page._delete();
-
-    expect(navigate).not.toHaveBeenCalled();
-    expect(vi.mocked(toast.error).mock.lastCall?.[0]).toBe(
-      "packages.delete_failed: gone"
-    );
   });
 });
 

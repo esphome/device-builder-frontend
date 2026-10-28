@@ -161,7 +161,6 @@ import "../components/firmware-install-dialog.js";
 import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/labels/bulk-labels-dialog.js";
-import { showDependencies } from "../components/packages/usage.js";
 import "../components/labels/label-dialog.js";
 import "../components/logs-dialog.js";
 import "../components/remote-build-panel.js";
@@ -997,13 +996,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._encryptionKeyDialog.open(key);
   };
   _showDependencies = (device: ConfiguredDevice) =>
-    void showDependencies(
-      this._api,
-      this._localize,
-      this._devices,
-      this._fileListDialog,
-      device.configuration
-    );
+    void this._fileListDialog?.showDependencies(device.configuration);
   _downloadFirmware = (device: ConfiguredDevice) =>
     this._firmwareDialog.downloadArtifacts(device);
   _onRequestDownloadFirmware = (e: CustomEvent<ConfiguredDevice>) =>

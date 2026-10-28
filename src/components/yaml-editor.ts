@@ -11,14 +11,8 @@ import { css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
-import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import {
-  apiContext,
-  darkModeContext,
-  devicesContext,
-  localizeContext,
-} from "../context/index.js";
+import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import {
   darkHighlight,
   EDITOR_BG_DARK,
@@ -143,10 +137,6 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
-
-  /** Decides whether an include link opens the device or the file editor. */
-  @consume({ context: devicesContext, subscribe: true })
-  private _devices: ConfiguredDevice[] = [];
 
   @property() value = "";
 
@@ -639,8 +629,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
 
   /** Open an include target: device YAMLs in the device editor, others in the file editor. */
   private _openInclude = (path: string) => {
-    const url = openTargetUrl(path, new Set(this._devices.map((d) => d.configuration)));
-    if (url) void navigate(url);
+    void navigate(openTargetUrl(path));
   };
 
   private _buildView() {
