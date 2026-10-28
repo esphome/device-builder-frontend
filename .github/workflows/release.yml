@@ -116,6 +116,10 @@ jobs:
           LOKALISE_API_TOKEN: ${{ secrets.LOKALISE_API_TOKEN }}
           LOKALISE_PROJECT_ID: ${{ secrets.LOKALISE_PROJECT_ID }}
           REPO: ${{ github.repository }}
+          # The release-source download and the latest-release lookup
+          # below authenticate with this; Actions doesn't export it.
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ -z "${LOKALISE_API_TOKEN}" ] || [ -z "${LOKALISE_PROJECT_ID}" ]; then
@@ -129,9 +133,25 @@ jobs:
           # Keep the previous release's locales aside so the notes step can
           # credit the languages that changed. Downloads never delete stale
           # files, so move them out before the Lokalise download lands.
-          pnpm run translations:download --source release
+          # No previous release (HTTP 404) or one without translations.zip
+          # leaves the baseline empty, so every locale reads as new; any
+          # other lookup failure is fatal.
           mkdir -p "$RUNNER_TEMP/previous"
-          find src/translations -name '*.json' ! -name en.json -exec mv -t "$RUNNER_TEMP/previous" {} +
+          latest=""
+          if ! latest=$(gh api "repos/${REPO}/releases/latest" 2>"$RUNNER_TEMP/latest.err"); then
+            if ! grep -q "HTTP 404" "$RUNNER_TEMP/latest.err"; then
+              echo "::error::Failed to look up the latest release."
+              cat "$RUNNER_TEMP/latest.err"
+              exit 1
+            fi
+            latest=""
+          fi
+          if [ -n "$latest" ] && jq -e '.assets[] | select(.name == "translations.zip")' <<<"$latest" >/dev/null; then
+            pnpm run translations:download --source release
+            find src/translations -name '*.json' ! -name en.json -exec mv -t "$RUNNER_TEMP/previous" {} +
+          else
+            echo "No previous release translations; every locale counts as new."
+          fi
           pnpm run translations:download
 
       - name: Write translation release notes
