@@ -54,7 +54,12 @@ import type {
   EventSubscriptionCallback,
   VersionMatchPolicy,
 } from "./types/event-subscription.js";
-import type { DeviceDependencies, FileUsage, PackageFile } from "./types/files.js";
+import type {
+  DeviceDependencies,
+  FileRenameResult,
+  FileUsage,
+  PackageFile,
+} from "./types/files.js";
 import type {
   FirmwareBinary,
   FirmwareJob,
@@ -1332,6 +1337,14 @@ export class ESPHomeAPI {
   /** Create a package YAML (parent folders included); ALREADY_EXISTS if taken. */
   async createFile(path: string, content: string): Promise<PackageFile> {
     return this.sendCommand<PackageFile>("files/create", { path, content });
+  }
+
+  /** Move a package YAML and rewrite every ``!include`` reference to it. */
+  async renameFile(path: string, newPath: string): Promise<FileRenameResult> {
+    return this.sendCommand<FileRenameResult>("files/rename", {
+      path,
+      new_path: newPath,
+    });
   }
 
   /** Delete a package YAML. */

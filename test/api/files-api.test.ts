@@ -58,6 +58,13 @@ describe("ESPHomeAPI — files commands", () => {
       undefined,
     ],
     [
+      "renameFile",
+      ["common/a.yaml", "shared/a.yaml"],
+      "files/rename",
+      { path: "common/a.yaml", new_path: "shared/a.yaml" },
+      { path: "shared/a.yaml", rewritten: ["k.yaml"], unresolved: [] },
+    ],
+    [
       "getFileUsage",
       ["common/a.yaml"],
       "files/usage",

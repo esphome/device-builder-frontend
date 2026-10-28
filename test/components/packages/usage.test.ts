@@ -7,10 +7,21 @@ import type {
   FileListDialogContent,
 } from "../../../src/components/packages/file-list-dialog.js";
 import { deviceItems, fileItems } from "../../../src/components/packages/link-list.js";
-import { showDependencies, showUsage } from "../../../src/components/packages/usage.js";
+import {
+  fetchUsers,
+  renameFile,
+  showDependencies,
+  showUsage,
+} from "../../../src/components/packages/usage.js";
 
-vi.mock("../../../src/util/notify.js", () => ({ notifyError: vi.fn() }));
-const { notifyError } = await import("../../../src/util/notify.js");
+vi.mock("../../../src/util/notify.js", () => ({
+  LONG_TOAST_DURATION_MS: 8000,
+  notifyError: vi.fn(),
+  notifySuccess: vi.fn(),
+  notifyWarning: vi.fn(),
+}));
+const { notifyError, notifySuccess, notifyWarning } =
+  await import("../../../src/util/notify.js");
 
 const localize = (key: string, args?: Record<string, unknown>) =>
   args ? `${key} ${JSON.stringify(args)}` : key;
@@ -75,6 +86,18 @@ describe("showUsage / showDependencies", () => {
     expect(opened[0].note).toBe('packages.usage_unknown {"names":"broken.yaml"}');
   });
 
+  it("doesn't claim nobody uses the file while devices are unchecked", async () => {
+    const api = {
+      getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: ["broken.yaml"] }),
+    } as unknown as ESPHomeAPI;
+    const { dialog, opened } = fakeDialog();
+
+    await showUsage(api, localize, devices, dialog, "common/a.yaml");
+
+    expect(opened[0].message).toBe("");
+    expect(opened[0].note).toBe('packages.usage_unknown {"names":"broken.yaml"}');
+  });
+
   it("toasts with the backend detail when the lookup fails", async () => {
     const api = {
       getFileUsage: vi
@@ -99,5 +122,54 @@ describe("showUsage / showDependencies", () => {
 
     expect(opened[0].message).toBe('packages.dependencies_none {"count":0}');
     expect(opened[0].note).toBe("packages.dependencies_incomplete");
+  });
+});
+
+describe("renameFile / fetchUsers", () => {
+  const detail = { path: "common/a.yaml", newPath: "shared/a.yaml" };
+
+  it("reports rewritten files and warns about unresolved devices", async () => {
+    const api = {
+      renameFile: vi.fn().mockResolvedValue({
+        path: "shared/a.yaml",
+        rewritten: ["kitchen.yaml"],
+        unresolved: ["garage.yaml"],
+      }),
+    } as unknown as ESPHomeAPI;
+
+    expect(await renameFile(api, localize, detail)).toBe("shared/a.yaml");
+    expect(api.renameFile).toHaveBeenCalledWith("common/a.yaml", "shared/a.yaml");
+    expect(vi.mocked(notifySuccess).mock.lastCall?.[1]?.description).toBe(
+      'packages.renamed_rewritten {"count":1,"files":"kitchen.yaml"}'
+    );
+    expect(vi.mocked(notifyWarning).mock.lastCall?.[0]).toBe(
+      'packages.renamed_unresolved {"names":"garage.yaml"}'
+    );
+  });
+
+  it("returns null and toasts on failure", async () => {
+    vi.mocked(notifyWarning).mockClear();
+    const api = {
+      renameFile: vi.fn().mockRejectedValue(new APIError("already_exists", "taken")),
+    } as unknown as ESPHomeAPI;
+
+    expect(await renameFile(api, localize, detail)).toBeNull();
+    expect(notifyError).toHaveBeenCalledWith("packages.rename_failed: taken");
+    expect(notifyWarning).not.toHaveBeenCalled();
+  });
+
+  it("fetchUsers returns the users, or null after a toast", async () => {
+    const ok = {
+      getFileUsage: vi.fn().mockResolvedValue({ used_by: ["a.yaml"], unknown: [] }),
+    } as unknown as ESPHomeAPI;
+    expect(await fetchUsers(ok, localize, "common/a.yaml")).toEqual({
+      used_by: ["a.yaml"],
+      unknown: [],
+    });
+
+    const bad = {
+      getFileUsage: vi.fn().mockRejectedValue(new APIError("internal_error", "x")),
+    } as unknown as ESPHomeAPI;
+    expect(await fetchUsers(bad, localize, "common/a.yaml")).toBeNull();
   });
 });

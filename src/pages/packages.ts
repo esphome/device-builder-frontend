@@ -4,22 +4,39 @@
  * dashboard lists them here instead of as (always offline) devices.
  */
 import { consume } from "@lit/context";
-import { mdiDeleteOutline, mdiDevices, mdiPackageVariantClosed, mdiPlus } from "@mdi/js";
+import {
+  mdiDeleteOutline,
+  mdiDevices,
+  mdiPackageVariantClosed,
+  mdiPlus,
+  mdiRenameOutline,
+} from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FileUsage } from "../api/types/files.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
+import { linkListStyles } from "../components/packages/link-list.js";
+import type {
+  ESPHomeRenameFileDialog,
+  RenameFileDetail,
+} from "../components/packages/rename-file-dialog.js";
 import {
-  deviceItems,
-  linkListStyles,
-  renderLinkList,
-} from "../components/packages/link-list.js";
-import { notifyFailure, showUsage } from "../components/packages/usage.js";
+  NO_USAGE,
+  renderUsageSummary,
+  usageSummaryStyles,
+} from "../components/packages/usage-summary.js";
+import {
+  fetchUsers,
+  notifyFailure,
+  renameFile,
+  showUsage,
+} from "../components/packages/usage.js";
 import {
   apiConnectedContext,
   apiContext,
@@ -44,12 +61,14 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/confirm-dialog.js";
 import "../components/packages/file-list-dialog.js";
+import "../components/packages/rename-file-dialog.js";
 
 registerMdiIcons({
   "delete-outline": mdiDeleteOutline,
   devices: mdiDevices,
   "package-variant-closed": mdiPackageVariantClosed,
   plus: mdiPlus,
+  "rename-outline": mdiRenameOutline,
 });
 
 type LoadState = "loading" | "ready" | "error";
@@ -77,7 +96,7 @@ export class ESPHomePagePackages extends LitElement {
   @state() private _newPath = "";
   @state() private _creating = false;
   /** The package the delete confirm is about, and the devices using it. */
-  @state() private _pendingDelete: { path: string; users: string[] } | null = null;
+  @state() private _pendingDelete: { path: string; usage: FileUsage } | null = null;
 
   @query("esphome-confirm-dialog")
   private _deleteDialog?: ESPHomeConfirmDialog;
@@ -85,12 +104,16 @@ export class ESPHomePagePackages extends LitElement {
   @query("esphome-file-list-dialog")
   private _usageDialog?: ESPHomeFileListDialog;
 
+  @query("esphome-rename-file-dialog")
+  private _renameDialog?: ESPHomeRenameFileDialog;
+
   private _wasConnected = false;
 
   static styles = [
     espHomeStyles,
     loadMessageStyles,
     linkListStyles,
+    usageSummaryStyles,
     css`
       .page {
         max-width: 960px;
@@ -285,6 +308,9 @@ export class ESPHomePagePackages extends LitElement {
         <div slot="body">${this._renderDeleteBody()}</div>
       </esphome-confirm-dialog>
       <esphome-file-list-dialog></esphome-file-list-dialog>
+      <esphome-rename-file-dialog
+        @rename-file=${this._rename}
+      ></esphome-rename-file-dialog>
     `;
   }
 
@@ -320,6 +346,15 @@ export class ESPHomePagePackages extends LitElement {
                 <button
                   type="button"
                   class="row-action"
+                  aria-label=${this._localize("packages.rename_named", { path })}
+                  title=${this._localize("packages.rename")}
+                  @click=${() => this._openRename(path)}
+                >
+                  <wa-icon library="mdi" name="rename-outline"></wa-icon>
+                </button>
+                <button
+                  type="button"
+                  class="row-action"
                   aria-label=${this._localize("packages.delete_named", { path })}
                   title=${this._localize("packages.delete")}
                   @click=${() => this._confirmDelete(path)}
@@ -333,19 +368,16 @@ export class ESPHomePagePackages extends LitElement {
   }
 
   private _renderDeleteBody() {
-    const users = this._pendingDelete?.users ?? [];
-    return html`${this._localize(
-        users.length > 0
-          ? "packages.delete_used_message"
-          : "packages.delete_unused_message",
-        { count: users.length }
-      )}
-      <div class="delete-users">
-        ${renderLinkList(deviceItems(users, this._devices), (url) => {
-          this._deleteDialog?.close();
-          void navigate(url);
-        })}
-      </div>`;
+    return renderUsageSummary(this._pendingDelete?.usage ?? NO_USAGE, {
+      localize: this._localize,
+      devices: this._devices,
+      usedKey: "packages.delete_used_message",
+      unusedKey: "packages.delete_unused_message",
+      open: (url) => {
+        this._deleteDialog?.close();
+        void navigate(url);
+      },
+    });
   }
 
   private _reload = async () => {
@@ -357,6 +389,16 @@ export class ESPHomePagePackages extends LitElement {
       console.error("Failed to list packages:", err);
       this._state = "error";
     }
+  };
+
+  private async _openRename(path: string) {
+    const usage = await fetchUsers(this._api, this._localize, path);
+    if (usage !== null) this._renameDialog?.open(path, usage);
+  }
+
+  private _rename = async (e: CustomEvent<RenameFileDetail>) => {
+    await renameFile(this._api, this._localize, e.detail);
+    void this._reload();
   };
 
   private _create = async (e: Event) => {
@@ -388,13 +430,9 @@ export class ESPHomePagePackages extends LitElement {
   }
 
   private async _confirmDelete(path: string) {
-    try {
-      const usage = await this._api.getFileUsage(path);
-      this._pendingDelete = { path, users: usage.used_by };
-    } catch (err) {
-      this._fail("packages.usage_failed", err);
-      return;
-    }
+    const usage = await fetchUsers(this._api, this._localize, path);
+    if (usage === null) return;
+    this._pendingDelete = { path, usage };
     this._deleteDialog?.open();
   }
 

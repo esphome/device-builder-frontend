@@ -5,23 +5,40 @@
  * ``expected`` so an edit made outside the dashboard isn't overwritten.
  */
 import { consume } from "@lit/context";
-import { mdiContentSave, mdiDeleteOutline, mdiDevices, mdiMenu } from "@mdi/js";
+import {
+  mdiContentSave,
+  mdiDeleteOutline,
+  mdiDevices,
+  mdiMenu,
+  mdiRenameOutline,
+} from "@mdi/js";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FileUsage } from "../api/types/files.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
+import { linkListStyles } from "../components/packages/link-list.js";
+import type {
+  ESPHomeRenameFileDialog,
+  RenameFileDetail,
+} from "../components/packages/rename-file-dialog.js";
 import {
-  deviceItems,
-  linkListStyles,
-  renderLinkList,
-} from "../components/packages/link-list.js";
-import { notifyFailure, showUsage } from "../components/packages/usage.js";
+  NO_USAGE,
+  renderUsageSummary,
+  usageSummaryStyles,
+} from "../components/packages/usage-summary.js";
+import {
+  fetchUsers,
+  notifyFailure,
+  renameFile,
+  showUsage,
+} from "../components/packages/usage.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
 import {
@@ -51,6 +68,7 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/confirm-dialog.js";
 import "../components/device/device-navigator.js";
 import "../components/packages/file-list-dialog.js";
+import "../components/packages/rename-file-dialog.js";
 import "../components/unsaved-changes-dialog.js";
 import "../components/yaml-editor.js";
 
@@ -59,6 +77,7 @@ registerMdiIcons({
   "delete-outline": mdiDeleteOutline,
   devices: mdiDevices,
   menu: mdiMenu,
+  "rename-outline": mdiRenameOutline,
 });
 
 @customElement("esphome-page-file")
@@ -101,7 +120,7 @@ export class ESPHomePageFile extends LitElement {
   /** Navigator accordion: one section open at a time, Components first. */
   @state() private _openSections = new Set<number>([1]);
   /** Users shown in the delete confirm, fetched when it opens. */
-  @state() private _deleteUsers: string[] = [];
+  @state() private _deleteUsage: FileUsage = NO_USAGE;
 
   protected readonly _load = new ConfigLoadController(this, {
     api: () => this._api,
@@ -124,6 +143,9 @@ export class ESPHomePageFile extends LitElement {
 
   @query("esphome-file-list-dialog")
   private _usageDialog?: ESPHomeFileListDialog;
+
+  @query("esphome-rename-file-dialog")
+  private _renameDialog?: ESPHomeRenameFileDialog;
 
   private _unsavedGuard = new UnsavedGuard();
 
@@ -178,6 +200,7 @@ export class ESPHomePageFile extends LitElement {
     loadMessageStyles,
     secretsStyles,
     linkListStyles,
+    usageSummaryStyles,
     css`
       .page-title p {
         font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -196,7 +219,11 @@ export class ESPHomePageFile extends LitElement {
         font-weight: var(--wa-font-weight-bold);
         cursor: pointer;
       }
-      .header-button:hover {
+      .header-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .header-button:hover:not(:disabled) {
         background: var(--wa-color-surface-lowered);
       }
       .header-button wa-icon {
@@ -253,13 +280,23 @@ export class ESPHomePageFile extends LitElement {
           ${
             this._isPackage
               ? html`<button
-                  type="button"
-                  class="header-button"
-                  @click=${this._confirmDelete}
-                >
-                  <wa-icon library="mdi" name="delete-outline"></wa-icon>
-                  ${this._localize("packages.delete")}
-                </button>`
+                    type="button"
+                    class="header-button"
+                    ?disabled=${this._isDirty}
+                    title=${this._isDirty ? this._localize("packages.rename_save_first") : ""}
+                    @click=${this._openRename}
+                  >
+                    <wa-icon library="mdi" name="rename-outline"></wa-icon>
+                    ${this._localize("packages.rename")}
+                  </button>
+                  <button
+                    type="button"
+                    class="header-button"
+                    @click=${this._confirmDelete}
+                  >
+                    <wa-icon library="mdi" name="delete-outline"></wa-icon>
+                    ${this._localize("packages.delete")}
+                  </button>`
               : null
           }
         </div>
@@ -344,21 +381,22 @@ export class ESPHomePageFile extends LitElement {
         @confirm=${this._delete}
       >
         <div slot="body">
-          ${this._localize(
-            this._deleteUsers.length > 0
-              ? "packages.delete_used_message"
-              : "packages.delete_unused_message",
-            { count: this._deleteUsers.length }
-          )}
-          <div class="delete-users">
-            ${renderLinkList(deviceItems(this._deleteUsers, this._devices), (url) => {
+          ${renderUsageSummary(this._deleteUsage, {
+            localize: this._localize,
+            devices: this._devices,
+            usedKey: "packages.delete_used_message",
+            unusedKey: "packages.delete_unused_message",
+            open: (url) => {
               this._deleteDialog?.close();
               void navigate(url);
-            })}
-          </div>
+            },
+          })}
         </div>
       </esphome-confirm-dialog>
       <esphome-file-list-dialog></esphome-file-list-dialog>
+      <esphome-rename-file-dialog
+        @rename-file=${this._rename}
+      ></esphome-rename-file-dialog>
     `;
   }
 
@@ -446,13 +484,20 @@ export class ESPHomePageFile extends LitElement {
       this.path
     );
 
+  private _openRename = async () => {
+    const usage = await fetchUsers(this._api, this._localize, this.path);
+    if (usage !== null) this._renameDialog?.open(this.path, usage);
+  };
+
+  private _rename = async (e: CustomEvent<RenameFileDetail>) => {
+    const newPath = await renameFile(this._api, this._localize, e.detail);
+    if (newPath !== null) void navigate(fileEditorUrl(newPath));
+  };
+
   private _confirmDelete = async () => {
-    try {
-      this._deleteUsers = (await this._api.getFileUsage(this.path)).used_by;
-    } catch (err) {
-      notifyFailure(this._localize, "packages.usage_failed", err);
-      return;
-    }
+    const usage = await fetchUsers(this._api, this._localize, this.path);
+    if (usage === null) return;
+    this._deleteUsage = usage;
     this._deleteDialog?.open();
   };
 

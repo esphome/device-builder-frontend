@@ -17,3 +17,11 @@ export interface DeviceDependencies {
   files: string[];
   complete: boolean;
 }
+
+/** ``files/rename`` reply. ``unresolved`` lists devices using the file whose
+ *  references couldn't be rewritten (e.g. ``${substitution}``-built paths). */
+export interface FileRenameResult {
+  path: string;
+  rewritten: string[];
+  unresolved: string[];
+}

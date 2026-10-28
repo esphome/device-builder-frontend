@@ -25,6 +25,7 @@ vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}
 vi.mock("../../src/components/confirm-dialog.js", () => ({}));
 vi.mock("../../src/components/device/device-navigator.js", () => ({}));
 vi.mock("../../src/components/packages/file-list-dialog.js", () => ({}));
+vi.mock("../../src/components/packages/rename-file-dialog.js", () => ({}));
 vi.mock("../../src/components/unsaved-changes-dialog.js", () => ({}));
 vi.mock("../../src/components/yaml-editor.js", () => ({}));
 
@@ -165,9 +166,10 @@ describe("esphome-page-file delete", () => {
 
     await page._confirmDelete();
 
-    expect((page as unknown as { _deleteUsers: string[] })._deleteUsers).toEqual([
-      "a.yaml",
-    ]);
+    expect((page as unknown as { _deleteUsage: unknown })._deleteUsage).toEqual({
+      used_by: ["a.yaml"],
+      unknown: [],
+    });
     expect(open).toHaveBeenCalledOnce();
   });
 
@@ -272,5 +274,54 @@ describe("esphome-page-file section navigator", () => {
 
     page._onYamlChange(new CustomEvent("yaml-change", { detail: { value: "x: 1\n" } }));
     expect(page._highlight).toBeNull();
+  });
+});
+
+describe("esphome-page-file rename", () => {
+  interface RenameView extends PageView {
+    _rename(e: CustomEvent): Promise<void>;
+  }
+  const renameButton = (tree: unknown) =>
+    findTemplatesByAnchor(tree, 'name="rename-outline"').length;
+
+  test("offered for a package only, and blocked while there are unsaved edits", () => {
+    expect(renameButton(makePage().render())).toBe(1);
+    expect(renameButton(makePage({ path: "_shared.yaml" }).render())).toBe(0);
+    const dirty = makePage({ _yaml: "changed: 1\n" }).render();
+    const [header] = findTemplatesByAnchor(dirty, 'name="rename-outline"');
+    expect(header.strings.join("")).toContain("?disabled=");
+    expect(header.values).toContain(true);
+  });
+
+  test("a successful rename opens the moved file", async () => {
+    const page = makePage() as unknown as RenameView;
+    page._api = {
+      renameFile: vi
+        .fn()
+        .mockResolvedValue({ path: "shared/base.yaml", rewritten: [], unresolved: [] }),
+    } as unknown as ESPHomeAPI;
+
+    await page._rename(
+      new CustomEvent("rename-file", {
+        detail: { path: "common/base.yaml", newPath: "shared/base.yaml" },
+      })
+    );
+
+    expect(navigate).toHaveBeenCalledWith("/file/shared/base.yaml");
+  });
+
+  test("a failed rename stays put", async () => {
+    const page = makePage() as unknown as RenameView;
+    page._api = {
+      renameFile: vi.fn().mockRejectedValue(new APIError("already_exists", "taken")),
+    } as unknown as ESPHomeAPI;
+
+    await page._rename(
+      new CustomEvent("rename-file", {
+        detail: { path: "common/base.yaml", newPath: "common/wifi.yaml" },
+      })
+    );
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

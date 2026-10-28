@@ -1,0 +1,91 @@
+/** @vitest-environment happy-dom */
+import "../../_mock-webawesome.js";
+
+import { describe, expect, it, vi } from "vitest";
+import { baseDialogSettled, dialogOpen, stubDialogRequestClose } from "../../_dom.js";
+import { makeConfiguredDevice } from "../../_make-configured-device.js";
+import { ESPHomeRenameFileDialog } from "../../../src/components/packages/rename-file-dialog.js";
+
+async function openDialog(
+  used_by: string[] = [],
+  unknown: string[] = []
+): Promise<ESPHomeRenameFileDialog> {
+  const el = new ESPHomeRenameFileDialog();
+  Object.assign(el, {
+    _devices: [
+      makeConfiguredDevice({ configuration: "kitchen.yaml", friendly_name: "Kitchen" }),
+    ],
+  });
+  document.body.appendChild(el);
+  await baseDialogSettled(el);
+  el.open("common/base.yaml", { used_by, unknown });
+  await baseDialogSettled(el);
+  stubDialogRequestClose(el);
+  return el;
+}
+
+async function type(el: ESPHomeRenameFileDialog, value: string) {
+  const input = el.shadowRoot!.querySelector("input")!;
+  input.value = value;
+  input.dispatchEvent(new Event("input"));
+  await el.updateComplete;
+}
+
+const confirmButton = (el: ESPHomeRenameFileDialog) =>
+  el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--primary")!;
+
+describe("rename-file-dialog", () => {
+  it("starts on the current path with Rename disabled", async () => {
+    const el = await openDialog();
+    expect(el.shadowRoot!.querySelector("input")!.value).toBe("common/base.yaml");
+    expect(confirmButton(el).disabled).toBe(true);
+  });
+
+  it.each([
+    ["base.yaml", "packages.path_needs_folder"],
+    ["common/base.txt", "packages.path_needs_yaml"],
+  ])("flags %j", async (value, key) => {
+    const el = await openDialog();
+    await type(el, value);
+    expect(el.shadowRoot!.querySelector(".problem")?.textContent).toBe(key);
+    expect(confirmButton(el).disabled).toBe(true);
+  });
+
+  it("lists the devices whose references get updated", async () => {
+    const el = await openDialog(["kitchen.yaml"]);
+    expect(el.shadowRoot!.querySelector(".usage-message")?.textContent).toContain(
+      "packages.rename_users"
+    );
+    expect(el.shadowRoot!.querySelector(".link-label")?.textContent).toBe("Kitchen");
+  });
+
+  it("names unchecked devices instead of claiming nobody uses the file", async () => {
+    const el = await openDialog([], ["broken.yaml"]);
+    expect(el.shadowRoot!.querySelector(".usage-message")).toBeNull();
+    expect(el.shadowRoot!.querySelector(".usage-note")?.textContent).toContain(
+      "packages.usage_unknown"
+    );
+  });
+
+  it("says nobody uses it only when every device was checked", async () => {
+    const el = await openDialog();
+    expect(el.shadowRoot!.querySelector(".usage-message")?.textContent?.trim()).toBe(
+      "packages.rename_no_users"
+    );
+  });
+
+  it("emits the trimmed new path and closes", async () => {
+    const el = await openDialog();
+    const emitted = vi.fn();
+    el.addEventListener("rename-file", emitted);
+    await type(el, " shared/base.yaml ");
+
+    confirmButton(el).click();
+
+    expect((emitted.mock.calls[0][0] as CustomEvent).detail).toEqual({
+      path: "common/base.yaml",
+      newPath: "shared/base.yaml",
+    });
+    expect(dialogOpen(el)).toBe(false);
+  });
+});

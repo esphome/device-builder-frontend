@@ -21,6 +21,7 @@ import { navigate } from "../../src/util/navigation.js";
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
 vi.mock("../../src/components/confirm-dialog.js", () => ({}));
 vi.mock("../../src/components/packages/file-list-dialog.js", () => ({}));
+vi.mock("../../src/components/packages/rename-file-dialog.js", () => ({}));
 
 type Api = Partial<Record<keyof ESPHomeAPI, ReturnType<typeof vi.fn>>>;
 
@@ -176,6 +177,44 @@ describe("esphome-page-packages delete", () => {
     await flushMicrotasks(4);
 
     expect(deleteFile).toHaveBeenCalledWith("common/base.yaml");
+    expect(listPackages).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("esphome-page-packages rename", () => {
+  test("opens the dialog with the users, renames and reloads", async () => {
+    const listPackages = vi.fn().mockResolvedValue([{ path: "common/base.yaml" }]);
+    const getFileUsage = vi
+      .fn()
+      .mockResolvedValue({ used_by: ["kitchen.yaml"], unknown: [] });
+    const renameFile = vi.fn().mockResolvedValue({
+      path: "shared/base.yaml",
+      rewritten: ["kitchen.yaml"],
+      unresolved: [],
+    });
+    const page = await mountWith({ listPackages, getFileUsage, renameFile });
+    const open = vi.fn();
+    Object.defineProperty(page, "_renameDialog", { value: { open } });
+
+    root(page)
+      .querySelector<HTMLButtonElement>('[aria-label="packages.rename_named"]')!
+      .click();
+    await flushMicrotasks(4);
+    expect(open).toHaveBeenCalledWith("common/base.yaml", {
+      used_by: ["kitchen.yaml"],
+      unknown: [],
+    });
+
+    root(page)
+      .querySelector("esphome-rename-file-dialog")!
+      .dispatchEvent(
+        new CustomEvent("rename-file", {
+          detail: { path: "common/base.yaml", newPath: "shared/base.yaml" },
+        })
+      );
+    await flushMicrotasks(4);
+
+    expect(renameFile).toHaveBeenCalledWith("common/base.yaml", "shared/base.yaml");
     expect(listPackages).toHaveBeenCalledTimes(2);
   });
 });
