@@ -52,6 +52,7 @@ describe("file-paths", () => {
     ["common/@main.yaml", "packages.path_start"],
     ["!x/main.yaml", "packages.path_start"],
     ["common/_main.yaml", null],
+    ["共有/éclairage.yaml", null],
     ["common/secrets.yaml", "packages.path_reserved"],
     ["Archive/x.yaml", "packages.path_reserved"],
   ])("newPackagePathProblem(%j) → %j", (input, expected) => {

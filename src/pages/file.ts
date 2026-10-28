@@ -156,7 +156,11 @@ export class ESPHomePageFile extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues<this>) {
-    if (changed.has("path") && this.path) void this._load.start();
+    if (changed.has("path") && this.path) {
+      // A discarded buffer of the previous file must not be saved into this one.
+      this._yaml = this._savedYaml = "";
+      void this._load.start();
+    }
   }
 
   private get _isDirty(): boolean {
@@ -384,17 +388,21 @@ export class ESPHomePageFile extends LitElement {
 
   // Returns whether the save landed, so the leave guard knows whether to go.
   private _save = async (): Promise<boolean> => {
+    // The page is reused across files: late results only apply to the file they belong to.
+    const path = this.path;
     const content = this._yaml;
     this._saving = true;
     try {
-      await this._api.updateConfig(this.path, content, { expected: this._savedYaml });
+      await this._api.updateConfig(path, content, { expected: this._savedYaml });
     } catch (err) {
       if (err instanceof APIError && err.errorCode === ErrorCode.PRECONDITION_FAILED) {
         notifyError(this._localize("file.changed_on_disk"), {
           duration: LONG_TOAST_DURATION_MS,
           action: {
             label: this._localize("file.reload"),
-            onClick: () => void this._load.start(),
+            onClick: () => {
+              if (this.path === path) void this._load.start();
+            },
           },
         });
       } else {
@@ -404,16 +412,17 @@ export class ESPHomePageFile extends LitElement {
     } finally {
       this._saving = false;
     }
+    if (this.path !== path) return true;
     this._savedYaml = content;
-    void this._announceSaved();
+    void this._announceSaved(path);
     return true;
   };
 
   /** Success toast; when devices use the file, it offers to install them. */
-  private async _announceSaved() {
+  private async _announceSaved(path: string) {
     let users: string[] = [];
     try {
-      users = (await this._api.getFileUsage(this.path)).used_by;
+      users = (await this._api.getFileUsage(path)).used_by;
     } catch {
       // Usage is a convenience on top of a save that already landed.
     }
@@ -448,7 +457,8 @@ export class ESPHomePageFile extends LitElement {
 
   private _confirmDelete = () => void this._deleteDialog?.open(this.path);
 
-  private _onDeleted = () => {
+  private _onDeleted = (e: CustomEvent<{ path: string }>) => {
+    if (e.detail.path !== this.path) return;
     // The file is gone; leaving must not prompt to save it back.
     this._savedYaml = this._yaml;
     void navigate("/packages");

@@ -38,9 +38,9 @@ interface PageView {
   _localize: typeof argsLocalize;
   _deleteDialog?: { open(path: string): void };
   _save(): Promise<boolean>;
-  _announceSaved(): Promise<void>;
+  _announceSaved(path: string): Promise<void>;
   _confirmDelete(): void;
-  _onDeleted(): void;
+  _onDeleted(e: CustomEvent<{ path: string }>): void;
   render(): unknown;
 }
 
@@ -115,6 +115,40 @@ describe("esphome-page-file save", () => {
     expect(lastToastOptions(toast.error).action?.label).toBe("file.reload");
   });
 
+  test("a save finishing after switching files leaves the new file alone", async () => {
+    let finish!: () => void;
+    const getFileUsage = vi.fn();
+    const page = makePage({ _yaml: "a: 1\n" });
+    page._api = {
+      updateConfig: vi.fn(() => new Promise<void>((resolve) => (finish = resolve))),
+      getFileUsage,
+    } as unknown as ESPHomeAPI;
+
+    const saved = page._save();
+    Object.assign(page, { path: "common/other.yaml", _savedYaml: "b: 1\n" });
+    finish();
+
+    expect(await saved).toBe(true);
+    expect(page._savedYaml).toBe("b: 1\n");
+    expect(getFileUsage).not.toHaveBeenCalled();
+  });
+
+  test("Reload from a conflict toast is ignored once another file is open", async () => {
+    const page = makePage({ _yaml: "new: 1\n" });
+    page._api = {
+      updateConfig: vi
+        .fn()
+        .mockRejectedValue(new APIError("precondition_failed", "differs")),
+    } as unknown as ESPHomeAPI;
+    await page._save();
+    const start = vi.spyOn(page._load as unknown as { start(): void }, "start");
+
+    page.path = "common/other.yaml";
+    lastToastOptions(toast.error).action!.onClick();
+
+    expect(start).not.toHaveBeenCalled();
+  });
+
   test("any other failure toasts the backend detail", async () => {
     const page = makePage({ _yaml: "new: 1\n" });
     page._api = {
@@ -133,7 +167,7 @@ describe("esphome-page-file save", () => {
         .mockResolvedValue({ used_by: ["a.yaml", "b.yaml"], unknown: [] }),
     } as unknown as ESPHomeAPI;
 
-    await page._announceSaved();
+    await page._announceSaved("common/base.yaml");
 
     const options = lastToastOptions(toast.success);
     expect(options.description).toBe("file.saved_used_by | 2");
@@ -147,7 +181,7 @@ describe("esphome-page-file save", () => {
       getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: [] }),
     } as unknown as ESPHomeAPI;
 
-    await page._announceSaved();
+    await page._announceSaved("common/base.yaml");
 
     expect(vi.mocked(toast.success).mock.lastCall?.[0]).toBe("file.saved");
     expect(lastToastOptions(toast.success).action).toBeUndefined();
@@ -169,10 +203,23 @@ describe("esphome-page-file delete", () => {
   test("after the delete, returns to the packages list without a save prompt", () => {
     const page = makePage({ _yaml: "unsaved: 1\n" });
 
-    page._onDeleted();
+    page._onDeleted(
+      new CustomEvent("file-deleted", { detail: { path: "common/base.yaml" } })
+    );
 
     expect(page._savedYaml).toBe(page._yaml);
     expect(navigate).toHaveBeenCalledWith("/packages");
+  });
+
+  test("a delete of a file no longer open leaves this one alone", () => {
+    const page = makePage({ _yaml: "unsaved: 1\n" });
+
+    page._onDeleted(
+      new CustomEvent("file-deleted", { detail: { path: "common/old.yaml" } })
+    );
+
+    expect(page._savedYaml).toBe("logger:\n");
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
 
@@ -187,7 +234,11 @@ describe("esphome-page-file load", () => {
     page.path = "common/a.yaml";
     document.body.appendChild(page);
     await flushMicrotasks(8);
+    // a discarded edit of a.yaml must not survive into b.yaml
+    (page as unknown as PageView)._yaml = "edited: 1\n";
     page.path = "common/b.yaml";
+    await page.updateComplete;
+    expect((page as unknown as PageView)._yaml).toBe("");
     await flushMicrotasks(8);
 
     expect(getConfig.mock.calls.map((c) => c[0])).toEqual([

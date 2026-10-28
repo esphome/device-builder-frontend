@@ -56,7 +56,8 @@ export function newPackagePathProblem(raw: string): string | null {
   }
   // Names that would need quoting in an !include.
   if (/[\s#"'{}[\],]/.test(path)) return "packages.path_characters";
-  if (parts.some((p) => !/^\w/.test(p))) return "packages.path_start";
+  // Unicode, like the backend's Python ``\w``.
+  if (parts.some((p) => !/^[\p{L}\p{N}_]/u.test(p))) return "packages.path_start";
   if (!YAML_RE.test(path)) return "packages.path_needs_yaml";
   if (
     /^secrets\.ya?ml$/i.test(fileNameOf(path)) ||

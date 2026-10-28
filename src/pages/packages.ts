@@ -334,6 +334,8 @@ export class ESPHomePagePackages extends LitElement {
   private _reload = async () => {
     this._state = "loading";
     try {
+      // A reconnect flips "connected" before a stored-token login finishes.
+      await this._api.ready;
       this._paths = (await this._api.listPackages()).map((p) => p.path);
       this._state = "ready";
     } catch (err) {
