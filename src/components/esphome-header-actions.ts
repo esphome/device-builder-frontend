@@ -11,6 +11,7 @@ import {
   mdiEyeOutline,
   mdiKeyVariant,
   mdiMagnify,
+  mdiPackageVariantClosed,
   mdiPlaylistCheck,
   mdiUpdate,
   mdiWifiCog,
@@ -53,6 +54,7 @@ registerMdiIcons({
   "eye-off-outline": mdiEyeOffOutline,
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
+  "package-variant-closed": mdiPackageVariantClosed,
   magnify: mdiMagnify,
   "playlist-check": mdiPlaylistCheck,
   update: mdiUpdate,
@@ -229,6 +231,18 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   class="menu-item"
                   role="menuitem"
                   tabindex="0"
+                  @click=${this._openPackages}
+                  @keydown=${this._onItemKeydown}
+                >
+                  <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+                  <span class="menu-item-label"
+                    >${this._localize("layout.packages")}</span
+                  >
+                </div>
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
                   @click=${this._openOnboarding}
                   @keydown=${this._onItemKeydown}
                 >
@@ -388,6 +402,11 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
   private _openSecrets() {
     this._close();
     void navigate("/secrets");
+  }
+
+  private _openPackages() {
+    this._close();
+    void navigate("/packages");
   }
 
   /** Opens the Wi-Fi credentials dialog on demand. The kebab item

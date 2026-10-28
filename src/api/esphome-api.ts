@@ -54,6 +54,7 @@ import type {
   EventSubscriptionCallback,
   VersionMatchPolicy,
 } from "./types/event-subscription.js";
+import type { DeviceDependencies, FileUsage, PackageFile } from "./types/files.js";
 import type {
   FirmwareBinary,
   FirmwareJob,
@@ -1170,16 +1171,19 @@ export class ESPHomeAPI {
     return this.sendCommand<string>("devices/get_config", { configuration }, timeout);
   }
 
-  /** Save device YAML config. `allowWipe` confirms clearing secrets.yaml. */
+  /** Save device YAML config. `allowWipe` confirms clearing secrets.yaml;
+   *  `expected` (the text last read) makes the save fail with
+   *  PRECONDITION_FAILED if the file changed on disk meanwhile. */
   async updateConfig(
     configuration: string,
     content: string,
-    opts?: { allowWipe?: boolean }
+    opts?: { allowWipe?: boolean; expected?: string }
   ): Promise<void> {
     await this.sendCommand("devices/update_config", {
       configuration,
       content,
       ...(opts?.allowWipe ? { allow_wipe: true } : {}),
+      ...(opts?.expected !== undefined ? { expected: opts.expected } : {}),
     });
   }
 
@@ -1315,6 +1319,34 @@ export class ESPHomeAPI {
    *  last so consumers can drop the catalog entry. */
   async deleteLabel(labelId: string): Promise<void> {
     await this.sendCommand("labels/delete", { label_id: labelId });
+  }
+
+  // ─── Files Commands ──────────────────────────────────────
+
+  /** Every package YAML (a YAML in a subfolder), sorted by path. Read and
+   *  save one with ``getConfig`` / ``updateConfig``. */
+  async listPackages(): Promise<PackageFile[]> {
+    return this.sendCommand<PackageFile[]>("files/list_packages");
+  }
+
+  /** Create a package YAML (parent folders included); ALREADY_EXISTS if taken. */
+  async createFile(path: string, content: string): Promise<PackageFile> {
+    return this.sendCommand<PackageFile>("files/create", { path, content });
+  }
+
+  /** Delete a package YAML. */
+  async deleteFile(path: string): Promise<void> {
+    await this.sendCommand("files/delete", { path });
+  }
+
+  /** Devices whose config pulls in *path*, directly or through other includes. */
+  async getFileUsage(path: string): Promise<FileUsage> {
+    return this.sendCommand<FileUsage>("files/usage", { path });
+  }
+
+  /** Files *configuration* pulls in, secrets files left out. */
+  async getDeviceDependencies(configuration: string): Promise<DeviceDependencies> {
+    return this.sendCommand<DeviceDependencies>("files/dependencies", { configuration });
   }
 
   // ─── Streaming Commands (per-connection) ───────────────────

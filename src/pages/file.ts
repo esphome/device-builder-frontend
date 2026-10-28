@@ -1,0 +1,392 @@
+/**
+ * Editor for a non-device YAML (a package in a subfolder, or any include
+ * a device pulls in). Plain YAML editing: device lint needs a device
+ * config, so the editor runs without one. Saves are guarded with
+ * ``expected`` so an edit made outside the dashboard isn't overwritten.
+ */
+import { consume } from "@lit/context";
+import { mdiContentSave, mdiDeleteOutline, mdiDevices } from "@mdi/js";
+import { css, html, LitElement, type PropertyValues } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
+import { APIError } from "../api/api-error.js";
+import type { ESPHomeAPI } from "../api/index.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import { ErrorCode } from "../api/types/protocol.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
+import type { LocalizeFunc } from "../common/localize.js";
+import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
+import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
+import {
+  deviceItems,
+  linkListStyles,
+  renderLinkList,
+} from "../components/packages/link-list.js";
+import { notifyFailure, showUsage } from "../components/packages/usage.js";
+import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
+import {
+  apiConnectedContext,
+  apiContext,
+  buildOffloadPairingsContext,
+  devicesContext,
+  localizeContext,
+  versionContext,
+} from "../context/index.js";
+import { loadMessageStyles } from "../styles/load-message.js";
+import { espHomeStyles } from "../styles/shared.js";
+import { runBulkUpdate } from "../util/bulk-update.js";
+import { ConfigLoadController } from "../util/config-load-controller.js";
+import { fileEditorUrl, fileNameOf, folderOf } from "../util/file-paths.js";
+import { navigate, PopLeaveGuardController } from "../util/navigation.js";
+import { LONG_TOAST_DURATION_MS, notifyError, notifySuccess } from "../util/notify.js";
+import { registerMdiIcons } from "../util/register-icons.js";
+import { renderAsyncState } from "../util/render-async-state.js";
+import { SaveShortcutController } from "../util/save-shortcut-controller.js";
+import { UnsavedGuard } from "../util/unsaved-guard.js";
+import { secretsStyles } from "./secrets.styles.js";
+
+import "@home-assistant/webawesome/dist/components/button/button.js";
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../components/confirm-dialog.js";
+import "../components/packages/file-list-dialog.js";
+import "../components/unsaved-changes-dialog.js";
+import "../components/yaml-editor.js";
+
+registerMdiIcons({
+  "content-save": mdiContentSave,
+  "delete-outline": mdiDeleteOutline,
+  devices: mdiDevices,
+});
+
+@customElement("esphome-page-file")
+export class ESPHomePageFile extends LitElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: apiContext })
+  private _api!: ESPHomeAPI;
+
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  private _apiConnected = false;
+
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  private _devices: ConfiguredDevice[] = [];
+
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  private _appVersion = "";
+
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  private _pairings: Map<string, PairingSummary> | null = null;
+
+  /** Config-relative POSIX path, from the ``/file/*`` route. */
+  @property() path = "";
+
+  @state() private _yaml = "";
+  @state() private _savedYaml = "";
+  @state() private _saving = false;
+  /** Users shown in the delete confirm, fetched when it opens. */
+  @state() private _deleteUsers: string[] = [];
+
+  protected readonly _load = new ConfigLoadController(this, {
+    api: () => this._api,
+    connected: () => this._apiConnected,
+    configuration: () => this.path,
+    attempts: 4,
+    commit: (yaml) => {
+      this._yaml = yaml;
+      this._savedYaml = yaml;
+    },
+    onApiError: (err) => (err.errorCode === ErrorCode.NOT_FOUND ? "missing" : undefined),
+    onRefreshFailed: () => notifyError(this._localize("file.reload_failed")),
+  });
+
+  @query("esphome-unsaved-changes-dialog")
+  private _unsavedDialog?: ESPHomeUnsavedChangesDialog;
+
+  @query("esphome-confirm-dialog")
+  private _deleteDialog?: ESPHomeConfirmDialog;
+
+  @query("esphome-file-list-dialog")
+  private _usageDialog?: ESPHomeFileListDialog;
+
+  private _unsavedGuard = new UnsavedGuard();
+
+  protected readonly _saveShortcut = new SaveShortcutController(this, () => {
+    if (this._isDirty && !this._saving && this._yaml.trim() !== "") void this._save();
+  });
+
+  protected readonly _leaveGuard = new PopLeaveGuardController(this, {
+    confirmLeave: () =>
+      this._unsavedGuard.run({
+        dirty: this._isDirty,
+        open: () => this._unsavedDialog?.open(),
+        save: () => this._save(),
+      }),
+    isDirty: () => this._isDirty,
+    url: () => fileEditorUrl(this.path),
+  });
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener("beforeunload", this._onBeforeUnload);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener("beforeunload", this._onBeforeUnload);
+    this._unsavedGuard.cancelPending();
+    super.disconnectedCallback();
+  }
+
+  protected willUpdate(changed: PropertyValues<this>) {
+    if (changed.has("path") && this.path) void this._load.start();
+  }
+
+  private get _isDirty(): boolean {
+    return this._yaml !== this._savedYaml;
+  }
+
+  /** Only packages (subfolder YAMLs) are deletable here; a top-level file is a device. */
+  private get _isPackage(): boolean {
+    return folderOf(this.path) !== "";
+  }
+
+  private _onBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (this._isDirty) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  };
+
+  static styles = [
+    espHomeStyles,
+    loadMessageStyles,
+    secretsStyles,
+    linkListStyles,
+    css`
+      .page-title p {
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+      .header-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-m);
+        background: transparent;
+        color: var(--wa-color-text-normal);
+        font: inherit;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        cursor: pointer;
+      }
+      .header-button:hover {
+        background: var(--wa-color-surface-lowered);
+      }
+      .header-button wa-icon {
+        font-size: 16px;
+      }
+      .delete-users {
+        margin-top: var(--wa-space-s);
+      }
+    `,
+  ];
+
+  protected render() {
+    return html`
+      <div class="page">
+        <div class="page-header">
+          <div class="page-title">
+            <h1>${fileNameOf(this.path)}</h1>
+            <p>${this.path}</p>
+          </div>
+          <button type="button" class="header-button" @click=${this._showUsage}>
+            <wa-icon library="mdi" name="devices"></wa-icon>
+            ${this._localize("packages.show_usage")}
+          </button>
+          ${
+            this._isPackage
+              ? html`<button
+                  type="button"
+                  class="header-button"
+                  @click=${this._confirmDelete}
+                >
+                  <wa-icon library="mdi" name="delete-outline"></wa-icon>
+                  ${this._localize("packages.delete")}
+                </button>`
+              : null
+          }
+        </div>
+        <div class="editor-card">
+          ${renderAsyncState({
+            loading: this._load.state === "loading",
+            loadingMessage: this._localize("file.loading"),
+            loadingLead: html`<wa-spinner></wa-spinner>`,
+            error:
+              this._load.state === "error"
+                ? this._localize("file.load_failed")
+                : this._load.state === "missing"
+                  ? this._localize("file.not_found", { path: this.path })
+                  : null,
+            errorActions: () =>
+              this._load.state === "error"
+                ? html`<wa-button size="small" @click=${this._load.retry}>
+                    ${this._localize("command.retry")}
+                  </wa-button>`
+                : html`<wa-button size="small" @click=${() => navigate("/packages")}>
+                    ${this._localize("packages.title")}
+                  </wa-button>`,
+            content: () => html`
+              <button
+                type="button"
+                class="save-button"
+                ?disabled=${this._saving || !this._isDirty}
+                @click=${this._save}
+              >
+                <wa-icon library="mdi" name="content-save"></wa-icon>
+                ${this._localize(this._saving ? "file.saving" : "file.save")}
+              </button>
+              <div class="editor-pane">
+                <esphome-yaml-editor
+                  .value=${this._yaml}
+                  @yaml-change=${this._onYamlChange}
+                ></esphome-yaml-editor>
+              </div>
+            `,
+          })}
+        </div>
+      </div>
+      <esphome-unsaved-changes-dialog
+        heading=${this._localize("file.unsaved_title")}
+        message=${this._localize("file.unsaved_message")}
+        @discard=${() => this._unsavedGuard.onDiscard()}
+        @save=${() => this._unsavedGuard.onSave()}
+        @cancel=${() => this._unsavedGuard.onCancel()}
+      ></esphome-unsaved-changes-dialog>
+      <esphome-confirm-dialog
+        ?destructive=${true}
+        heading=${this._localize("packages.delete_title", { path: this.path })}
+        confirm-label=${this._localize("packages.delete")}
+        @confirm=${this._delete}
+      >
+        <div slot="body">
+          ${this._localize(
+            this._deleteUsers.length > 0
+              ? "packages.delete_used_message"
+              : "packages.delete_unused_message",
+            { count: this._deleteUsers.length }
+          )}
+          <div class="delete-users">
+            ${renderLinkList(deviceItems(this._deleteUsers, this._devices), (url) => {
+              this._deleteDialog?.close();
+              void navigate(url);
+            })}
+          </div>
+        </div>
+      </esphome-confirm-dialog>
+      <esphome-file-list-dialog></esphome-file-list-dialog>
+    `;
+  }
+
+  private _onYamlChange = (e: CustomEvent<{ value: string }>) => {
+    this._yaml = e.detail.value;
+  };
+
+  // Returns whether the save landed, so the leave guard knows whether to go.
+  private _save = async (): Promise<boolean> => {
+    const content = this._yaml;
+    this._saving = true;
+    try {
+      await this._api.updateConfig(this.path, content, { expected: this._savedYaml });
+    } catch (err) {
+      if (err instanceof APIError && err.errorCode === ErrorCode.PRECONDITION_FAILED) {
+        notifyError(this._localize("file.changed_on_disk"), {
+          duration: LONG_TOAST_DURATION_MS,
+          action: {
+            label: this._localize("file.reload"),
+            onClick: () => void this._load.start(),
+          },
+        });
+      } else {
+        notifyFailure(this._localize, "file.save_error", err);
+      }
+      return false;
+    } finally {
+      this._saving = false;
+    }
+    this._savedYaml = content;
+    void this._announceSaved();
+    return true;
+  };
+
+  /** Success toast; when devices use the file, it offers to install them. */
+  private async _announceSaved() {
+    let users: string[] = [];
+    try {
+      users = (await this._api.getFileUsage(this.path)).used_by;
+    } catch {
+      // Usage is a convenience on top of a save that already landed.
+    }
+    if (users.length === 0) {
+      notifySuccess(this._localize("file.saved"));
+      return;
+    }
+    notifySuccess(this._localize("file.saved"), {
+      description: this._localize("file.saved_used_by", { count: users.length }),
+      duration: LONG_TOAST_DURATION_MS,
+      action: {
+        label: this._localize("file.install_users"),
+        onClick: () =>
+          void runBulkUpdate(users, {
+            api: this._api,
+            localize: this._localize,
+            appVersion: this._appVersion,
+            pairings: this._pairings?.values() ?? [],
+          }),
+      },
+    });
+  }
+
+  private _showUsage = () =>
+    void showUsage(
+      this._api,
+      this._localize,
+      this._devices,
+      this._usageDialog,
+      this.path
+    );
+
+  private _confirmDelete = async () => {
+    try {
+      this._deleteUsers = (await this._api.getFileUsage(this.path)).used_by;
+    } catch (err) {
+      notifyFailure(this._localize, "packages.usage_failed", err);
+      return;
+    }
+    this._deleteDialog?.open();
+  };
+
+  private _delete = async () => {
+    try {
+      await this._api.deleteFile(this.path);
+    } catch (err) {
+      notifyFailure(this._localize, "packages.delete_failed", err);
+      return;
+    }
+    // The file is gone; leaving must not prompt to save it back.
+    this._savedYaml = this._yaml;
+    notifySuccess(this._localize("packages.deleted", { path: this.path }));
+    void navigate("/packages");
+  };
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "esphome-page-file": ESPHomePageFile;
+  }
+}

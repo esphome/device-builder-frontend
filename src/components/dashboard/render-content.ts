@@ -226,6 +226,8 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       @show-encryption-key=${(e: CustomEvent<ConfiguredDevice>) => host._showEncryptionKey(e.detail)}
       @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
         downloadYaml(e.detail, host._api, host._localize)}
+      @show-dependencies=${(e: CustomEvent<ConfiguredDevice>) =>
+        host._showDependencies(e.detail)}
       @rename-device=${(e: CustomEvent<ConfiguredDevice>) => host._openRename(e.detail)}
       @clone-device=${(e: CustomEvent<ConfiguredDevice>) => host._openClone(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -342,6 +344,8 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
       @show-encryption-key=${(e: CustomEvent<ConfiguredDevice>) => host._showEncryptionKey(e.detail)}
       @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
         downloadYaml(e.detail, host._api, host._localize)}
+      @show-dependencies=${(e: CustomEvent<ConfiguredDevice>) =>
+        host._showDependencies(e.detail)}
       @rename-device=${(e: CustomEvent<ConfiguredDevice>) => host._openRename(e.detail)}
       @clone-device=${(e: CustomEvent<ConfiguredDevice>) => host._openClone(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>

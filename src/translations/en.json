@@ -448,7 +448,8 @@
     "compile_selected_aria": "Compile {count} selected without installing",
     "builder_stack_heading": "Device builder",
     "builder_stack_tagline": "create and manage your devices",
-    "logs_serial_probe_failed": "Could not check for serial ports; showing logs over the network."
+    "logs_serial_probe_failed": "Could not check for serial ports; showing logs over the network.",
+    "action_show_dependencies": "Show included files"
   },
   "command": {
     "install_title": "Install — {name}",
@@ -1478,7 +1479,8 @@
     "editor": "Editor",
     "preview_badge": "Beta",
     "page_load_failed": "The page failed to load. Check your connection and try again.",
-    "reconnecting": "Connection lost. Reconnecting…"
+    "reconnecting": "Connection lost. Reconnecting…",
+    "packages": "Packages"
   },
   "feedback": {
     "title": "Found a bug? Have an idea?",
@@ -1919,6 +1921,57 @@
     "loading": "Loading secrets…",
     "load_failed": "Secrets could not be loaded. Check your connection and retry.",
     "reload_failed": "Couldn't refresh secrets after an external change; the editor may be out of date."
+  },
+  "packages": {
+    "title": "Packages",
+    "desc": "Shared YAML that devices pull in with packages: or !include. Any YAML in a subfolder of your config folder is a package, not a device.",
+    "new_label": "New package path",
+    "new_placeholder": "common/wifi.yaml",
+    "new": "New package",
+    "new_file_template": "# {path}\n# Shared configuration. Include it from a device with:\n#   packages:\n#     shared: !include {path}\n",
+    "loading": "Loading packages…",
+    "load_failed": "Packages could not be loaded. Check your connection and retry.",
+    "empty": "No packages yet. Create one above, or move shared YAML into a subfolder such as common/.",
+    "show_usage": "Used by",
+    "usage_title": "Devices using {path}",
+    "usage_message": "{count, plural, one {# device includes this file, directly or through another include.} other {# devices include this file, directly or through another include.}}",
+    "usage_none": "No device includes this file.",
+    "usage_unknown": "Not checked yet (config not loaded): {names}",
+    "usage_failed": "Couldn't check which devices use this file",
+    "delete": "Delete",
+    "delete_named": "Delete {path}",
+    "delete_title": "Delete {path}?",
+    "delete_used_message": "{count, plural, one {# device still includes this file and will fail to build until you fix it:} other {# devices still include this file and will fail to build until you fix them:}}",
+    "delete_unused_message": "No device includes this file. Its earlier versions stay in version history.",
+    "deleted": "Deleted {path}",
+    "delete_failed": "Couldn't delete the file",
+    "already_exists": "A file with that path already exists",
+    "create_failed": "Couldn't create the package",
+    "dependencies_title": "Files included by {name}",
+    "dependencies_message": "{count, plural, one {This device pulls in # file:} other {This device pulls in # files:}}",
+    "dependencies_none": "This device doesn't include any other files.",
+    "dependencies_incomplete": "The config hasn't loaded yet, so this list may be incomplete.",
+    "dependencies_failed": "Couldn't list the included files",
+    "path_needs_folder": "Put the package in a folder, e.g. common/wifi.yaml. Files at the top level are devices.",
+    "path_invalid": "Use a relative path without .. or hidden (dot) names.",
+    "path_needs_yaml": "The file name must end in .yaml or .yml.",
+    "path_reserved": "secrets.yaml and the archive folder are reserved."
+  },
+  "file": {
+    "loading": "Loading file…",
+    "load_failed": "The file could not be loaded. Check your connection and retry.",
+    "not_found": "{path} doesn't exist.",
+    "reload_failed": "Couldn't refresh the file; the editor may be out of date.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "File saved",
+    "saved_used_by": "{count, plural, one {# device uses this file and needs a new install to pick up the change.} other {# devices use this file and need a new install to pick up the change.}}",
+    "install_users": "Install",
+    "save_error": "Failed to save the file",
+    "changed_on_disk": "The file changed outside the dashboard since you opened it. Reload to see the current version; your edits are not saved.",
+    "reload": "Reload",
+    "unsaved_title": "Unsaved changes",
+    "unsaved_message": "You have unsaved changes to this file. If you leave without saving, they will be lost."
   },
   "auth": {
     "connecting": "Connecting…",
