@@ -39,10 +39,14 @@ describe("link-list items", () => {
     ]);
   });
 
-  it("links top-level files to the device editor and the rest to the file editor", () => {
-    expect(fileItems(["common/a.yaml", "kitchen.yaml"])).toEqual([
+  it("links top-level files to the device editor, the rest to the file editor, absolute paths nowhere", () => {
+    expect(
+      fileItems(["common/a.yaml", "kitchen.yaml", "/abs/x.yaml", "C:/abs/y.yaml"])
+    ).toEqual([
       { label: "common/a.yaml", url: "/file/common/a.yaml" },
       { label: "kitchen.yaml", url: "/device/kitchen.yaml" },
+      { label: "/abs/x.yaml", url: null },
+      { label: "C:/abs/y.yaml", url: null },
     ]);
   });
 });

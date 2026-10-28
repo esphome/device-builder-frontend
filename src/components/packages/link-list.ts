@@ -8,8 +8,8 @@ export interface LinkItem {
   label: string;
   /** Secondary text, e.g. the YAML file name under a friendly name. */
   detail?: string;
-  /** App-relative URL to open. */
-  url: string;
+  /** App-relative URL to open; null renders a plain row. */
+  url: string | null;
 }
 
 /** Rows for *configurations*, labelled with each device's friendly name. */
@@ -29,9 +29,13 @@ export function deviceItems(
   });
 }
 
-/** Rows for config-relative *paths*; device YAMLs open the device editor. */
+/** Rows for *paths*; device YAMLs open the device editor. Absolute paths
+ *  (includes outside the config dir) have no editor and stay plain. */
 export function fileItems(paths: readonly string[]): LinkItem[] {
-  return paths.map((path) => ({ label: path, url: openTargetUrl(path) }));
+  return paths.map((path) => ({
+    label: path,
+    url: /^(\/|[a-z]:)/i.test(path) ? null : openTargetUrl(path),
+  }));
 }
 
 export function renderLinkList(
@@ -43,10 +47,20 @@ export function renderLinkList(
     ${items.map(
       (item) =>
         html`<li>
-          <button type="button" class="link-row" @click=${() => open(item.url)}>
-            <span class="link-label">${item.label}</span>
-            ${item.detail ? html`<span class="link-detail">${item.detail}</span>` : nothing}
-          </button>
+          ${
+            item.url === null
+              ? html`<span class="link-row"
+                  ><span class="link-label">${item.label}</span></span
+                >`
+              : html`<button
+                  type="button"
+                  class="link-row"
+                  @click=${() => open(item.url!)}
+                >
+                  <span class="link-label">${item.label}</span>
+                  ${item.detail ? html`<span class="link-detail">${item.detail}</span>` : nothing}
+                </button>`
+          }
         </li>`
     )}
   </ul>`;
@@ -79,11 +93,11 @@ export const linkListStyles = css`
     text-align: left;
     box-sizing: border-box;
   }
-  .link-row {
+  button.link-row {
     cursor: pointer;
   }
-  .link-row:hover,
-  .link-row:focus-visible {
+  button.link-row:hover,
+  button.link-row:focus-visible {
     background: var(--wa-color-surface-lowered);
   }
   .link-label {
