@@ -355,9 +355,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
         ],
       },
     ];
-    // A read-only host (a package file) has no device to add things to.
+    // A read-only host (a package file) has no device to add things to; the blurbs talk about adding.
     if (this.readonly) {
-      // The section blurbs talk about adding things, which this host can't.
       for (const section of sections) Object.assign(section, { actions: [], desc: "" });
     }
 
@@ -399,38 +398,34 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
     return html`
       <section class="card" ${tourAnchor(this.tourAnchorId)}>
-        ${
-          this.readonly
-            ? nothing
-            : html`<esphome-add-config-dialog
-                  .boardName=${this.boardName}
-                  .configuration=${this.configuration}
-                  .platform=${this.platform}
-                  .board=${this.board}
-                  .yaml=${this.yaml}
-                ></esphome-add-config-dialog>
-                <esphome-add-component-dialog
-                  .boardName=${this.boardName}
-                  .configuration=${this.configuration}
-                  .platform=${this.platform}
-                  .board=${this.board}
-                  .yaml=${this.yaml}
-                ></esphome-add-component-dialog>
-                <esphome-add-automation-dialog
-                  .boardName=${this.boardName}
-                  .configuration=${this.configuration}
-                  .board=${this.board}
-                  .yaml=${this.yaml}
-                  @automation-added=${this._onAutomationAdded}
-                ></esphome-add-automation-dialog>
-                <esphome-add-script-dialog
-                  .boardName=${this.boardName}
-                  .configuration=${this.configuration}
-                  .board=${this.board}
-                  .yaml=${this.yaml}
-                  @automation-added=${this._onAutomationAdded}
-                ></esphome-add-script-dialog>`
-        }
+        <esphome-add-config-dialog
+          .boardName=${this.boardName}
+          .configuration=${this.configuration}
+          .platform=${this.platform}
+          .board=${this.board}
+          .yaml=${this.yaml}
+        ></esphome-add-config-dialog>
+        <esphome-add-component-dialog
+          .boardName=${this.boardName}
+          .configuration=${this.configuration}
+          .platform=${this.platform}
+          .board=${this.board}
+          .yaml=${this.yaml}
+        ></esphome-add-component-dialog>
+        <esphome-add-automation-dialog
+          .boardName=${this.boardName}
+          .configuration=${this.configuration}
+          .board=${this.board}
+          .yaml=${this.yaml}
+          @automation-added=${this._onAutomationAdded}
+        ></esphome-add-automation-dialog>
+        <esphome-add-script-dialog
+          .boardName=${this.boardName}
+          .configuration=${this.configuration}
+          .board=${this.board}
+          .yaml=${this.yaml}
+          @automation-added=${this._onAutomationAdded}
+        ></esphome-add-script-dialog>
         <header class="card-header">
           <h2 class="card-title truncate">
             ${this._localize(
