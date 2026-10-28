@@ -32,6 +32,8 @@ describe("device-navigator readonly", () => {
     const nav = await mountNavigator(true);
     expect(root(nav).querySelectorAll(".action-item")).toHaveLength(0);
     expect(root(nav).querySelector("esphome-add-component-dialog")).toBeNull();
+    // Only the header blurb; no per-section "add things" copy.
+    expect(root(nav).querySelectorAll("p.italic")).toHaveLength(1);
     expect(root(nav).querySelector(".card-title")?.textContent?.trim()).toBe(
       "device.navigator_title_file"
     );

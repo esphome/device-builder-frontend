@@ -356,7 +356,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
       },
     ];
     // A read-only host (a package file) has no device to add things to.
-    if (this.readonly) for (const section of sections) section.actions = [];
+    if (this.readonly) {
+      // The section blurbs talk about adding things, which this host can't.
+      for (const section of sections) Object.assign(section, { actions: [], desc: "" });
+    }
 
     // Labels resolve once per (yaml, catalog tick, platform, name, locale)
     // via the memo, so typing only re-runs the cheap match predicate.
