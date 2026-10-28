@@ -23,6 +23,7 @@ import { navigate } from "../../src/util/navigation.js";
 
 vi.mock("@home-assistant/webawesome/dist/components/button/button.js", () => ({}));
 vi.mock("../../src/components/confirm-dialog.js", () => ({}));
+vi.mock("../../src/components/device/device-navigator.js", () => ({}));
 vi.mock("../../src/components/packages/file-list-dialog.js", () => ({}));
 vi.mock("../../src/components/unsaved-changes-dialog.js", () => ({}));
 vi.mock("../../src/components/yaml-editor.js", () => ({}));
@@ -216,5 +217,60 @@ describe("esphome-page-file load", () => {
       "common/b.yaml",
     ]);
     page.remove();
+  });
+});
+
+describe("esphome-page-file section navigator", () => {
+  interface NavView extends PageView {
+    _navCollapsed: boolean;
+    _highlight: { fromLine: number; toLine: number } | null;
+    _scrollToHighlight: boolean;
+    _selectedSection: string | null;
+    _onYamlHighlight(e: CustomEvent): void;
+    _onSectionSelect(e: CustomEvent): void;
+    _onYamlChange(e: CustomEvent): void;
+  }
+
+  test("renders a read-only navigator next to a completion-enabled editor", () => {
+    const tree = makePage().render();
+    const nav = findTemplatesByAnchor(tree, "<esphome-device-navigator");
+    expect(nav).toHaveLength(1);
+    expect(nav[0].strings.join("")).toContain("readonly");
+    const editor = findTemplatesByAnchor(tree, "<esphome-yaml-editor");
+    expect(editor[0].strings.join("")).toContain("completion");
+  });
+
+  test("collapsing hides the navigator and offers a way back", () => {
+    const page = makePage() as unknown as NavView;
+    page._navCollapsed = true;
+    const tree = page.render();
+    expect(findTemplatesByAnchor(tree, "<esphome-device-navigator")).toHaveLength(0);
+    expect(findTemplatesByAnchor(tree, 'name="menu"')).toHaveLength(1);
+  });
+
+  test("no navigator until the file has loaded", () => {
+    const page = makePage();
+    page._load.state = "loading";
+    expect(
+      findTemplatesByAnchor(page.render(), "<esphome-device-navigator")
+    ).toHaveLength(0);
+  });
+
+  test("a section click highlights its YAML; a hand edit drops the highlight", () => {
+    const page = makePage() as unknown as NavView;
+    page._onSectionSelect(
+      new CustomEvent("section-select", { detail: { sectionKey: "sensor", fromLine: 5 } })
+    );
+    page._onYamlHighlight(
+      new CustomEvent("yaml-highlight", {
+        detail: { range: { fromLine: 5, toLine: 9 }, scroll: true },
+      })
+    );
+    expect(page._selectedSection).toBe("sensor");
+    expect(page._highlight).toEqual({ fromLine: 5, toLine: 9 });
+    expect(page._scrollToHighlight).toBe(true);
+
+    page._onYamlChange(new CustomEvent("yaml-change", { detail: { value: "x: 1\n" } }));
+    expect(page._highlight).toBeNull();
   });
 });

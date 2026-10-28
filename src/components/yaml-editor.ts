@@ -144,6 +144,10 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    */
   @property() configuration = "";
 
+  /** Schema completion + hover docs without a ``configuration`` (e.g. a
+   *  package file); lint stays device-only. */
+  @property({ type: Boolean }) completion = false;
+
   /**
    * The device's resolved board catalog entry. Supplies the target
    * platform/board so completion hydrates per-platform value options (e.g.
@@ -558,6 +562,9 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         }),
         lintErrorLineGutter
       );
+    }
+
+    if (this._api && (this.configuration || this.completion)) {
       // The device's platform/board, read per invocation so completion
       // and hover share the structured editor's hydrated-body cache bucket.
       const getDeviceTarget = () => ({
@@ -784,6 +791,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       (changed.has("_darkMode") ||
         changed.has("_api") ||
         changed.has("maskAllValues") ||
+        changed.has("completion") ||
         changed.has("_localize")) &&
       this._view
     ) {

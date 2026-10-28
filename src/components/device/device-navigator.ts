@@ -177,6 +177,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @property({ type: Boolean })
   platformReady = false;
 
+  /** Hide the "+ Add …" actions; they write through device-only commands. */
+  @property({ type: Boolean })
+  readonly = false;
+
   @query("esphome-add-config-dialog")
   private _addConfigDialog!: ESPHomeAddConfigDialog;
 
@@ -351,6 +355,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
         ],
       },
     ];
+    // A read-only host (a package file) has no device to add things to.
+    if (this.readonly) for (const section of sections) section.actions = [];
 
     // Labels resolve once per (yaml, catalog tick, platform, name, locale)
     // via the memo, so typing only re-runs the cheap match predicate.
@@ -390,36 +396,44 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
     return html`
       <section class="card" ${tourAnchor(this.tourAnchorId)}>
-        <esphome-add-config-dialog
-          .boardName=${this.boardName}
-          .configuration=${this.configuration}
-          .platform=${this.platform}
-          .board=${this.board}
-          .yaml=${this.yaml}
-        ></esphome-add-config-dialog>
-        <esphome-add-component-dialog
-          .boardName=${this.boardName}
-          .configuration=${this.configuration}
-          .platform=${this.platform}
-          .board=${this.board}
-          .yaml=${this.yaml}
-        ></esphome-add-component-dialog>
-        <esphome-add-automation-dialog
-          .boardName=${this.boardName}
-          .configuration=${this.configuration}
-          .board=${this.board}
-          .yaml=${this.yaml}
-          @automation-added=${this._onAutomationAdded}
-        ></esphome-add-automation-dialog>
-        <esphome-add-script-dialog
-          .boardName=${this.boardName}
-          .configuration=${this.configuration}
-          .board=${this.board}
-          .yaml=${this.yaml}
-          @automation-added=${this._onAutomationAdded}
-        ></esphome-add-script-dialog>
+        ${
+          this.readonly
+            ? nothing
+            : html`<esphome-add-config-dialog
+                  .boardName=${this.boardName}
+                  .configuration=${this.configuration}
+                  .platform=${this.platform}
+                  .board=${this.board}
+                  .yaml=${this.yaml}
+                ></esphome-add-config-dialog>
+                <esphome-add-component-dialog
+                  .boardName=${this.boardName}
+                  .configuration=${this.configuration}
+                  .platform=${this.platform}
+                  .board=${this.board}
+                  .yaml=${this.yaml}
+                ></esphome-add-component-dialog>
+                <esphome-add-automation-dialog
+                  .boardName=${this.boardName}
+                  .configuration=${this.configuration}
+                  .board=${this.board}
+                  .yaml=${this.yaml}
+                  @automation-added=${this._onAutomationAdded}
+                ></esphome-add-automation-dialog>
+                <esphome-add-script-dialog
+                  .boardName=${this.boardName}
+                  .configuration=${this.configuration}
+                  .board=${this.board}
+                  .yaml=${this.yaml}
+                  @automation-added=${this._onAutomationAdded}
+                ></esphome-add-script-dialog>`
+        }
         <header class="card-header">
-          <h2 class="card-title truncate">${this._localize("device.navigator_title")}</h2>
+          <h2 class="card-title truncate">
+            ${this._localize(
+              this.readonly ? "device.navigator_title_file" : "device.navigator_title"
+            )}
+          </h2>
           <div class="header-actions">
             ${
               showSearchToggle
@@ -456,7 +470,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
           ${
             filtering
               ? nothing
-              : html`<p class="italic">${this._localize("device.navigator_desc")}</p>`
+              : html`<p class="italic">
+                  ${this._localize(
+                    this.readonly ? "device.navigator_desc_file" : "device.navigator_desc"
+                  )}
+                </p>`
           }
           <div class="separator"></div>
           ${

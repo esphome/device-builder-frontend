@@ -5,7 +5,7 @@
  * ``expected`` so an edit made outside the dashboard isn't overwritten.
  */
 import { consume } from "@lit/context";
-import { mdiContentSave, mdiDeleteOutline, mdiDevices } from "@mdi/js";
+import { mdiContentSave, mdiDeleteOutline, mdiDevices, mdiMenu } from "@mdi/js";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { APIError } from "../api/api-error.js";
@@ -23,6 +23,7 @@ import {
 } from "../components/packages/link-list.js";
 import { notifyFailure, showUsage } from "../components/packages/usage.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
+import type { HighlightRange } from "../components/yaml-editor.js";
 import {
   apiConnectedContext,
   apiContext,
@@ -48,6 +49,7 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/confirm-dialog.js";
+import "../components/device/device-navigator.js";
 import "../components/packages/file-list-dialog.js";
 import "../components/unsaved-changes-dialog.js";
 import "../components/yaml-editor.js";
@@ -56,6 +58,7 @@ registerMdiIcons({
   "content-save": mdiContentSave,
   "delete-outline": mdiDeleteOutline,
   devices: mdiDevices,
+  menu: mdiMenu,
 });
 
 @customElement("esphome-page-file")
@@ -89,6 +92,14 @@ export class ESPHomePageFile extends LitElement {
   @state() private _yaml = "";
   @state() private _savedYaml = "";
   @state() private _saving = false;
+  /** Navigator selection and the YAML range it highlights. */
+  @state() private _selectedSection: string | null = null;
+  @state() private _selectedFromLine?: number;
+  @state() private _highlight: HighlightRange | null = null;
+  @state() private _scrollToHighlight = false;
+  @state() private _navCollapsed = false;
+  /** Navigator accordion: one section open at a time, Components first. */
+  @state() private _openSections = new Set<number>([1]);
   /** Users shown in the delete confirm, fetched when it opens. */
   @state() private _deleteUsers: string[] = [];
 
@@ -194,6 +205,24 @@ export class ESPHomePageFile extends LitElement {
       .delete-users {
         margin-top: var(--wa-space-s);
       }
+      .body {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(230px, 1fr) minmax(0, 4fr);
+        gap: var(--wa-space-m);
+      }
+      .body.nav-collapsed {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      @media (max-width: 900px) {
+        .body {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        esphome-device-navigator {
+          display: none;
+        }
+      }
     `,
   ];
 
@@ -205,6 +234,18 @@ export class ESPHomePageFile extends LitElement {
             <h1>${fileNameOf(this.path)}</h1>
             <p>${this.path}</p>
           </div>
+          ${
+            this._navCollapsed
+              ? html`<button
+                  type="button"
+                  class="header-button"
+                  @click=${() => (this._navCollapsed = false)}
+                >
+                  <wa-icon library="mdi" name="menu"></wa-icon>
+                  ${this._localize("device.show_navigator")}
+                </button>`
+              : null
+          }
           <button type="button" class="header-button" @click=${this._showUsage}>
             <wa-icon library="mdi" name="devices"></wa-icon>
             ${this._localize("packages.show_usage")}
@@ -222,43 +263,70 @@ export class ESPHomePageFile extends LitElement {
               : null
           }
         </div>
-        <div class="editor-card">
-          ${renderAsyncState({
-            loading: this._load.state === "loading",
-            loadingMessage: this._localize("file.loading"),
-            loadingLead: html`<wa-spinner></wa-spinner>`,
-            error:
-              this._load.state === "error"
-                ? this._localize("file.load_failed")
-                : this._load.state === "missing"
-                  ? this._localize("file.not_found", { path: this.path })
-                  : null,
-            errorActions: () =>
-              this._load.state === "error"
-                ? html`<wa-button size="small" @click=${this._load.retry}>
-                    ${this._localize("command.retry")}
-                  </wa-button>`
-                : html`<wa-button size="small" @click=${() => navigate("/packages")}>
-                    ${this._localize("packages.title")}
-                  </wa-button>`,
-            content: () => html`
-              <button
-                type="button"
-                class="save-button"
-                ?disabled=${this._saving || !this._isDirty}
-                @click=${this._save}
-              >
-                <wa-icon library="mdi" name="content-save"></wa-icon>
-                ${this._localize(this._saving ? "file.saving" : "file.save")}
-              </button>
-              <div class="editor-pane">
-                <esphome-yaml-editor
-                  .value=${this._yaml}
-                  @yaml-change=${this._onYamlChange}
-                ></esphome-yaml-editor>
-              </div>
-            `,
-          })}
+        <div class="body ${this._navCollapsed ? "nav-collapsed" : ""}">
+          ${
+            this._load.state === "ready" && !this._navCollapsed
+              ? html`<esphome-device-navigator
+                  readonly
+                  platformReady
+                  .yaml=${this._yaml}
+                  .configuration=${this.path}
+                  .selectedKey=${this._selectedSection}
+                  .selectedFromLine=${this._selectedFromLine}
+                  .openSections=${this._openSections}
+                  @section-toggle=${(e: CustomEvent<{ index: number }>) =>
+                    (this._openSections = this._openSections.has(e.detail.index)
+                      ? new Set()
+                      : new Set([e.detail.index]))}
+                  @section-reveal=${(e: CustomEvent<{ index: number }>) =>
+                    (this._openSections = new Set([e.detail.index]))}
+                  @section-select=${this._onSectionSelect}
+                  @yaml-highlight=${this._onYamlHighlight}
+                  @nav-collapse=${() => (this._navCollapsed = true)}
+                ></esphome-device-navigator>`
+              : null
+          }
+          <div class="editor-card">
+            ${renderAsyncState({
+              loading: this._load.state === "loading",
+              loadingMessage: this._localize("file.loading"),
+              loadingLead: html`<wa-spinner></wa-spinner>`,
+              error:
+                this._load.state === "error"
+                  ? this._localize("file.load_failed")
+                  : this._load.state === "missing"
+                    ? this._localize("file.not_found", { path: this.path })
+                    : null,
+              errorActions: () =>
+                this._load.state === "error"
+                  ? html`<wa-button size="small" @click=${this._load.retry}>
+                      ${this._localize("command.retry")}
+                    </wa-button>`
+                  : html`<wa-button size="small" @click=${() => navigate("/packages")}>
+                      ${this._localize("packages.title")}
+                    </wa-button>`,
+              content: () => html`
+                <button
+                  type="button"
+                  class="save-button"
+                  ?disabled=${this._saving || !this._isDirty}
+                  @click=${this._save}
+                >
+                  <wa-icon library="mdi" name="content-save"></wa-icon>
+                  ${this._localize(this._saving ? "file.saving" : "file.save")}
+                </button>
+                <div class="editor-pane">
+                  <esphome-yaml-editor
+                    completion
+                    .value=${this._yaml}
+                    .highlightRange=${this._highlight}
+                    .scrollToHighlight=${this._scrollToHighlight}
+                    @yaml-change=${this._onYamlChange}
+                  ></esphome-yaml-editor>
+                </div>
+              `,
+            })}
+          </div>
         </div>
       </div>
       <esphome-unsaved-changes-dialog
@@ -295,6 +363,22 @@ export class ESPHomePageFile extends LitElement {
 
   private _onYamlChange = (e: CustomEvent<{ value: string }>) => {
     this._yaml = e.detail.value;
+    // A hand edit shifts lines under the navigator's highlight.
+    this._highlight = null;
+  };
+
+  private _onSectionSelect = (
+    e: CustomEvent<{ sectionKey: string | null; fromLine?: number }>
+  ) => {
+    this._selectedSection = e.detail.sectionKey;
+    this._selectedFromLine = e.detail.fromLine;
+  };
+
+  private _onYamlHighlight = (
+    e: CustomEvent<{ range: HighlightRange | null; scroll: boolean }>
+  ) => {
+    this._highlight = e.detail.range;
+    this._scrollToHighlight = e.detail.scroll;
   };
 
   // Returns whether the save landed, so the leave guard knows whether to go.

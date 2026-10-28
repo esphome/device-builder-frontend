@@ -831,6 +831,7 @@
   },
   "device": {
     "navigator_title": "Device navigator",
+    "navigator_title_file": "Sections",
     "navigator_search_placeholder": "Filter by name or ID…",
     "navigator_search_toggle": "Search",
     "navigator_search_clear": "Clear filter",
@@ -838,6 +839,7 @@
     "navigator_search_none": "No matches",
     "navigator_error_count": "{count, plural, one {# validation error} other {# validation errors}}",
     "navigator_desc": "Navigate, add and remove options to define your ESP device and its functionality.",
+    "navigator_desc_file": "Jump to a section of this file.",
     "section_core": "Core configuration",
     "section_components": "Components",
     "section_automations": "Automations",
