@@ -1972,6 +1972,7 @@
     "path_invalid": "Use a relative path without .. or hidden (dot) names.",
     "path_needs_yaml": "The file name must end in .yaml or .yml.",
     "path_characters": "Don't use spaces or any of # \" ' { } [ ] , in the name.",
+    "path_start": "Start each folder and file name with a letter, digit or _.",
     "path_reserved": "secrets.yaml and the archive folder are reserved."
   },
   "file": {

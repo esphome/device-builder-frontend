@@ -51,6 +51,7 @@ describe("rename-file-dialog", () => {
     ["shared/base.yaml", "packages.rename_name_only"],
     ["base.txt", "packages.path_needs_yaml"],
     ["base 1.yaml", "packages.path_characters"],
+    ["@main.yaml", "packages.path_start"],
   ])("flags %j", async (value, key) => {
     const el = await openDialog();
     await type(el, value);
