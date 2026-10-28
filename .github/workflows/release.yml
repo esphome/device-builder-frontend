@@ -15,6 +15,11 @@ on:
         description: "Version number (e.g. 0.2.0)"
         required: true
         type: string
+      translation_update:
+        description: "Release only ships updated translations (set by auto-release)"
+        required: false
+        default: false
+        type: boolean
 
 env:
   PYTHON_VERSION: "3.14"
@@ -111,6 +116,9 @@ jobs:
           LOKALISE_API_TOKEN: ${{ secrets.LOKALISE_API_TOKEN }}
           LOKALISE_PROJECT_ID: ${{ secrets.LOKALISE_PROJECT_ID }}
           REPO: ${{ github.repository }}
+          # The previous-release lookup and download below authenticate
+          # with this; Actions doesn't export it.
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ -z "${LOKALISE_API_TOKEN}" ] || [ -z "${LOKALISE_PROJECT_ID}" ]; then
@@ -121,7 +129,50 @@ jobs:
             echo "::warning::Lokalise secrets unset; building English-only (fork)."
             exit 0
           fi
+          # Unpack the previous release's translations.zip (its locales plus
+          # the en.json they were measured against) aside so the notes step
+          # can credit the languages that changed.
+          # No previous release (HTTP 404) or one without translations.zip
+          # leaves the baseline empty, so every locale reads as new; any
+          # other lookup failure is fatal.
+          mkdir -p "$RUNNER_TEMP/previous"
+          latest=""
+          if ! latest=$(gh api "repos/${REPO}/releases/latest" 2>"$RUNNER_TEMP/latest.err"); then
+            if ! grep -q "HTTP 404" "$RUNNER_TEMP/latest.err"; then
+              echo "::error::Failed to look up the latest release."
+              cat "$RUNNER_TEMP/latest.err"
+              exit 1
+            fi
+            latest=""
+          fi
+          if [ -n "$latest" ] && jq -e '.assets[] | select(.name == "translations.zip")' <<<"$latest" >/dev/null; then
+            tag=$(jq -r .tag_name <<<"$latest")
+            gh release download "$tag" --repo "${REPO}" --pattern translations.zip --dir "$RUNNER_TEMP"
+            unzip -q "$RUNNER_TEMP/translations.zip" -d "$RUNNER_TEMP/previous"
+          else
+            echo "No previous release translations; every locale counts as new."
+          fi
           pnpm run translations:download
+
+      - name: Write translation release notes
+        # Empty when no locale changed (or on a fork, where nothing was
+        # downloaded); draft-release then adds nothing.
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/notes"
+          notes="$RUNNER_TEMP/notes/translations.md"
+          if [ -d "$RUNNER_TEMP/previous" ]; then
+            node build-scripts/translation-release-notes.ts "$RUNNER_TEMP/previous" src/translations > "$notes"
+          else
+            : > "$notes"
+          fi
+          cat "$notes"
+
+      - name: Upload translation notes artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: translation-notes
+          path: ${{ runner.temp }}/notes/translations.md
 
       - name: Upload translations artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -242,6 +293,45 @@ jobs:
           # Since v7.8 the token input wins over env.GITHUB_TOKEN and
           # defaults to the job's read-only github.token.
           token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Download translation notes artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: translation-notes
+          path: translation-notes/
+
+      - name: Add translation notes to draft release
+        # A translation-only release (auto-release found no code changes
+        # but newer Lokalise translations) says so up top; any release
+        # whose locales changed credits the translators at the bottom.
+        # release-drafter rewrites the draft body on every run, so a
+        # rerun appends to a fresh body rather than duplicating.
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+          TRANSLATION_UPDATE: ${{ inputs.translation_update }}
+        run: |
+          set -euo pipefail
+          notes=translation-notes/translations.md
+          if [ "$TRANSLATION_UPDATE" != "true" ] && [ ! -s "$notes" ]; then
+            echo "No translation changes; leaving release notes as drafted."
+            exit 0
+          fi
+          if ! body=$(gh release view "$VERSION" --json body --jq .body); then
+            echo "::error::Failed to read the draft release body."
+            exit 1
+          fi
+          {
+            if [ "$TRANSLATION_UPDATE" = "true" ]; then
+              printf '%s\n\n' "This is a translation update release, shipping the latest translations from Lokalise."
+            fi
+            printf '%s\n' "$body"
+            if [ -s "$notes" ]; then
+              printf '\n\n'
+              cat "$notes"
+            fi
+          } > release-body.md
+          gh release edit "$VERSION" --notes-file release-body.md
 
       - name: Download dist artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
