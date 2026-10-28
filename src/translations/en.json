@@ -1944,8 +1944,9 @@
     "rename": "Rename",
     "rename_named": "Rename {path}",
     "rename_title": "Rename {path}",
-    "rename_label": "New path",
-    "rename_same": "Enter a different path.",
+    "rename_label": "New file name",
+    "rename_same": "Enter a different name.",
+    "rename_name_only": "Enter a file name only; a rename keeps the file in its folder.",
     "rename_users": "{count, plural, one {# device includes this file. Its references will be updated:} other {# devices include this file. Their references will be updated:}}",
     "rename_no_users": "No device includes this file.",
     "rename_save_first": "Save your changes before renaming",
@@ -1970,6 +1971,7 @@
     "path_needs_folder": "Put the package in a folder, e.g. common/wifi.yaml. Files at the top level are devices.",
     "path_invalid": "Use a relative path without .. or hidden (dot) names.",
     "path_needs_yaml": "The file name must end in .yaml or .yml.",
+    "path_characters": "Don't use spaces or any of # \" ' { } [ ] , in the name.",
     "path_reserved": "secrets.yaml and the archive folder are reserved."
   },
   "file": {

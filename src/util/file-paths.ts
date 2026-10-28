@@ -54,6 +54,8 @@ export function newPackagePathProblem(raw: string): string | null {
   if (parts.some((p) => p === ".." || p.startsWith(".")) || /[\\:]/.test(path)) {
     return "packages.path_invalid";
   }
+  // Names that would need quoting in an !include.
+  if (/[\s#"'{}[\],]/.test(path)) return "packages.path_characters";
   if (!YAML_RE.test(path)) return "packages.path_needs_yaml";
   if (
     /^secrets\.ya?ml$/i.test(fileNameOf(path)) ||

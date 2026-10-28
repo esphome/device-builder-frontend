@@ -40,15 +40,17 @@ const confirmButton = (el: ESPHomeRenameFileDialog) =>
   el.shadowRoot!.querySelector<HTMLButtonElement>(".btn--primary")!;
 
 describe("rename-file-dialog", () => {
-  it("starts on the current path with Rename disabled", async () => {
+  it("edits the file name after a fixed folder, Rename disabled until it changes", async () => {
     const el = await openDialog();
-    expect(el.shadowRoot!.querySelector("input")!.value).toBe("common/base.yaml");
+    expect(el.shadowRoot!.querySelector(".folder")!.textContent).toBe("common/");
+    expect(el.shadowRoot!.querySelector("input")!.value).toBe("base.yaml");
     expect(confirmButton(el).disabled).toBe(true);
   });
 
   it.each([
-    ["base.yaml", "packages.path_needs_folder"],
-    ["common/base.txt", "packages.path_needs_yaml"],
+    ["shared/base.yaml", "packages.rename_name_only"],
+    ["base.txt", "packages.path_needs_yaml"],
+    ["base 1.yaml", "packages.path_characters"],
   ])("flags %j", async (value, key) => {
     const el = await openDialog();
     await type(el, value);
@@ -83,13 +85,13 @@ describe("rename-file-dialog", () => {
     const el = await openDialog();
     const emitted = vi.fn();
     el.addEventListener("rename-file", emitted);
-    await type(el, " shared/base.yaml ");
+    await type(el, " main.yaml ");
 
     confirmButton(el).click();
 
     expect((emitted.mock.calls[0][0] as CustomEvent).detail).toEqual({
       path: "common/base.yaml",
-      newPath: "shared/base.yaml",
+      newPath: "common/main.yaml",
     });
     expect(dialogOpen(el)).toBe(false);
   });

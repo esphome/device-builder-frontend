@@ -214,12 +214,14 @@ export class ESPHomePagePackages extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // The mount load covers the current connection; updated() only reacts to the next one.
+    this._wasConnected = this._apiConnected;
     void this._reload();
   }
 
   protected updated() {
-    // Socket back after a failed load: try again without a Retry click.
-    if (this._apiConnected && !this._wasConnected && this._state === "error") {
+    // Socket back: another tab may have changed the folder meanwhile.
+    if (this._apiConnected && !this._wasConnected) {
       void this._reload();
     }
     this._wasConnected = this._apiConnected;

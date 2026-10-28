@@ -94,6 +94,30 @@ describe("esphome-page-packages list", () => {
   });
 });
 
+describe("esphome-page-packages reconnect", () => {
+  test("reloads a ready list when the socket comes back, not on mount", async () => {
+    const listPackages = vi.fn().mockResolvedValue([{ path: "common/base.yaml" }]);
+    const page = new ESPHomePagePackages();
+    Object.assign(page, {
+      _api: { listPackages },
+      _localize: identityLocalize,
+      _apiConnected: true,
+    });
+    document.body.appendChild(page);
+    await flushMicrotasks(8);
+    await page.updateComplete;
+    expect(listPackages).toHaveBeenCalledTimes(1);
+
+    Object.assign(page, { _apiConnected: false });
+    await page.updateComplete;
+    Object.assign(page, { _apiConnected: true });
+    await page.updateComplete;
+    await flushMicrotasks(4);
+
+    expect(listPackages).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("esphome-page-packages create", () => {
   test("flags a top-level path and keeps New disabled", async () => {
     const page = await mountWith({ listPackages: vi.fn().mockResolvedValue([]) });
