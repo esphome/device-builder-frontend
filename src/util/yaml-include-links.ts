@@ -6,7 +6,7 @@
  * file being edited). Targets outside the config dir, absolute paths and
  * ``${substitution}``-built paths aren't linked.
  */
-import { type Extension, RangeSetBuilder } from "@codemirror/state";
+import { type Extension, type Line, RangeSetBuilder, type Text } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -15,8 +15,14 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 
-/** ``!include path`` / ``!include {file: path}``, path optionally quoted. */
-const INCLUDE_RE = /!include\s+(?:\{\s*file:\s*)?(["']?)([^\s"'{},#]+\.ya?ml)\1/g;
+/** A path ending in ``.yaml`` / ``.yml`` (any case), optionally quoted, ending there:
+ *  ``base.yaml.backup`` is another file. Same rules as the backend's rename. */
+const PATH = String.raw`(["']?)([^\s"'{},#]+\.[yY][aA]?[mM][lL])\1(?=[\s"'},]|$)`;
+/** ``!include path`` / ``!include {file: path}``. */
+const INCLUDE_RE = new RegExp(String.raw`!include\s+(?:\{\s*file:\s*)?` + PATH, "g");
+/** Block form: ``!include`` ending a line, ``file: path`` on a deeper next line. */
+const BARE_TAG_RE = /!include\s*$/;
+const FILE_KEY_RE = new RegExp(String.raw`^\s*file:\s*` + PATH);
 
 export interface IncludeTarget {
   /** Offsets of the path text within the line. */
@@ -26,18 +32,38 @@ export interface IncludeTarget {
   ref: string;
 }
 
-/** Every linkable ``!include`` path in one line of YAML. */
-export function findIncludeTargets(line: string): IncludeTarget[] {
+const codeOf = (line: string) => {
   const comment = line.search(/(^|\s)#/);
-  const code = comment < 0 ? line : line.slice(0, comment);
+  return comment < 0 ? line : line.slice(0, comment);
+};
+
+const indentOf = (line: string) => line.length - line.trimStart().length;
+
+/** Every linkable ``!include`` path in one line of YAML; *prev* is the previous
+ *  non-blank line, for the block form. */
+export function findIncludeTargets(line: string, prev = ""): IncludeTarget[] {
+  const code = codeOf(line);
   const out: IncludeTarget[] = [];
-  for (const m of code.matchAll(INCLUDE_RE)) {
-    const ref = m[2];
-    if (ref.includes("$")) continue;
-    const from = m.index + m[0].lastIndexOf(ref);
-    out.push({ from, to: from + ref.length, ref });
+  const add = (ref: string, from: number) => {
+    if (!ref.includes("$")) out.push({ from, to: from + ref.length, ref });
+  };
+  for (const m of code.matchAll(INCLUDE_RE)) add(m[2], m.index + m[0].lastIndexOf(m[2]));
+  const block = FILE_KEY_RE.exec(code);
+  if (
+    block &&
+    BARE_TAG_RE.test(codeOf(prev).trimEnd()) &&
+    indentOf(line) > indentOf(prev)
+  ) {
+    add(block[2], block[0].lastIndexOf(block[2]));
   }
   return out;
+}
+
+/** The include targets of *line*, with the previous non-blank line as context. */
+function lineTargets(doc: Text, line: Line): IncludeTarget[] {
+  let n = line.number - 1;
+  while (n >= 1 && doc.line(n).text.trim() === "") n--;
+  return findIncludeTargets(line.text, n >= 1 ? doc.line(n).text : "");
 }
 
 /** *ref* resolved against the folder of *basePath*, POSIX-relative to the
@@ -66,7 +92,7 @@ function buildDecorations(view: EditorView, title: string): DecorationSet {
   for (const { from, to } of view.visibleRanges) {
     for (let pos = from; pos <= to;) {
       const line = view.state.doc.lineAt(pos);
-      for (const t of findIncludeTargets(line.text)) {
+      for (const t of lineTargets(view.state.doc, line)) {
         builder.add(line.from + t.from, line.from + t.to, mark);
       }
       pos = line.to + 1;
@@ -157,6 +183,6 @@ export function includePathAt(
 ): string | null {
   const line = view.state.doc.lineAt(pos);
   const col = pos - line.from;
-  const hit = findIncludeTargets(line.text).find((t) => col >= t.from && col <= t.to);
+  const hit = lineTargets(view.state.doc, line).find((t) => col >= t.from && col <= t.to);
   return hit ? resolveIncludePath(basePath, hit.ref) : null;
 }

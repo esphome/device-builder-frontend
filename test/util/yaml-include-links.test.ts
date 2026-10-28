@@ -22,8 +22,23 @@ describe("findIncludeTargets", () => {
     ["  base: !include common/notes.txt", []],
     ["  base: github://esphome/firmware/x.yaml@main", []],
     ["  name: include_me.yaml", []],
+    ["  base: !include common/base.yaml.backup", []],
+    ["  base: !include common/Base.YAML", ["common/Base.YAML"]],
   ])("%j → %j", (line, refs) => {
     expect(findIncludeTargets(line).map((t) => t.ref)).toEqual(refs);
+  });
+
+  it.each([
+    ["  b: !include", "    file: common/base.yaml", ["common/base.yaml"]],
+    ["  b: !include", '    file: "common/base.yaml"', ["common/base.yaml"]],
+    ["  b: !include  # shared", "    file: common/base.yaml", ["common/base.yaml"]],
+    ["  b: !include", "  file: common/base.yaml", []],
+    ["  b: other", "    file: common/base.yaml", []],
+    ["  b: !include", "    file: ${dir}/base.yaml", []],
+  ])("block form %j / %j → %j", (prev, line, refs) => {
+    const targets = findIncludeTargets(line, prev);
+    expect(targets.map((t) => t.ref)).toEqual(refs);
+    for (const t of targets) expect(line.slice(t.from, t.to)).toBe(t.ref);
   });
 
   it("reports the path's offsets within the line", () => {
@@ -55,6 +70,14 @@ describe("includePathAt", () => {
   it("resolves the target under the position against the base file", () => {
     expect(includePathAt(view, at("wifi.yaml"), "common/base.yaml")).toBe(
       "common/wifi.yaml"
+    );
+  });
+
+  it("follows the block form across a blank line", () => {
+    const block = "b: !include\n\n  file: common/base.yaml\n";
+    const v = new EditorView({ state: EditorState.create({ doc: block }) });
+    expect(includePathAt(v, block.indexOf("common/") + 1, "kitchen.yaml")).toBe(
+      "common/base.yaml"
     );
   });
 

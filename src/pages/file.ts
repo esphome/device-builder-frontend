@@ -386,8 +386,16 @@ export class ESPHomePageFile extends LitElement {
     this._scrollToHighlight = e.detail.scroll;
   };
 
-  // Returns whether the save landed, so the leave guard knows whether to go.
-  private _save = async (): Promise<boolean> => {
+  private _pendingSave: Promise<boolean> | null = null;
+
+  // Returns whether the buffer is clean afterwards, so the leave guard knows whether to go.
+  private _save = (): Promise<boolean> => {
+    // A second Save (button, shortcut, leave dialog) joins the write in flight.
+    this._pendingSave ??= this._write().finally(() => (this._pendingSave = null));
+    return this._pendingSave;
+  };
+
+  private _write = async (): Promise<boolean> => {
     // The page is reused across files: late results only apply to the file they belong to.
     const path = this.path;
     const content = this._yaml;
@@ -415,7 +423,8 @@ export class ESPHomePageFile extends LitElement {
     if (this.path !== path) return true;
     this._savedYaml = content;
     void this._announceSaved(path);
-    return true;
+    // Typed while saving: not clean, so "Save and leave" stays.
+    return this._yaml === content;
   };
 
   /** Success toast; when devices use the file, it offers to install them. */
@@ -452,7 +461,10 @@ export class ESPHomePageFile extends LitElement {
 
   private _rename = async (e: CustomEvent<RenameFileDetail>) => {
     const newPath = await renameFile(this._api, this._localize, e.detail);
-    if (newPath !== null) void navigate(fileEditorUrl(newPath));
+    // The user may have moved on while the rename ran.
+    if (newPath !== null && this.isConnected && this.path === e.detail.path) {
+      void navigate(fileEditorUrl(newPath));
+    }
   };
 
   private _confirmDelete = () => void this._deleteDialog?.open(this.path);

@@ -133,6 +133,39 @@ describe("esphome-page-file save", () => {
     expect(getFileUsage).not.toHaveBeenCalled();
   });
 
+  test("a second save joins the write in flight", async () => {
+    let finish!: () => void;
+    const updateConfig = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    const page = makePage({ _yaml: "a: 1\n" });
+    page._api = {
+      updateConfig,
+      getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: [] }),
+    } as unknown as ESPHomeAPI;
+
+    const first = page._save();
+    const second = page._save();
+    finish();
+
+    expect(await Promise.all([first, second])).toEqual([true, true]);
+    expect(updateConfig).toHaveBeenCalledTimes(1);
+  });
+
+  test("edits typed during the save keep the leave guard from leaving", async () => {
+    let finish!: () => void;
+    const page = makePage({ _yaml: "a: 1\n" });
+    page._api = {
+      updateConfig: vi.fn(() => new Promise<void>((resolve) => (finish = resolve))),
+      getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: [] }),
+    } as unknown as ESPHomeAPI;
+
+    const saved = page._save();
+    page._yaml = "a: 2\n";
+    finish();
+
+    expect(await saved).toBe(false);
+    expect(page._savedYaml).toBe("a: 1\n");
+  });
+
   test("Reload from a conflict toast is ignored once another file is open", async () => {
     const page = makePage({ _yaml: "new: 1\n" });
     page._api = {
@@ -322,6 +355,7 @@ describe("esphome-page-file rename", () => {
 
   test("a successful rename opens the moved file", async () => {
     const page = makePage() as unknown as RenameView;
+    Object.defineProperty(page, "isConnected", { value: true });
     page._api = {
       renameFile: vi
         .fn()
@@ -335,6 +369,27 @@ describe("esphome-page-file rename", () => {
     );
 
     expect(navigate).toHaveBeenCalledWith("/file/shared/base.yaml");
+  });
+
+  test.each([
+    ["the page is gone", false, "common/base.yaml"],
+    ["another file is open", true, "common/other.yaml"],
+  ])("a rename finishing after %s doesn't navigate", async (_, connected, current) => {
+    const page = makePage({ path: current }) as unknown as RenameView;
+    Object.defineProperty(page, "isConnected", { value: connected });
+    page._api = {
+      renameFile: vi
+        .fn()
+        .mockResolvedValue({ path: "common/main.yaml", rewritten: [], unresolved: [] }),
+    } as unknown as ESPHomeAPI;
+
+    await page._rename(
+      new CustomEvent("rename-file", {
+        detail: { path: "common/base.yaml", newPath: "common/main.yaml" },
+      })
+    );
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   test("a failed rename stays put", async () => {
