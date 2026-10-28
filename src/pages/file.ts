@@ -318,6 +318,7 @@ export class ESPHomePageFile extends LitElement {
                 <div class="editor-pane">
                   <esphome-yaml-editor
                     completion
+                    .filePath=${this.path}
                     .value=${this._yaml}
                     .highlightRange=${this._highlight}
                     .scrollToHighlight=${this._scrollToHighlight}
