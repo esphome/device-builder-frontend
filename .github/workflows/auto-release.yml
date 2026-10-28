@@ -148,11 +148,11 @@ jobs:
 
   trigger-release:
     needs: [check-and-release, check-translations]
-    # always() so a skipped check-translations (commits alone already
-    # decided) doesn't skip this job; a failed check-and-release still
-    # stops it.
+    # !cancelled() so a skipped check-translations (commits alone already
+    # decided) doesn't skip this job, while a cancelled run never
+    # dispatches; a failed check-and-release still stops it.
     if: >-
-      always() &&
+      !cancelled() &&
       needs.check-and-release.result == 'success' &&
       (needs.check-and-release.outputs.should_release == 'true' ||
        needs.check-translations.outputs.changed == 'true')

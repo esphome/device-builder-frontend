@@ -303,15 +303,18 @@ function localeChanged(a: Messages, b: Messages): boolean {
 
 // Markdown "Translations" section for GitHub release notes, thanking the
 // translators and listing each language whose translations changed since the
-// previous release. `base` is en.json; `previous` / `current` map a BCP 47
-// locale code to its parsed locale JSON (never containing the base
-// language). A locale is changed when it is new or its string leaves differ;
+// previous release. `base` is this release's en.json and `previousBase` the
+// previous release's (defaulting to `base` when that isn't available), so each
+// side's percentage is what that release actually shipped; `previous` /
+// `current` map a BCP 47 locale code to its parsed locale JSON (never
+// containing the base language). A locale is changed when it is new or its string leaves differ;
 // locales only in `previous` (dropped) are ignored. Returns "" when nothing
 // changed so the caller can omit the section entirely.
 export function translationReleaseNotes(
   base: Messages,
   previous: Record<string, Messages>,
-  current: Record<string, Messages>
+  current: Record<string, Messages>,
+  previousBase: Messages = base
 ): string {
   const lines: string[] = [];
   for (const code of Object.keys(current).sort()) {
@@ -326,7 +329,7 @@ export function translationReleaseNotes(
       lines.push(`- ${name} (new): ${now}%`);
       continue;
     }
-    const was = localeCompleteness(base, before);
+    const was = localeCompleteness(previousBase, before);
     lines.push(was === now ? `- ${name}: ${now}%` : `- ${name}: ${was}% \u2192 ${now}%`);
   }
   if (lines.length === 0) {

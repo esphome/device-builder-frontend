@@ -3,7 +3,7 @@
 //   node build-scripts/translation-release-notes.ts <previous-dir> <current-dir>
 //
 // Each directory holds locale files (`fr.json`, `zh_CN.json`, ...). The
-// current directory's en.json is the base the completeness percentages are
+// current directory's en.json is the base the current percentages are
 // measured against. A missing previous directory counts as empty, so every
 // language reads as new. Prints nothing when no language changed.
 
@@ -43,10 +43,15 @@ function main(): void {
     process.exit(1);
   }
   const base = readJson(join(currentDir, `${BASE_LANGUAGE}.json`));
+  // The previous release's own en.json, when shipped alongside its locales,
+  // so its percentages match what that release showed.
+  const previousBasePath = join(previousDir, `${BASE_LANGUAGE}.json`);
+  const previousBase = existsSync(previousBasePath) ? readJson(previousBasePath) : base;
   const notes = translationReleaseNotes(
     base,
     readLocales(previousDir),
-    readLocales(currentDir)
+    readLocales(currentDir),
+    previousBase
   );
   if (notes) {
     process.stdout.write(notes);

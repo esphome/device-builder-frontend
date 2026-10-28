@@ -116,9 +116,8 @@ jobs:
           LOKALISE_API_TOKEN: ${{ secrets.LOKALISE_API_TOKEN }}
           LOKALISE_PROJECT_ID: ${{ secrets.LOKALISE_PROJECT_ID }}
           REPO: ${{ github.repository }}
-          # The release-source download and the latest-release lookup
-          # below authenticate with this; Actions doesn't export it.
-          GITHUB_TOKEN: ${{ github.token }}
+          # The previous-release lookup and download below authenticate
+          # with this; Actions doesn't export it.
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -130,9 +129,9 @@ jobs:
             echo "::warning::Lokalise secrets unset; building English-only (fork)."
             exit 0
           fi
-          # Keep the previous release's locales aside so the notes step can
-          # credit the languages that changed. Downloads never delete stale
-          # files, so move them out before the Lokalise download lands.
+          # Unpack the previous release's translations.zip (its locales plus
+          # the en.json they were measured against) aside so the notes step
+          # can credit the languages that changed.
           # No previous release (HTTP 404) or one without translations.zip
           # leaves the baseline empty, so every locale reads as new; any
           # other lookup failure is fatal.
@@ -147,8 +146,9 @@ jobs:
             latest=""
           fi
           if [ -n "$latest" ] && jq -e '.assets[] | select(.name == "translations.zip")' <<<"$latest" >/dev/null; then
-            pnpm run translations:download --source release
-            find src/translations -name '*.json' ! -name en.json -exec mv -t "$RUNNER_TEMP/previous" {} +
+            tag=$(jq -r .tag_name <<<"$latest")
+            gh release download "$tag" --repo "${REPO}" --pattern translations.zip --dir "$RUNNER_TEMP"
+            unzip -q "$RUNNER_TEMP/translations.zip" -d "$RUNNER_TEMP/previous"
           else
             echo "No previous release translations; every locale counts as new."
           fi

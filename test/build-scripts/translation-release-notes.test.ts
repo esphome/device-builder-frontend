@@ -64,6 +64,24 @@ describe("translation-release-notes.ts", () => {
     }
   });
 
+  it("measures previous percentages against the previous en.json", async () => {
+    const { path, tmp, write, run, cleanup } = await setup();
+    try {
+      const prev = path.join(tmp, "prev");
+      const cur = path.join(tmp, "cur");
+      write(prev, "en.json", { a: "A" });
+      write(prev, "de.json", { language: "Deutsch", a: "x" });
+      write(cur, "en.json", en);
+      write(cur, "de.json", { language: "Deutsch", a: "x", b: "y" });
+      const res = run(prev, cur);
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain("- Deutsch: 100%\n");
+      expect(res.stdout).not.toContain("→");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("prints nothing when nothing changed", async () => {
     const { path, tmp, write, run, cleanup } = await setup();
     try {

@@ -340,6 +340,18 @@ describe("translationReleaseNotes", () => {
     ).toBe(`${header}- Deutsch: 50% → 100%\n`);
   });
 
+  it("measures the previous locale against the previous release's English keys", () => {
+    // Both releases shipped fully translated; only the key set grew.
+    expect(
+      translationReleaseNotes(
+        en,
+        { de: { language: "Deutsch", a: "x" } },
+        { de: { language: "Deutsch", a: "x", b: "y" } },
+        { a: "A" }
+      )
+    ).toBe(`${header}- Deutsch: 100%\n`);
+  });
+
   it("prints a single percentage when it did not move", () => {
     expect(
       translationReleaseNotes(
