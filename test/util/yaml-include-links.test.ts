@@ -4,6 +4,7 @@ import { EditorView } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
 import {
   findIncludeTargets,
+  includeLinks,
   includePathAt,
   resolveIncludePath,
 } from "../../src/util/yaml-include-links.js";
@@ -60,5 +61,31 @@ describe("includePathAt", () => {
   it("is null off the path", () => {
     expect(includePathAt(view, at("!include"), "common/base.yaml")).toBeNull();
     expect(includePathAt(view, at("name"), "common/base.yaml")).toBeNull();
+  });
+});
+
+describe("includeLinks modifier state", () => {
+  it("marks the editor while Ctrl/Cmd is held and clears it on release or blur", () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        extensions: includeLinks(
+          () => "a.yaml",
+          () => {},
+          ""
+        ),
+      }),
+    });
+    const held = () => view.dom.hasAttribute("data-include-mod");
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Control", ctrlKey: true }));
+    expect(held()).toBe(true);
+    window.dispatchEvent(new KeyboardEvent("keyup", { key: "Control" }));
+    expect(held()).toBe(false);
+    window.dispatchEvent(new MouseEvent("mousemove", { metaKey: true }));
+    expect(held()).toBe(true);
+    window.dispatchEvent(new Event("blur"));
+    expect(held()).toBe(false);
+    view.destroy();
+    window.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true }));
+    expect(held()).toBe(false);
   });
 });

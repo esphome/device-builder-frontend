@@ -75,6 +75,31 @@ function buildDecorations(view: EditorView, title: string): DecorationSet {
   return builder.finish();
 }
 
+/** Mirrors the Ctrl/Cmd key state onto the editor as ``data-include-mod``.
+ *  Window listeners so it reacts while hovering an unfocused editor. */
+const modifierTracker = ViewPlugin.fromClass(
+  class {
+    private readonly win: Window;
+    constructor(private readonly view: EditorView) {
+      this.win = view.dom.ownerDocument.defaultView ?? window;
+      for (const type of ["keydown", "keyup", "mousemove"] as const) {
+        this.win.addEventListener(type, this.sync);
+      }
+      this.win.addEventListener("blur", this.clear);
+    }
+    sync = (e: KeyboardEvent | MouseEvent) => {
+      this.view.dom.toggleAttribute("data-include-mod", e.ctrlKey || e.metaKey);
+    };
+    clear = () => this.view.dom.removeAttribute("data-include-mod");
+    destroy() {
+      for (const type of ["keydown", "keyup", "mousemove"] as const) {
+        this.win.removeEventListener(type, this.sync);
+      }
+      this.win.removeEventListener("blur", this.clear);
+    }
+  }
+);
+
 /**
  * Underline include targets and open one on Ctrl/Cmd+click.
  * *getBasePath* is read per click so a reused editor follows its file.
@@ -115,8 +140,13 @@ export function includeLinks(
       textDecoration: "underline dotted",
       textUnderlineOffset: "3px",
     },
+    // Ctrl/Cmd held: the hovered link turns into a real link (VS Code style).
+    "&[data-include-mod] .cm-include-link:hover": {
+      textDecorationStyle: "solid",
+      cursor: "pointer",
+    },
   });
-  return [plugin, click, theme];
+  return [plugin, modifierTracker, click, theme];
 }
 
 /** The resolved include target under document offset *pos*, if any. */
