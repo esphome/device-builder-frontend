@@ -38,7 +38,7 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.14",
     "@home-assistant/webawesome": "3.7.0",
-    "@lezer/common": "^1.5.3",
+    "@lezer/common": "^1.5.4",
     "@lezer/highlight": "^1.2.5",
     "@lezer/yaml": "^1.0.4",
     "@lit-labs/router": "0.1.4",
