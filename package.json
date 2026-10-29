@@ -67,7 +67,7 @@
     "@types/w3c-web-usb": "^1.0.14",
     "@types/web-bluetooth": "0.0.21",
     "eslint": "^10.13.0",
-    "eslint-plugin-perfectionist": "^5.12.1",
+    "eslint-plugin-perfectionist": "^5.13.0",
     "happy-dom": "^21.0.3",
     "husky": "^9.1.7",
     "prettier": "3.9.10",
