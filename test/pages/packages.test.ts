@@ -152,6 +152,24 @@ describe("esphome-page-packages create", () => {
     expect(navigate).toHaveBeenCalledWith("/file/common/wifi.yaml");
   });
 
+  test("a page left while creating does not open the new file", async () => {
+    let finish!: (v: { path: string }) => void;
+    const page = await mountWith({
+      listPackages: vi.fn().mockResolvedValue([]),
+      createFile: vi.fn(() => new Promise((resolve) => (finish = resolve))),
+    });
+
+    await typePath(page, "common/wifi.yaml");
+    root(page)
+      .querySelector("form")!
+      .dispatchEvent(new Event("submit", { cancelable: true }));
+    page.remove();
+    finish({ path: "common/wifi.yaml" });
+    await flushMicrotasks(4);
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   test("an existing path toasts and stays on the page", async () => {
     const createFile = vi.fn().mockRejectedValue(new APIError("already_exists", "taken"));
     const page = await mountWith({

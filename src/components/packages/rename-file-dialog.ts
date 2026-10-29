@@ -5,7 +5,7 @@
  */
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { FileUsage } from "../../api/types/files.js";
@@ -47,8 +47,6 @@ export class ESPHomeRenameFileDialog extends LitElement {
   @state() private _path = "";
   @state() private _name = "";
   @state() private _usage: FileUsage = NO_USAGE;
-
-  @query("input") private _input?: HTMLInputElement;
 
   private readonly _dialog = new DialogOpenController(this);
 
@@ -110,7 +108,6 @@ export class ESPHomeRenameFileDialog extends LitElement {
     this._name = fileNameOf(path);
     this._usage = usage;
     this._dialog.open = true;
-    void this.updateComplete.then(() => this._input?.select());
   }
 
   private get _newPath(): string {
@@ -137,6 +134,7 @@ export class ESPHomeRenameFileDialog extends LitElement {
           <span class="folder">${folderOf(this._path)}/</span>
           <input
             type="text"
+            autofocus
             autocomplete="off"
             spellcheck="false"
             aria-label=${this._localize("packages.rename_label")}

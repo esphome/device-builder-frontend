@@ -386,13 +386,18 @@ export class ESPHomePageFile extends LitElement {
     this._scrollToHighlight = e.detail.scroll;
   };
 
-  private _pendingSave: Promise<boolean> | null = null;
+  private _pendingSave: { path: string; result: Promise<boolean> } | null = null;
 
   // Returns whether the buffer is clean afterwards, so the leave guard knows whether to go.
   private _save = (): Promise<boolean> => {
-    // A second Save (button, shortcut, leave dialog) joins the write in flight.
-    this._pendingSave ??= this._write().finally(() => (this._pendingSave = null));
-    return this._pendingSave;
+    const pending = this._pendingSave;
+    // A second Save of the same file (button, shortcut, leave dialog) joins the write in
+    // flight; while another file's write is pending, this one is not saved.
+    if (pending)
+      return pending.path === this.path ? pending.result : Promise.resolve(false);
+    const result = this._write().finally(() => (this._pendingSave = null));
+    this._pendingSave = { path: this.path, result };
+    return result;
   };
 
   private _write = async (): Promise<boolean> => {

@@ -370,7 +370,7 @@ export class ESPHomePagePackages extends LitElement {
       this._creating = false;
     }
     this._newPath = "";
-    void navigate(fileEditorUrl(path));
+    if (this.isConnected) void navigate(fileEditorUrl(path));
   };
 
   private _fail(key: string, err: unknown) {

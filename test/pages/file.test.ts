@@ -150,6 +150,25 @@ describe("esphome-page-file save", () => {
     expect(updateConfig).toHaveBeenCalledTimes(1);
   });
 
+  test("a save of another file does not join the write in flight", async () => {
+    let finish!: () => void;
+    const updateConfig = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    const page = makePage({ _yaml: "a: 1\n" });
+    page._api = {
+      updateConfig,
+      getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: [] }),
+    } as unknown as ESPHomeAPI;
+
+    const first = page._save();
+    Object.assign(page, { path: "common/other.yaml", _yaml: "b: 2\n" });
+    const second = page._save();
+    finish();
+
+    expect(await second).toBe(false);
+    await first;
+    expect(updateConfig).toHaveBeenCalledTimes(1);
+  });
+
   test("edits typed during the save keep the leave guard from leaving", async () => {
     let finish!: () => void;
     const page = makePage({ _yaml: "a: 1\n" });
