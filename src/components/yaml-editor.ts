@@ -13,6 +13,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { isApplePlatform } from "../util/apple-platform.js";
 import {
   darkHighlight,
   EDITOR_BG_DARK,
@@ -576,7 +577,11 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         includeLinks(
           () => this.filePath || this.configuration,
           this._openInclude,
-          this._localize("yaml_editor.include_link_title")
+          this._localize(
+            isApplePlatform()
+              ? "yaml_editor.include_link_title_mac"
+              : "yaml_editor.include_link_title"
+          )
         )
       );
     }

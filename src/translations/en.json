@@ -1577,7 +1577,8 @@
     "no_match_yaml_preview": "{count, plural, one {Try YAML search — found # match across your configs} other {Try YAML search — found # matches across your configs}}"
   },
   "yaml_editor": {
-    "include_link_title": "Ctrl+click (Cmd+click on Mac) to open this file",
+    "include_link_title": "Ctrl+click to open this file",
+    "include_link_title_mac": "⌘+click to open this file",
     "sticky_jump_to_line": "Jump to line {line}",
     "error_indent_fix": "Indentation mismatch: line {line} \"- {key}\" is indented less than its properties. Indent line {line} by {spaces, plural, one {# space} other {# spaces}} so \"- {key}\" lines up with them.",
     "error_misaligned_indent_fix": "Indentation mismatch: line {line} \"{key}\" is indented too little. Indent line {line} by {spaces, plural, one {# space} other {# spaces}} so it lines up.",
