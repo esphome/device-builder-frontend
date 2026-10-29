@@ -14,17 +14,24 @@ import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { renderStatusExtra } from "../../src/components/firmware-install-dialog/renderers.js";
 
-function rowsText(binaries: FirmwareBinary[]): string {
+function renderRows(
+  binaries: FirmwareBinary[],
+  onChooseBinary: (file: string) => void = () => {},
+  onCopyMd5: (digest: string) => void = () => {}
+) {
   const host = {
     _step: "choose-binary",
     _binaries: binaries,
     _log: fakeLogBuffer(),
     _localize: defaultLocalize,
-    _onChooseBinary: () => {},
+    _onChooseBinary: onChooseBinary,
+    _copyMd5: onCopyMd5,
   };
-  const container = renderInto(
-    renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
-  );
+  return renderInto(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog));
+}
+
+function rowsText(binaries: FirmwareBinary[]): string {
+  const container = renderRows(binaries);
   return container.textContent ?? "";
 }
 
@@ -61,5 +68,58 @@ describe("choose-binary artifact labels", () => {
       { title: "Factory format (Previously Modern)", file: "firmware.factory.bin" },
     ]);
     expect(text).toContain("Factory format (Previously Modern)");
+  });
+
+  it("shows MD5 copy and sidecar download actions beside each firmware", () => {
+    const digest = "a".repeat(32);
+    const elfDigest = "b".repeat(32);
+    const selected: string[] = [];
+    const copied: string[] = [];
+    const container = renderRows(
+      [
+        {
+          title: "OTA Update",
+          file: "firmware.ota.bin",
+          type: "ota",
+          md5: digest,
+        },
+        {
+          title: "ELF (for debugging)",
+          file: "firmware.elf",
+          type: "elf",
+          md5: elfDigest,
+        },
+        {
+          title: "MD5 checksum for OTA Update",
+          file: "firmware.ota.bin.md5",
+          type: "md5",
+          description: digest,
+        },
+        {
+          title: "MD5 checksum for ELF (for debugging)",
+          file: "firmware.elf.md5",
+          type: "md5",
+          description: elfDigest,
+        },
+      ],
+      (file) => selected.push(file),
+      (value) => copied.push(value)
+    );
+    const text = container.textContent ?? "";
+
+    expect(text).toContain(`MD5: ${digest}`);
+    expect(text).toContain(`MD5: ${elfDigest}`);
+    expect(text).toContain("ELF (debug symbols)");
+    expect(text).not.toContain("MD5 checksum for OTA update");
+    const copyButtons = container.querySelectorAll<HTMLButtonElement>(
+      '[aria-label="Copy MD5"]'
+    );
+    copyButtons.forEach((button) => button.click());
+    expect(copied).toEqual([digest, elfDigest]);
+    const downloadButtons = container.querySelectorAll<HTMLButtonElement>(
+      '[aria-label="Download .md5"]'
+    );
+    downloadButtons.forEach((button) => button.click());
+    expect(selected).toEqual(["firmware.ota.bin.md5", "firmware.elf.md5"]);
   });
 });
