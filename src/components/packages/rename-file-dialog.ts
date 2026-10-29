@@ -1,7 +1,8 @@
 /**
  * Rename a package within its folder: a file-name input after the fixed
- * folder, plus the devices whose ``!include`` references the backend will
- * rewrite. Emits ``rename-file`` with ``{path, newPath}`` on confirm.
+ * folder, plus the files whose ``!include`` references the backend will
+ * rewrite, each ticked; unticked ones keep the old name. Emits
+ * ``rename-file`` with ``{path, newPath, skip}`` on confirm.
  */
 import { consume } from "@lit/context";
 import { css, html, LitElement, nothing } from "lit";
@@ -18,17 +19,29 @@ import {
 import { dialogChromeStyles } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
-import { fileNameOf, folderOf, newPackagePathProblem } from "../../util/file-paths.js";
-import { navigate } from "../../util/navigation.js";
-import { linkListStyles } from "./link-list.js";
-import { NO_USAGE, renderUsageSummary, usageSummaryStyles } from "./usage-summary.js";
+import {
+  fileNameOf,
+  folderOf,
+  isArchivedPath,
+  newPackagePathProblem,
+} from "../../util/file-paths.js";
+import {
+  deviceItems,
+  type LinkItem,
+  linkListStyles,
+  renderLinkList,
+} from "./link-list.js";
+import { NO_USAGE, usageSummaryStyles } from "./usage-summary.js";
 import { notifyFailure } from "./usage.js";
 
+import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
 import "../base-dialog.js";
 
 export interface RenameFileDetail {
   path: string;
   newPath: string;
+  /** Files that keep referencing the old name. */
+  skip: string[];
 }
 
 @customElement("esphome-rename-file-dialog")
@@ -47,6 +60,7 @@ export class ESPHomeRenameFileDialog extends LitElement {
   @state() private _path = "";
   @state() private _name = "";
   @state() private _usage: FileUsage = NO_USAGE;
+  @state() private _skip: ReadonlySet<string> = new Set();
 
   private readonly _dialog = new DialogOpenController(this);
 
@@ -75,7 +89,7 @@ export class ESPHomeRenameFileDialog extends LitElement {
         color: var(--wa-color-text-quiet);
         white-space: nowrap;
       }
-      input {
+      .name input {
         flex: 1;
         min-width: 0;
         box-sizing: border-box;
@@ -92,10 +106,17 @@ export class ESPHomeRenameFileDialog extends LitElement {
         font-size: var(--wa-font-size-xs);
         color: var(--esphome-error);
       }
+      .check-row {
+        align-items: center;
+      }
+      .check-row wa-checkbox {
+        flex: 1;
+        min-width: 0;
+      }
     `,
   ];
 
-  /** Fetch the devices using *path*, then open; a toast instead when that fails. */
+  /** Fetch the files including *path*, then open; a toast instead when that fails. */
   async open(path: string): Promise<void> {
     let usage: FileUsage;
     try {
@@ -107,6 +128,7 @@ export class ESPHomeRenameFileDialog extends LitElement {
     this._path = path;
     this._name = fileNameOf(path);
     this._usage = usage;
+    this._skip = new Set();
     this._dialog.open = true;
   }
 
@@ -143,16 +165,7 @@ export class ESPHomeRenameFileDialog extends LitElement {
           />
         </div>
         ${problem ? html`<p class="problem" role="alert">${this._localize(problem)}</p>` : nothing}
-        ${renderUsageSummary(this._usage, {
-          localize: this._localize,
-          devices: this._devices,
-          usedKey: "packages.rename_users",
-          unusedKey: "packages.rename_no_users",
-          open: (url) => {
-            this._close();
-            void navigate(url);
-          },
-        })}
+        ${this._renderReferrers()}
         <div class="actions">
           <button class="btn btn--cancel" @click=${this._close}>
             ${this._localize("layout.cancel")}
@@ -169,6 +182,73 @@ export class ESPHomeRenameFileDialog extends LitElement {
     `;
   }
 
+  /** The files to rewrite, each with a checkbox, those to fix by hand, and the
+   *  unchecked-devices note. */
+  private _renderReferrers() {
+    const { referenced_by, rewritable: referrers, unknown } = this._usage;
+    const manual = referenced_by.filter((path) => !referrers.includes(path));
+    return html`<p class="usage-message">
+        ${
+          referrers.length > 0
+            ? this._localize("packages.rename_referrers", { count: referrers.length })
+            : this._localize("packages.rename_no_referrers")
+        }
+      </p>
+      ${
+        referrers.length > 0
+          ? html`<ul class="link-list">
+              ${referrers.map((path) => {
+                const item = this._referrerItem(path);
+                return html`<li class="link-row check-row">
+                  <wa-checkbox
+                    .checked=${!this._skip.has(path)}
+                    @change=${(e: Event) =>
+                      this._toggle(path, (e.target as HTMLInputElement).checked)}
+                    ><span class="link-label">${item.label}</span></wa-checkbox
+                  >
+                  ${item.detail ? html`<span class="link-detail">${item.detail}</span>` : nothing}
+                </li>`;
+              })}
+            </ul>`
+          : nothing
+      }
+      ${
+        manual.length > 0
+          ? html`<p class="usage-message">
+                ${this._localize("packages.rename_manual", { count: manual.length })}
+              </p>
+              ${renderLinkList(
+                manual.map((path) => ({ ...this._referrerItem(path), url: null })),
+                () => undefined
+              )}`
+          : nothing
+      }
+      ${
+        unknown.length > 0
+          ? html`<p class="usage-note">
+              ${this._localize("packages.usage_unknown", { names: unknown.join(", ") })}
+            </p>`
+          : nothing
+      }`;
+  }
+
+  /** Devices by friendly name, other files by path, archived ones marked. */
+  private _referrerItem(path: string): Pick<LinkItem, "label" | "detail"> {
+    if (isArchivedPath(path)) {
+      return { label: path, detail: this._localize("packages.rename_archived") };
+    }
+    return folderOf(path) === ""
+      ? deviceItems([path], this._devices)[0]
+      : { label: path };
+  }
+
+  private _toggle(path: string, checked: boolean) {
+    const skip = new Set(this._skip);
+    if (checked) skip.delete(path);
+    else skip.add(path);
+    this._skip = skip;
+  }
+
   private _close = () => {
     this._dialog.open = false;
   };
@@ -178,7 +258,7 @@ export class ESPHomeRenameFileDialog extends LitElement {
     this._close();
     this.dispatchEvent(
       new CustomEvent<RenameFileDetail>("rename-file", {
-        detail: { path: this._path, newPath: this._newPath },
+        detail: { path: this._path, newPath: this._newPath, skip: [...this._skip] },
         bubbles: true,
       })
     );

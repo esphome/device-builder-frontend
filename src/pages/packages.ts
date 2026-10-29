@@ -54,6 +54,10 @@ registerMdiIcons({
 
 type LoadState = "loading" | "ready" | "error";
 
+/** Starter content for a new package; it is YAML, so it is not localized. */
+export const newFileTemplate = (path: string): string =>
+  `# ${path}\n# Shared configuration. Include it from a device with:\n#   packages:\n#     shared: !include ${path}\n`;
+
 @customElement("esphome-page-packages")
 export class ESPHomePagePackages extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -355,10 +359,7 @@ export class ESPHomePagePackages extends LitElement {
     if (newPackagePathProblem(path) !== null) return;
     this._creating = true;
     try {
-      await this._api.createFile(
-        path,
-        this._localize("packages.new_file_template", { path })
-      );
+      await this._api.createFile(path, newFileTemplate(path));
     } catch (err) {
       const key =
         err instanceof APIError && err.errorCode === ErrorCode.ALREADY_EXISTS

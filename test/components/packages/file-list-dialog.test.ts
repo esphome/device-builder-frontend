@@ -33,9 +33,12 @@ async function mount(api: object): Promise<{
 
 describe("file-list-dialog showUsage", () => {
   it("lists the using devices by name and notes unchecked ones", async () => {
-    const getFileUsage = vi
-      .fn()
-      .mockResolvedValue({ used_by: ["kitchen.yaml"], unknown: ["broken.yaml"] });
+    const getFileUsage = vi.fn().mockResolvedValue({
+      used_by: ["kitchen.yaml"],
+      unknown: ["broken.yaml"],
+      referenced_by: ["kitchen.yaml", "broken.yaml"],
+      rewritable: ["kitchen.yaml", "broken.yaml"],
+    });
     const { el, content } = await mount({ getFileUsage });
 
     await el.showUsage("common/a.yaml");
@@ -45,11 +48,58 @@ describe("file-list-dialog showUsage", () => {
     expect(content().message).toBe("packages.usage_message | 1");
     expect(content().items.map((i) => i.label)).toEqual(["Kitchen"]);
     expect(content().note).toBe("packages.usage_unknown | broken.yaml");
+    // direct includers already listed as devices aren't repeated
+    expect(content().more).toBeUndefined();
+  });
+
+  it.each([
+    ["a package", "bridge/plug.yaml", "/file/bridge/plug.yaml"],
+    ["an archived device", "archive/old.yaml", null],
+    ["a device the scanner hasn't loaded", "new-device.yaml", "/device/new-device.yaml"],
+  ])("lists %s that includes the file", async (_, path, url) => {
+    const { el, content } = await mount({
+      getFileUsage: vi.fn().mockResolvedValue({
+        used_by: [],
+        unknown: [],
+        referenced_by: [path],
+        rewritable: [path],
+      }),
+    });
+
+    await el.showUsage("common/a.yaml");
+
+    expect(content().message).toBe("");
+    expect(content().items).toEqual([]);
+    expect(content().more).toEqual({
+      message: "packages.usage_other_files | 1",
+      items: [{ label: path, url }],
+    });
+  });
+
+  it("says nobody uses the file only when nothing includes it", async () => {
+    const { el, content } = await mount({
+      getFileUsage: vi.fn().mockResolvedValue({
+        used_by: [],
+        unknown: [],
+        referenced_by: [],
+        rewritable: [],
+      }),
+    });
+
+    await el.showUsage("common/a.yaml");
+
+    expect(content().message).toBe("packages.usage_none");
+    expect(content().more).toBeUndefined();
   });
 
   it("doesn't claim nobody uses the file while devices are unchecked", async () => {
     const { el, content } = await mount({
-      getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: ["broken.yaml"] }),
+      getFileUsage: vi.fn().mockResolvedValue({
+        used_by: [],
+        unknown: ["broken.yaml"],
+        referenced_by: [],
+        rewritable: [],
+      }),
     });
 
     await el.showUsage("common/a.yaml");

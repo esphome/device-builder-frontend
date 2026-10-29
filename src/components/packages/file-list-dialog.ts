@@ -25,6 +25,7 @@ import {
   linkListStyles,
   renderLinkList,
 } from "./link-list.js";
+import { otherReferrers } from "./usage-summary.js";
 import { notifyFailure } from "./usage.js";
 
 import "../base-dialog.js";
@@ -34,6 +35,8 @@ export interface FileListDialogContent {
   /** Shown above the list; also the whole body when *items* is empty. */
   message: string;
   items: LinkItem[];
+  /** A second list under its own message (e.g. other files including a package). */
+  more?: { message: string; items: LinkItem[] };
   /** Extra line under the list (e.g. devices that couldn't be checked). */
   note?: string;
 }
@@ -79,6 +82,9 @@ export class ESPHomeFileListDialog extends LitElement {
       .note {
         margin: var(--wa-space-s) 0 0;
       }
+      .more {
+        margin-top: var(--wa-space-m);
+      }
     `,
   ];
 
@@ -87,20 +93,28 @@ export class ESPHomeFileListDialog extends LitElement {
     this._dialog.open = true;
   }
 
-  /** List the devices using *path*; a toast instead when the lookup fails. */
+  /** List the devices and files using *path*; a toast instead when the lookup fails. */
   async showUsage(path: string): Promise<void> {
     const localize = this._localize;
     try {
       const usage = await this._api.getFileUsage(path);
+      const others = otherReferrers(usage);
       this.open({
         heading: localize("packages.usage_title", { path }),
         message:
           usage.used_by.length > 0
             ? localize("packages.usage_message", { count: usage.used_by.length })
-            : usage.unknown.length === 0
+            : usage.unknown.length === 0 && others.length === 0
               ? localize("packages.usage_none")
               : "",
         items: deviceItems(usage.used_by, this._devices),
+        more:
+          others.length > 0
+            ? {
+                message: localize("packages.usage_other_files", { count: others.length }),
+                items: fileItems(others),
+              }
+            : undefined,
         note:
           usage.unknown.length > 0
             ? localize("packages.usage_unknown", { names: usage.unknown.join(", ") })
@@ -144,6 +158,12 @@ export class ESPHomeFileListDialog extends LitElement {
           content
             ? html`<p class="message">${content.message}</p>
                 ${renderLinkList(content.items, this._open)}
+                ${
+                  content.more
+                    ? html`<p class="message more">${content.more.message}</p>
+                        ${renderLinkList(content.more.items, this._open)}`
+                    : nothing
+                }
                 ${content.note ? html`<p class="note">${content.note}</p>` : nothing}`
             : nothing
         }

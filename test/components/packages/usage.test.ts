@@ -41,18 +41,29 @@ describe("link-list items", () => {
 
   it("links top-level files to the device editor, the rest to the file editor, absolute paths nowhere", () => {
     expect(
-      fileItems(["common/a.yaml", "kitchen.yaml", "/abs/x.yaml", "C:/abs/y.yaml"])
+      fileItems([
+        "common/a.yaml",
+        "kitchen.yaml",
+        "/abs/x.yaml",
+        "C:/abs/y.yaml",
+        "archive/old.yaml",
+      ])
     ).toEqual([
       { label: "common/a.yaml", url: "/file/common/a.yaml" },
       { label: "kitchen.yaml", url: "/device/kitchen.yaml" },
       { label: "/abs/x.yaml", url: null },
       { label: "C:/abs/y.yaml", url: null },
+      { label: "archive/old.yaml", url: null },
     ]);
   });
 });
 
 describe("renameFile", () => {
-  const detail = { path: "common/a.yaml", newPath: "shared/a.yaml" };
+  const detail = {
+    path: "common/a.yaml",
+    newPath: "shared/a.yaml",
+    skip: ["archive/old.yaml"],
+  };
 
   it("reports rewritten files and warns about unresolved devices", async () => {
     const api = {
@@ -64,7 +75,9 @@ describe("renameFile", () => {
     } as unknown as ESPHomeAPI;
 
     expect(await renameFile(api, localize, detail)).toBe("shared/a.yaml");
-    expect(api.renameFile).toHaveBeenCalledWith("common/a.yaml", "shared/a.yaml");
+    expect(api.renameFile).toHaveBeenCalledWith("common/a.yaml", "shared/a.yaml", [
+      "archive/old.yaml",
+    ]);
     expect(vi.mocked(notifySuccess).mock.lastCall?.[1]?.description).toBe(
       'packages.renamed_rewritten {"count":1,"files":"kitchen.yaml"}'
     );

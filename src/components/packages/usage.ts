@@ -21,11 +21,11 @@ export function notifyFailure(localize: LocalizeFunc, key: string, err: unknown)
 export async function renameFile(
   api: ESPHomeAPI,
   localize: LocalizeFunc,
-  { path, newPath }: RenameFileDetail
+  { path, newPath, skip }: RenameFileDetail
 ): Promise<string | null> {
   let result;
   try {
-    result = await api.renameFile(path, newPath);
+    result = await api.renameFile(path, newPath, skip);
   } catch (err) {
     notifyFailure(localize, "packages.rename_failed", err);
     return null;

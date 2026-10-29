@@ -29,7 +29,12 @@ describe("delete-file-dialog", () => {
   it("lists the users, then deletes and emits file-deleted", async () => {
     const deleteFile = vi.fn().mockResolvedValue(undefined);
     const { el, confirm, open } = await mount({
-      getFileUsage: vi.fn().mockResolvedValue({ used_by: ["kitchen.yaml"], unknown: [] }),
+      getFileUsage: vi.fn().mockResolvedValue({
+        used_by: ["kitchen.yaml"],
+        unknown: [],
+        referenced_by: [],
+        rewritable: [],
+      }),
       deleteFile,
     });
     const deleted = vi.fn();
@@ -51,6 +56,50 @@ describe("delete-file-dialog", () => {
     });
   });
 
+  it.each([
+    ["a package", "bridge/plug.yaml", "BUTTON"],
+    ["an archived device", "archive/old.yaml", "SPAN"],
+    ["a device the scanner hasn't loaded", "new-device.yaml", "BUTTON"],
+  ])(
+    "lists %s that includes the file instead of calling it unused",
+    async (_, path, tag) => {
+      const { el, confirm } = await mount({
+        getFileUsage: vi.fn().mockResolvedValue({
+          used_by: [],
+          unknown: [],
+          referenced_by: [path],
+          rewritable: [path],
+        }),
+      });
+
+      await el.open("common/base.yaml");
+
+      const body = confirm.querySelector('[slot="body"]')!;
+      expect(body.textContent).not.toContain("packages.delete_unused_message");
+      expect(body.textContent).toContain("packages.usage_other_files");
+      const row = body.querySelector(".link-row")!;
+      expect(row.textContent).toContain(path);
+      expect(row.tagName).toBe(tag);
+    }
+  );
+
+  it("calls the file unused only when nothing includes it", async () => {
+    const { el, confirm } = await mount({
+      getFileUsage: vi.fn().mockResolvedValue({
+        used_by: [],
+        unknown: [],
+        referenced_by: [],
+        rewritable: [],
+      }),
+    });
+
+    await el.open("common/base.yaml");
+
+    expect(confirm.querySelector('[slot="body"]')?.textContent?.trim()).toBe(
+      "packages.delete_unused_message"
+    );
+  });
+
   it("doesn't ask when the usage lookup fails", async () => {
     const { el, open } = await mount({
       getFileUsage: vi.fn().mockRejectedValue(new APIError("internal_error", "x")),
@@ -64,7 +113,12 @@ describe("delete-file-dialog", () => {
 
   it("a failed delete toasts and emits nothing", async () => {
     const { el, confirm } = await mount({
-      getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: [] }),
+      getFileUsage: vi.fn().mockResolvedValue({
+        used_by: [],
+        unknown: [],
+        referenced_by: [],
+        rewritable: [],
+      }),
       deleteFile: vi.fn().mockRejectedValue(new APIError("not_found", "gone")),
     });
     const deleted = vi.fn();

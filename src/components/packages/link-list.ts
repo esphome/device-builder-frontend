@@ -2,7 +2,7 @@
  *  usage / dependencies dialog and the delete confirm. */
 import { css, html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
-import { openTargetUrl } from "../../util/file-paths.js";
+import { isArchivedPath, openTargetUrl } from "../../util/file-paths.js";
 
 export interface LinkItem {
   label: string;
@@ -30,11 +30,12 @@ export function deviceItems(
 }
 
 /** Rows for *paths*; device YAMLs open the device editor. Absolute paths
- *  (includes outside the config dir) have no editor and stay plain. */
+ *  (includes outside the config dir) and archived devices have no editor
+ *  and stay plain. */
 export function fileItems(paths: readonly string[]): LinkItem[] {
   return paths.map((path) => ({
     label: path,
-    url: /^(\/|[a-z]:)/i.test(path) ? null : openTargetUrl(path),
+    url: /^(\/|[a-z]:)/i.test(path) || isArchivedPath(path) ? null : openTargetUrl(path),
   }));
 }
 

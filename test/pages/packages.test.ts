@@ -147,7 +147,8 @@ describe("esphome-page-packages create", () => {
 
     expect(createFile).toHaveBeenCalledWith(
       "common/wifi.yaml",
-      "packages.new_file_template"
+      "# common/wifi.yaml\n# Shared configuration. Include it from a device with:\n" +
+        "#   packages:\n#     shared: !include common/wifi.yaml\n"
     );
     expect(navigate).toHaveBeenCalledWith("/file/common/wifi.yaml");
   });
@@ -234,12 +235,18 @@ describe("esphome-page-packages rename", () => {
       .querySelector("esphome-rename-file-dialog")!
       .dispatchEvent(
         new CustomEvent("rename-file", {
-          detail: { path: "common/base.yaml", newPath: "shared/base.yaml" },
+          detail: {
+            path: "common/base.yaml",
+            newPath: "shared/base.yaml",
+            skip: ["archive/old.yaml"],
+          },
         })
       );
     await flushMicrotasks(4);
 
-    expect(renameFile).toHaveBeenCalledWith("common/base.yaml", "shared/base.yaml");
+    expect(renameFile).toHaveBeenCalledWith("common/base.yaml", "shared/base.yaml", [
+      "archive/old.yaml",
+    ]);
     expect(listPackages).toHaveBeenCalledTimes(2);
   });
 });

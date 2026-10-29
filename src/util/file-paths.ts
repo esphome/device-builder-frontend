@@ -21,6 +21,11 @@ export function openTargetUrl(path: string): string {
     : fileEditorUrl(path);
 }
 
+/** Whether *path* is an archived device (``archive/<name>``); it has no editor. */
+export function isArchivedPath(path: string): boolean {
+  return path.startsWith("archive/");
+}
+
 /** Folder part of *path* ("" for a top-level file). */
 export function folderOf(path: string): string {
   const slash = path.lastIndexOf("/");

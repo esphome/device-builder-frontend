@@ -1339,11 +1339,17 @@ export class ESPHomeAPI {
     return this.sendCommand<PackageFile>("files/create", { path, content });
   }
 
-  /** Move a package YAML and rewrite every ``!include`` reference to it. */
-  async renameFile(path: string, newPath: string): Promise<FileRenameResult> {
+  /** Move a package YAML and rewrite every ``!include`` reference to it,
+   *  except in the files in *skip*. */
+  async renameFile(
+    path: string,
+    newPath: string,
+    skip: readonly string[] = []
+  ): Promise<FileRenameResult> {
     return this.sendCommand<FileRenameResult>("files/rename", {
       path,
       new_path: newPath,
+      skip,
     });
   }
 
@@ -1352,7 +1358,8 @@ export class ESPHomeAPI {
     await this.sendCommand("files/delete", { path });
   }
 
-  /** Devices whose config pulls in *path*, directly or through other includes. */
+  /** Devices whose config pulls in *path*, directly or through other includes,
+   *  and the files that include it directly. */
   async getFileUsage(path: string): Promise<FileUsage> {
     return this.sendCommand<FileUsage>("files/usage", { path });
   }

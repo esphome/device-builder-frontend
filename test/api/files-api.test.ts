@@ -59,9 +59,9 @@ describe("ESPHomeAPI — files commands", () => {
     ],
     [
       "renameFile",
-      ["common/a.yaml", "shared/a.yaml"],
+      ["common/a.yaml", "shared/a.yaml", ["archive/old.yaml"]],
       "files/rename",
-      { path: "common/a.yaml", new_path: "shared/a.yaml" },
+      { path: "common/a.yaml", new_path: "shared/a.yaml", skip: ["archive/old.yaml"] },
       { path: "shared/a.yaml", rewritten: ["k.yaml"], unresolved: [] },
     ],
     [
@@ -69,7 +69,12 @@ describe("ESPHomeAPI — files commands", () => {
       ["common/a.yaml"],
       "files/usage",
       { path: "common/a.yaml" },
-      { used_by: ["k.yaml"], unknown: [] },
+      {
+        used_by: ["k.yaml"],
+        unknown: [],
+        referenced_by: ["k.yaml"],
+        rewritable: ["k.yaml"],
+      },
     ],
     [
       "getDeviceDependencies",
