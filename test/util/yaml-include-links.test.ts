@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
-import { codeFolding, foldEffect } from "@codemirror/language";
+import { codeFolding, foldEffect, forceParsing } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
+import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import {
   findIncludeTargets,
   includeLinks,
@@ -10,73 +11,74 @@ import {
   resolveIncludePath,
 } from "../../src/util/yaml-include-links.js";
 
+const stateOf = (doc: string) => EditorState.create({ doc, extensions: esphomeYaml() });
+const refs = (doc: string) => findIncludeTargets(stateOf(doc)).map((t) => t.ref);
+
 describe("findIncludeTargets", () => {
   it.each([
-    ["  base: !include common/base.yaml", ["common/base.yaml"]],
-    ['  base: !include "common/base.yaml"', ["common/base.yaml"]],
-    ["  base: !include 'common/b.yml'", ["common/b.yml"]],
-    ["  base: !include { file: common/base.yaml, vars: { a: 1 } }", ["common/base.yaml"]],
+    ["base: !include common/base.yaml", ["common/base.yaml"]],
+    ['base: !include "common/base.yaml"', ["common/base.yaml"]],
+    ["base: !include 'common/b.yml'", ["common/b.yml"]],
+    ["base: !include { file: common/base.yaml, vars: { a: 1 } }", ["common/base.yaml"]],
     ["<<: !include ../shared.yaml", ["../shared.yaml"]],
     ["wifi: !include wifi.yaml # !include other.yaml", ["wifi.yaml"]],
     ["# base: !include common/base.yaml", []],
-    ["  base: !include ${dir}/base.yaml", []],
-    ["  base: !include common/notes.txt", []],
-    ["  base: github://esphome/firmware/x.yaml@main", []],
-    ["  name: include_me.yaml", []],
-    ["  base: !include common/base.yaml.backup", []],
-    ["  base: !include common/Base.YAML", ["common/Base.YAML"]],
+    ["base: !include ${dir}/base.yaml", []],
+    ["base: !include common/notes.txt", []],
+    ["base: github://esphome/firmware/x.yaml@main", []],
+    ["name: include_me.yaml", []],
+    ["base: !include common/base.yaml.backup", []],
+    ["base: !include common/Base.YAML", ["common/Base.YAML"]],
+    ['base: !include "\\u0062ase.yaml"', []],
     ["sensor: [!include common/uptime.yaml]", ["common/uptime.yaml"]],
     ["s: [!include a.yaml, !include b.yaml]", ["a.yaml", "b.yaml"]],
+    ["b: !include { vars: { id: plug }, file: common/base.yaml }", ["common/base.yaml"]],
     [
-      "  b: !include { vars: { id: plug }, file: common/base.yaml }",
+      "b: !include { vars: { file: x.yaml }, file: common/base.yaml }",
       ["common/base.yaml"],
     ],
     [
-      "  b: !include { vars: { file: x.yaml }, file: common/base.yaml }",
+      'b: !include {vars: {name: "Room #1"}, file: common/base.yaml}',
       ["common/base.yaml"],
     ],
-    ["  b: !include { vars: { file: x.yaml } }", []],
+    ["b: !include { vars: { file: x.yaml } }", []],
     ["p: {a: !include {file: a.yaml}, b: !include b.yaml}", ["a.yaml", "b.yaml"]],
-  ])("%j → %j", (line, refs) => {
-    expect(findIncludeTargets(line).map((t) => t.ref)).toEqual(refs);
+    ['name: "see !include x.yaml"', []],
+    ["on_boot:\n  - lambda: |-\n      // !include y.yaml", []],
+    ["- !include ../x.yaml", ["../x.yaml"]],
+  ])("%j → %j", (doc, expected) => {
+    expect(refs(doc)).toEqual(expected);
   });
 
   it.each([
-    ["  b: !include", "    file: common/base.yaml", ["common/base.yaml"]],
-    ["  b: !include", '    file: "common/base.yaml"', ["common/base.yaml"]],
-    ["  b: !include  # shared", "    file: common/base.yaml", ["common/base.yaml"]],
-    ["  b: !include", "  file: common/base.yaml", []],
-    ["  b: other", "    file: common/base.yaml", []],
-    ["  b: !include", "    file: ${dir}/base.yaml", []],
-  ])("block form %j / %j → %j", (prev, line, refs) => {
-    const targets = findIncludeTargets(line, [prev]);
-    expect(targets.map((t) => t.ref)).toEqual(refs);
-    for (const t of targets) expect(line.slice(t.from, t.to)).toBe(t.ref);
-  });
-
-  it.each([
-    [["    vars: { id: plug }", "  b: !include"], ["common/base.yaml"]],
+    ["b: !include\n  file: common/base.yaml", ["common/base.yaml"]],
+    ['b: !include\n  file: "common/base.yaml"', ["common/base.yaml"]],
+    ["b: !include  # shared\n  file: common/base.yaml", ["common/base.yaml"]],
+    ["b: !include\n  vars: { id: plug }\n  file: common/base.yaml", ["common/base.yaml"]],
     [
-      ["      id: plug", "    vars:", "    # shared", "  b: !include"],
+      "b: !include\n  vars:\n    id: plug\n  # shared\n  file: common/base.yaml",
       ["common/base.yaml"],
     ],
-    [["    - x", "  b: !include"], []],
-    [["      id: plug", "    vars:", "  b: other"], []],
-  ])("block form below %j → %j", (above, refs) => {
-    const line = "    file: common/base.yaml";
-    expect(findIncludeTargets(line, above).map((t) => t.ref)).toEqual(refs);
+    ["b: !include\n  vars:\n    file: x.yaml", []],
+    ["b: other\n  file: common/base.yaml", []],
+    ["b: !include\n  file: ${dir}/base.yaml", []],
+  ])("block form %j → %j", (doc, expected) => {
+    expect(refs(doc)).toEqual(expected);
   });
 
-  it("leaves a nested vars.file in the block form alone", () => {
-    expect(
-      findIncludeTargets("      file: x.yaml", ["    vars:", "  b: !include"])
-    ).toEqual([]);
+  it("reports the path's document offsets, inside the quotes", () => {
+    const doc = 'a: 1\nbase: !include "common/base.yaml"';
+    const [t] = findIncludeTargets(stateOf(doc));
+    expect(doc.slice(t.from, t.to)).toBe("common/base.yaml");
   });
 
-  it("reports the path's offsets within the line", () => {
-    const line = '  base: !include "common/base.yaml"';
-    const [t] = findIncludeTargets(line);
-    expect(line.slice(t.from, t.to)).toBe("common/base.yaml");
+  it("only returns targets overlapping the range", () => {
+    const doc = "a: !include a.yaml\nb: !include b.yaml";
+    const state = stateOf(doc);
+    const second = doc.indexOf("b.yaml");
+    expect(findIncludeTargets(state, second, doc.length).map((t) => t.ref)).toEqual([
+      "b.yaml",
+    ]);
   });
 });
 
@@ -96,7 +98,7 @@ describe("resolveIncludePath", () => {
 
 describe("includePathAt", () => {
   const doc = "packages:\n  wifi: !include wifi.yaml\n  name: x\n";
-  const view = new EditorView({ state: EditorState.create({ doc }) });
+  const view = new EditorView({ state: stateOf(doc) });
   const at = (needle: string, offset = 1) => doc.indexOf(needle) + offset;
 
   it("resolves the target under the position against the base file", () => {
@@ -107,7 +109,7 @@ describe("includePathAt", () => {
 
   it("follows the block form across a blank line", () => {
     const block = "b: !include\n\n  file: common/base.yaml\n";
-    const v = new EditorView({ state: EditorState.create({ doc: block }) });
+    const v = new EditorView({ state: stateOf(block) });
     expect(includePathAt(v, block.indexOf("common/") + 1, "kitchen.yaml")).toBe(
       "common/base.yaml"
     );
@@ -185,6 +187,7 @@ describe("includeLinks decorations", () => {
       state: EditorState.create({
         doc,
         extensions: [
+          esphomeYaml(),
           codeFolding(),
           includeLinks(
             () => "kitchen.yaml",
@@ -194,13 +197,18 @@ describe("includeLinks decorations", () => {
         ],
       }),
     });
+    const links = () => view.dom.querySelectorAll(".cm-include-link").length;
+    expect(links()).toBe(1);
+    // finishing the parse rebuilds the links the first pass couldn't reach
+    forceParsing(view, doc.length);
+    expect(links()).toBe(2);
     expect(() =>
       view.dispatch({
         effects: foldEffect.of({ from: doc.indexOf("k0"), to: doc.indexOf(" b:") }),
       })
     ).not.toThrow();
     expect(view.visibleRanges.length).toBe(2);
-    expect(view.dom.querySelectorAll(".cm-include-link").length).toBe(2);
+    expect(links()).toBe(2);
     view.destroy();
   });
 });

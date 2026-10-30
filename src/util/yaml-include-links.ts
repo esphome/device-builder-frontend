@@ -6,7 +6,8 @@
  * file being edited). Targets outside the config dir, absolute paths and
  * ``${substitution}``-built paths aren't linked.
  */
-import { type Extension, type Line, RangeSetBuilder, type Text } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
+import { type EditorState, type Extension, RangeSetBuilder } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -14,104 +15,70 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
+import type { SyntaxNode } from "@lezer/common";
 import { isApplePlatform } from "./apple-platform.js";
+import { readKeyText } from "./yaml-ast.js";
 
-/** A path ending in ``.yaml`` / ``.yml`` (any case), optionally quoted, ending there:
- *  ``base.yaml.backup`` is another file. Same rules as the backend's rename. */
-const PATH = String.raw`(["']?)([^\s"'{}\[\],#]+\.[yY][aA]?[mM][lL])\1(?=[\s"'}\],]|$)`;
-/** ``!include path``. */
-const INCLUDE_RE = new RegExp(String.raw`!include\s+` + PATH, "g");
-/** ``!include {`` opening a flow mapping; its ``file`` key may come in any order. */
-const FLOW_INCLUDE_RE = /!include\s+\{/g;
-const FLOW_FILE_RE = new RegExp(String.raw`^file:\s*` + PATH);
-/** Block form: ``!include`` ending a line, ``file: path`` on a deeper line below. */
-const BARE_TAG_RE = /!include\s*$/;
-const FILE_KEY_RE = new RegExp(String.raw`^\s*file:\s*` + PATH);
+/** A path ending in ``.yaml`` / ``.yml`` (any case): same rules as the backend's
+ *  rename. Escaped (``\``) and ``${…}``-built paths aren't linked. */
+const PATH_RE = /^[^\s"'{}[\],#$\\]+\.ya?ml$/i;
 
 export interface IncludeTarget {
-  /** Offsets of the path text within the line. */
+  /** Document offsets of the path text, inside any quotes. */
   from: number;
   to: number;
   /** The path exactly as written. */
   ref: string;
 }
 
-const codeOf = (line: string) => {
-  const comment = line.search(/(^|\s)#/);
-  return comment < 0 ? line : line.slice(0, comment);
-};
+const isScalar = (node: SyntaxNode) =>
+  node.name === "Literal" || node.name === "QuotedLiteral";
 
-const indentOf = (line: string) => line.length - line.trimStart().length;
-
-/** Every linkable ``!include`` path in one line of YAML; *above* yields the
- *  lines above it, nearest first, for the block form. */
-export function findIncludeTargets(
-  line: string,
-  above: Iterable<string> = []
-): IncludeTarget[] {
-  const code = codeOf(line);
-  const out: IncludeTarget[] = [];
-  const add = (ref: string, from: number) => {
-    if (!ref.includes("$")) out.push({ from, to: from + ref.length, ref });
-  };
-  for (const m of code.matchAll(INCLUDE_RE)) add(m[2], m.index + m[0].lastIndexOf(m[2]));
-  for (const m of code.matchAll(FLOW_INCLUDE_RE)) {
-    const hit = flowFileTarget(code, m.index + m[0].length - 1);
-    if (hit) add(hit.ref, hit.from);
-  }
-  const block = FILE_KEY_RE.exec(code);
-  if (block && isBlockIncludeKey(line, above)) {
-    add(block[2], block[0].lastIndexOf(block[2]));
-  }
-  return out.sort((a, b) => a.from - b.from);
-}
-
-/** The ``file`` value of the flow mapping opening at *open* in *code*; keys of
- *  nested collections (``vars: {file: …}``) don't count.
- *  shortcut: brackets inside quoted values aren't skipped; parse the YAML if that matters. */
-function flowFileTarget(
-  code: string,
-  open: number
-): { ref: string; from: number } | null {
-  let depth = 0;
-  for (let i = open; i < code.length; i++) {
-    const c = code[i];
-    if (c === "{" || c === "[") depth++;
-    else if (c === "}" || c === "]") {
-      if (--depth === 0) return null;
-    } else if (depth === 1 && c === "f" && /[{,]\s*$/.test(code.slice(open, i))) {
-      const m = FLOW_FILE_RE.exec(code.slice(i));
-      if (m) return { ref: m[2], from: i + m[0].lastIndexOf(m[2]) };
+/** The scalar holding an ``!include``'s path: the tagged value itself, or the
+ *  ``file`` value of the tagged mapping (not a nested ``vars: {file: …}``). */
+function pathNode(state: EditorState, tagged: SyntaxNode): SyntaxNode | null {
+  let value = tagged.getChild("Tag")?.nextSibling;
+  while (value?.name === "Comment") value = value.nextSibling;
+  if (!value) return null;
+  if (isScalar(value)) return value;
+  if (value.name !== "FlowMapping" && value.name !== "BlockMapping") return null;
+  for (const pair of value.getChildren("Pair")) {
+    const key = pair.getChild("Key");
+    if (key && readKeyText(state, key) === "file") {
+      const file = pair.lastChild;
+      return file && isScalar(file) ? file : null;
     }
   }
   return null;
 }
 
-/** Whether *line* is a key of a block mapping whose parent line ends in ``!include``,
- *  skipping its sibling keys and their nested values. */
-function isBlockIncludeKey(line: string, above: Iterable<string>): boolean {
-  const indent = indentOf(line);
-  if (indent === 0) return false;
-  for (const raw of above) {
-    const code = codeOf(raw).trimEnd();
-    if (code.trim() === "") continue;
-    const level = indentOf(code);
-    if (level > indent) continue;
-    if (level === indent) {
-      if (code.trimStart().startsWith("-")) return false;
-      continue;
-    }
-    return BARE_TAG_RE.test(code);
-  }
-  return false;
-}
-
-/** The include targets of *line*, with the lines above it as context. */
-function lineTargets(doc: Text, line: Line): IncludeTarget[] {
-  function* above() {
-    for (let n = line.number - 1; n >= 1; n--) yield doc.line(n).text;
-  }
-  return findIncludeTargets(line.text, above());
+/** Every linkable ``!include`` path overlapping *from*–*to*, read from the
+ *  editor's YAML tree so quoted strings, block scalars and comments don't count. */
+export function findIncludeTargets(
+  state: EditorState,
+  from = 0,
+  to = state.doc.length
+): IncludeTarget[] {
+  const out: IncludeTarget[] = [];
+  syntaxTree(state).iterate({
+    from,
+    to,
+    enter(node) {
+      if (node.name !== "Tagged") return;
+      const tag = node.node.getChild("Tag");
+      if (!tag || state.doc.sliceString(tag.from, tag.to) !== "!include") return;
+      const path = pathNode(state, node.node);
+      if (!path) return;
+      const quoted = path.name === "QuotedLiteral" ? 1 : 0;
+      const start = path.from + quoted;
+      const end = path.to - quoted;
+      const ref = state.doc.sliceString(start, end);
+      if (end >= from && start <= to && PATH_RE.test(ref)) {
+        out.push({ from: start, to: end, ref });
+      }
+    },
+  });
+  return out.sort((a, b) => a.from - b.from);
 }
 
 /** *ref* resolved against the folder of *basePath*, POSIX-relative to the
@@ -137,18 +104,13 @@ const linkMark = (title: string) =>
 function buildDecorations(view: EditorView, title: string): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const mark = linkMark(title);
-  // A fold can split one line across two visible ranges; decorate it once.
-  let done = 0;
+  // A fold can split one include across two visible ranges; decorate it once.
+  let last = -1;
   for (const { from, to } of view.visibleRanges) {
-    for (let pos = from; pos <= to;) {
-      const line = view.state.doc.lineAt(pos);
-      if (line.number > done) {
-        for (const t of lineTargets(view.state.doc, line)) {
-          builder.add(line.from + t.from, line.from + t.to, mark);
-        }
-        done = line.number;
-      }
-      pos = line.to + 1;
+    for (const t of findIncludeTargets(view.state, from, to)) {
+      if (t.from <= last) continue;
+      builder.add(t.from, t.to, mark);
+      last = t.from;
     }
   }
   return builder.finish();
@@ -199,7 +161,12 @@ export function includeLinks(
         this.decorations = buildDecorations(view, title);
       }
       update(u: ViewUpdate) {
-        if (u.docChanged || u.viewportChanged) {
+        // the parser fills in the tree after the edit that triggered it
+        if (
+          u.docChanged ||
+          u.viewportChanged ||
+          syntaxTree(u.startState) !== syntaxTree(u.state)
+        ) {
           this.decorations = buildDecorations(u.view, title);
         }
       }
@@ -238,8 +205,8 @@ export function includePathAt(
   pos: number,
   basePath: string
 ): string | null {
-  const line = view.state.doc.lineAt(pos);
-  const col = pos - line.from;
-  const hit = lineTargets(view.state.doc, line).find((t) => col >= t.from && col <= t.to);
+  const hit = findIncludeTargets(view.state, pos, pos).find(
+    (t) => pos >= t.from && pos <= t.to
+  );
   return hit ? resolveIncludePath(basePath, hit.ref) : null;
 }
