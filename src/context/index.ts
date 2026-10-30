@@ -29,6 +29,7 @@ export {
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
+  preferencesContext,
   prefsLoadedContext,
   recentJobsContext,
   remoteBuildCleanupTtlContext,

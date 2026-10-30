@@ -20,7 +20,7 @@ import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devi
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
 import type { ArchivedDevice } from "../api/types/system.js";
-import { DashboardView } from "../api/types/system.js";
+import { DashboardView, type UserPreferences } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   type AdoptedDetail,
@@ -47,7 +47,12 @@ import {
   showJobProgress,
 } from "../components/dashboard/install.js";
 import { relinkLive } from "../components/dashboard/live-rebind.js";
-import { loadPreferences, saveTablePreference } from "../components/dashboard/prefs.js";
+import {
+  applyDashboardPreferences,
+  cacheView,
+  readCachedView,
+  saveTablePreference,
+} from "../components/dashboard/prefs.js";
 import {
   renderCardGrid,
   renderDiscoveredSection,
@@ -100,6 +105,7 @@ import {
   importableDevicesContext,
   labelsContext,
   localizeContext,
+  preferencesContext,
   prefsLoadedContext,
   recentJobsContext,
   remoteComputeOnlyContext,
@@ -232,6 +238,11 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: prefsLoadedContext, subscribe: true })
   @state()
   _prefsLoaded = false;
+  @consume({ context: preferencesContext, subscribe: true })
+  @state()
+  _preferences: UserPreferences | null = null;
+  /** Seed view/table state from preferences once per mount, so a reconnect can't undo a toggle. */
+  private _prefsSeeded = false;
 
   @consume({ context: buildServerPeersContext, subscribe: true })
   @state()
@@ -407,6 +418,7 @@ export class ESPHomePageDashboard extends LitElement {
     // else mounts — a refresh, deep link, or browser-back must land
     // the user on the same view they left, not the default-empty
     // state that would otherwise flash through on first paint.
+    this._view = readCachedView() ?? this._view;
     this._hydrateFromUrl();
     this.setAttribute("view", this._view);
     this.toggleAttribute("yaml", this._yamlMode);
@@ -572,7 +584,11 @@ export class ESPHomePageDashboard extends LitElement {
       this._search = "";
       this._yamlSearch.clear();
     }
-    if (changed.has("_view")) this.setAttribute("view", this._view);
+    if (this._preferences && !this._prefsSeeded) {
+      this._prefsSeeded = true;
+      applyDashboardPreferences(this, this._preferences);
+    }
+    if (this.getAttribute("view") !== this._view) this.setAttribute("view", this._view);
     if (changed.has("_yamlMode")) this.toggleAttribute("yaml", this._yamlMode);
     // ``has-discovered`` is the hook that adds top padding for the
     // discovery banner. Track the same condition the banner renders
@@ -594,7 +610,6 @@ export class ESPHomePageDashboard extends LitElement {
       "remote-open",
       this._stacks.show && !this._stacks.remoteCollapsed
     );
-    if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.
     // Resolve any URL-sourced pending label names the moment it does.
     if (changed.has("_labelsCatalog")) this._resolvePendingLabelNames();
@@ -920,6 +935,7 @@ export class ESPHomePageDashboard extends LitElement {
     // search and returns to the device list.
     if (this._yamlMode) this._setSearchMode(false);
     this._view = view;
+    cacheView(view);
     this._api.updatePreferences({ dashboard_view: view }).catch(() => {});
   };
 

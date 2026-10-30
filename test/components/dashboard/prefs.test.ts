@@ -1,13 +1,22 @@
 /**
  * @vitest-environment happy-dom
  *
- * saveTablePreference mirrors each change onto the host fields that
- * seed a remounted table.
+ * applyDashboardPreferences seeds the host from a snapshot; saveTablePreference
+ * mirrors each change onto the host fields that seed a remounted table.
  */
 import type { ColumnVisibilityState } from "@tanstack/lit-table";
-import { describe, expect, it, vi } from "vitest";
-import { SortDirection } from "../../../src/api/types/system.js";
-import { saveTablePreference } from "../../../src/components/dashboard/prefs.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  DashboardView,
+  SortDirection,
+  type UserPreferences,
+} from "../../../src/api/types/system.js";
+import {
+  applyDashboardPreferences,
+  cacheView,
+  readCachedView,
+  saveTablePreference,
+} from "../../../src/components/dashboard/prefs.js";
 import { makeDashboardHost } from "./_host.js";
 
 function makeHost() {
@@ -22,6 +31,67 @@ function makeHost() {
 }
 
 const event = (type: string, detail: unknown) => new CustomEvent(type, { detail });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+  vi.restoreAllMocks();
+});
+
+describe("cached dashboard view", () => {
+  it("round-trips a view", () => {
+    cacheView(DashboardView.TABLE);
+    expect(readCachedView()).toBe(DashboardView.TABLE);
+  });
+
+  it("returns null for a missing or unknown value", () => {
+    expect(readCachedView()).toBeNull();
+    localStorage.setItem("esphome-dashboard-view", "grid");
+    expect(readCachedView()).toBeNull();
+  });
+
+  it("degrades to null / no-op when storage throws", () => {
+    const blocked = () => {
+      throw new Error("blocked");
+    };
+    vi.stubGlobal("localStorage", { getItem: blocked, setItem: blocked });
+    expect(() => cacheView(DashboardView.TABLE)).not.toThrow();
+    expect(readCachedView()).toBeNull();
+  });
+});
+
+describe("applyDashboardPreferences", () => {
+  const prefs = (over: Partial<UserPreferences> = {}) =>
+    ({
+      dashboard_view: DashboardView.TABLE,
+      table_page_size: 50,
+      table_column_visibility: { ip: false },
+      table_sort_column: "name",
+      table_sort_direction: SortDirection.DESC,
+      ...over,
+    }) as UserPreferences;
+
+  it("copies the view and table preferences onto the host", () => {
+    const { host } = makeHost();
+    applyDashboardPreferences(host, prefs());
+    expect(host._view).toBe(DashboardView.TABLE);
+    expect(host._tablePageSize).toBe(50);
+    expect(host._tableColumnVisibility).toEqual({ ip: false });
+    expect(host._tableSorting).toEqual([{ id: "name", desc: true }]);
+  });
+
+  it("remembers the applied view for the next load", () => {
+    const { host } = makeHost();
+    applyDashboardPreferences(host, prefs());
+    expect(readCachedView()).toBe(DashboardView.TABLE);
+  });
+
+  it("maps an unset sort column to an empty sort", () => {
+    const { host } = makeHost();
+    applyDashboardPreferences(host, prefs({ table_sort_column: null }));
+    expect(host._tableSorting).toEqual([]);
+  });
+});
 
 describe("saveTablePreference", () => {
   it("mirrors a page-size change onto the host and persists it", () => {

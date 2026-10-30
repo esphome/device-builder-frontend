@@ -16,7 +16,11 @@ import type {
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
 import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
-import { type ExperienceLevel, Theme } from "../api/types/system.js";
+import {
+  type ExperienceLevel,
+  Theme,
+  type UserPreferences,
+} from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import {
@@ -50,6 +54,7 @@ import {
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
+  preferencesContext,
   prefsLoadedContext,
   recentJobsContext,
   remoteBuildCleanupTtlContext,
@@ -193,6 +198,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: prefsLoadedContext })
   @state()
   _prefsLoaded = false;
+  @provide({ context: preferencesContext })
+  @state()
+  _preferences: UserPreferences | null = null;
   // Derived from _experienceLevel in willUpdate (EXPERT ⇒ true); there is no
   // separate expert_mode preference.
   @provide({ context: expertModeContext }) @state() _expertMode = false;

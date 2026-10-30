@@ -35,6 +35,7 @@ function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
 function makeHost() {
   return {
     _prefsLoaded: false,
+    _preferences: null as UserPreferences | null,
     _prefsWritesInFlight: 0,
     _experienceLevel: null as ExperienceLevel | null,
     _remoteComputeOnly: false,
@@ -79,6 +80,13 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     expect(host._experienceLevel).toBe(ExperienceLevel.EXPERT);
     expect(host._remoteComputeOnly).toBe(true);
     expect(host.applyTheme).toHaveBeenCalledWith("dark");
+  });
+
+  it("publishes the snapshot so the dashboard can seed its view on first paint", () => {
+    const host = makeHost();
+    const p = prefs({ dashboard_view: "table" as UserPreferences["dashboard_view"] });
+    dispatch(host, snapshot(p));
+    expect(host._preferences).toBe(p);
   });
 
   it("does not throw or drop the rest of the snapshot when preferences is absent", () => {
