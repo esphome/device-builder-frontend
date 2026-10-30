@@ -59,6 +59,14 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
       keywords: ["password", "wifi"],
       run: () => void navigate("/secrets"),
     },
+    {
+      id: "nav.packages",
+      group: t("command_palette.group_navigation"),
+      label: t("layout.packages"),
+      icon: "package-variant-closed",
+      keywords: ["include", "template", "shared", "common"],
+      run: () => void navigate("/packages"),
+    },
   ];
 
   const deviceGroup = t("command_palette.group_devices");

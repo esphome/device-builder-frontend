@@ -25,6 +25,7 @@ vi.mock("../../src/components/install-method-dialog.js", () => ({}));
 vi.mock("../../src/components/labels/bulk-labels-dialog.js", () => ({}));
 vi.mock("../../src/components/labels/label-dialog.js", () => ({}));
 vi.mock("../../src/components/logs-dialog.js", () => ({}));
+vi.mock("../../src/components/packages/file-list-dialog.js", () => ({}));
 vi.mock("../../src/components/rename-device-dialog.js", () => ({}));
 vi.mock("../../src/components/select-bar.js", () => ({}));
 vi.mock("../../src/components/wizard/create-config-dialog.js", () => ({}));

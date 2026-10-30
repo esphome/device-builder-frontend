@@ -1,0 +1,390 @@
+/**
+ * Package YAMLs: every YAML in a subfolder of the config dir, grouped by
+ * folder. Devices include them through ``packages:`` / ``!include``; the
+ * dashboard lists them here instead of as (always offline) devices.
+ */
+import { consume } from "@lit/context";
+import {
+  mdiDeleteOutline,
+  mdiDevices,
+  mdiPackageVariantClosed,
+  mdiPlus,
+  mdiRenameOutline,
+} from "@mdi/js";
+import { css, html, LitElement, nothing } from "lit";
+import { customElement, query, state } from "lit/decorators.js";
+import { APIError } from "../api/api-error.js";
+import type { ESPHomeAPI } from "../api/index.js";
+import { ErrorCode } from "../api/types/protocol.js";
+import type { LocalizeFunc } from "../common/localize.js";
+import type { ESPHomeDeleteFileDialog } from "../components/packages/delete-file-dialog.js";
+import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
+import type {
+  ESPHomeRenameFileDialog,
+  RenameFileDetail,
+} from "../components/packages/rename-file-dialog.js";
+import { notifyFailure, renameFile } from "../components/packages/usage.js";
+import { apiConnectedContext, apiContext, localizeContext } from "../context/index.js";
+import { loadMessageStyles } from "../styles/load-message.js";
+import { espHomeStyles } from "../styles/shared.js";
+import {
+  fileEditorUrl,
+  fileNameOf,
+  groupByFolder,
+  newPackagePathProblem,
+} from "../util/file-paths.js";
+import { navigate } from "../util/navigation.js";
+import { registerMdiIcons } from "../util/register-icons.js";
+import { renderAsyncState } from "../util/render-async-state.js";
+
+import "@home-assistant/webawesome/dist/components/button/button.js";
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../components/packages/delete-file-dialog.js";
+import "../components/packages/file-list-dialog.js";
+import "../components/packages/rename-file-dialog.js";
+
+registerMdiIcons({
+  "delete-outline": mdiDeleteOutline,
+  devices: mdiDevices,
+  "package-variant-closed": mdiPackageVariantClosed,
+  plus: mdiPlus,
+  "rename-outline": mdiRenameOutline,
+});
+
+type LoadState = "loading" | "ready" | "error";
+
+/** Starter content for a new package; it is YAML, so it is not localized. */
+export const newFileTemplate = (path: string): string =>
+  `# ${path}\n# Shared configuration. Include it from a device with:\n#   packages:\n#     shared: !include ${path}\n`;
+
+@customElement("esphome-page-packages")
+export class ESPHomePagePackages extends LitElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: apiContext })
+  private _api!: ESPHomeAPI;
+
+  /** WS liveness; the false→true edge re-runs a load that failed. */
+  @consume({ context: apiConnectedContext, subscribe: true })
+  @state()
+  private _apiConnected = false;
+
+  @state() private _state: LoadState = "loading";
+  @state() private _paths: string[] = [];
+  @state() private _newPath = "";
+  @state() private _creating = false;
+  @query("esphome-delete-file-dialog")
+  private _deleteDialog?: ESPHomeDeleteFileDialog;
+
+  @query("esphome-file-list-dialog")
+  private _usageDialog?: ESPHomeFileListDialog;
+
+  @query("esphome-rename-file-dialog")
+  private _renameDialog?: ESPHomeRenameFileDialog;
+
+  private _wasConnected = false;
+
+  static styles = [
+    espHomeStyles,
+    loadMessageStyles,
+    css`
+      .page {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: var(--wa-space-l) var(--content-gutter);
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-l);
+      }
+      h1 {
+        margin: 0 0 2px;
+        font-size: var(--wa-font-size-l);
+        font-weight: var(--wa-font-weight-bold);
+      }
+      .desc {
+        margin: 0;
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-quiet);
+      }
+      code,
+      .path {
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+      .create {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--wa-space-s);
+        align-items: center;
+      }
+      .create input {
+        flex: 1;
+        min-width: 220px;
+        padding: 8px 10px;
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-m);
+        background: var(--wa-color-surface-default);
+        color: var(--wa-color-text-normal);
+        font: inherit;
+        font-size: var(--wa-font-size-s);
+      }
+      .create .problem {
+        flex-basis: 100%;
+        margin: 0;
+        font-size: var(--wa-font-size-xs);
+        color: var(--esphome-error);
+      }
+      .primary,
+      .row-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: var(--wa-border-radius-m);
+        font: inherit;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        cursor: pointer;
+      }
+      .primary {
+        padding: var(--esphome-button-padding);
+        border: none;
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+      }
+      .primary:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .folder {
+        background: var(--wa-color-surface-default);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-l);
+        overflow: hidden;
+      }
+      .folder h2 {
+        margin: 0;
+        padding: 10px 16px;
+        font-size: var(--wa-font-size-s);
+        background: var(--wa-color-surface-lowered);
+      }
+      .file {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-s);
+        padding: 8px 16px;
+        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+      .file-name {
+        flex: 1;
+        border: none;
+        background: none;
+        padding: 0;
+        text-align: left;
+        font: inherit;
+        font-size: var(--wa-font-size-s);
+        color: var(--esphome-primary);
+        cursor: pointer;
+        overflow-wrap: anywhere;
+      }
+      .file-name:hover {
+        text-decoration: underline;
+      }
+      .row-action {
+        padding: 4px 8px;
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        background: transparent;
+        color: var(--wa-color-text-normal);
+      }
+      .row-action:hover {
+        background: var(--wa-color-surface-lowered);
+      }
+      .row-action wa-icon,
+      .primary wa-icon {
+        font-size: 16px;
+      }
+      .empty {
+        padding: var(--wa-space-l);
+        text-align: center;
+        color: var(--wa-color-text-quiet);
+        font-size: var(--wa-font-size-s);
+      }
+      .empty wa-icon {
+        font-size: 40px;
+      }
+    `,
+  ];
+
+  connectedCallback() {
+    super.connectedCallback();
+    // The mount load covers the current connection; updated() only reacts to the next one.
+    this._wasConnected = this._apiConnected;
+    void this._reload();
+  }
+
+  protected updated() {
+    // Socket back: another tab may have changed the folder meanwhile.
+    if (this._apiConnected && !this._wasConnected) {
+      void this._reload();
+    }
+    this._wasConnected = this._apiConnected;
+  }
+
+  protected render() {
+    const problem = this._newPath.trim() ? newPackagePathProblem(this._newPath) : null;
+    return html`
+      <div class="page">
+        <div>
+          <h1>${this._localize("packages.title")}</h1>
+          <p class="desc">${this._localize("packages.desc")}</p>
+        </div>
+        <form class="create" @submit=${this._create}>
+          <input
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            class="path"
+            aria-label=${this._localize("packages.new_label")}
+            placeholder=${this._localize("packages.new_placeholder")}
+            .value=${this._newPath}
+            @input=${(e: Event) => (this._newPath = (e.currentTarget as HTMLInputElement).value)}
+          />
+          <button
+            type="submit"
+            class="primary"
+            ?disabled=${this._creating || !this._newPath.trim() || problem !== null}
+          >
+            <wa-icon library="mdi" name="plus"></wa-icon>
+            ${this._localize("packages.new")}
+          </button>
+          ${problem ? html`<p class="problem" role="alert">${this._localize(problem)}</p>` : nothing}
+        </form>
+        ${renderAsyncState({
+          loading: this._state === "loading",
+          loadingMessage: this._localize("packages.loading"),
+          loadingLead: html`<wa-spinner></wa-spinner>`,
+          error: this._state === "error" ? this._localize("packages.load_failed") : null,
+          errorActions: () =>
+            html`<wa-button size="small" @click=${this._reload}>
+              ${this._localize("command.retry")}
+            </wa-button>`,
+          content: () => this._renderList(),
+        })}
+      </div>
+      <esphome-delete-file-dialog
+        @file-deleted=${this._reload}
+      ></esphome-delete-file-dialog>
+      <esphome-file-list-dialog></esphome-file-list-dialog>
+      <esphome-rename-file-dialog
+        @rename-file=${this._rename}
+      ></esphome-rename-file-dialog>
+    `;
+  }
+
+  private _renderList() {
+    if (this._paths.length === 0) {
+      return html`<div class="empty">
+        <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+        <p>${this._localize("packages.empty")}</p>
+      </div>`;
+    }
+    return html`${[...groupByFolder(this._paths)].map(
+      ([folder, paths]) =>
+        html`<section class="folder" aria-label=${folder}>
+          <h2 class="path">${folder}/</h2>
+          ${paths.map(
+            (path) =>
+              html`<div class="file">
+                <button
+                  type="button"
+                  class="file-name path"
+                  @click=${() => navigate(fileEditorUrl(path))}
+                >
+                  ${fileNameOf(path)}
+                </button>
+                <button
+                  type="button"
+                  class="row-action"
+                  @click=${() => this._usageDialog?.showUsage(path)}
+                >
+                  <wa-icon library="mdi" name="devices"></wa-icon>
+                  ${this._localize("packages.show_usage")}
+                </button>
+                <button
+                  type="button"
+                  class="row-action"
+                  aria-label=${this._localize("packages.rename_named", { path })}
+                  title=${this._localize("packages.rename")}
+                  @click=${() => this._renameDialog?.open(path)}
+                >
+                  <wa-icon library="mdi" name="rename-outline"></wa-icon>
+                </button>
+                <button
+                  type="button"
+                  class="row-action"
+                  aria-label=${this._localize("packages.delete_named", { path })}
+                  title=${this._localize("packages.delete")}
+                  @click=${() => this._deleteDialog?.open(path)}
+                >
+                  <wa-icon library="mdi" name="delete-outline"></wa-icon>
+                </button>
+              </div>`
+          )}
+        </section>`
+    )}`;
+  }
+
+  /** Bumped per ``_reload``, so an older listing can't overwrite a newer one. */
+  private _reloading = 0;
+
+  private _reload = async () => {
+    const reloading = ++this._reloading;
+    // A refresh keeps the current list up instead of flashing the spinner.
+    if (this._state !== "ready") this._state = "loading";
+    try {
+      // A reconnect flips "connected" before a stored-token login finishes.
+      await this._api.ready;
+      const paths = (await this._api.listPackages()).map((p) => p.path);
+      if (reloading !== this._reloading) return;
+      this._paths = paths;
+      this._state = "ready";
+    } catch (err) {
+      if (reloading !== this._reloading) return;
+      console.error("Failed to list packages:", err);
+      this._state = "error";
+    }
+  };
+
+  private _rename = async (e: CustomEvent<RenameFileDetail>) => {
+    await renameFile(this._api, this._localize, e.detail);
+    void this._reload();
+  };
+
+  private _create = async (e: Event) => {
+    e.preventDefault();
+    const path = this._newPath.trim();
+    if (newPackagePathProblem(path) !== null) return;
+    this._creating = true;
+    try {
+      await this._api.createFile(path, newFileTemplate(path));
+    } catch (err) {
+      const key =
+        err instanceof APIError && err.errorCode === ErrorCode.ALREADY_EXISTS
+          ? "packages.already_exists"
+          : "packages.create_failed";
+      notifyFailure(this._localize, key, err);
+      return;
+    } finally {
+      this._creating = false;
+    }
+    this._newPath = "";
+    if (this.isConnected) void navigate(fileEditorUrl(path));
+  };
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "esphome-page-packages": ESPHomePagePackages;
+  }
+}

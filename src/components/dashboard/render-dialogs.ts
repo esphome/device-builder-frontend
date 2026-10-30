@@ -243,6 +243,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       @adopted=${host._onAdopted}
     ></esphome-adopt-dialog>
     <esphome-encryption-key-dialog></esphome-encryption-key-dialog>
+    <esphome-file-list-dialog></esphome-file-list-dialog>
     <esphome-create-config-dialog
       .takenHostnames=${takenHostnameSet(host._devices, host._importableDevices)}
     ></esphome-create-config-dialog>
