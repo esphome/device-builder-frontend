@@ -1941,6 +1941,7 @@
     "usage_none": "No device or other file includes this file.",
     "usage_other_files": "{count, plural, one {# file includes it directly:} other {# files include it directly:}}",
     "usage_unknown": "Couldn't check these devices because their config doesn't load right now: {names}",
+    "usage_unreadable": "Couldn't read these files, so they may include it: {names}",
     "usage_failed": "Couldn't check which devices use this file",
     "rename": "Rename",
     "rename_named": "Rename {path}",

@@ -35,7 +35,13 @@ describe("delete-file-dialog", () => {
       ),
       deleteFile,
     });
-    const usage = { used_by: [], unknown: [], referenced_by: [], rewritable: [] };
+    const usage = {
+      used_by: [],
+      unknown: [],
+      referenced_by: [],
+      rewritable: [],
+      unreadable: [],
+    };
 
     const first = el.open("common/a.yaml");
     const second = el.open("common/b.yaml");
@@ -58,6 +64,7 @@ describe("delete-file-dialog", () => {
         unknown: [],
         referenced_by: [],
         rewritable: [],
+        unreadable: [],
       }),
       deleteFile,
     });
@@ -93,6 +100,7 @@ describe("delete-file-dialog", () => {
           unknown: [],
           referenced_by: [path],
           rewritable: [path],
+          unreadable: [],
         }),
       });
 
@@ -114,6 +122,7 @@ describe("delete-file-dialog", () => {
         unknown: [],
         referenced_by: [],
         rewritable: [],
+        unreadable: [],
       }),
     });
 
@@ -142,6 +151,7 @@ describe("delete-file-dialog", () => {
         unknown: [],
         referenced_by: [],
         rewritable: [],
+        unreadable: [],
       }),
       deleteFile: vi.fn().mockRejectedValue(new APIError("not_found", "gone")),
     });

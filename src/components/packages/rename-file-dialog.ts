@@ -31,7 +31,7 @@ import {
   linkListStyles,
   renderLinkList,
 } from "./link-list.js";
-import { NO_USAGE, usageSummaryStyles } from "./usage-summary.js";
+import { NO_USAGE, renderUncheckedNotes, usageSummaryStyles } from "./usage-summary.js";
 import { notifyFailure } from "./usage.js";
 
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
@@ -190,9 +190,9 @@ export class ESPHomeRenameFileDialog extends LitElement {
   }
 
   /** The files to rewrite, each with a checkbox, those to fix by hand, and the
-   *  unchecked-devices note. */
+   *  unchecked devices and files. */
   private _renderReferrers() {
-    const { referenced_by, rewritable: referrers, unknown } = this._usage;
+    const { referenced_by, rewritable: referrers } = this._usage;
     const manual = referenced_by.filter((path) => !referrers.includes(path));
     return html`<p class="usage-message">
         ${
@@ -230,13 +230,7 @@ export class ESPHomeRenameFileDialog extends LitElement {
               )}`
           : nothing
       }
-      ${
-        unknown.length > 0
-          ? html`<p class="usage-note">
-              ${this._localize("packages.usage_unknown", { names: unknown.join(", ") })}
-            </p>`
-          : nothing
-      }`;
+      ${renderUncheckedNotes(this._usage, this._localize)}`;
   }
 
   /** Devices by friendly name, other files by path, archived ones marked. */

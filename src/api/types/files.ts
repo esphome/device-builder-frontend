@@ -9,12 +9,14 @@ export interface PackageFile {
  *  aren't known yet (never parsed, or the startup scan is still running).
  *  ``referenced_by`` lists the files whose ``!include`` names the path
  *  directly: devices, packages and archived devices (``archive/…``);
- *  ``rewritable`` the ones of them a rename updates. */
+ *  ``rewritable`` the ones of them a rename updates; ``unreadable`` the
+ *  files that couldn't be checked and may include it. */
 export interface FileUsage {
   used_by: string[];
   unknown: string[];
   referenced_by: string[];
   rewritable: string[];
+  unreadable: string[];
 }
 
 /** ``files/dependencies`` reply. Paths outside the config dir stay absolute. */

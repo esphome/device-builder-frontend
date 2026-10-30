@@ -23,6 +23,7 @@ async function openDialog(
     unknown: [],
     referenced_by: usage.rewritable ?? [],
     rewritable: [],
+    unreadable: [],
     ...usage,
   };
   Object.assign(el, {
@@ -79,6 +80,7 @@ describe("rename-file-dialog", () => {
     const el = await openDialog({
       used_by: ["kitchen.yaml", "garage.yaml"],
       rewritable: ["archive/old.yaml", "bridge/plug.yaml", "kitchen.yaml"],
+      unreadable: [],
     });
     expect(el.shadowRoot!.querySelector(".usage-message")?.textContent).toContain(
       "packages.rename_referrers"
@@ -101,6 +103,7 @@ describe("rename-file-dialog", () => {
     const el = await openDialog({
       referenced_by: ["bridge/escaped.yaml", "kitchen.yaml"],
       rewritable: ["kitchen.yaml"],
+      unreadable: [],
     });
     const messages = [...el.shadowRoot!.querySelectorAll(".usage-message")].map((m) =>
       m.textContent?.trim()
@@ -109,6 +112,14 @@ describe("rename-file-dialog", () => {
     expect(checkboxes(el)).toHaveLength(1);
     const plain = el.shadowRoot!.querySelector("span.link-row");
     expect(plain?.textContent).toContain("bridge/escaped.yaml");
+  });
+
+  it("names the files it couldn't read", async () => {
+    const el = await openDialog({ unreadable: ["bridge/broken.yaml"] });
+    const notes = [...el.shadowRoot!.querySelectorAll(".usage-note")].map((n) =>
+      n.textContent?.trim()
+    );
+    expect(notes).toEqual(["packages.usage_unreadable"]);
   });
 
   it("doesn't claim nothing uses the file when no include can be rewritten", async () => {
@@ -194,7 +205,13 @@ describe("rename-file-dialog usage lookup", () => {
     });
     document.body.appendChild(el);
     await baseDialogSettled(el);
-    const usage = { used_by: [], unknown: [], referenced_by: [], rewritable: [] };
+    const usage = {
+      used_by: [],
+      unknown: [],
+      referenced_by: [],
+      rewritable: [],
+      unreadable: [],
+    };
 
     const first = el.open("common/a.yaml");
     const second = el.open("common/b.yaml");

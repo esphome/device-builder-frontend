@@ -74,6 +74,7 @@ describe("ESPHomeAPI — files commands", () => {
         unknown: [],
         referenced_by: ["k.yaml"],
         rewritable: ["k.yaml"],
+        unreadable: [],
       },
     ],
     [

@@ -10,6 +10,7 @@ export const NO_USAGE: FileUsage = {
   unknown: [],
   referenced_by: [],
   rewritable: [],
+  unreadable: [],
 };
 
 /** Direct includers not already listed as using devices: packages, archived
@@ -22,8 +23,8 @@ export function otherReferrers(usage: FileUsage): string[] {
 /**
  * The using devices as links, under *usedKey* (``{count}``), then the other
  * files that include it. *unusedKey* only shows when nothing does and every
- * device was checked; unchecked ones (config doesn't load yet) are named in
- * a note instead of being reported as non-users.
+ * device and file was checked; unchecked ones (config doesn't load yet, file
+ * can't be read) are named in a note instead of being reported as non-users.
  */
 export function renderUsageSummary(
   usage: FileUsage,
@@ -40,7 +41,7 @@ export function renderUsageSummary(
   const message =
     used.length > 0
       ? localize(opts.usedKey, { count: used.length })
-      : usage.unknown.length === 0 && others.length === 0
+      : usage.unknown.length === 0 && usage.unreadable.length === 0 && others.length === 0
         ? localize(opts.unusedKey)
         : "";
   return html`${message ? html`<p class="usage-message">${message}</p>` : nothing}
@@ -53,10 +54,25 @@ export function renderUsageSummary(
           ${renderLinkList(fileItems(others), opts.open)}`
       : nothing
   }
-  ${
+  ${renderUncheckedNotes(usage, localize)}`;
+}
+
+/** Notes naming the devices and files that couldn't be checked for the include. */
+export function renderUncheckedNotes(
+  usage: FileUsage,
+  localize: LocalizeFunc
+): TemplateResult {
+  return html`${
     usage.unknown.length > 0
       ? html`<p class="usage-note">
           ${localize("packages.usage_unknown", { names: usage.unknown.join(", ") })}
+        </p>`
+      : nothing
+  }
+  ${
+    usage.unreadable.length > 0
+      ? html`<p class="usage-note">
+          ${localize("packages.usage_unreadable", { names: usage.unreadable.join(", ") })}
         </p>`
       : nothing
   }`;

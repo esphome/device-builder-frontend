@@ -53,6 +53,7 @@ describe("file-list-dialog showUsage", () => {
       unknown: ["broken.yaml"],
       referenced_by: ["kitchen.yaml", "broken.yaml"],
       rewritable: ["kitchen.yaml", "broken.yaml"],
+      unreadable: [],
     });
     const { el, rendered } = await mount({ getFileUsage });
 
@@ -80,6 +81,7 @@ describe("file-list-dialog showUsage", () => {
         unknown: [],
         referenced_by: [path],
         rewritable: [path],
+        unreadable: [],
       }),
     });
 
@@ -100,6 +102,7 @@ describe("file-list-dialog showUsage", () => {
         unknown: [],
         referenced_by: [],
         rewritable: [],
+        unreadable: [],
       }),
     });
 
@@ -115,12 +118,34 @@ describe("file-list-dialog showUsage", () => {
         unknown: ["broken.yaml"],
         referenced_by: [],
         rewritable: [],
+        unreadable: [],
       }),
     });
 
     await el.showUsage("common/a.yaml");
 
     expect((await rendered()).messages).toEqual([]);
+  });
+
+  it("names the files it couldn't read instead of claiming nobody uses the file", async () => {
+    const { el, rendered } = await mount({
+      getFileUsage: vi.fn().mockResolvedValue({
+        used_by: [],
+        unknown: [],
+        referenced_by: [],
+        rewritable: [],
+        unreadable: ["bridge/broken.yaml"],
+      }),
+    });
+
+    await el.showUsage("common/a.yaml");
+
+    expect(await rendered()).toEqual({
+      messages: [],
+      labels: [],
+      links: [],
+      notes: ["packages.usage_unreadable | bridge/broken.yaml"],
+    });
   });
 
   it("toasts with the backend detail and stays closed when the lookup fails", async () => {
