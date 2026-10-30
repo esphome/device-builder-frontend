@@ -50,9 +50,10 @@ export function renderLinkList(
         html`<li>
           ${
             item.url === null
-              ? html`<span class="link-row"
-                  ><span class="link-label">${item.label}</span></span
-                >`
+              ? html`<span class="link-row">
+                  <span class="link-label">${item.label}</span>
+                  ${item.detail ? html`<span class="link-detail">${item.detail}</span>` : nothing}
+                </span>`
               : html`<button
                   type="button"
                   class="link-row"

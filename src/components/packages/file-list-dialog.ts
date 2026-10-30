@@ -4,7 +4,7 @@
  * the files a device pulls in; each fetches, then opens.
  */
 import { consume } from "@lit/context";
-import { css, html, LitElement, nothing } from "lit";
+import { css, html, LitElement, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
@@ -18,27 +18,16 @@ import { dialogChromeStyles } from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
 import { navigate } from "../../util/navigation.js";
-import {
-  deviceItems,
-  fileItems,
-  type LinkItem,
-  linkListStyles,
-  renderLinkList,
-} from "./link-list.js";
-import { otherReferrers } from "./usage-summary.js";
+import { fileItems, linkListStyles, renderLinkList } from "./link-list.js";
+import { renderUsageSummary, usageSummaryStyles } from "./usage-summary.js";
 import { notifyFailure } from "./usage.js";
 
 import "../base-dialog.js";
 
-export interface FileListDialogContent {
+interface FileListDialogContent {
   heading: string;
-  /** Shown above the list; also the whole body when *items* is empty. */
-  message: string;
-  items: LinkItem[];
-  /** A second list under its own message (e.g. other files including a package). */
-  more?: { message: string; items: LinkItem[] };
-  /** Extra line under the list (e.g. devices that couldn't be checked). */
-  note?: string;
+  /** Rendered on every update, so device names follow the devices context. */
+  body: () => TemplateResult;
 }
 
 @customElement("esphome-file-list-dialog")
@@ -52,6 +41,7 @@ export class ESPHomeFileListDialog extends LitElement {
 
   /** Friendly names for the device rows. */
   @consume({ context: devicesContext, subscribe: true })
+  @state()
   private _devices: ConfiguredDevice[] = [];
 
   @state()
@@ -65,6 +55,7 @@ export class ESPHomeFileListDialog extends LitElement {
     dialogActionButtonStyles,
     dialogActionsRowStyles,
     linkListStyles,
+    usageSummaryStyles,
     css`
       esphome-base-dialog {
         --width: 480px;
@@ -72,53 +63,24 @@ export class ESPHomeFileListDialog extends LitElement {
       esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l) var(--wa-space-l);
       }
-      .message,
-      .note {
-        margin: 0 0 var(--wa-space-s);
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.5;
-      }
-      .note {
-        margin: var(--wa-space-s) 0 0;
-      }
-      .more {
-        margin-top: var(--wa-space-m);
-      }
     `,
   ];
-
-  open(content: FileListDialogContent) {
-    this._content = content;
-    this._dialog.open = true;
-  }
 
   /** List the devices and files using *path*; a toast instead when the lookup fails. */
   async showUsage(path: string): Promise<void> {
     const localize = this._localize;
     try {
       const usage = await this._api.getFileUsage(path);
-      const others = otherReferrers(usage);
-      this.open({
+      this._open({
         heading: localize("packages.usage_title", { path }),
-        message:
-          usage.used_by.length > 0
-            ? localize("packages.usage_message", { count: usage.used_by.length })
-            : usage.unknown.length === 0 && others.length === 0
-              ? localize("packages.usage_none")
-              : "",
-        items: deviceItems(usage.used_by, this._devices),
-        more:
-          others.length > 0
-            ? {
-                message: localize("packages.usage_other_files", { count: others.length }),
-                items: fileItems(others),
-              }
-            : undefined,
-        note:
-          usage.unknown.length > 0
-            ? localize("packages.usage_unknown", { names: usage.unknown.join(", ") })
-            : undefined,
+        body: () =>
+          renderUsageSummary(usage, {
+            localize: this._localize,
+            devices: this._devices,
+            usedKey: "packages.usage_message",
+            unusedKey: "packages.usage_none",
+            open: this._navigate,
+          }),
       });
     } catch (err) {
       notifyFailure(localize, "packages.usage_failed", err);
@@ -129,17 +91,26 @@ export class ESPHomeFileListDialog extends LitElement {
   async showDependencies(configuration: string): Promise<void> {
     const localize = this._localize;
     try {
-      const deps = await this._api.getDeviceDependencies(configuration);
-      this.open({
+      const { files, complete } = await this._api.getDeviceDependencies(configuration);
+      this._open({
         heading: localize("packages.dependencies_title", { name: configuration }),
-        message: localize(
-          deps.files.length > 0
-            ? "packages.dependencies_message"
-            : "packages.dependencies_none",
-          { count: deps.files.length }
-        ),
-        items: fileItems(deps.files),
-        note: deps.complete ? undefined : localize("packages.dependencies_incomplete"),
+        body: () =>
+          html`<p class="usage-message">
+              ${this._localize(
+                files.length > 0
+                  ? "packages.dependencies_message"
+                  : "packages.dependencies_none",
+                { count: files.length }
+              )}
+            </p>
+            ${renderLinkList(fileItems(files), this._navigate)}
+            ${
+              complete
+                ? nothing
+                : html`<p class="usage-note">
+                    ${this._localize("packages.dependencies_incomplete")}
+                  </p>`
+            }`,
       });
     } catch (err) {
       notifyFailure(localize, "packages.dependencies_failed", err);
@@ -154,19 +125,7 @@ export class ESPHomeFileListDialog extends LitElement {
         .label=${content?.heading ?? ""}
         @request-close=${this._dialog.onRequestClose}
       >
-        ${
-          content
-            ? html`<p class="message">${content.message}</p>
-                ${renderLinkList(content.items, this._open)}
-                ${
-                  content.more
-                    ? html`<p class="message more">${content.more.message}</p>
-                        ${renderLinkList(content.more.items, this._open)}`
-                    : nothing
-                }
-                ${content.note ? html`<p class="note">${content.note}</p>` : nothing}`
-            : nothing
-        }
+        ${content ? content.body() : nothing}
         <div class="actions">
           <button class="btn btn--cancel" @click=${this._close}>
             ${this._localize("layout.close")}
@@ -180,7 +139,12 @@ export class ESPHomeFileListDialog extends LitElement {
     this._dialog.open = false;
   };
 
-  private _open = (url: string) => {
+  private _open(content: FileListDialogContent) {
+    this._content = content;
+    this._dialog.open = true;
+  }
+
+  private _navigate = (url: string) => {
     this._close();
     void navigate(url);
   };

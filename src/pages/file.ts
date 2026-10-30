@@ -159,8 +159,18 @@ export class ESPHomePageFile extends LitElement {
     if (changed.has("path") && this.path) {
       // A discarded buffer of the previous file must not be saved into this one.
       this._yaml = this._savedYaml = "";
+      // Nor may its navigator selection highlight lines of this one.
+      this._selectedSection = null;
+      this._selectedFromLine = undefined;
+      this._highlight = null;
+      this._scrollToHighlight = false;
       void this._load.start();
     }
+  }
+
+  /** The navigator needs a loaded file; without it the editor takes the full width. */
+  private get _showNav(): boolean {
+    return this._load.state === "ready" && !this._navCollapsed;
   }
 
   private get _isDirty(): boolean {
@@ -211,9 +221,6 @@ export class ESPHomePageFile extends LitElement {
       .header-button wa-icon {
         font-size: 16px;
       }
-      .delete-users {
-        margin-top: var(--wa-space-s);
-      }
       .body {
         flex: 1;
         min-height: 0;
@@ -221,7 +228,7 @@ export class ESPHomePageFile extends LitElement {
         grid-template-columns: minmax(230px, 1fr) minmax(0, 4fr);
         gap: var(--wa-space-m);
       }
-      .body.nav-collapsed {
+      .body.no-nav {
         grid-template-columns: minmax(0, 1fr);
       }
       @media (max-width: 900px) {
@@ -282,9 +289,9 @@ export class ESPHomePageFile extends LitElement {
               : null
           }
         </div>
-        <div class="body ${this._navCollapsed ? "nav-collapsed" : ""}">
+        <div class="body ${this._showNav ? "" : "no-nav"}">
           ${
-            this._load.state === "ready" && !this._navCollapsed
+            this._showNav
               ? html`<esphome-device-navigator
                   readonly
                   platformReady
@@ -393,8 +400,11 @@ export class ESPHomePageFile extends LitElement {
     const pending = this._pendingSave;
     // A second Save of the same file (button, shortcut, leave dialog) joins the write in
     // flight; while another file's write is pending, this one is not saved.
-    if (pending)
-      return pending.path === this.path ? pending.result : Promise.resolve(false);
+    if (pending) {
+      if (pending.path === this.path) return pending.result;
+      notifyError(this._localize("file.save_busy"));
+      return Promise.resolve(false);
+    }
     const result = this._write().finally(() => (this._pendingSave = null));
     this._pendingSave = { path: this.path, result };
     return result;
@@ -425,9 +435,10 @@ export class ESPHomePageFile extends LitElement {
     } finally {
       this._saving = false;
     }
+    // Named in the toast, as the user may have moved on to another file.
+    void this._announceSaved(path);
     if (this.path !== path) return true;
     this._savedYaml = content;
-    void this._announceSaved(path);
     // Typed while saving: not clean, so "Save and leave" stays.
     return this._yaml === content;
   };
@@ -441,10 +452,10 @@ export class ESPHomePageFile extends LitElement {
       // Usage is a convenience on top of a save that already landed.
     }
     if (users.length === 0) {
-      notifySuccess(this._localize("file.saved"));
+      notifySuccess(this._localize("file.saved", { path }));
       return;
     }
-    notifySuccess(this._localize("file.saved"), {
+    notifySuccess(this._localize("file.saved", { path }), {
       description: this._localize("file.saved_used_by", { count: users.length }),
       duration: LONG_TOAST_DURATION_MS,
       action: {

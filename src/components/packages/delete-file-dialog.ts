@@ -47,17 +47,26 @@ export class ESPHomeDeleteFileDialog extends LitElement {
     `,
   ];
 
+  /** Bumped per ``open``, so only the latest lookup opens the prompt. */
+  private _opening = 0;
+
   /** Fetch the devices using *path*, then ask; a toast instead when that fails. */
   async open(path: string): Promise<void> {
+    const opening = ++this._opening;
+    let usage: FileUsage;
     try {
-      this._usage = await this._api.getFileUsage(path);
+      usage = await this._api.getFileUsage(path);
     } catch (err) {
-      notifyFailure(this._localize, "packages.usage_failed", err);
+      if (opening === this._opening) {
+        notifyFailure(this._localize, "packages.usage_failed", err);
+      }
       return;
     }
+    if (opening !== this._opening) return;
+    this._usage = usage;
     this._path = path;
     await this.updateComplete;
-    this._confirm?.open();
+    if (opening === this._opening) this._confirm?.open();
   }
 
   protected render() {

@@ -26,6 +26,30 @@ async function mount(api: object) {
 beforeEach(() => vi.clearAllMocks());
 
 describe("delete-file-dialog", () => {
+  it("asks about the latest file when an older lookup answers last", async () => {
+    const replies = new Map<string, (usage: object) => void>();
+    const deleteFile = vi.fn().mockResolvedValue(undefined);
+    const { el, confirm, open } = await mount({
+      getFileUsage: vi.fn(
+        (path: string) => new Promise((resolve) => replies.set(path, resolve))
+      ),
+      deleteFile,
+    });
+    const usage = { used_by: [], unknown: [], referenced_by: [], rewritable: [] };
+
+    const first = el.open("common/a.yaml");
+    const second = el.open("common/b.yaml");
+    replies.get("common/b.yaml")!(usage);
+    await second;
+    replies.get("common/a.yaml")!(usage);
+    await first;
+
+    expect(open).toHaveBeenCalledOnce();
+    confirm.dispatchEvent(new CustomEvent("confirm"));
+    await flushMicrotasks(4);
+    expect(deleteFile).toHaveBeenCalledWith("common/b.yaml");
+  });
+
   it("lists the users, then deletes and emits file-deleted", async () => {
     const deleteFile = vi.fn().mockResolvedValue(undefined);
     const { el, confirm, open } = await mount({

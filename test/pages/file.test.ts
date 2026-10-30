@@ -117,7 +117,7 @@ describe("esphome-page-file save", () => {
 
   test("a save finishing after switching files leaves the new file alone", async () => {
     let finish!: () => void;
-    const getFileUsage = vi.fn();
+    const getFileUsage = vi.fn().mockResolvedValue({ used_by: [], unknown: [] });
     const page = makePage({ _yaml: "a: 1\n" });
     page._api = {
       updateConfig: vi.fn(() => new Promise<void>((resolve) => (finish = resolve))),
@@ -130,7 +130,8 @@ describe("esphome-page-file save", () => {
 
     expect(await saved).toBe(true);
     expect(page._savedYaml).toBe("b: 1\n");
-    expect(getFileUsage).not.toHaveBeenCalled();
+    // still announced, by name, for the file that was saved
+    expect(getFileUsage).toHaveBeenCalledWith("common/base.yaml");
   });
 
   test("a second save joins the write in flight", async () => {
@@ -165,6 +166,7 @@ describe("esphome-page-file save", () => {
     finish();
 
     expect(await second).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith("file.save_busy", expect.anything());
     await first;
     expect(updateConfig).toHaveBeenCalledTimes(1);
   });
@@ -235,7 +237,9 @@ describe("esphome-page-file save", () => {
 
     await page._announceSaved("common/base.yaml");
 
-    expect(vi.mocked(toast.success).mock.lastCall?.[0]).toBe("file.saved");
+    expect(vi.mocked(toast.success).mock.lastCall?.[0]).toBe(
+      "file.saved | common/base.yaml"
+    );
     expect(lastToastOptions(toast.success).action).toBeUndefined();
   });
 });
@@ -329,12 +333,39 @@ describe("esphome-page-file section navigator", () => {
     expect(findTemplatesByAnchor(tree, 'name="menu"')).toHaveLength(1);
   });
 
-  test("no navigator until the file has loaded", () => {
+  test("no navigator until the file has loaded, and the editor takes the full width", () => {
     const page = makePage();
     page._load.state = "loading";
-    expect(
-      findTemplatesByAnchor(page.render(), "<esphome-device-navigator")
-    ).toHaveLength(0);
+    const tree = page.render();
+    expect(findTemplatesByAnchor(tree, "<esphome-device-navigator")).toHaveLength(0);
+    expect(findTemplatesByAnchor(tree, '<div class="body')[0].values).toContain("no-nav");
+  });
+
+  test("switching files drops the previous file's selection and highlight", async () => {
+    const page = new ESPHomePageFile() as unknown as NavView & HTMLElement;
+    page._api = {
+      ready: Promise.resolve(),
+      getConfig: vi.fn().mockResolvedValue("a: 1\n"),
+    } as unknown as ESPHomeAPI;
+    page.path = "common/a.yaml";
+    document.body.appendChild(page);
+    await flushMicrotasks(8);
+    page._onSectionSelect(
+      new CustomEvent("section-select", { detail: { sectionKey: "sensor", fromLine: 5 } })
+    );
+    page._onYamlHighlight(
+      new CustomEvent("yaml-highlight", {
+        detail: { range: { fromLine: 5, toLine: 9 }, scroll: true },
+      })
+    );
+
+    page.path = "common/b.yaml";
+    await (page as unknown as ESPHomePageFile).updateComplete;
+
+    expect(page._selectedSection).toBeNull();
+    expect(page._highlight).toBeNull();
+    expect(page._scrollToHighlight).toBe(false);
+    page.remove();
   });
 
   test("a section click highlights its YAML; a hand edit drops the highlight", () => {

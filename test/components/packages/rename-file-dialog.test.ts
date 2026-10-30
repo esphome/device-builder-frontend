@@ -145,6 +145,25 @@ describe("rename-file-dialog", () => {
     expect(checkboxes(el).every((box) => box.checked)).toBe(true);
   });
 
+  it("names a device it can't update along with its file", async () => {
+    const el = await openDialog({ referenced_by: ["kitchen.yaml"], rewritable: [] });
+    const plain = el.shadowRoot!.querySelector("span.link-row")!;
+    expect(plain.querySelector(".link-label")?.textContent).toBe("Kitchen");
+    expect(plain.querySelector(".link-detail")?.textContent).toBe("kitchen.yaml");
+  });
+
+  it("emits once when Rename is clicked again while the dialog closes", async () => {
+    const el = await openDialog();
+    const emitted = vi.fn();
+    el.addEventListener("rename-file", emitted);
+    await type(el, "main.yaml");
+
+    confirmButton(el).click();
+    confirmButton(el).click();
+
+    expect(emitted).toHaveBeenCalledOnce();
+  });
+
   it("emits the trimmed new path and closes", async () => {
     const el = await openDialog();
     const emitted = vi.fn();
@@ -163,6 +182,32 @@ describe("rename-file-dialog", () => {
 });
 
 describe("rename-file-dialog usage lookup", () => {
+  it("opens for the latest file when an older lookup answers last", async () => {
+    const replies = new Map<string, (usage: FileUsage) => void>();
+    const el = new ESPHomeRenameFileDialog();
+    Object.assign(el, {
+      _api: {
+        getFileUsage: vi.fn(
+          (path: string) => new Promise((resolve) => replies.set(path, resolve))
+        ),
+      },
+    });
+    document.body.appendChild(el);
+    await baseDialogSettled(el);
+    const usage = { used_by: [], unknown: [], referenced_by: [], rewritable: [] };
+
+    const first = el.open("common/a.yaml");
+    const second = el.open("common/b.yaml");
+    replies.get("common/b.yaml")!(usage);
+    await second;
+    replies.get("common/a.yaml")!(usage);
+    await first;
+    await el.updateComplete;
+
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>(".name input")!;
+    expect(input.value).toBe("b.yaml");
+  });
+
   it("stays closed and toasts when the lookup fails", async () => {
     const el = new ESPHomeRenameFileDialog();
     Object.assign(el, {

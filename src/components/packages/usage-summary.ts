@@ -12,10 +12,10 @@ export const NO_USAGE: FileUsage = {
   rewritable: [],
 };
 
-/** Direct includers not already shown as devices: packages, archived devices
- *  and devices the scanner hasn't loaded yet. */
+/** Direct includers not already listed as using devices: packages, archived
+ *  devices and devices the scanner hasn't loaded yet. */
 export function otherReferrers(usage: FileUsage): string[] {
-  const shown = new Set([...usage.used_by, ...usage.unknown]);
+  const shown = new Set(usage.used_by);
   return usage.referenced_by.filter((path) => !shown.has(path));
 }
 

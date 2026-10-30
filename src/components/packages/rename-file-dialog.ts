@@ -116,15 +116,22 @@ export class ESPHomeRenameFileDialog extends LitElement {
     `,
   ];
 
+  /** Bumped per ``open``, so only the latest lookup opens the dialog. */
+  private _opening = 0;
+
   /** Fetch the files including *path*, then open; a toast instead when that fails. */
   async open(path: string): Promise<void> {
+    const opening = ++this._opening;
     let usage: FileUsage;
     try {
       usage = await this._api.getFileUsage(path);
     } catch (err) {
-      notifyFailure(this._localize, "packages.usage_failed", err);
+      if (opening === this._opening) {
+        notifyFailure(this._localize, "packages.usage_failed", err);
+      }
       return;
     }
+    if (opening !== this._opening) return;
     this._path = path;
     this._name = fileNameOf(path);
     this._usage = usage;
@@ -254,7 +261,8 @@ export class ESPHomeRenameFileDialog extends LitElement {
   };
 
   private _confirm = () => {
-    if (!this._name.trim() || this.problem !== null) return;
+    // The button stays clickable while the dialog animates out.
+    if (!this._dialog.open || !this._name.trim() || this.problem !== null) return;
     this._close();
     this.dispatchEvent(
       new CustomEvent<RenameFileDetail>("rename-file", {

@@ -212,6 +212,31 @@ describe("esphome-page-packages delete", () => {
 
     expect(listPackages).toHaveBeenCalledTimes(2);
   });
+
+  test("an older listing landing last doesn't bring a deleted file back", async () => {
+    const replies: ((paths: { path: string }[]) => void)[] = [];
+    const listPackages = vi
+      .fn()
+      .mockResolvedValueOnce([{ path: "common/base.yaml" }])
+      .mockImplementation(() => new Promise((resolve) => replies.push(resolve)));
+    const page = await mountWith({ listPackages });
+    const dialog = root(page).querySelector("esphome-delete-file-dialog")!;
+    const deleted = new CustomEvent("file-deleted", {
+      detail: { path: "common/base.yaml" },
+    });
+
+    dialog.dispatchEvent(deleted);
+    dialog.dispatchEvent(deleted);
+    await flushMicrotasks(4);
+    // the list stays up while it refreshes
+    expect(root(page).querySelector("wa-spinner")).toBeNull();
+    replies[1]([]);
+    replies[0]([{ path: "common/base.yaml" }]);
+    await flushMicrotasks(4);
+    await page.updateComplete;
+
+    expect(root(page).querySelectorAll(".file-name")).toHaveLength(0);
+  });
 });
 
 describe("esphome-page-packages rename", () => {

@@ -5,17 +5,22 @@ import { describe, expect, it, vi } from "vitest";
 import { argsLocalize, baseDialogSettled, dialogOpen } from "../../_dom.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 import { APIError } from "../../../src/api/api-error.js";
-import {
-  ESPHomeFileListDialog,
-  type FileListDialogContent,
-} from "../../../src/components/packages/file-list-dialog.js";
+import { ESPHomeFileListDialog } from "../../../src/components/packages/file-list-dialog.js";
 
 vi.mock("../../../src/util/notify.js", () => ({ notifyError: vi.fn() }));
 const { notifyError } = await import("../../../src/util/notify.js");
 
+interface Rendered {
+  messages: string[];
+  labels: string[];
+  /** Row labels that open an editor. */
+  links: string[];
+  notes: string[];
+}
+
 async function mount(api: object): Promise<{
   el: ESPHomeFileListDialog;
-  content: () => FileListDialogContent;
+  rendered: () => Promise<Rendered>;
 }> {
   const el = new ESPHomeFileListDialog();
   Object.assign(el, {
@@ -27,37 +32,49 @@ async function mount(api: object): Promise<{
   });
   document.body.appendChild(el);
   await baseDialogSettled(el);
-  const content = () => (el as unknown as { _content: FileListDialogContent })._content;
-  return { el, content };
+  const texts = (selector: string) =>
+    [...el.shadowRoot!.querySelectorAll(selector)].map((n) => n.textContent!.trim());
+  const rendered = async () => {
+    await el.updateComplete;
+    return {
+      messages: texts(".usage-message"),
+      labels: texts(".link-label"),
+      links: texts("button.link-row .link-label"),
+      notes: texts(".usage-note"),
+    };
+  };
+  return { el, rendered };
 }
 
 describe("file-list-dialog showUsage", () => {
-  it("lists the using devices by name and notes unchecked ones", async () => {
+  it("lists the using devices by name, then other includers, and notes unchecked ones", async () => {
     const getFileUsage = vi.fn().mockResolvedValue({
       used_by: ["kitchen.yaml"],
       unknown: ["broken.yaml"],
       referenced_by: ["kitchen.yaml", "broken.yaml"],
       rewritable: ["kitchen.yaml", "broken.yaml"],
     });
-    const { el, content } = await mount({ getFileUsage });
+    const { el, rendered } = await mount({ getFileUsage });
 
     await el.showUsage("common/a.yaml");
 
     expect(getFileUsage).toHaveBeenCalledWith("common/a.yaml");
     expect(dialogOpen(el)).toBe(true);
-    expect(content().message).toBe("packages.usage_message | 1");
-    expect(content().items.map((i) => i.label)).toEqual(["Kitchen"]);
-    expect(content().note).toBe("packages.usage_unknown | broken.yaml");
-    // direct includers already listed as devices aren't repeated
-    expect(content().more).toBeUndefined();
+    // a device listed as a user isn't repeated; an unchecked one that includes it is
+    expect(await rendered()).toEqual({
+      messages: ["packages.usage_message | 1", "packages.usage_other_files | 1"],
+      labels: ["Kitchen", "broken.yaml"],
+      links: ["Kitchen", "broken.yaml"],
+      notes: ["packages.usage_unknown | broken.yaml"],
+    });
   });
 
   it.each([
-    ["a package", "bridge/plug.yaml", "/file/bridge/plug.yaml"],
-    ["an archived device", "archive/old.yaml", null],
-    ["a device the scanner hasn't loaded", "new-device.yaml", "/device/new-device.yaml"],
-  ])("lists %s that includes the file", async (_, path, url) => {
-    const { el, content } = await mount({
+    ["a package", "bridge/plug.yaml", true],
+    ["an archived device", "archive/old.yaml", false],
+    ["a device the scanner hasn't loaded", "new-device.yaml", true],
+  ])("lists %s that includes the file", async (_, path, linked) => {
+    const { el, rendered } = await mount({
       getFileUsage: vi.fn().mockResolvedValue({
         used_by: [],
         unknown: [],
@@ -68,16 +85,16 @@ describe("file-list-dialog showUsage", () => {
 
     await el.showUsage("common/a.yaml");
 
-    expect(content().message).toBe("");
-    expect(content().items).toEqual([]);
-    expect(content().more).toEqual({
-      message: "packages.usage_other_files | 1",
-      items: [{ label: path, url }],
+    expect(await rendered()).toEqual({
+      messages: ["packages.usage_other_files | 1"],
+      labels: [path],
+      links: linked ? [path] : [],
+      notes: [],
     });
   });
 
   it("says nobody uses the file only when nothing includes it", async () => {
-    const { el, content } = await mount({
+    const { el, rendered } = await mount({
       getFileUsage: vi.fn().mockResolvedValue({
         used_by: [],
         unknown: [],
@@ -88,12 +105,11 @@ describe("file-list-dialog showUsage", () => {
 
     await el.showUsage("common/a.yaml");
 
-    expect(content().message).toBe("packages.usage_none");
-    expect(content().more).toBeUndefined();
+    expect((await rendered()).messages).toEqual(["packages.usage_none"]);
   });
 
   it("doesn't claim nobody uses the file while devices are unchecked", async () => {
-    const { el, content } = await mount({
+    const { el, rendered } = await mount({
       getFileUsage: vi.fn().mockResolvedValue({
         used_by: [],
         unknown: ["broken.yaml"],
@@ -104,7 +120,7 @@ describe("file-list-dialog showUsage", () => {
 
     await el.showUsage("common/a.yaml");
 
-    expect(content().message).toBe("");
+    expect((await rendered()).messages).toEqual([]);
   });
 
   it("toasts with the backend detail and stays closed when the lookup fails", async () => {
@@ -123,7 +139,7 @@ describe("file-list-dialog showUsage", () => {
 
 describe("file-list-dialog showDependencies", () => {
   it("links each file to its editor", async () => {
-    const { el, content } = await mount({
+    const { el, rendered } = await mount({
       getDeviceDependencies: vi
         .fn()
         .mockResolvedValue({ files: ["common/a.yaml"], complete: true }),
@@ -131,20 +147,26 @@ describe("file-list-dialog showDependencies", () => {
 
     await el.showDependencies("kitchen.yaml");
 
-    expect(content().items).toEqual([
-      { label: "common/a.yaml", url: "/file/common/a.yaml" },
-    ]);
-    expect(content().note).toBeUndefined();
+    expect(await rendered()).toEqual({
+      messages: ["packages.dependencies_message | 1"],
+      labels: ["common/a.yaml"],
+      links: ["common/a.yaml"],
+      notes: [],
+    });
   });
 
   it("flags an incomplete dependency list", async () => {
-    const { el, content } = await mount({
+    const { el, rendered } = await mount({
       getDeviceDependencies: vi.fn().mockResolvedValue({ files: [], complete: false }),
     });
 
     await el.showDependencies("kitchen.yaml");
 
-    expect(content().message).toBe("packages.dependencies_none | 0");
-    expect(content().note).toBe("packages.dependencies_incomplete");
+    expect(await rendered()).toEqual({
+      messages: ["packages.dependencies_none | 0"],
+      labels: [],
+      links: [],
+      notes: ["packages.dependencies_incomplete"],
+    });
   });
 });

@@ -14,13 +14,17 @@ import {
   ViewPlugin,
   type ViewUpdate,
 } from "@codemirror/view";
+import { isApplePlatform } from "./apple-platform.js";
 
 /** A path ending in ``.yaml`` / ``.yml`` (any case), optionally quoted, ending there:
  *  ``base.yaml.backup`` is another file. Same rules as the backend's rename. */
-const PATH = String.raw`(["']?)([^\s"'{},#]+\.[yY][aA]?[mM][lL])\1(?=[\s"'},]|$)`;
-/** ``!include path`` / ``!include {file: path}``. */
-const INCLUDE_RE = new RegExp(String.raw`!include\s+(?:\{\s*file:\s*)?` + PATH, "g");
-/** Block form: ``!include`` ending a line, ``file: path`` on a deeper next line. */
+const PATH = String.raw`(["']?)([^\s"'{}\[\],#]+\.[yY][aA]?[mM][lL])\1(?=[\s"'}\],]|$)`;
+/** ``!include path``. */
+const INCLUDE_RE = new RegExp(String.raw`!include\s+` + PATH, "g");
+/** ``!include {`` opening a flow mapping; its ``file`` key may come in any order. */
+const FLOW_INCLUDE_RE = /!include\s+\{/g;
+const FLOW_FILE_RE = new RegExp(String.raw`^file:\s*` + PATH);
+/** Block form: ``!include`` ending a line, ``file: path`` on a deeper line below. */
 const BARE_TAG_RE = /!include\s*$/;
 const FILE_KEY_RE = new RegExp(String.raw`^\s*file:\s*` + PATH);
 
@@ -39,31 +43,75 @@ const codeOf = (line: string) => {
 
 const indentOf = (line: string) => line.length - line.trimStart().length;
 
-/** Every linkable ``!include`` path in one line of YAML; *prev* is the previous
- *  non-blank line, for the block form. */
-export function findIncludeTargets(line: string, prev = ""): IncludeTarget[] {
+/** Every linkable ``!include`` path in one line of YAML; *above* yields the
+ *  lines above it, nearest first, for the block form. */
+export function findIncludeTargets(
+  line: string,
+  above: Iterable<string> = []
+): IncludeTarget[] {
   const code = codeOf(line);
   const out: IncludeTarget[] = [];
   const add = (ref: string, from: number) => {
     if (!ref.includes("$")) out.push({ from, to: from + ref.length, ref });
   };
   for (const m of code.matchAll(INCLUDE_RE)) add(m[2], m.index + m[0].lastIndexOf(m[2]));
+  for (const m of code.matchAll(FLOW_INCLUDE_RE)) {
+    const hit = flowFileTarget(code, m.index + m[0].length - 1);
+    if (hit) add(hit.ref, hit.from);
+  }
   const block = FILE_KEY_RE.exec(code);
-  if (
-    block &&
-    BARE_TAG_RE.test(codeOf(prev).trimEnd()) &&
-    indentOf(line) > indentOf(prev)
-  ) {
+  if (block && isBlockIncludeKey(line, above)) {
     add(block[2], block[0].lastIndexOf(block[2]));
   }
-  return out;
+  return out.sort((a, b) => a.from - b.from);
 }
 
-/** The include targets of *line*, with the previous non-blank line as context. */
+/** The ``file`` value of the flow mapping opening at *open* in *code*; keys of
+ *  nested collections (``vars: {file: …}``) don't count.
+ *  shortcut: brackets inside quoted values aren't skipped; parse the YAML if that matters. */
+function flowFileTarget(
+  code: string,
+  open: number
+): { ref: string; from: number } | null {
+  let depth = 0;
+  for (let i = open; i < code.length; i++) {
+    const c = code[i];
+    if (c === "{" || c === "[") depth++;
+    else if (c === "}" || c === "]") {
+      if (--depth === 0) return null;
+    } else if (depth === 1 && c === "f" && /[{,]\s*$/.test(code.slice(open, i))) {
+      const m = FLOW_FILE_RE.exec(code.slice(i));
+      if (m) return { ref: m[2], from: i + m[0].lastIndexOf(m[2]) };
+    }
+  }
+  return null;
+}
+
+/** Whether *line* is a key of a block mapping whose parent line ends in ``!include``,
+ *  skipping its sibling keys and their nested values. */
+function isBlockIncludeKey(line: string, above: Iterable<string>): boolean {
+  const indent = indentOf(line);
+  if (indent === 0) return false;
+  for (const raw of above) {
+    const code = codeOf(raw).trimEnd();
+    if (code.trim() === "") continue;
+    const level = indentOf(code);
+    if (level > indent) continue;
+    if (level === indent) {
+      if (code.trimStart().startsWith("-")) return false;
+      continue;
+    }
+    return BARE_TAG_RE.test(code);
+  }
+  return false;
+}
+
+/** The include targets of *line*, with the lines above it as context. */
 function lineTargets(doc: Text, line: Line): IncludeTarget[] {
-  let n = line.number - 1;
-  while (n >= 1 && doc.line(n).text.trim() === "") n--;
-  return findIncludeTargets(line.text, n >= 1 ? doc.line(n).text : "");
+  function* above() {
+    for (let n = line.number - 1; n >= 1; n--) yield doc.line(n).text;
+  }
+  return findIncludeTargets(line.text, above());
 }
 
 /** *ref* resolved against the folder of *basePath*, POSIX-relative to the
@@ -89,17 +137,26 @@ const linkMark = (title: string) =>
 function buildDecorations(view: EditorView, title: string): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const mark = linkMark(title);
+  // A fold can split one line across two visible ranges; decorate it once.
+  let done = 0;
   for (const { from, to } of view.visibleRanges) {
     for (let pos = from; pos <= to;) {
       const line = view.state.doc.lineAt(pos);
-      for (const t of lineTargets(view.state.doc, line)) {
-        builder.add(line.from + t.from, line.from + t.to, mark);
+      if (line.number > done) {
+        for (const t of lineTargets(view.state.doc, line)) {
+          builder.add(line.from + t.from, line.from + t.to, mark);
+        }
+        done = line.number;
       }
       pos = line.to + 1;
     }
   }
   return builder.finish();
 }
+
+/** ⌘ on Apple platforms, where Ctrl+click opens the context menu; Ctrl elsewhere. */
+const linkModifier = (e: KeyboardEvent | MouseEvent) =>
+  isApplePlatform() ? e.metaKey : e.ctrlKey;
 
 /** Mirrors the Ctrl/Cmd key state onto the editor as ``data-include-mod``.
  *  Window listeners so it reacts while hovering an unfocused editor. */
@@ -114,7 +171,7 @@ const modifierTracker = ViewPlugin.fromClass(
       this.win.addEventListener("blur", this.clear);
     }
     sync = (e: KeyboardEvent | MouseEvent) => {
-      this.view.dom.toggleAttribute("data-include-mod", e.ctrlKey || e.metaKey);
+      this.view.dom.toggleAttribute("data-include-mod", linkModifier(e));
     };
     clear = () => this.view.dom.removeAttribute("data-include-mod");
     destroy() {
@@ -151,7 +208,7 @@ export function includeLinks(
   );
   const click = EditorView.domEventHandlers({
     mousedown(event, view) {
-      if (!(event.ctrlKey || event.metaKey) || event.button !== 0) return false;
+      if (!linkModifier(event) || event.button !== 0) return false;
       const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
       if (pos === null) return false;
       const path = includePathAt(view, pos, getBasePath());

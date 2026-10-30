@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { codeFolding, foldEffect } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { describe, expect, it } from "vitest";
@@ -24,6 +25,18 @@ describe("findIncludeTargets", () => {
     ["  name: include_me.yaml", []],
     ["  base: !include common/base.yaml.backup", []],
     ["  base: !include common/Base.YAML", ["common/Base.YAML"]],
+    ["sensor: [!include common/uptime.yaml]", ["common/uptime.yaml"]],
+    ["s: [!include a.yaml, !include b.yaml]", ["a.yaml", "b.yaml"]],
+    [
+      "  b: !include { vars: { id: plug }, file: common/base.yaml }",
+      ["common/base.yaml"],
+    ],
+    [
+      "  b: !include { vars: { file: x.yaml }, file: common/base.yaml }",
+      ["common/base.yaml"],
+    ],
+    ["  b: !include { vars: { file: x.yaml } }", []],
+    ["p: {a: !include {file: a.yaml}, b: !include b.yaml}", ["a.yaml", "b.yaml"]],
   ])("%j → %j", (line, refs) => {
     expect(findIncludeTargets(line).map((t) => t.ref)).toEqual(refs);
   });
@@ -36,9 +49,28 @@ describe("findIncludeTargets", () => {
     ["  b: other", "    file: common/base.yaml", []],
     ["  b: !include", "    file: ${dir}/base.yaml", []],
   ])("block form %j / %j → %j", (prev, line, refs) => {
-    const targets = findIncludeTargets(line, prev);
+    const targets = findIncludeTargets(line, [prev]);
     expect(targets.map((t) => t.ref)).toEqual(refs);
     for (const t of targets) expect(line.slice(t.from, t.to)).toBe(t.ref);
+  });
+
+  it.each([
+    [["    vars: { id: plug }", "  b: !include"], ["common/base.yaml"]],
+    [
+      ["      id: plug", "    vars:", "    # shared", "  b: !include"],
+      ["common/base.yaml"],
+    ],
+    [["    - x", "  b: !include"], []],
+    [["      id: plug", "    vars:", "  b: other"], []],
+  ])("block form below %j → %j", (above, refs) => {
+    const line = "    file: common/base.yaml";
+    expect(findIncludeTargets(line, above).map((t) => t.ref)).toEqual(refs);
+  });
+
+  it("leaves a nested vars.file in the block form alone", () => {
+    expect(
+      findIncludeTargets("      file: x.yaml", ["    vars:", "  b: !include"])
+    ).toEqual([]);
   });
 
   it("reports the path's offsets within the line", () => {
@@ -87,9 +119,23 @@ describe("includePathAt", () => {
   });
 });
 
+function withApplePlatform(run: () => void) {
+  const original = Object.getOwnPropertyDescriptor(navigator, "userAgentData");
+  Object.defineProperty(navigator, "userAgentData", {
+    value: { platform: "macOS" },
+    configurable: true,
+  });
+  try {
+    run();
+  } finally {
+    if (original) Object.defineProperty(navigator, "userAgentData", original);
+    else Reflect.deleteProperty(navigator, "userAgentData");
+  }
+}
+
 describe("includeLinks modifier state", () => {
-  it("marks the editor while Ctrl/Cmd is held and clears it on release or blur", () => {
-    const view = new EditorView({
+  const linkedView = () =>
+    new EditorView({
       state: EditorState.create({
         extensions: includeLinks(
           () => "a.yaml",
@@ -98,17 +144,63 @@ describe("includeLinks modifier state", () => {
         ),
       }),
     });
+
+  it("marks the editor while Ctrl is held and clears it on release or blur", () => {
+    const view = linkedView();
     const held = () => view.dom.hasAttribute("data-include-mod");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Control", ctrlKey: true }));
     expect(held()).toBe(true);
     window.dispatchEvent(new KeyboardEvent("keyup", { key: "Control" }));
     expect(held()).toBe(false);
     window.dispatchEvent(new MouseEvent("mousemove", { metaKey: true }));
+    expect(held()).toBe(false);
+    window.dispatchEvent(new MouseEvent("mousemove", { ctrlKey: true }));
     expect(held()).toBe(true);
     window.dispatchEvent(new Event("blur"));
     expect(held()).toBe(false);
     view.destroy();
     window.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true }));
     expect(held()).toBe(false);
+  });
+
+  it("uses ⌘ on Apple platforms, where Ctrl+click is the context menu", () => {
+    withApplePlatform(() => {
+      const view = linkedView();
+      const held = () => view.dom.hasAttribute("data-include-mod");
+      window.dispatchEvent(new MouseEvent("mousemove", { ctrlKey: true }));
+      expect(held()).toBe(false);
+      window.dispatchEvent(new MouseEvent("mousemove", { metaKey: true }));
+      expect(held()).toBe(true);
+      view.destroy();
+    });
+  });
+});
+
+describe("includeLinks decorations", () => {
+  it("decorates a line split by a fold once, in order", () => {
+    // Only a large fold splits the line into two visible ranges.
+    const filler = Array.from({ length: 400 }, (_, i) => `k${i}: v`).join(", ");
+    const doc = `packages: {a: !include common/a.yaml, ${filler}, b: !include common/b.yaml}\n`;
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        extensions: [
+          codeFolding(),
+          includeLinks(
+            () => "kitchen.yaml",
+            () => {},
+            "open"
+          ),
+        ],
+      }),
+    });
+    expect(() =>
+      view.dispatch({
+        effects: foldEffect.of({ from: doc.indexOf("k0"), to: doc.indexOf(" b:") }),
+      })
+    ).not.toThrow();
+    expect(view.visibleRanges.length).toBe(2);
+    expect(view.dom.querySelectorAll(".cm-include-link").length).toBe(2);
+    view.destroy();
   });
 });

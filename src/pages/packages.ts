@@ -335,14 +335,22 @@ export class ESPHomePagePackages extends LitElement {
     )}`;
   }
 
+  /** Bumped per ``_reload``, so an older listing can't overwrite a newer one. */
+  private _reloading = 0;
+
   private _reload = async () => {
-    this._state = "loading";
+    const reloading = ++this._reloading;
+    // A refresh keeps the current list up instead of flashing the spinner.
+    if (this._state !== "ready") this._state = "loading";
     try {
       // A reconnect flips "connected" before a stored-token login finishes.
       await this._api.ready;
-      this._paths = (await this._api.listPackages()).map((p) => p.path);
+      const paths = (await this._api.listPackages()).map((p) => p.path);
+      if (reloading !== this._reloading) return;
+      this._paths = paths;
       this._state = "ready";
     } catch (err) {
+      if (reloading !== this._reloading) return;
       console.error("Failed to list packages:", err);
       this._state = "error";
     }
@@ -365,7 +373,7 @@ export class ESPHomePagePackages extends LitElement {
         err instanceof APIError && err.errorCode === ErrorCode.ALREADY_EXISTS
           ? "packages.already_exists"
           : "packages.create_failed";
-      this._fail(key, err);
+      notifyFailure(this._localize, key, err);
       return;
     } finally {
       this._creating = false;
@@ -373,10 +381,6 @@ export class ESPHomePagePackages extends LitElement {
     this._newPath = "";
     if (this.isConnected) void navigate(fileEditorUrl(path));
   };
-
-  private _fail(key: string, err: unknown) {
-    notifyFailure(this._localize, key, err);
-  }
 }
 
 declare global {
