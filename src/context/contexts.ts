@@ -17,7 +17,7 @@ import type {
   PeerSummary,
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
-import type { ExperienceLevel } from "../api/types/system.js";
+import type { ExperienceLevel, UserPreferences } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /** Context for the ESPHome API client instance. */
@@ -179,6 +179,11 @@ export const versionHistoryEnabledContext = createContext<boolean>(
  * known (``remote_compute_only`` would still be at its permissive default).
  */
 export const prefsLoadedContext = createContext<boolean>(Symbol("esphome-prefs-loaded"));
+
+/** Context for the latest preferences snapshot; ``null`` until the first one arrives. */
+export const preferencesContext = createContext<UserPreferences | null>(
+  Symbol("esphome-preferences")
+);
 
 /**
  * Context for the receiver-side remote-build master switch.

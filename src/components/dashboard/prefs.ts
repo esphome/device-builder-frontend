@@ -1,26 +1,47 @@
 import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
 import type { UserPreferences } from "../../api/types/system.js";
-import { SortDirection } from "../../api/types/system.js";
+import { DashboardView, SortDirection } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
-export async function loadPreferences(host: ESPHomePageDashboard): Promise<void> {
+const VIEW_STORAGE_KEY = "esphome-dashboard-view";
+
+/** This browser's last dashboard view, or ``null`` when unknown or unreadable. */
+export function readCachedView(): DashboardView | null {
   try {
-    const prefs = await host._api.getPreferences();
-    host._view = prefs.dashboard_view;
-    host._tablePageSize = prefs.table_page_size;
-    host._tableColumnVisibility = prefs.table_column_visibility;
-    if (prefs.table_sort_column) {
-      host._tableSorting = [
-        {
-          id: prefs.table_sort_column,
-          desc: prefs.table_sort_direction === SortDirection.DESC,
-        },
-      ];
-    } else {
-      host._tableSorting = [];
-    }
+    const view = localStorage.getItem(VIEW_STORAGE_KEY);
+    return view === DashboardView.CARDS || view === DashboardView.TABLE ? view : null;
   } catch {
-    // Preferences are not critical — fall through with defaults.
+    return null;
+  }
+}
+
+/** Remember *view* so the next load paints it before preferences arrive. */
+export function cacheView(view: DashboardView): void {
+  try {
+    localStorage.setItem(VIEW_STORAGE_KEY, view);
+  } catch {
+    // Storage blocked (private mode, quota); the server preference still applies.
+  }
+}
+
+/** Copy the view and table preferences onto the dashboard host. */
+export function applyDashboardPreferences(
+  host: ESPHomePageDashboard,
+  prefs: UserPreferences
+): void {
+  host._view = prefs.dashboard_view;
+  cacheView(prefs.dashboard_view);
+  host._tablePageSize = prefs.table_page_size;
+  host._tableColumnVisibility = prefs.table_column_visibility;
+  if (prefs.table_sort_column) {
+    host._tableSorting = [
+      {
+        id: prefs.table_sort_column,
+        desc: prefs.table_sort_direction === SortDirection.DESC,
+      },
+    ];
+  } else {
+    host._tableSorting = [];
   }
 }
 
