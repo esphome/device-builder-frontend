@@ -20,7 +20,7 @@ import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devi
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { PairingSummary, PeerSummary } from "../api/types/remote-build.js";
 import type { ArchivedDevice } from "../api/types/system.js";
-import { DashboardView, type UserPreferences } from "../api/types/system.js";
+import { DashboardView } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   type AdoptedDetail,
@@ -48,10 +48,11 @@ import {
 } from "../components/dashboard/install.js";
 import { relinkLive } from "../components/dashboard/live-rebind.js";
 import {
-  applyDashboardPreferences,
   cacheView,
   readCachedView,
+  saveDashboardPrefs,
   saveTablePreference,
+  seedDashboardPreferences,
 } from "../components/dashboard/prefs.js";
 import {
   renderCardGrid,
@@ -98,6 +99,8 @@ import {
   apiContext,
   buildOffloadPairingsContext,
   buildServerPeersContext,
+  type DashboardPrefs,
+  dashboardPrefsContext,
   devicesContext,
   devicesLoadedContext,
   expertModeContext,
@@ -105,7 +108,6 @@ import {
   importableDevicesContext,
   labelsContext,
   localizeContext,
-  preferencesContext,
   prefsLoadedContext,
   recentJobsContext,
   remoteComputeOnlyContext,
@@ -238,11 +240,10 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: prefsLoadedContext, subscribe: true })
   @state()
   _prefsLoaded = false;
-  @consume({ context: preferencesContext, subscribe: true })
+  @consume({ context: dashboardPrefsContext, subscribe: true })
   @state()
-  _preferences: UserPreferences | null = null;
-  /** Seed view/table state from preferences once per mount, so a reconnect can't undo a toggle. */
-  private _prefsSeeded = false;
+  _dashboardPrefs: DashboardPrefs | null = null;
+  _prefsSeeded = false;
 
   @consume({ context: buildServerPeersContext, subscribe: true })
   @state()
@@ -584,10 +585,7 @@ export class ESPHomePageDashboard extends LitElement {
       this._search = "";
       this._yamlSearch.clear();
     }
-    if (this._preferences && !this._prefsSeeded) {
-      this._prefsSeeded = true;
-      applyDashboardPreferences(this, this._preferences);
-    }
+    seedDashboardPreferences(this);
     if (this.getAttribute("view") !== this._view) this.setAttribute("view", this._view);
     if (changed.has("_yamlMode")) this.toggleAttribute("yaml", this._yamlMode);
     // ``has-discovered`` is the hook that adds top padding for the
@@ -936,7 +934,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (this._yamlMode) this._setSearchMode(false);
     this._view = view;
     cacheView(view);
-    this._api.updatePreferences({ dashboard_view: view }).catch(() => {});
+    saveDashboardPrefs(this, { dashboard_view: view }).catch(() => {});
   };
 
   _toggleSelectMode = () => {

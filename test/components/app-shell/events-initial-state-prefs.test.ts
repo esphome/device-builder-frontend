@@ -11,6 +11,7 @@ import {
 } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import { handleEvent } from "../../../src/components/app-shell/events.js";
+import type { DashboardPrefs } from "../../../src/context/index.js";
 
 function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
   return {
@@ -35,7 +36,7 @@ function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
 function makeHost() {
   return {
     _prefsLoaded: false,
-    _preferences: null as UserPreferences | null,
+    _dashboardPrefs: null as DashboardPrefs | null,
     _prefsWritesInFlight: 0,
     _experienceLevel: null as ExperienceLevel | null,
     _remoteComputeOnly: false,
@@ -82,11 +83,29 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     expect(host.applyTheme).toHaveBeenCalledWith("dark");
   });
 
-  it("publishes the snapshot so the dashboard can seed its view on first paint", () => {
+  it("publishes the dashboard slice so the dashboard can seed its view on first paint", () => {
     const host = makeHost();
-    const p = prefs({ dashboard_view: "table" as UserPreferences["dashboard_view"] });
-    dispatch(host, snapshot(p));
-    expect(host._preferences).toBe(p);
+    dispatch(
+      host,
+      snapshot(prefs({ dashboard_view: "table" as UserPreferences["dashboard_view"] }))
+    );
+    expect(host._dashboardPrefs).toEqual({
+      dashboard_view: "table",
+      table_page_size: 25,
+      table_column_visibility: {},
+      table_sort_column: null,
+      table_sort_direction: null,
+    });
+  });
+
+  it("publishes the dashboard slice even while a Settings write is in flight", () => {
+    const host = makeHost();
+    host._prefsWritesInFlight = 1;
+    dispatch(
+      host,
+      snapshot(prefs({ dashboard_view: "table" as UserPreferences["dashboard_view"] }))
+    );
+    expect(host._dashboardPrefs?.dashboard_view).toBe("table");
   });
 
   it("does not throw or drop the rest of the snapshot when preferences is absent", () => {

@@ -1,6 +1,6 @@
 import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
-import type { UserPreferences } from "../../api/types/system.js";
 import { DashboardView, SortDirection } from "../../api/types/system.js";
+import type { DashboardPrefs } from "../../context/index.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 const VIEW_STORAGE_KEY = "esphome-dashboard-view";
@@ -24,10 +24,17 @@ export function cacheView(view: DashboardView): void {
   }
 }
 
+/** Apply the shell's dashboard prefs once per mount, so a reconnect can't undo a toggle. */
+export function seedDashboardPreferences(host: ESPHomePageDashboard): void {
+  if (!host._dashboardPrefs || host._prefsSeeded) return;
+  host._prefsSeeded = true;
+  applyDashboardPreferences(host, host._dashboardPrefs);
+}
+
 /** Copy the view and table preferences onto the dashboard host. */
 export function applyDashboardPreferences(
   host: ESPHomePageDashboard,
-  prefs: UserPreferences
+  prefs: DashboardPrefs
 ): void {
   host._view = prefs.dashboard_view;
   cacheView(prefs.dashboard_view);
@@ -45,10 +52,25 @@ export function applyDashboardPreferences(
   }
 }
 
+/** Persist *patch* and hand it to app-shell, which seeds the next mount from it. */
+export async function saveDashboardPrefs(
+  host: ESPHomePageDashboard,
+  patch: Partial<DashboardPrefs>
+): Promise<void> {
+  host.dispatchEvent(
+    new CustomEvent("dashboard-prefs-changed", {
+      detail: patch,
+      bubbles: true,
+      composed: true,
+    })
+  );
+  await host._api.updatePreferences(patch);
+}
+
 /** Persist a table preference and mirror it onto the host state that seeds a remounted table. */
 export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent): void {
   const type = e.type;
-  let patch: Partial<UserPreferences>;
+  let patch: Partial<DashboardPrefs>;
   if (type === "table-sort-change") {
     const sorting = (e as CustomEvent<SortingState>).detail;
     const first = sorting[0] ?? null;
@@ -74,7 +96,7 @@ export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent):
   }
   // The mirror is kept on failure — cosmetic prefs, self-healing on
   // the next mount — but a failing write shouldn't be invisible.
-  host._api.updatePreferences(patch).catch((err) => {
+  saveDashboardPrefs(host, patch).catch((err) => {
     console.warn("Failed to save table preferences", err);
   });
 }

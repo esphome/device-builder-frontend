@@ -12,7 +12,9 @@ import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
   loadOnboardingState,
   loadPreferences,
+  onDashboardPrefsChanged,
 } from "../../../src/components/app-shell/data-load.js";
+import type { DashboardPrefs } from "../../../src/context/index.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
 
 // loadOnboardingState reads the shared (session-cached) secret-keys list; mock
@@ -147,5 +149,39 @@ describe("loadPreferences (post-wizard context refresh)", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe("onDashboardPrefsChanged", () => {
+  const changed = (detail: Partial<DashboardPrefs>) =>
+    new CustomEvent("dashboard-prefs-changed", { detail });
+
+  it("merges a dashboard write into the shell's copy", () => {
+    const host = {
+      _dashboardPrefs: {
+        dashboard_view: "cards",
+        table_page_size: 25,
+        table_column_visibility: {},
+        table_sort_column: null,
+        table_sort_direction: null,
+      } as DashboardPrefs | null,
+    };
+    onDashboardPrefsChanged(
+      host as unknown as ESPHomeApp,
+      changed({ table_page_size: 50 })
+    );
+    expect(host._dashboardPrefs).toMatchObject({
+      dashboard_view: "cards",
+      table_page_size: 50,
+    });
+  });
+
+  it("ignores a write before the first snapshot", () => {
+    const host = { _dashboardPrefs: null as DashboardPrefs | null };
+    onDashboardPrefsChanged(
+      host as unknown as ESPHomeApp,
+      changed({ dashboard_view: "table" as DashboardPrefs["dashboard_view"] })
+    );
+    expect(host._dashboardPrefs).toBeNull();
   });
 });

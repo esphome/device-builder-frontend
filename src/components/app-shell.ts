@@ -16,13 +16,9 @@ import type {
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
 import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
-import {
-  type ExperienceLevel,
-  Theme,
-  type UserPreferences,
-} from "../api/types/system.js";
+import { type ExperienceLevel, Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
-import type { RemoteBuildJobState } from "../context/index.js";
+import type { DashboardPrefs, RemoteBuildJobState } from "../context/index.js";
 import {
   activeJobsContext,
   apiConnectedContext,
@@ -36,6 +32,7 @@ import {
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
   darkModeContext,
+  dashboardPrefsContext,
   desktopUpdateCapableContext,
   desktopVersionContext,
   devicesContext,
@@ -54,7 +51,6 @@ import {
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
-  preferencesContext,
   prefsLoadedContext,
   recentJobsContext,
   remoteBuildCleanupTtlContext,
@@ -91,6 +87,7 @@ import {
   loadOnboardingState,
   loadPreferences,
   loadRemoteBuildSettings,
+  onDashboardPrefsChanged,
 } from "./app-shell/data-load.js";
 import { handleEvent } from "./app-shell/events.js";
 import {
@@ -198,9 +195,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: prefsLoadedContext })
   @state()
   _prefsLoaded = false;
-  @provide({ context: preferencesContext })
+  @provide({ context: dashboardPrefsContext })
   @state()
-  _preferences: UserPreferences | null = null;
+  _dashboardPrefs: DashboardPrefs | null = null;
   // Derived from _experienceLevel in willUpdate (EXPERT ⇒ true); there is no
   // separate expert_mode preference.
   @provide({ context: expertModeContext }) @state() _expertMode = false;
@@ -534,6 +531,8 @@ export class ESPHomeApp extends LitElement {
       ${this._connectionLost ? renderReconnectPill(this._localize) : nothing}
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
+        @dashboard-prefs-changed=${(e: CustomEvent<Partial<DashboardPrefs>>) =>
+          onDashboardPrefsChanged(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}

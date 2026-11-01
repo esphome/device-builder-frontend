@@ -180,9 +180,25 @@ export const versionHistoryEnabledContext = createContext<boolean>(
  */
 export const prefsLoadedContext = createContext<boolean>(Symbol("esphome-prefs-loaded"));
 
-/** Context for the latest preferences snapshot; ``null`` until the first one arrives. */
-export const preferencesContext = createContext<UserPreferences | null>(
-  Symbol("esphome-preferences")
+/** The dashboard's view and table preferences. */
+export type DashboardPrefs = Pick<
+  UserPreferences,
+  | "dashboard_view"
+  | "table_page_size"
+  | "table_column_visibility"
+  | "table_sort_column"
+  | "table_sort_direction"
+>;
+
+/**
+ * Context for the dashboard's saved view and table preferences.
+ *
+ * ``null`` until the first ``initial_state`` snapshot. app-shell owns it and
+ * merges the dashboard's own writes, so a remounted dashboard seeds from what
+ * was last saved rather than the first-load snapshot.
+ */
+export const dashboardPrefsContext = createContext<DashboardPrefs | null>(
+  Symbol("esphome-dashboard-prefs")
 );
 
 /**

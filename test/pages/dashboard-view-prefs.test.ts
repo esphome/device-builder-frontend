@@ -2,7 +2,8 @@
  * @vitest-environment happy-dom
  *
  * Pins that the dashboard paints the user's view from first paint: the cached
- * view picks the skeleton, and preferences seed it in the same update devices load.
+ * view picks the skeleton, preferences seed it in the same update devices load,
+ * and a remount seeds from what was last saved.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./_mock-dashboard-children.js";
 
 import { flushMicrotasks } from "../_dom.js";
-import { DashboardView, type UserPreferences } from "../../src/api/types/system.js";
+import { DashboardView } from "../../src/api/types/system.js";
+import type { ESPHomeApp } from "../../src/components/app-shell.js";
+import { onDashboardPrefsChanged } from "../../src/components/app-shell/data-load.js";
+import type { DashboardPrefs } from "../../src/context/index.js";
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 
 const prefs = (view: DashboardView) =>
@@ -20,7 +24,7 @@ const prefs = (view: DashboardView) =>
     table_column_visibility: {},
     table_sort_column: null,
     table_sort_direction: null,
-  }) as unknown as UserPreferences;
+  }) as DashboardPrefs;
 
 describe("dashboard view from preferences", () => {
   beforeEach(() => {
@@ -49,7 +53,7 @@ describe("dashboard view from preferences", () => {
       attributeFilter: ["view"],
     });
     // app-shell sets both in one INITIAL_STATE handler.
-    p._preferences = prefs(DashboardView.TABLE);
+    p._dashboardPrefs = prefs(DashboardView.TABLE);
     p._devicesLoaded = true;
     await page.updateComplete;
     await flushMicrotasks(8);
@@ -64,12 +68,12 @@ describe("dashboard view from preferences", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const p = page as any;
     p._api = { updatePreferences: vi.fn(async () => {}) };
-    p._preferences = prefs(DashboardView.TABLE);
+    p._dashboardPrefs = prefs(DashboardView.TABLE);
     document.body.appendChild(page);
     await page.updateComplete;
 
     p._enterDeviceView(DashboardView.CARDS);
-    p._preferences = prefs(DashboardView.TABLE);
+    p._dashboardPrefs = prefs(DashboardView.TABLE);
     await page.updateComplete;
 
     expect(p._view).toBe(DashboardView.CARDS);
@@ -97,5 +101,60 @@ describe("dashboard view from preferences", () => {
 
     p._enterDeviceView(DashboardView.TABLE);
     expect(localStorage.getItem("esphome-dashboard-view")).toBe("table");
+  });
+
+  describe("across a remount", () => {
+    // Stands in for app-shell: owns the context value and merges dashboard writes.
+    const shell = { _dashboardPrefs: null as DashboardPrefs | null };
+    const onChanged = (e: Event) =>
+      onDashboardPrefsChanged(
+        shell as unknown as ESPHomeApp,
+        e as CustomEvent<Partial<DashboardPrefs>>
+      );
+
+    beforeEach(() => {
+      shell._dashboardPrefs = prefs(DashboardView.CARDS);
+      document.addEventListener("dashboard-prefs-changed", onChanged);
+    });
+
+    afterEach(() => {
+      document.removeEventListener("dashboard-prefs-changed", onChanged);
+    });
+
+    async function mount() {
+      const page = new ESPHomePageDashboard();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p = page as any;
+      p._api = { updatePreferences: vi.fn(async () => {}) };
+      p._dashboardPrefs = shell._dashboardPrefs;
+      document.body.appendChild(page);
+      await page.updateComplete;
+      return p;
+    }
+
+    it("keeps a view toggled before leaving the dashboard", async () => {
+      const first = await mount();
+      first._enterDeviceView(DashboardView.TABLE);
+      first.remove();
+
+      const second = await mount();
+      expect(second._view).toBe(DashboardView.TABLE);
+      expect(localStorage.getItem("esphome-dashboard-view")).toBe("table");
+    });
+
+    it("keeps table settings changed before leaving the dashboard", async () => {
+      const first = await mount();
+      first._saveTablePreference(
+        new CustomEvent("table-page-size-change", { detail: 50 })
+      );
+      first._saveTablePreference(
+        new CustomEvent("table-sort-change", { detail: [{ id: "name", desc: true }] })
+      );
+      first.remove();
+
+      const second = await mount();
+      expect(second._tablePageSize).toBe(50);
+      expect(second._tableSorting).toEqual([{ id: "name", desc: true }]);
+    });
   });
 });

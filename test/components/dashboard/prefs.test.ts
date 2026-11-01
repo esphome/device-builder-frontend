@@ -6,23 +6,24 @@
  */
 import type { ColumnVisibilityState } from "@tanstack/lit-table";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  DashboardView,
-  SortDirection,
-  type UserPreferences,
-} from "../../../src/api/types/system.js";
+import { flushMicrotasks } from "../../_dom.js";
+import { DashboardView, SortDirection } from "../../../src/api/types/system.js";
 import {
   applyDashboardPreferences,
   cacheView,
   readCachedView,
+  saveDashboardPrefs,
   saveTablePreference,
+  seedDashboardPreferences,
 } from "../../../src/components/dashboard/prefs.js";
+import type { DashboardPrefs } from "../../../src/context/index.js";
 import { makeDashboardHost } from "./_host.js";
 
 function makeHost() {
   const updatePreferences = vi.fn(async () => {});
   const host = makeDashboardHost({
     _api: { updatePreferences },
+    dispatchEvent: vi.fn(),
     _tablePageSize: 25,
     _tableColumnVisibility: null,
     _tableSorting: null,
@@ -61,7 +62,7 @@ describe("cached dashboard view", () => {
 });
 
 describe("applyDashboardPreferences", () => {
-  const prefs = (over: Partial<UserPreferences> = {}) =>
+  const prefs = (over: Partial<DashboardPrefs> = {}) =>
     ({
       dashboard_view: DashboardView.TABLE,
       table_page_size: 50,
@@ -69,7 +70,7 @@ describe("applyDashboardPreferences", () => {
       table_sort_column: "name",
       table_sort_direction: SortDirection.DESC,
       ...over,
-    }) as UserPreferences;
+    }) as DashboardPrefs;
 
   it("copies the view and table preferences onto the host", () => {
     const { host } = makeHost();
@@ -86,10 +87,35 @@ describe("applyDashboardPreferences", () => {
     expect(readCachedView()).toBe(DashboardView.TABLE);
   });
 
+  it("seeds from the shell's prefs once per mount", () => {
+    const { host } = makeHost();
+    host._prefsSeeded = false;
+    host._dashboardPrefs = prefs();
+    seedDashboardPreferences(host);
+    host._view = DashboardView.CARDS;
+    seedDashboardPreferences(host);
+    expect(host._view).toBe(DashboardView.CARDS);
+    expect(host._tablePageSize).toBe(50);
+  });
+
   it("maps an unset sort column to an empty sort", () => {
     const { host } = makeHost();
     applyDashboardPreferences(host, prefs({ table_sort_column: null }));
     expect(host._tableSorting).toEqual([]);
+  });
+});
+
+describe("saveDashboardPrefs", () => {
+  it("hands the patch to app-shell and persists it", async () => {
+    const { host, updatePreferences } = makeHost();
+    await saveDashboardPrefs(host, { dashboard_view: DashboardView.TABLE });
+    const event = vi.mocked(host.dispatchEvent).mock.calls[0][0] as CustomEvent;
+    expect(event.type).toBe("dashboard-prefs-changed");
+    expect(event.bubbles && event.composed).toBe(true);
+    expect(event.detail).toEqual({ dashboard_view: DashboardView.TABLE });
+    expect(updatePreferences).toHaveBeenCalledWith({
+      dashboard_view: DashboardView.TABLE,
+    });
   });
 });
 
@@ -138,7 +164,7 @@ describe("saveTablePreference", () => {
     const boom = new Error("offline");
     updatePreferences.mockRejectedValueOnce(boom);
     saveTablePreference(host, event("table-page-size-change", 10));
-    await Promise.resolve();
+    await flushMicrotasks(4);
     expect(host._tablePageSize).toBe(10);
     expect(warn).toHaveBeenCalledWith("Failed to save table preferences", boom);
     warn.mockRestore();

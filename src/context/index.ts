@@ -11,6 +11,7 @@ export {
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
   darkModeContext,
+  dashboardPrefsContext,
   desktopUpdateCapableContext,
   desktopVersionContext,
   devicesContext,
@@ -29,7 +30,6 @@ export {
   offloaderRemoteBuildsEnabledContext,
   offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
-  preferencesContext,
   prefsLoadedContext,
   recentJobsContext,
   remoteBuildCleanupTtlContext,
@@ -42,4 +42,4 @@ export {
   versionContext,
   versionHistoryEnabledContext,
 } from "./contexts.js";
-export type { RemoteBuildJobState } from "./contexts.js";
+export type { DashboardPrefs, RemoteBuildJobState } from "./contexts.js";
