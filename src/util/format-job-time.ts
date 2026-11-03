@@ -1,5 +1,23 @@
 import { formatDuration } from "./relative-time.js";
 
+// Building an Intl formatter costs far more than calling one, and the jobs
+// list formats every row on every render, so reuse one per locale.
+const formatterCache = new Map<string, Intl.DateTimeFormat | Intl.RelativeTimeFormat>();
+
+function cached<T extends Intl.DateTimeFormat | Intl.RelativeTimeFormat>(
+  kind: string,
+  locale: string | undefined,
+  make: () => T
+): T {
+  const key = `${kind}|${locale ?? ""}`;
+  let fmt = formatterCache.get(key);
+  if (!fmt) {
+    fmt = make();
+    formatterCache.set(key, fmt);
+  }
+  return fmt as T;
+}
+
 /**
  * Render an ISO timestamp as a short relative phrase ("2m ago",
  * "in 30s") via Intl.RelativeTimeFormat. Picks the coarsest unit that
@@ -10,7 +28,11 @@ import { formatDuration } from "./relative-time.js";
 export function formatRelativeTime(iso: string, now: number, locale?: string): string {
   const past = new Date(iso).getTime();
   const diffSec = Math.round((past - now) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const rtf = cached(
+    "rtf",
+    locale,
+    () => new Intl.RelativeTimeFormat(locale, { numeric: "auto" })
+  );
   const absSec = Math.abs(diffSec);
   if (absSec < 60) return rtf.format(diffSec, "second");
   const diffMin = Math.round(diffSec / 60);
@@ -44,19 +66,23 @@ export function formatElapsed(ms: number, language?: string): string {
  */
 export function formatAbsoluteTime(iso: string, now: number, locale?: string): string {
   const date = new Date(iso);
+  // Intl.DateTimeFormat.format throws on an invalid date, where toLocale*String returned "Invalid Date".
+  if (Number.isNaN(date.getTime())) return "Invalid Date";
   const today = new Date(now);
   const isSameDay =
     date.getFullYear() === today.getFullYear() &&
     date.getMonth() === today.getMonth() &&
     date.getDate() === today.getDate();
-  const time = date.toLocaleTimeString(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const time = cached(
+    "time",
+    locale,
+    () => new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" })
+  ).format(date);
   if (isSameDay) return time;
-  const dateStr = date.toLocaleDateString(locale, {
-    month: "short",
-    day: "numeric",
-  });
+  const dateStr = cached(
+    "date",
+    locale,
+    () => new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" })
+  ).format(date);
   return `${dateStr} ${time}`;
 }
