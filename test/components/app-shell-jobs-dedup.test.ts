@@ -1,6 +1,6 @@
 // Live-jobs dedup keys on (config, type) so an install's compile and upload
 // both survive — the upload's terminal must not evict the compile (#1131).
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeApp } from "../../src/components/app-shell.js";
@@ -162,5 +162,43 @@ describe("terminal analyze-memory jobs never enter history", () => {
       })
     );
     expect(new Set(host._firmwareJobs.keys())).toEqual(new Set(["c"]));
+  });
+});
+
+describe("follow_jobs snapshot replay", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("applies a burst of snapshot frames in one pass", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    let sets = 0;
+    let jobs = host._firmwareJobs;
+    Object.defineProperty(host, "_firmwareJobs", {
+      get: () => jobs,
+      set: (v) => {
+        sets++;
+        jobs = v;
+      },
+    });
+    for (const id of ["a", "b", "c"]) {
+      handleJobEvent(host, "snapshot", done({ job_id: id }));
+    }
+    expect(sets).toBe(0);
+    vi.runAllTimers();
+    expect(sets).toBe(1);
+    expect(new Set(host._firmwareJobs.keys())).toEqual(new Set(["a", "b", "c"]));
+  });
+
+  it("keeps a live event that raced ahead of the buffered snapshot", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    handleJobEvent(host, "snapshot", makeJob({ job_id: "a", status: JobStatus.QUEUED }));
+    handleJobEvent(
+      host,
+      "job_started",
+      makeJob({ job_id: "a", status: JobStatus.RUNNING })
+    );
+    vi.runAllTimers();
+    expect(host._firmwareJobs.get("a")!.status).toBe(JobStatus.RUNNING);
   });
 });

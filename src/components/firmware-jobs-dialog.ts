@@ -126,7 +126,12 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     return this._ticker.now;
   }
 
+  // Rendering every history row is costly and the list is invisible while
+  // closed, so it only exists from open() until the hide animation ends.
+  @state() private _listMounted = false;
+
   open() {
+    this._listMounted = true;
     this._dialog.open = true;
     this._ticker.start();
   }
@@ -226,7 +231,13 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
               : nothing
           }
         </div>
-        ${hasJobs ? renderGroups(this, active, terminal) : renderEmpty(this._localize)}
+        ${
+          !this._listMounted
+            ? nothing
+            : hasJobs
+              ? renderGroups(this, active, terminal)
+              : renderEmpty(this._localize)
+        }
       </esphome-base-dialog>
       <esphome-command-dialog
         @open-settings=${this._onOpenSettings}
@@ -267,6 +278,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   private _onAfterHide = (): void => {
     this._dialog.open = false;
+    this._listMounted = false;
     this._ticker.stop();
   };
 

@@ -38,7 +38,33 @@ export function clearRecentJobs(host: ESPHomeApp): void {
   host._recentJobs = new Map();
 }
 
+// follow_jobs replays one "snapshot" frame per stored job. Applying each as it
+// arrives re-renders every jobs consumer per frame, so buffer them and apply
+// the burst in one pass (~one frame later).
+const SNAPSHOT_FLUSH_MS = 16;
+const pendingSnapshots = new WeakMap<
+  ESPHomeApp,
+  { jobs: FirmwareJob[]; timer: ReturnType<typeof setTimeout> }
+>();
+
+function queueSnapshot(host: ESPHomeApp, job: FirmwareJob): void {
+  const pending = pendingSnapshots.get(host);
+  if (pending) {
+    pending.jobs.push(job);
+    return;
+  }
+  const jobs = [job];
+  const timer = setTimeout(() => {
+    pendingSnapshots.delete(host);
+    seedJobs(host, jobs);
+  }, SNAPSHOT_FLUSH_MS);
+  pendingSnapshots.set(host, { jobs, timer });
+}
+
 export function subscribeToFollowJobs(host: ESPHomeApp): void {
+  const stale = pendingSnapshots.get(host);
+  if (stale) clearTimeout(stale.timer);
+  pendingSnapshots.delete(host);
   host._activeJobs = new Map();
   host._firmwareJobs = new Map();
   clearRecentJobs(host);
@@ -75,6 +101,8 @@ export function seedJobs(host: ESPHomeApp, jobs: FirmwareJob[]): void {
 export function handleJobEvent(host: ESPHomeApp, event: string, data: unknown): void {
   switch (event) {
     case "snapshot":
+      queueSnapshot(host, data as FirmwareJob);
+      break;
     case "job_queued":
     case "job_started":
       upsertJob(host, data as FirmwareJob);
