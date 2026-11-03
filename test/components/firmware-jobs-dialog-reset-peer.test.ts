@@ -189,12 +189,9 @@ describe("reset all build servers", () => {
 
   it("reports the servers that fail and still opens the list for the rest", async () => {
     const { el, open } = makeTwo();
-    el._api.remoteBuildResetPeerBuildEnv.mockImplementation(
-      ({ pin_sha256 }: { pin_sha256: string }) =>
-        pin_sha256 === PIN_B
-          ? Promise.reject(new Error("link down"))
-          : Promise.resolve({} as FirmwareJob)
-    );
+    el._api.remoteBuildResetPeerBuildEnv
+      .mockResolvedValueOnce({} as FirmwareJob)
+      .mockRejectedValueOnce(new Error("link down"));
     await el._onResetAllPeersConfirmed();
     expect(notifyError).toHaveBeenCalledTimes(1);
     expect(vi.mocked(notifyError).mock.calls[0][0] as string).toContain("mini");
