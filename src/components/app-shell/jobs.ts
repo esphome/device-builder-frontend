@@ -40,7 +40,8 @@ export function clearRecentJobs(host: ESPHomeApp): void {
 
 // follow_jobs replays one "snapshot" frame per stored job. Applying each as it
 // arrives re-renders every jobs consumer per frame, so buffer them and apply
-// the burst in one pass (~one frame later).
+// the burst in one pass (~one frame later). Any other job event flushes the
+// buffer first, so frames are always applied in arrival order.
 const SNAPSHOT_FLUSH_MS = 16;
 const pendingSnapshots = new WeakMap<
   ESPHomeApp,
@@ -54,11 +55,31 @@ function queueSnapshot(host: ESPHomeApp, job: FirmwareJob): void {
     return;
   }
   const jobs = [job];
-  const timer = setTimeout(() => {
-    pendingSnapshots.delete(host);
-    seedJobs(host, jobs);
-  }, SNAPSHOT_FLUSH_MS);
+  const timer = setTimeout(() => flushSnapshots(host), SNAPSHOT_FLUSH_MS);
   pendingSnapshots.set(host, { jobs, timer });
+}
+
+function flushSnapshots(host: ESPHomeApp): void {
+  const pending = pendingSnapshots.get(host);
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pendingSnapshots.delete(host);
+  // Same per-job effect as upsertJob, with one map build for the whole burst.
+  const all = new Map(host._firmwareJobs);
+  const active = new Map(host._activeJobs);
+  for (const job of pending.jobs) {
+    all.set(job.job_id, job);
+    const keys = [job.configuration, ...renameKeys(job)];
+    if (isTerminalJobStatus(job.status)) {
+      // Terminal replays belong only in history; release a stale slot they supersede.
+      for (const key of keys)
+        if (active.get(key)?.job_id === job.job_id) active.delete(key);
+      continue;
+    }
+    for (const key of keys) active.set(key, job);
+  }
+  host._firmwareJobs = all;
+  host._activeJobs = active;
 }
 
 export function subscribeToFollowJobs(host: ESPHomeApp): void {
@@ -99,6 +120,7 @@ export function seedJobs(host: ESPHomeApp, jobs: FirmwareJob[]): void {
 }
 
 export function handleJobEvent(host: ESPHomeApp, event: string, data: unknown): void {
+  if (event !== "snapshot") flushSnapshots(host);
   switch (event) {
     case "snapshot":
       queueSnapshot(host, data as FirmwareJob);

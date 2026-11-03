@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeApp } from "../../src/components/app-shell.js";
-import { handleJobEvent } from "../../src/components/app-shell/jobs.js";
+import { handleJobEvent, seedJobs } from "../../src/components/app-shell/jobs.js";
 
 function makeHost(): ESPHomeApp {
   return {
@@ -200,5 +200,61 @@ describe("follow_jobs snapshot replay", () => {
     );
     vi.runAllTimers();
     expect(host._firmwareJobs.get("a")!.status).toBe(JobStatus.RUNNING);
+  });
+
+  it("does not resurrect a job that a live terminal event removed", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    const memory = {
+      job_id: "m",
+      job_type: JobType.ANALYZE_MEMORY,
+      configuration: "a.yaml",
+    };
+    handleJobEvent(host, "snapshot", makeJob({ ...memory, status: JobStatus.RUNNING }));
+    handleJobEvent(
+      host,
+      "job_completed",
+      makeJob({ ...memory, status: JobStatus.COMPLETED })
+    );
+    vi.runAllTimers();
+    expect(host._firmwareJobs.has("m")).toBe(false);
+    expect(host._activeJobs.has("a.yaml")).toBe(false);
+  });
+
+  it("keeps the active slot picked by a live event", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    const base = { configuration: "a.yaml" };
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ ...base, job_id: "c", status: JobStatus.QUEUED })
+    );
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ ...base, job_id: "u", status: JobStatus.QUEUED })
+    );
+    handleJobEvent(
+      host,
+      "job_started",
+      makeJob({ ...base, job_id: "c", status: JobStatus.RUNNING })
+    );
+    vi.runAllTimers();
+    expect(host._activeJobs.get("a.yaml")!.job_id).toBe("c");
+  });
+
+  it("lets a replay frame replace an older initial-state row", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    seedJobs(host, [makeJob({ job_id: "a", status: JobStatus.RUNNING })]);
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ job_id: "a", status: JobStatus.COMPLETED })
+    );
+    vi.runAllTimers();
+    expect(host._firmwareJobs.get("a")!.status).toBe(JobStatus.COMPLETED);
+    expect(host._activeJobs.size).toBe(0);
   });
 });
