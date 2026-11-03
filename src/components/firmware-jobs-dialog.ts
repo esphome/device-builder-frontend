@@ -41,7 +41,7 @@ import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { navigate } from "../util/navigation.js";
-import { notifyError } from "../util/notify.js";
+import { notifyError, notifySuccess } from "../util/notify.js";
 import { NowTickController } from "../util/now-tick-controller.js";
 import { pairingDisplayName } from "../util/pairing-display-name.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -109,6 +109,8 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   @state() private _installDialogMounted = false;
   @query("#reset-local-confirm") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("#reset-peer-confirm") private _resetPeerConfirmDialog!: ESPHomeConfirmDialog;
+  @query("#reset-all-peers-confirm")
+  private _resetAllConfirmDialog!: ESPHomeConfirmDialog;
 
   // The pairing a pending remote-reset confirm targets; null when the
   // confirm dialog is closed.
@@ -154,6 +156,16 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       label: pairingDisplayName(pairing),
     };
     this._resetPeerConfirmDialog.open();
+  }
+
+  // Entry point for resetting every reset-capable build server at once.
+  openResetAllPeerBuildEnv() {
+    if (this._resettablePairings().length === 0) return;
+    this._resetAllConfirmDialog.open();
+  }
+
+  private _resettablePairings(): PairingSummary[] {
+    return Array.from(this._pairings?.values() ?? []).filter(canResetBuildEnv);
   }
 
   private _onRequestDownloadFirmware = async (e: CustomEvent<ConfiguredDevice>) => {
@@ -262,6 +274,15 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
         })}
         @confirm=${this._onResetPeerConfirmed}
       ></esphome-confirm-dialog>
+      <esphome-confirm-dialog
+        id="reset-all-peers-confirm"
+        heading=${this._localize("firmware_jobs.reset_all_peers_confirm_title", {
+          count: this._resettablePairings().length,
+        })}
+        confirm-label=${this._localize("firmware_jobs.reset_all_peers_confirm_button")}
+        message=${this._localize("firmware_jobs.reset_all_peers_confirm_message")}
+        @confirm=${this._onResetAllPeersConfirmed}
+      ></esphome-confirm-dialog>
     `;
   }
 
@@ -326,6 +347,34 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     // A busy refusal surfaces in this job's stream (the mirror fails
     // with a retry-when-idle message), not as a command error.
     this._commandDialog.followJob(job, this._jobDisplayName(job));
+  };
+
+  private _onResetAllPeersConfirmed = async () => {
+    const targets = this._resettablePairings();
+    const results = await Promise.allSettled(
+      targets.map((p) =>
+        this._api.remoteBuildResetPeerBuildEnv({ pin_sha256: p.pin_sha256 })
+      )
+    );
+    let started = 0;
+    results.forEach((result, i) => {
+      if (result.status === "fulfilled") {
+        started++;
+        return;
+      }
+      notifyError(
+        this._localize("firmware_jobs.reset_peer_failed", {
+          label: pairingDisplayName(targets[i]),
+          detail: getErrorMessage(result.reason),
+        })
+      );
+    });
+    if (started === 0) return;
+    notifySuccess(
+      this._localize("firmware_jobs.reset_all_peers_started", { count: started })
+    );
+    // The wipes run as ordinary jobs; show the list so they can be watched.
+    this.open();
   };
 
   private _onClearHistory = async () => {
