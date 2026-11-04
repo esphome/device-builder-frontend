@@ -7,7 +7,11 @@
 import type { ColumnVisibilityState } from "@tanstack/lit-table";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushMicrotasks } from "../../_dom.js";
-import { DashboardView, SortDirection } from "../../../src/api/types/system.js";
+import {
+  DashboardView,
+  SortDirection,
+  type UserPreferences,
+} from "../../../src/api/types/system.js";
 import {
   applyDashboardPreferences,
   cacheView,
@@ -19,16 +23,31 @@ import {
 import type { DashboardPrefs } from "../../../src/context/index.js";
 import { makeDashboardHost } from "./_host.js";
 
+/** Full server preferences as the API returns them, with *over* applied. */
+const serverPrefs = (over: Partial<DashboardPrefs> = {}) =>
+  ({
+    dashboard_view: DashboardView.CARDS,
+    table_page_size: 25,
+    table_column_visibility: {},
+    table_sort_column: null,
+    table_sort_direction: null,
+    theme: "system",
+    ...over,
+  }) as unknown as UserPreferences;
+
 function makeHost() {
-  const updatePreferences = vi.fn(async () => {});
+  const updatePreferences = vi.fn(async (patch: Partial<DashboardPrefs>) =>
+    serverPrefs(patch)
+  );
+  const getPreferences = vi.fn(async () => serverPrefs());
   const host = makeDashboardHost({
-    _api: { updatePreferences },
+    _api: { updatePreferences, getPreferences },
     dispatchEvent: vi.fn(),
     _tablePageSize: 25,
     _tableColumnVisibility: null,
     _tableSorting: null,
   });
-  return { host, updatePreferences };
+  return { host, updatePreferences, getPreferences };
 }
 
 const event = (type: string, detail: unknown) => new CustomEvent(type, { detail });
@@ -116,6 +135,49 @@ describe("saveDashboardPrefs", () => {
     expect(updatePreferences).toHaveBeenCalledWith({
       dashboard_view: DashboardView.TABLE,
     });
+  });
+
+  const published = (host: ReturnType<typeof makeHost>["host"]) =>
+    vi.mocked(host.dispatchEvent).mock.calls.map(([e]) => (e as CustomEvent).detail);
+  const lastPublished = (host: ReturnType<typeof makeHost>["host"]) => {
+    const details = published(host);
+    return details[details.length - 1];
+  };
+
+  it("replaces app-shell's copy with the server's reply", async () => {
+    const { host, updatePreferences } = makeHost();
+    updatePreferences.mockResolvedValueOnce(
+      serverPrefs({ dashboard_view: DashboardView.TABLE, table_page_size: 50 })
+    );
+    await saveDashboardPrefs(host, { dashboard_view: DashboardView.TABLE });
+    expect(lastPublished(host)).toEqual({
+      dashboard_view: DashboardView.TABLE,
+      table_page_size: 50,
+      table_column_visibility: {},
+      table_sort_column: null,
+      table_sort_direction: null,
+    });
+  });
+
+  it("restores the server's values when the write fails", async () => {
+    const { host, updatePreferences } = makeHost();
+    const boom = new Error("offline");
+    updatePreferences.mockRejectedValueOnce(boom);
+    await expect(
+      saveDashboardPrefs(host, { dashboard_view: DashboardView.TABLE })
+    ).rejects.toBe(boom);
+    expect(lastPublished(host)).toMatchObject({ dashboard_view: DashboardView.CARDS });
+  });
+
+  it("keeps app-shell's copy when the refetch fails too", async () => {
+    const { host, updatePreferences, getPreferences } = makeHost();
+    const boom = new Error("offline");
+    updatePreferences.mockRejectedValueOnce(boom);
+    getPreferences.mockRejectedValueOnce(new Error("offline"));
+    await expect(
+      saveDashboardPrefs(host, { dashboard_view: DashboardView.TABLE })
+    ).rejects.toBe(boom);
+    expect(published(host)).toEqual([{ dashboard_view: DashboardView.TABLE }]);
   });
 });
 

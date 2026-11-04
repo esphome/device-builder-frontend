@@ -2,6 +2,7 @@ import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
 import { DashboardView, SortDirection } from "../../api/types/system.js";
 import type { DashboardPrefs } from "../../context/index.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { pickDashboardPrefs } from "../app-shell/data-load.js";
 
 const VIEW_STORAGE_KEY = "esphome-dashboard-view";
 
@@ -52,19 +53,27 @@ export function applyDashboardPreferences(
   }
 }
 
-/** Persist *patch* and hand it to app-shell, which seeds the next mount from it. */
+/**
+ * Persist *patch* and hand it to app-shell, which seeds the next mount from it.
+ *
+ * Once the write settles, app-shell's copy is replaced with the server's values:
+ * the write's reply, or a refetch when the write fails.
+ */
 export async function saveDashboardPrefs(
   host: ESPHomePageDashboard,
   patch: Partial<DashboardPrefs>
 ): Promise<void> {
-  host.dispatchEvent(
-    new CustomEvent("dashboard-prefs-changed", {
-      detail: patch,
-      bubbles: true,
-      composed: true,
-    })
-  );
-  await host._api.updatePreferences(patch);
+  publishDashboardPrefs(host, patch);
+  try {
+    publishDashboardPrefs(
+      host,
+      pickDashboardPrefs(await host._api.updatePreferences(patch))
+    );
+  } catch (err) {
+    const current = await host._api.getPreferences().catch(() => null);
+    if (current) publishDashboardPrefs(host, pickDashboardPrefs(current));
+    throw err;
+  }
 }
 
 /** Persist a table preference and mirror it onto the host state that seeds a remounted table. */
@@ -99,4 +108,13 @@ export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent):
   saveDashboardPrefs(host, patch).catch((err) => {
     console.warn("Failed to save table preferences", err);
   });
+}
+
+function publishDashboardPrefs(
+  host: ESPHomePageDashboard,
+  detail: Partial<DashboardPrefs>
+): void {
+  host.dispatchEvent(
+    new CustomEvent("dashboard-prefs-changed", { detail, bubbles: true, composed: true })
+  );
 }

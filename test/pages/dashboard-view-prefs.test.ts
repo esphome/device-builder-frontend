@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./_mock-dashboard-children.js";
 
 import { flushMicrotasks } from "../_dom.js";
-import { DashboardView } from "../../src/api/types/system.js";
+import { DashboardView, type UserPreferences } from "../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../src/components/app-shell.js";
 import { onDashboardPrefsChanged } from "../../src/components/app-shell/data-load.js";
 import type { DashboardPrefs } from "../../src/context/index.js";
@@ -106,6 +106,12 @@ describe("dashboard view from preferences", () => {
   describe("across a remount", () => {
     // Stands in for app-shell: owns the context value and merges dashboard writes.
     const shell = { _dashboardPrefs: null as DashboardPrefs | null };
+    // Stands in for the backend's stored preferences.
+    let server: DashboardPrefs;
+    const save = async (patch: Partial<DashboardPrefs>) => {
+      server = { ...server, ...patch };
+      return server as unknown as UserPreferences;
+    };
     const onChanged = (e: Event) =>
       onDashboardPrefsChanged(
         shell as unknown as ESPHomeApp,
@@ -114,6 +120,7 @@ describe("dashboard view from preferences", () => {
 
     beforeEach(() => {
       shell._dashboardPrefs = prefs(DashboardView.CARDS);
+      server = prefs(DashboardView.CARDS);
       document.addEventListener("dashboard-prefs-changed", onChanged);
     });
 
@@ -125,7 +132,10 @@ describe("dashboard view from preferences", () => {
       const page = new ESPHomePageDashboard();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const p = page as any;
-      p._api = { updatePreferences: vi.fn(async () => {}) };
+      p._api = {
+        updatePreferences: vi.fn(save),
+        getPreferences: vi.fn(async () => server),
+      };
       p._dashboardPrefs = shell._dashboardPrefs;
       document.body.appendChild(page);
       await page.updateComplete;
@@ -155,6 +165,40 @@ describe("dashboard view from preferences", () => {
       const second = await mount();
       expect(second._tablePageSize).toBe(50);
       expect(second._tableSorting).toEqual([{ id: "name", desc: true }]);
+    });
+
+    it("keeps a view saved while a reconnect snapshot was in flight", async () => {
+      const first = await mount();
+      let settle!: () => void;
+      first._api.updatePreferences = vi.fn(
+        (patch: Partial<DashboardPrefs>) =>
+          new Promise((resolve) => {
+            settle = () => resolve(save(patch));
+          })
+      );
+      first._enterDeviceView(DashboardView.TABLE);
+      // The reconnect snapshot predates the write and lands before its reply.
+      shell._dashboardPrefs = prefs(DashboardView.CARDS);
+      settle();
+      await flushMicrotasks(8);
+      first.remove();
+
+      const second = await mount();
+      expect(second._view).toBe(DashboardView.TABLE);
+    });
+
+    it("drops a failed view change before the next mount", async () => {
+      const first = await mount();
+      first._api.updatePreferences = vi.fn(async () => {
+        throw new Error("offline");
+      });
+      first._enterDeviceView(DashboardView.TABLE);
+      await flushMicrotasks(8);
+      expect(first._view).toBe(DashboardView.TABLE);
+      first.remove();
+
+      const second = await mount();
+      expect(second._view).toBe(DashboardView.CARDS);
     });
   });
 });
