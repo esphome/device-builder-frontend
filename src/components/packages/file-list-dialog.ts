@@ -66,11 +66,21 @@ export class ESPHomeFileListDialog extends LitElement {
     `,
   ];
 
+  /** Bumped per lookup and on disconnect, so only the latest lookup opens or toasts. */
+  private _opening = 0;
+
+  disconnectedCallback() {
+    this._opening++;
+    super.disconnectedCallback();
+  }
+
   /** List the devices and files using *path*; a toast instead when the lookup fails. */
   async showUsage(path: string): Promise<void> {
     const localize = this._localize;
+    const opening = ++this._opening;
     try {
       const usage = await this._api.getFileUsage(path);
+      if (opening !== this._opening) return;
       this._open({
         heading: localize("packages.usage_title", { path }),
         body: () =>
@@ -83,37 +93,47 @@ export class ESPHomeFileListDialog extends LitElement {
           }),
       });
     } catch (err) {
-      notifyFailure(localize, "packages.usage_failed", err);
+      if (opening === this._opening) {
+        notifyFailure(localize, "packages.usage_failed", err);
+      }
     }
   }
 
   /** List the files *configuration* pulls in; a toast instead when the lookup fails. */
   async showDependencies(configuration: string): Promise<void> {
     const localize = this._localize;
+    const opening = ++this._opening;
     try {
       const { files, complete } = await this._api.getDeviceDependencies(configuration);
+      if (opening !== this._opening) return;
       this._open({
         heading: localize("packages.dependencies_title", { name: configuration }),
         body: () =>
-          html`<p class="usage-message">
-              ${this._localize(
-                files.length > 0
-                  ? "packages.dependencies_message"
-                  : "packages.dependencies_none",
-                { count: files.length }
-              )}
-            </p>
-            ${renderLinkList(fileItems(files), this._navigate)}
-            ${
-              complete
-                ? nothing
-                : html`<p class="usage-note">
-                    ${this._localize("packages.dependencies_incomplete")}
-                  </p>`
-            }`,
+          html`${
+            complete || files.length > 0
+              ? html`<p class="usage-message">
+                  ${this._localize(
+                    files.length > 0
+                      ? "packages.dependencies_message"
+                      : "packages.dependencies_none",
+                    { count: files.length }
+                  )}
+                </p>`
+              : nothing
+          }
+          ${renderLinkList(fileItems(files), this._navigate)}
+          ${
+            complete
+              ? nothing
+              : html`<p class="usage-note">
+                  ${this._localize("packages.dependencies_incomplete")}
+                </p>`
+          }`,
       });
     } catch (err) {
-      notifyFailure(localize, "packages.dependencies_failed", err);
+      if (opening === this._opening) {
+        notifyFailure(localize, "packages.dependencies_failed", err);
+      }
     }
   }
 

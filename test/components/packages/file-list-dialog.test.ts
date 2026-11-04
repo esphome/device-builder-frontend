@@ -188,10 +188,65 @@ describe("file-list-dialog showDependencies", () => {
     await el.showDependencies("kitchen.yaml");
 
     expect(await rendered()).toEqual({
-      messages: ["packages.dependencies_none | 0"],
+      messages: [],
       labels: [],
       links: [],
       notes: ["packages.dependencies_incomplete"],
     });
+  });
+
+  it("says a device includes nothing once its list is complete", async () => {
+    const { el, rendered } = await mount({
+      getDeviceDependencies: vi.fn().mockResolvedValue({ files: [], complete: true }),
+    });
+
+    await el.showDependencies("kitchen.yaml");
+
+    expect((await rendered()).messages).toEqual(["packages.dependencies_none | 0"]);
+  });
+
+  it("keeps the latest lookup when an older reply arrives last", async () => {
+    const replies: Record<string, (v: unknown) => void> = {};
+    const reply = (key: string) => new Promise((resolve) => (replies[key] = resolve));
+    const { el, rendered } = await mount({
+      getFileUsage: vi.fn(() => reply("usage")),
+      getDeviceDependencies: vi.fn(() => reply("deps")),
+    });
+
+    const usage = el.showUsage("common/a.yaml");
+    const deps = el.showDependencies("kitchen.yaml");
+    replies.deps({ files: ["common/b.yaml"], complete: true });
+    await deps;
+    replies.usage({
+      used_by: ["kitchen.yaml"],
+      unknown: [],
+      referenced_by: ["kitchen.yaml"],
+      rewritable: [],
+      unreadable: [],
+    });
+    await usage;
+
+    expect((await rendered()).links).toEqual(["common/b.yaml"]);
+  });
+
+  it("drops a failed older lookup and any lookup finishing after disconnect", async () => {
+    let fail!: (e: unknown) => void;
+    let finish!: (v: unknown) => void;
+    const { el } = await mount({
+      getFileUsage: vi.fn(() => new Promise((_, reject) => (fail = reject))),
+      getDeviceDependencies: vi.fn(() => new Promise((resolve) => (finish = resolve))),
+    });
+    vi.mocked(notifyError).mockClear();
+
+    const usage = el.showUsage("common/a.yaml");
+    const deps = el.showDependencies("kitchen.yaml");
+    fail(new Error("late"));
+    await usage;
+    expect(notifyError).not.toHaveBeenCalled();
+
+    el.remove();
+    finish({ files: ["common/b.yaml"], complete: true });
+    await deps;
+    expect(dialogOpen(el)).toBe(false);
   });
 });
