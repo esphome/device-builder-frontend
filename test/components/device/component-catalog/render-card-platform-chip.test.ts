@@ -7,10 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { identityLocalize as localize, renderInto } from "../../../_dom.js";
-import {
-  type ComponentCatalogEntry,
-  ComponentCategory,
-} from "../../../../src/api/types/components.js";
+import { type ComponentCatalogEntry } from "../../../../src/api/types/components.js";
 import { renderCard } from "../../../../src/components/device/component-catalog/renderers.js";
 import { makeCatalogHost } from "./_host.js";
 
@@ -23,7 +20,7 @@ function entry(id: string): ComponentCatalogEntry {
     id,
     name: "Stepper Component",
     description: "",
-    category: ComponentCategory.STEPPER,
+    category: "stepper",
     docs_url: "",
     image_url: "",
     dependencies: [],

@@ -12,8 +12,7 @@ import { makeComponentEntry } from "./_make-component-entry.js";
 
 type CatalogIndex = Parameters<typeof knownTopLevelKeys>[0];
 
-const entry = (id: string, category: ComponentCategory) =>
-  makeComponentEntry(id, { category });
+const entry = (id: string, category: string) => makeComponentEntry(id, { category });
 
 function catalog(entries: ComponentCatalogEntry[]): CatalogIndex {
   const byId = new Map<string, ComponentCatalogEntry>();
@@ -31,7 +30,7 @@ describe("knownTopLevelKeys", () => {
   it("unions domain umbrellas, standalone ids, and core/automation keys", () => {
     const keys = knownTopLevelKeys(
       catalog([
-        entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
+        entry("binary_sensor.gpio", "binary_sensor"),
         entry("http_request", ComponentCategory.MISC),
       ])
     );

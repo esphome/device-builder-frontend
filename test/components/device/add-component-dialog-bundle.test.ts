@@ -16,7 +16,6 @@ vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import toast from "sonner-js";
 
-import { ComponentCategory } from "../../../src/api/types/components.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeAddComponentDialogHost } from "./_add-component-dialog-host.js";
@@ -52,10 +51,10 @@ describe("add-component-dialog one-shot bundle", () => {
     const { d, addComponent, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
       "featured.bd.b": makeComponentEntry("featured.bd.b", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
     });
     addComponent
@@ -91,10 +90,10 @@ describe("add-component-dialog one-shot bundle", () => {
     dialog.yaml = "switch:\n  - platform: gpio\n    id: present_a\n";
     getComponentBodies.mockResolvedValue({
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
       "featured.bd.b": makeComponentEntry("featured.bd.b", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
     });
     addComponent.mockResolvedValue({ yaml: "Y_AFTER_B" });
@@ -118,7 +117,7 @@ describe("add-component-dialog one-shot bundle", () => {
     dialog.yaml = "switch:\n  - platform: gpio\n    id: present_a\n";
     getComponentBodies.mockResolvedValue({
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
     });
     d._fastPathFields = vi.fn().mockReturnValue({ id: "present_a" });
@@ -136,10 +135,10 @@ describe("add-component-dialog one-shot bundle", () => {
     const { d, addComponent, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.OUTPUT,
+        category: "output",
       }),
       "featured.bd.b": makeComponentEntry("featured.bd.b", {
-        category: ComponentCategory.LIGHT,
+        category: "light",
       }),
     });
     const startSequence = vi.fn().mockResolvedValue(true);
@@ -160,14 +159,14 @@ describe("add-component-dialog one-shot bundle", () => {
     });
     expect(startSequence).toHaveBeenCalledWith(["featured.bd.b"], "bd", "Full setup");
     // The just-added dependency is carried into the opened form's reference.
-    expect(d._prefillReference).toEqual({ domain: ComponentCategory.OUTPUT, id: "dep" });
+    expect(d._prefillReference).toEqual({ domain: "output", id: "dep" });
   });
 
   it("does not clobber state when the hand-off sequence goes stale", async () => {
     const { d, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.OUTPUT,
+        category: "output",
       }),
     });
     // The interactive sequence reports it didn't start (stale / errored hydrate).
@@ -204,10 +203,10 @@ describe("add-component-dialog one-shot bundle", () => {
     const { dialog, d, addComponent, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
       "featured.bd.b": makeComponentEntry("featured.bd.b", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
     });
     addComponent
@@ -230,10 +229,10 @@ describe("add-component-dialog one-shot bundle", () => {
     const { dialog, d, addComponent, getComponentBodies } = makeDialog();
     const bodies: Record<string, unknown> = {
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
       "featured.bd.b": makeComponentEntry("featured.bd.b", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
     };
     // Bump the selection token while member b is hydrating so its result is
@@ -264,13 +263,13 @@ describe("add-component-dialog one-shot bundle", () => {
     const { d, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.OUTPUT,
+        category: "output",
       }),
       "featured.bd.b": makeComponentEntry("featured.bd.b", {
-        category: ComponentCategory.LIGHT,
+        category: "light",
       }),
       "featured.bd.c": makeComponentEntry("featured.bd.c", {
-        category: ComponentCategory.LIGHT,
+        category: "light",
       }),
     });
     // First member fast-paths silently; the second needs the form.
@@ -290,7 +289,7 @@ describe("add-component-dialog one-shot bundle", () => {
     // b is absent from the bodies, so its hydrate resolves to an error.
     getComponentBodies.mockResolvedValue({
       "featured.bd.a": makeComponentEntry("featured.bd.a", {
-        category: ComponentCategory.SWITCH,
+        category: "switch",
       }),
     });
     const startSequence = vi.fn();

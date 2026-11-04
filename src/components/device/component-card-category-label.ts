@@ -14,8 +14,7 @@
  * "Audio Adc" and ``ota`` doesn't render as "Ota". The acronym
  * set is intentionally short — adding one is cheaper than
  * pulling in i18n for a chip — and only covers tokens that
- * appear as category-id components today (see
- * ``ComponentCategory`` in ``api/types.ts``).
+ * appear as category-id components today.
  *
  * Lives in its own module so the title-casing + acronym
  * handling can be unit-tested without spinning up a DOM env to
