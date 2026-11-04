@@ -13,8 +13,8 @@ import { classVerdict } from "../../util/reference-class.js";
 import {
   type CatalogIndex,
   getCachedCatalogIndex,
-  platformDomains,
 } from "../../util/yaml-completion-catalog.js";
+import { platformDomains } from "../../util/yaml-completion-items.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -57,7 +57,8 @@ function valueGateHides(
  *    platform domain of *index* — platform-style hubs (`atm90e32`) live
  *    under a domain (`sensor: - platform: atm90e32`), not at the top
  *    level, while a `binary_sensor: - platform: switch` mirror must not
- *    pass for a `switch:` dependency.
+ *    pass for a `switch:` dependency. With no *index* the domains are
+ *    unknown, so no stem satisfies a dep.
  *
  * `presentComponents` is the caller's effective presence — the literal scan
  * widened via `withMergedSourcePresence` on merged-source configs; it
@@ -81,7 +82,6 @@ export function findMissingDependencies(
   const platforms = withMergedSourcePresence(configured, yaml, resolvedPlatforms);
   // Stems stay on the literal scan: a package-supplied bare dep is already
   // covered by the widened presentComponents.
-  const domains: ReadonlySet<string> = index ? platformDomains(index) : new Set();
   const platformStems = new Set<string>();
   for (const id of configured) {
     const dot = id.indexOf(".");
@@ -90,7 +90,7 @@ export function findMissingDependencies(
   return dependencies.filter((dep) => {
     if (hasComponentKey(present, dep)) return false;
     if (dep.includes(".")) return !platforms.has(dep);
-    if (!domains.has(dep) && platformStems.has(dep)) return false;
+    if (index && !platformDomains(index).has(dep) && platformStems.has(dep)) return false;
     return true;
   });
 }

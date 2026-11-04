@@ -19,10 +19,8 @@ import { isVisible } from "../../util/is-visible.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { ResizeController } from "../../util/resize-controller.js";
 import { setsEqual } from "../../util/set-equal.js";
-import {
-  getCachedCatalogIndex,
-  platformDomains,
-} from "../../util/yaml-completion-catalog.js";
+import { getCachedCatalogIndex } from "../../util/yaml-completion-catalog.js";
+import { platformDomains } from "../../util/yaml-completion-items.js";
 import { renderLoadMoreFooter } from "../shared/load-more-footer.js";
 import { overflowingDescriptionIds } from "./component-catalog/description-overflow.js";
 import {

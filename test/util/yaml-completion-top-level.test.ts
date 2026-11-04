@@ -48,6 +48,12 @@ describe("platformDomains", () => {
     // Standalone ids are components, not domains.
     expect(domains.has("logger")).toBe(false);
   });
+
+  it("includes a domain no ComponentCategory member names", async () => {
+    const { platformDomains } = await import("../../src/util/yaml-completion-items.js");
+    const c = catalog([entry("power_management.esp32", "power_management")]);
+    expect(platformDomains(c).has("power_management")).toBe(true);
+  });
 });
 
 describe("buildTopLevelCompletions", () => {

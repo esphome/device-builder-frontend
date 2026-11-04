@@ -152,17 +152,18 @@ function componentToCompletion(c: ComponentCatalogIndexEntry): Completion {
  *  hypothetical session resets) gets garbage-collected with its
  *  memo. */
 const topLevelMemo = new WeakMap<CatalogIndex, Completion[]>();
-const domainsMemo = new WeakMap<CatalogIndex, ReadonlySet<string>>();
+const domainsMemo = new WeakMap<Pick<CatalogIndex, "components">, ReadonlySet<string>>();
 
 /**
  * Platform-domain umbrellas (``switch``, ``sensor``, …), from two
  * sources deduped by the Set — both the entry's ``category`` AND the
  * dotted-id prefix (``ota.esphome`` → ``ota``). Belt and braces:
  * ``category`` is the canonical signal but some umbrellas (e.g. ``ota``,
- * ``update``) carry no standalone catalog entry, only platform variants;
- * the id prefix catches a category enum lagging a new platform domain.
+ * ``update``) carry no standalone catalog entry, only platform variants.
  */
-export function platformDomains(catalog: CatalogIndex): ReadonlySet<string> {
+export function platformDomains(
+  catalog: Pick<CatalogIndex, "components">
+): ReadonlySet<string> {
   const cached = domainsMemo.get(catalog);
   if (cached) return cached;
   const domains = new Set<string>();

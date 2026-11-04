@@ -10,7 +10,7 @@ import type { PagedResponse } from "./protocol.js";
 
 /**
  * Categories the frontend names in code. A platform entry's category is its
- * domain string (``sensor``, ``packet_interface``), which has no member here.
+ * domain string (sensor, packet_interface), which has no member here.
  */
 export enum ComponentCategory {
   CORE = "core",
@@ -60,7 +60,7 @@ export interface ComponentCatalogIndexEntry {
   id: string;
   name: string;
   description: string;
-  /** A ``ComponentCategory`` value, or the platform domain for a dotted id. */
+  /** A ComponentCategory value, or the platform domain for a dotted id. */
   category: string;
   docs_url?: string;
   image_url?: string;

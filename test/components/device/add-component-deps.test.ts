@@ -49,7 +49,17 @@ describe("findMissingDependencies", () => {
     // atm90e32's hub lives under `sensor:`, not at the top level — the
     // button platform depends on the bare `atm90e32` stem.
     const yaml = "sensor:\n  - platform: atm90e32\n    id: power\n";
-    expect(findMissingDependencies(["atm90e32"], yaml)).toEqual([]);
+    const index = {
+      components: [makeComponentEntry("sensor.atm90e32", { category: "sensor" })],
+    };
+    expect(findMissingDependencies(["atm90e32"], yaml, undefined, [], index)).toEqual([]);
+  });
+
+  it("keeps a stem-matched dep missing until the catalog index loads", () => {
+    const yaml = "sensor:\n  - platform: atm90e32\n    id: power\n";
+    expect(findMissingDependencies(["atm90e32"], yaml, undefined, [], null)).toEqual([
+      "atm90e32",
+    ]);
   });
 
   it("flags a platform-style hub dep when its platform is absent", () => {
@@ -90,9 +100,12 @@ describe("findMissingDependencies", () => {
 
   it("returns only the unsatisfied subset", () => {
     const yaml = "ld2410:\n  uart_id: u\nsensor:\n  - platform: atm90e32\n";
-    expect(findMissingDependencies(["ld2410", "atm90e32", "uart"], yaml)).toEqual([
-      "uart",
-    ]);
+    const index = {
+      components: [makeComponentEntry("sensor.atm90e32", { category: "sensor" })],
+    };
+    expect(
+      findMissingDependencies(["ld2410", "atm90e32", "uart"], yaml, undefined, [], index)
+    ).toEqual(["uart"]);
   });
 
   // Callers own the merged-source widening; these pin the widened set
