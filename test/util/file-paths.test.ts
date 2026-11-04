@@ -49,6 +49,7 @@ describe("file-paths", () => {
     ["common/x.txt", "packages.path_needs_yaml"],
     ["common/base #1.yaml", "packages.path_characters"],
     ["common/a{b}.yaml", "packages.path_characters"],
+    ["common/price$usd.yaml", "packages.path_characters"],
     ["common/@main.yaml", "packages.path_start"],
     ["!x/main.yaml", "packages.path_start"],
     ["common/_main.yaml", null],

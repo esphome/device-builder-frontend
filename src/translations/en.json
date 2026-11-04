@@ -1962,7 +1962,7 @@
     "delete_named": "Delete {path}",
     "delete_title": "Delete {path}?",
     "delete_used_message": "{count, plural, one {# device still includes this file and will fail to build until you fix it:} other {# devices still include this file and will fail to build until you fix them:}}",
-    "delete_unused_message": "No device or other file includes this file. Its earlier versions stay in version history.",
+    "delete_unused_message": "No device or other file includes this file.",
     "deleted": "Deleted {path}",
     "delete_failed": "Couldn't delete the file",
     "already_exists": "A file with that path already exists",
@@ -1975,7 +1975,7 @@
     "path_needs_folder": "Put the package in a folder, e.g. common/wifi.yaml. Files at the top level are devices.",
     "path_invalid": "Use a relative path without .. or hidden (dot) names.",
     "path_needs_yaml": "The file name must end in .yaml or .yml.",
-    "path_characters": "Don't use spaces or any of # \" ' { } [ ] , in the name.",
+    "path_characters": "Don't use spaces or any of # \" ' { } [ ] , $ in the name.",
     "path_start": "Start each folder and file name with a letter, digit or _.",
     "path_reserved": "secrets.yaml and the archive folder are reserved."
   },

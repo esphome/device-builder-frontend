@@ -59,8 +59,8 @@ export function newPackagePathProblem(raw: string): string | null {
   if (parts.some((p) => p === ".." || p.startsWith(".")) || /[\\:]/.test(path)) {
     return "packages.path_invalid";
   }
-  // Names that would need quoting in an !include.
-  if (/[\s#"'{}[\],]/.test(path)) return "packages.path_characters";
+  // Names an !include can't hold verbatim; ESPHome expands ``$var`` in its path.
+  if (/[\s#"'{}[\],$]/.test(path)) return "packages.path_characters";
   // Unicode, like the backend's Python ``\w``.
   if (parts.some((p) => !/^[\p{L}\p{N}_]/u.test(p))) return "packages.path_start";
   if (!YAML_RE.test(path)) return "packages.path_needs_yaml";
