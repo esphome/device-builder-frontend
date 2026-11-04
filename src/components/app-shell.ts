@@ -18,7 +18,11 @@ import type {
 import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
 import { type ExperienceLevel, Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
-import type { DashboardPrefs, RemoteBuildJobState } from "../context/index.js";
+import type {
+  DashboardPrefs,
+  DashboardPrefsChange,
+  RemoteBuildJobState,
+} from "../context/index.js";
 import {
   activeJobsContext,
   apiConnectedContext,
@@ -269,6 +273,11 @@ export class ESPHomeApp extends LitElement {
   // value. A counter, not a boolean: it guards more than one write path, so
   // two overlapping writes must both settle before the gate reopens.
   _prefsWritesInFlight = 0;
+  // Dashboard view/table writes not yet settled, and their merged patches; a
+  // snapshot reseed reapplies these so it can't undo a write it predates.
+  _dashboardWritesInFlight = 0;
+  _pendingDashboardPrefs: Partial<DashboardPrefs> = {};
+  _dashboardWroteSinceSnapshot = false;
   // Same gate for the offloader-settings writes (remote-builds master,
   // version-match policy, include-local-in-pool): while one is outstanding,
   // the INITIAL_STATE reseed skips re-applying these three so a reconnect
@@ -531,7 +540,7 @@ export class ESPHomeApp extends LitElement {
       ${this._connectionLost ? renderReconnectPill(this._localize) : nothing}
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @dashboard-prefs-changed=${(e: CustomEvent<Partial<DashboardPrefs>>) =>
+        @dashboard-prefs-changed=${(e: CustomEvent<DashboardPrefsChange>) =>
           onDashboardPrefsChanged(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>

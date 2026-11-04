@@ -131,7 +131,10 @@ describe("saveDashboardPrefs", () => {
     const event = vi.mocked(host.dispatchEvent).mock.calls[0][0] as CustomEvent;
     expect(event.type).toBe("dashboard-prefs-changed");
     expect(event.bubbles && event.composed).toBe(true);
-    expect(event.detail).toEqual({ dashboard_view: DashboardView.TABLE });
+    expect(event.detail).toEqual({
+      prefs: { dashboard_view: DashboardView.TABLE },
+      phase: "start",
+    });
     expect(updatePreferences).toHaveBeenCalledWith({
       dashboard_view: DashboardView.TABLE,
     });
@@ -144,32 +147,38 @@ describe("saveDashboardPrefs", () => {
     return details[details.length - 1];
   };
 
-  it("replaces app-shell's copy with the server's reply", async () => {
+  it("settles with the server's reply", async () => {
     const { host, updatePreferences } = makeHost();
     updatePreferences.mockResolvedValueOnce(
       serverPrefs({ dashboard_view: DashboardView.TABLE, table_page_size: 50 })
     );
     await saveDashboardPrefs(host, { dashboard_view: DashboardView.TABLE });
     expect(lastPublished(host)).toEqual({
-      dashboard_view: DashboardView.TABLE,
-      table_page_size: 50,
-      table_column_visibility: {},
-      table_sort_column: null,
-      table_sort_direction: null,
+      prefs: {
+        dashboard_view: DashboardView.TABLE,
+        table_page_size: 50,
+        table_column_visibility: {},
+        table_sort_column: null,
+        table_sort_direction: null,
+      },
+      phase: "settle",
     });
   });
 
-  it("restores the server's values when the write fails", async () => {
+  it("settles with refetched server values when the write fails", async () => {
     const { host, updatePreferences } = makeHost();
     const boom = new Error("offline");
     updatePreferences.mockRejectedValueOnce(boom);
     await expect(
       saveDashboardPrefs(host, { dashboard_view: DashboardView.TABLE })
     ).rejects.toBe(boom);
-    expect(lastPublished(host)).toMatchObject({ dashboard_view: DashboardView.CARDS });
+    expect(lastPublished(host)).toMatchObject({
+      prefs: { dashboard_view: DashboardView.CARDS },
+      phase: "settle",
+    });
   });
 
-  it("keeps app-shell's copy when the refetch fails too", async () => {
+  it("settles with nothing new when the refetch fails too", async () => {
     const { host, updatePreferences, getPreferences } = makeHost();
     const boom = new Error("offline");
     updatePreferences.mockRejectedValueOnce(boom);
@@ -177,7 +186,10 @@ describe("saveDashboardPrefs", () => {
     await expect(
       saveDashboardPrefs(host, { dashboard_view: DashboardView.TABLE })
     ).rejects.toBe(boom);
-    expect(published(host)).toEqual([{ dashboard_view: DashboardView.TABLE }]);
+    expect(published(host)).toEqual([
+      { prefs: { dashboard_view: DashboardView.TABLE }, phase: "start" },
+      { prefs: {}, phase: "settle" },
+    ]);
   });
 });
 

@@ -13,8 +13,11 @@ import "./_mock-dashboard-children.js";
 import { flushMicrotasks } from "../_dom.js";
 import { DashboardView, type UserPreferences } from "../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../src/components/app-shell.js";
-import { onDashboardPrefsChanged } from "../../src/components/app-shell/data-load.js";
-import type { DashboardPrefs } from "../../src/context/index.js";
+import {
+  applyDashboardSnapshot,
+  onDashboardPrefsChanged,
+} from "../../src/components/app-shell/data-load.js";
+import type { DashboardPrefs, DashboardPrefsChange } from "../../src/context/index.js";
 import { ESPHomePageDashboard } from "../../src/pages/dashboard.js";
 
 const prefs = (view: DashboardView) =>
@@ -104,23 +107,38 @@ describe("dashboard view from preferences", () => {
   });
 
   describe("across a remount", () => {
-    // Stands in for app-shell: owns the context value and merges dashboard writes.
-    const shell = { _dashboardPrefs: null as DashboardPrefs | null };
     // Stands in for the backend's stored preferences.
     let server: DashboardPrefs;
     const save = async (patch: Partial<DashboardPrefs>) => {
       server = { ...server, ...patch };
       return server as unknown as UserPreferences;
     };
+    // Stands in for app-shell: owns the context value and tracks dashboard writes.
+    const shell = {
+      _dashboardPrefs: null as DashboardPrefs | null,
+      _dashboardWritesInFlight: 0,
+      _pendingDashboardPrefs: {} as Partial<DashboardPrefs>,
+      _dashboardWroteSinceSnapshot: false,
+      _api: { getPreferences: async () => server as unknown as UserPreferences },
+    };
     const onChanged = (e: Event) =>
       onDashboardPrefsChanged(
         shell as unknown as ESPHomeApp,
-        e as CustomEvent<Partial<DashboardPrefs>>
+        e as CustomEvent<DashboardPrefsChange>
+      );
+    /** A reconnect snapshot taken before any write below. */
+    const staleSnapshot = () =>
+      applyDashboardSnapshot(
+        shell as unknown as ESPHomeApp,
+        prefs(DashboardView.CARDS) as unknown as UserPreferences
       );
 
     beforeEach(() => {
-      shell._dashboardPrefs = prefs(DashboardView.CARDS);
       server = prefs(DashboardView.CARDS);
+      shell._dashboardPrefs = prefs(DashboardView.CARDS);
+      shell._dashboardWritesInFlight = 0;
+      shell._pendingDashboardPrefs = {};
+      shell._dashboardWroteSinceSnapshot = false;
       document.addEventListener("dashboard-prefs-changed", onChanged);
     });
 
@@ -140,6 +158,18 @@ describe("dashboard view from preferences", () => {
       document.body.appendChild(page);
       await page.updateComplete;
       return p;
+    }
+
+    /** Make the next view write wait; returns a function that lets it finish. */
+    function holdNextWrite(page: { _api: { updatePreferences: unknown } }) {
+      let release!: () => void;
+      page._api.updatePreferences = vi.fn(
+        (patch: Partial<DashboardPrefs>) =>
+          new Promise((resolve) => {
+            release = () => resolve(save(patch));
+          })
+      );
+      return () => release();
     }
 
     it("keeps a view toggled before leaving the dashboard", async () => {
@@ -167,19 +197,29 @@ describe("dashboard view from preferences", () => {
       expect(second._tableSorting).toEqual([{ id: "name", desc: true }]);
     });
 
-    it("keeps a view saved while a reconnect snapshot was in flight", async () => {
+    it("keeps a view when a stale snapshot lands before the write's reply", async () => {
       const first = await mount();
-      let settle!: () => void;
-      first._api.updatePreferences = vi.fn(
-        (patch: Partial<DashboardPrefs>) =>
-          new Promise((resolve) => {
-            settle = () => resolve(save(patch));
-          })
-      );
+      const release = holdNextWrite(first);
       first._enterDeviceView(DashboardView.TABLE);
-      // The reconnect snapshot predates the write and lands before its reply.
-      shell._dashboardPrefs = prefs(DashboardView.CARDS);
-      settle();
+      staleSnapshot();
+      first.remove();
+
+      // Remounted while the write is still in flight.
+      const second = await mount();
+      expect(second._view).toBe(DashboardView.TABLE);
+      release();
+      await flushMicrotasks(8);
+      second.remove();
+
+      const third = await mount();
+      expect(third._view).toBe(DashboardView.TABLE);
+    });
+
+    it("keeps a view when a stale snapshot lands after the write's reply", async () => {
+      const first = await mount();
+      first._enterDeviceView(DashboardView.TABLE);
+      await flushMicrotasks(8);
+      staleSnapshot();
       await flushMicrotasks(8);
       first.remove();
 

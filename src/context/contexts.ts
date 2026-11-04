@@ -190,6 +190,13 @@ export type DashboardPrefs = Pick<
   | "table_sort_direction"
 >;
 
+/** Detail of ``dashboard-prefs-changed``: a dashboard write starting or settling. */
+export interface DashboardPrefsChange {
+  /** Fields to merge into app-shell's copy: the patch on start, server values on settle. */
+  prefs: Partial<DashboardPrefs>;
+  phase: "start" | "settle";
+}
+
 /**
  * Context for the dashboard's saved view and table preferences.
  *

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { flushMicrotasks } from "../../_dom.js";
 import {
   EditorLayout,
   ExperienceLevel,
@@ -10,11 +11,12 @@ import {
 } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
+  applyDashboardSnapshot,
   loadOnboardingState,
   loadPreferences,
   onDashboardPrefsChanged,
 } from "../../../src/components/app-shell/data-load.js";
-import type { DashboardPrefs } from "../../../src/context/index.js";
+import type { DashboardPrefs, DashboardPrefsChange } from "../../../src/context/index.js";
 import { fetchSecretKeys } from "../../../src/util/secrets-cache.js";
 
 // loadOnboardingState reads the shared (session-cached) secret-keys list; mock
@@ -152,36 +154,108 @@ describe("loadPreferences (post-wizard context refresh)", () => {
   });
 });
 
-describe("onDashboardPrefsChanged", () => {
-  const changed = (detail: Partial<DashboardPrefs>) =>
-    new CustomEvent("dashboard-prefs-changed", { detail });
+const dashPrefs = (over: Partial<DashboardPrefs> = {}): DashboardPrefs => ({
+  dashboard_view: "cards" as DashboardPrefs["dashboard_view"],
+  table_page_size: 25,
+  table_column_visibility: {},
+  table_sort_column: null,
+  table_sort_direction: null,
+  ...over,
+});
 
-  it("merges a dashboard write into the shell's copy", () => {
-    const host = {
-      _dashboardPrefs: {
-        dashboard_view: "cards",
-        table_page_size: 25,
-        table_column_visibility: {},
-        table_sort_column: null,
-        table_sort_direction: null,
-      } as DashboardPrefs | null,
-    };
-    onDashboardPrefsChanged(
-      host as unknown as ESPHomeApp,
-      changed({ table_page_size: 50 })
-    );
-    expect(host._dashboardPrefs).toMatchObject({
-      dashboard_view: "cards",
-      table_page_size: 50,
-    });
+function makeShell(current: DashboardPrefs | null = dashPrefs()) {
+  return {
+    _dashboardPrefs: current,
+    _dashboardWritesInFlight: 0,
+    _pendingDashboardPrefs: {} as Partial<DashboardPrefs>,
+    _dashboardWroteSinceSnapshot: false,
+    _api: {
+      getPreferences: vi.fn(async () => dashPrefs() as unknown as UserPreferences),
+    },
+  };
+}
+
+const TABLE = "table" as DashboardPrefs["dashboard_view"];
+const change = (prefs: Partial<DashboardPrefs>, phase: DashboardPrefsChange["phase"]) =>
+  new CustomEvent<DashboardPrefsChange>("dashboard-prefs-changed", {
+    detail: { prefs, phase },
+  });
+const send = (
+  shell: ReturnType<typeof makeShell>,
+  e: CustomEvent<DashboardPrefsChange>
+) => onDashboardPrefsChanged(shell as unknown as ESPHomeApp, e);
+const snapshot = (shell: ReturnType<typeof makeShell>, prefs: DashboardPrefs) =>
+  applyDashboardSnapshot(
+    shell as unknown as ESPHomeApp,
+    prefs as unknown as UserPreferences
+  );
+
+describe("onDashboardPrefsChanged", () => {
+  it("merges a starting write and keeps it pending until it settles", () => {
+    const shell = makeShell();
+    send(shell, change({ table_page_size: 50 }, "start"));
+    expect(shell._dashboardPrefs?.table_page_size).toBe(50);
+    expect(shell._pendingDashboardPrefs).toEqual({ table_page_size: 50 });
+
+    send(shell, change(dashPrefs({ table_page_size: 50 }), "settle"));
+    expect(shell._dashboardWritesInFlight).toBe(0);
+    expect(shell._pendingDashboardPrefs).toEqual({});
+    expect(shell._dashboardPrefs).toEqual(dashPrefs({ table_page_size: 50 }));
   });
 
-  it("ignores a write before the first snapshot", () => {
-    const host = { _dashboardPrefs: null as DashboardPrefs | null };
-    onDashboardPrefsChanged(
-      host as unknown as ESPHomeApp,
-      changed({ dashboard_view: "table" as DashboardPrefs["dashboard_view"] })
+  it("keeps a later write's patch over an earlier write's reply", () => {
+    const shell = makeShell();
+    send(shell, change({ table_page_size: 50 }, "start"));
+    send(shell, change({ dashboard_view: TABLE }, "start"));
+    // The first reply predates the second write.
+    send(shell, change(dashPrefs({ table_page_size: 50 }), "settle"));
+    expect(shell._dashboardPrefs?.dashboard_view).toBe(TABLE);
+  });
+
+  it("holds a write made before the first snapshot for that snapshot", () => {
+    const shell = makeShell(null);
+    send(shell, change({ dashboard_view: TABLE }, "start"));
+    expect(shell._dashboardPrefs).toBeNull();
+    snapshot(shell, dashPrefs());
+    expect(shell._dashboardPrefs?.dashboard_view).toBe(TABLE);
+  });
+});
+
+describe("applyDashboardSnapshot", () => {
+  it("keeps an in-flight write over an older snapshot", () => {
+    const shell = makeShell();
+    send(shell, change({ dashboard_view: TABLE }, "start"));
+    snapshot(shell, dashPrefs());
+    expect(shell._dashboardPrefs?.dashboard_view).toBe(TABLE);
+  });
+
+  it("refetches after a write that settled before the snapshot arrived", async () => {
+    const shell = makeShell();
+    send(shell, change({ dashboard_view: TABLE }, "start"));
+    send(shell, change(dashPrefs({ dashboard_view: TABLE }), "settle"));
+    shell._api.getPreferences.mockResolvedValueOnce(
+      dashPrefs({ dashboard_view: TABLE }) as unknown as UserPreferences
     );
-    expect(host._dashboardPrefs).toBeNull();
+    snapshot(shell, dashPrefs());
+    await flushMicrotasks(4);
+    expect(shell._api.getPreferences).toHaveBeenCalledTimes(1);
+    expect(shell._dashboardPrefs?.dashboard_view).toBe(TABLE);
+  });
+
+  it("does not refetch when no write happened since the last snapshot", () => {
+    const shell = makeShell();
+    snapshot(shell, dashPrefs({ table_page_size: 50 }));
+    expect(shell._api.getPreferences).not.toHaveBeenCalled();
+    expect(shell._dashboardPrefs?.table_page_size).toBe(50);
+  });
+
+  it("keeps the snapshot when the refetch fails", async () => {
+    const shell = makeShell();
+    send(shell, change({ dashboard_view: TABLE }, "start"));
+    send(shell, change({}, "settle"));
+    shell._api.getPreferences.mockRejectedValueOnce(new Error("offline"));
+    snapshot(shell, dashPrefs({ table_page_size: 50 }));
+    await flushMicrotasks(4);
+    expect(shell._dashboardPrefs).toEqual(dashPrefs({ table_page_size: 50 }));
   });
 });

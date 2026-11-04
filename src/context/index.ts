@@ -42,4 +42,8 @@ export {
   versionContext,
   versionHistoryEnabledContext,
 } from "./contexts.js";
-export type { DashboardPrefs, RemoteBuildJobState } from "./contexts.js";
+export type {
+  DashboardPrefs,
+  DashboardPrefsChange,
+  RemoteBuildJobState,
+} from "./contexts.js";

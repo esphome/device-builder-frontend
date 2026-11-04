@@ -1,5 +1,5 @@
 import type { UserPreferences } from "../../api/types/system.js";
-import type { DashboardPrefs } from "../../context/index.js";
+import type { DashboardPrefs, DashboardPrefsChange } from "../../context/index.js";
 import {
   isExperienceChosen,
   shouldAutoShowOnboarding,
@@ -27,13 +27,41 @@ export function pickDashboardPrefs(prefs: UserPreferences): DashboardPrefs {
   };
 }
 
-/** Merge a dashboard preference write into the shell's copy. */
+/** Track a dashboard write and merge its values, keeping pending patches on top. */
 export function onDashboardPrefsChanged(
   host: ESPHomeApp,
-  e: CustomEvent<Partial<DashboardPrefs>>
+  e: CustomEvent<DashboardPrefsChange>
 ): void {
-  if (host._dashboardPrefs)
-    host._dashboardPrefs = { ...host._dashboardPrefs, ...e.detail };
+  const { prefs, phase } = e.detail;
+  if (phase === "start") {
+    host._dashboardWroteSinceSnapshot = true;
+    host._dashboardWritesInFlight += 1;
+    host._pendingDashboardPrefs = { ...host._pendingDashboardPrefs, ...prefs };
+  } else {
+    host._dashboardWritesInFlight = Math.max(0, host._dashboardWritesInFlight - 1);
+    if (host._dashboardWritesInFlight === 0) host._pendingDashboardPrefs = {};
+  }
+  if (host._dashboardPrefs) {
+    host._dashboardPrefs = {
+      ...host._dashboardPrefs,
+      ...prefs,
+      ...host._pendingDashboardPrefs,
+    };
+  }
+}
+
+/**
+ * Reseed the shell's dashboard prefs from a snapshot, keeping pending patches on top.
+ *
+ * A snapshot can predate a dashboard write whose reply already arrived, so after
+ * any write since the last snapshot the slice is refetched; the server answers
+ * in order, after that write.
+ */
+export function applyDashboardSnapshot(host: ESPHomeApp, prefs: UserPreferences): void {
+  host._dashboardPrefs = { ...pickDashboardPrefs(prefs), ...host._pendingDashboardPrefs };
+  if (!host._dashboardWroteSinceSnapshot) return;
+  host._dashboardWroteSinceSnapshot = false;
+  void refreshDashboardPrefs(host);
 }
 
 export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
@@ -96,5 +124,15 @@ export async function loadPreferences(host: ESPHomeApp): Promise<void> {
     // Non-fatal: the snapshot already seeded these, and theme also has a
     // localStorage fallback. Logged for diagnostics rather than toasted.
     console.warn("Failed to refresh preferences:", err);
+  }
+}
+
+async function refreshDashboardPrefs(host: ESPHomeApp): Promise<void> {
+  const current = await host._api.getPreferences().catch(() => null);
+  if (current) {
+    host._dashboardPrefs = {
+      ...pickDashboardPrefs(current),
+      ...host._pendingDashboardPrefs,
+    };
   }
 }

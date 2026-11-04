@@ -35,7 +35,7 @@ import { type RemoteBuildJobState } from "../../context/index.js";
 import { anchorOffline } from "../../util/device-status.js";
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
-import { applyPreferences, pickDashboardPrefs } from "./data-load.js";
+import { applyDashboardSnapshot, applyPreferences } from "./data-load.js";
 import { seedJobs } from "./jobs.js";
 
 // Merge a partial diff into the matching offloader pairing row keyed by pin_sha256.
@@ -82,7 +82,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       }
       // Outside the guard: the in-flight counter covers Settings writes, not
       // these fields, and the dashboard has no other source for them.
-      if (preferences) host._dashboardPrefs = pickDashboardPrefs(preferences);
+      if (preferences) applyDashboardSnapshot(host, preferences);
       host._devices = devices.map((d) => anchorOffline(d));
       host._importableDevices = importable;
       host._devicesLoaded = true;

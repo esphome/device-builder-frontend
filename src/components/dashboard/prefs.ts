@@ -1,6 +1,6 @@
 import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
 import { DashboardView, SortDirection } from "../../api/types/system.js";
-import type { DashboardPrefs } from "../../context/index.js";
+import type { DashboardPrefs, DashboardPrefsChange } from "../../context/index.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { pickDashboardPrefs } from "../app-shell/data-load.js";
 
@@ -56,23 +56,24 @@ export function applyDashboardPreferences(
 /**
  * Persist *patch* and hand it to app-shell, which seeds the next mount from it.
  *
- * Once the write settles, app-shell's copy is replaced with the server's values:
- * the write's reply, or a refetch when the write fails.
+ * app-shell keeps the patch on top of any snapshot until the write settles,
+ * then takes the server's values: the write's reply, or a refetch when the
+ * write fails (nothing new if that fails too).
  */
 export async function saveDashboardPrefs(
   host: ESPHomePageDashboard,
   patch: Partial<DashboardPrefs>
 ): Promise<void> {
-  publishDashboardPrefs(host, patch);
+  publishDashboardPrefs(host, { prefs: patch, phase: "start" });
+  let settled: Partial<DashboardPrefs> = {};
   try {
-    publishDashboardPrefs(
-      host,
-      pickDashboardPrefs(await host._api.updatePreferences(patch))
-    );
+    settled = pickDashboardPrefs(await host._api.updatePreferences(patch));
   } catch (err) {
     const current = await host._api.getPreferences().catch(() => null);
-    if (current) publishDashboardPrefs(host, pickDashboardPrefs(current));
+    if (current) settled = pickDashboardPrefs(current);
     throw err;
+  } finally {
+    publishDashboardPrefs(host, { prefs: settled, phase: "settle" });
   }
 }
 
@@ -112,7 +113,7 @@ export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent):
 
 function publishDashboardPrefs(
   host: ESPHomePageDashboard,
-  detail: Partial<DashboardPrefs>
+  detail: DashboardPrefsChange
 ): void {
   host.dispatchEvent(
     new CustomEvent("dashboard-prefs-changed", { detail, bubbles: true, composed: true })
