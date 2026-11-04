@@ -101,14 +101,19 @@ export function resolveIncludePath(basePath: string, ref: string): string | null
 const linkMark = (title: string) =>
   Decoration.mark({ class: "cm-include-link", attributes: { title } });
 
-function buildDecorations(view: EditorView, title: string): DecorationSet {
+function buildDecorations(
+  view: EditorView,
+  title: string,
+  basePath: string
+): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const mark = linkMark(title);
   // A fold can split one include across two visible ranges; decorate it once.
   let last = -1;
   for (const { from, to } of view.visibleRanges) {
     for (const t of findIncludeTargets(view.state, from, to)) {
-      if (t.from <= last) continue;
+      // A click on a target outside the config dir does nothing, so it isn't a link.
+      if (t.from <= last || resolveIncludePath(basePath, t.ref) === null) continue;
       builder.add(t.from, t.to, mark);
       last = t.from;
     }
@@ -158,7 +163,7 @@ export function includeLinks(
     class {
       decorations: DecorationSet;
       constructor(view: EditorView) {
-        this.decorations = buildDecorations(view, title);
+        this.decorations = buildDecorations(view, title, getBasePath());
       }
       update(u: ViewUpdate) {
         // the parser fills in the tree after the edit that triggered it
@@ -167,7 +172,7 @@ export function includeLinks(
           u.viewportChanged ||
           syntaxTree(u.startState) !== syntaxTree(u.state)
         ) {
-          this.decorations = buildDecorations(u.view, title);
+          this.decorations = buildDecorations(u.view, title, getBasePath());
         }
       }
     },

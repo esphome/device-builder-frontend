@@ -179,6 +179,26 @@ describe("includeLinks modifier state", () => {
 });
 
 describe("includeLinks decorations", () => {
+  it("doesn't underline a target outside the config dir", () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "a: !include common/a.yaml\nb: !include ../shared.yaml\nc: !include /etc/x.yaml\n",
+        extensions: [
+          esphomeYaml(),
+          includeLinks(
+            () => "kitchen.yaml",
+            () => {},
+            "open"
+          ),
+        ],
+      }),
+    });
+    forceParsing(view, view.state.doc.length);
+    const links = [...view.dom.querySelectorAll(".cm-include-link")];
+    expect(links.map((l) => l.textContent)).toEqual(["common/a.yaml"]);
+    view.destroy();
+  });
+
   it("decorates a line split by a fold once, in order", () => {
     // Only a large fold splits the line into two visible ranges.
     const filler = Array.from({ length: 400 }, (_, i) => `k${i}: v`).join(", ");
