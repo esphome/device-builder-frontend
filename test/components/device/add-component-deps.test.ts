@@ -69,7 +69,18 @@ describe("findMissingDependencies", () => {
     // `switch:` dependency — switch is a platform domain, satisfied
     // only by a top-level `switch:` block.
     const yaml = "binary_sensor:\n  - platform: switch\n    name: x\n";
-    expect(findMissingDependencies(["switch"], yaml)).toEqual(["switch"]);
+    const index = { components: [makeComponentEntry("switch.gpio")] };
+    expect(findMissingDependencies(["switch"], yaml, undefined, [], index)).toEqual([
+      "switch",
+    ]);
+  });
+
+  it("guards a domain the catalog index carries but no enum names", () => {
+    const yaml = "sensor:\n  - platform: packet_interface\n";
+    const index = { components: [makeComponentEntry("packet_interface.uart")] };
+    expect(
+      findMissingDependencies(["packet_interface"], yaml, undefined, [], index)
+    ).toEqual(["packet_interface"]);
   });
 
   it("satisfies a domain dependency from its top-level block", () => {

@@ -127,6 +127,23 @@ export interface CompletionTarget {
 let catalogPromise: Promise<CatalogIndex> | null = null;
 let catalogIndex: CatalogIndex | null = null;
 
+const platformDomainsMemo = new WeakMap<object, ReadonlySet<string>>();
+
+/** Platform domains in *index*: the prefixes of its dotted ``<domain>.<stem>`` ids. */
+export function platformDomains(
+  index: Pick<CatalogIndex, "components">
+): ReadonlySet<string> {
+  const cached = platformDomainsMemo.get(index);
+  if (cached) return cached;
+  const domains = new Set<string>();
+  for (const { id } of index.components) {
+    const dot = id.indexOf(".");
+    if (dot !== -1) domains.add(id.slice(0, dot));
+  }
+  platformDomainsMemo.set(index, domains);
+  return domains;
+}
+
 /** The loaded index, or null until ``loadCatalog`` resolves with components. */
 export function getCachedCatalogIndex(): CatalogIndex | null {
   return catalogIndex;

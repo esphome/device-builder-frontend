@@ -20,8 +20,7 @@ import { makeConfigEntry } from "./_make-config-entry.js";
 
 type CatalogIndex = Parameters<typeof buildTopLevelCompletions>[0];
 
-const entry = (id: string, category: ComponentCategory) =>
-  makeComponentEntry(id, { category });
+const entry = (id: string, category: string) => makeComponentEntry(id, { category });
 
 function catalog(entries: ComponentCatalogEntry[]): CatalogIndex {
   const byId = new Map<string, ComponentCatalogEntry>();
@@ -39,7 +38,7 @@ describe("platformDomains", () => {
   it("derives domains from categories and dotted-id prefixes only", async () => {
     const { platformDomains } = await import("../../src/util/yaml-completion-items.js");
     const c = catalog([
-      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
+      entry("binary_sensor.gpio", "binary_sensor"),
       entry("ota.esphome", ComponentCategory.OTA),
       entry("logger", ComponentCategory.CORE),
     ]);
@@ -59,9 +58,9 @@ describe("buildTopLevelCompletions", () => {
     // ``binary_sensor.gpio`` / ``binary_sensor.apds9960`` (platform
     // values that belong INSIDE the block).
     const c = catalog([
-      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
-      entry("binary_sensor.apds9960", ComponentCategory.BINARY_SENSOR),
-      entry("sensor.dht", ComponentCategory.SENSOR),
+      entry("binary_sensor.gpio", "binary_sensor"),
+      entry("binary_sensor.apds9960", "binary_sensor"),
+      entry("sensor.dht", "sensor"),
     ]);
     const labels = buildTopLevelCompletions(c).map((o) => o.label);
     expect(labels).toContain("binary_sensor");
@@ -86,7 +85,7 @@ describe("buildTopLevelCompletions", () => {
     // returned no completion. Pin the bare-domain entry so a future
     // refactor can't filter it out again.
     const c = catalog([
-      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
+      entry("binary_sensor.gpio", "binary_sensor"),
       entry("bedjet", ComponentCategory.MISC),
     ]);
     const labels = buildTopLevelCompletions(c).map((o) => o.label);
@@ -101,8 +100,8 @@ describe("buildTopLevelCompletions", () => {
     // category and a hypothetical bare ``binary_sensor`` component
     // shouldn't double-count.
     const c = catalog([
-      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
-      entry("binary_sensor", ComponentCategory.BINARY_SENSOR),
+      entry("binary_sensor.gpio", "binary_sensor"),
+      entry("binary_sensor", "binary_sensor"),
     ]);
     const labels = buildTopLevelCompletions(c).map((o) => o.label);
     expect(labels.filter((l) => l === "binary_sensor").length).toBe(1);
@@ -110,7 +109,7 @@ describe("buildTopLevelCompletions", () => {
 
   it("emits a sensible apply snippet (key:\\n  ) for both shapes", () => {
     const c = catalog([
-      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
+      entry("binary_sensor.gpio", "binary_sensor"),
       entry("wifi", ComponentCategory.CORE),
     ]);
     const out = buildTopLevelCompletions(c);
@@ -150,8 +149,8 @@ describe("platform-list fallback", () => {
   it("recognises domain umbrellas via byCategory", () => {
     const c = catalog([
       entry("ota.esphome", ComponentCategory.OTA),
-      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
-      entry("sensor.dht", ComponentCategory.SENSOR),
+      entry("binary_sensor.gpio", "binary_sensor"),
+      entry("sensor.dht", "sensor"),
     ]);
     expect(c.byCategory.has("ota")).toBe(true);
     expect(c.byCategory.has("binary_sensor")).toBe(true);
@@ -175,7 +174,7 @@ describe("resolveAvailableEntries (platform-merged)", () => {
     // catalog keys this implementation as ``binary_sensor.template``.
     const { resolveAvailableEntries } = await import("../../src/util/yaml-completion.js");
     const platformEntry: ComponentCatalogEntry = {
-      ...entry("binary_sensor.template", ComponentCategory.BINARY_SENSOR),
+      ...entry("binary_sensor.template", "binary_sensor"),
       config_entries: [
         {
           key: "name",
@@ -278,11 +277,9 @@ describe("platformValueCompletion", () => {
     // dotted catalog id (``binary_sensor.gpio``). Mirrors the
     // legacy ``getPlatformNames`` which yielded each entry as
     // the bare component name.
-    const c = platformValueCompletion(
-      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR)
-    );
+    const c = platformValueCompletion(entry("binary_sensor.gpio", "binary_sensor"));
     expect(c.label).toBe("gpio");
-    expect(c.detail).toBe(ComponentCategory.BINARY_SENSOR);
+    expect(c.detail).toBe("binary_sensor");
   });
 
   it("leaves non-dotted ids alone (for safety)", () => {
@@ -414,7 +411,7 @@ describe("createYamlCompletionSource (auto-fire at value position)", () => {
             id: "sensor.uptime",
             name: "sensor.uptime",
             description: "",
-            category: ComponentCategory.SENSOR,
+            category: "sensor",
             docs_url: "",
             image_url: "",
             dependencies: [],

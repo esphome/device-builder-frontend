@@ -252,8 +252,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
     this._submitting = false;
     this._dialog.open = true;
-    void loadCatalog(this._api); // a selection awaits it; start early
-    void this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
+    // A selection awaits the catalog too; filterByDomain reads its domains.
+    void Promise.all([loadCatalog(this._api), this.updateComplete]).then(() =>
+      this._catalog?.filterByDomain(domain)
+    );
   }
 
   /** See ``navigateToDep`` for the seq-counter contract. */

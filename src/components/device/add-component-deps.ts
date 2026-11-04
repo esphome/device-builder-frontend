@@ -1,8 +1,5 @@
 import type { ESPHomeAPI } from "../../api/index.js";
-import {
-  type ComponentCatalogEntry,
-  ComponentCategory,
-} from "../../api/types/components.js";
+import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { canonicalComponentKey, hasComponentKey } from "../../util/component-presence.js";
 import {
@@ -16,17 +13,12 @@ import { classVerdict } from "../../util/reference-class.js";
 import {
   type CatalogIndex,
   getCachedCatalogIndex,
+  platformDomains,
 } from "../../util/yaml-completion-catalog.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
 } from "../../util/yaml-serialize.js";
-
-// Platform domains (sensor, switch, number, ...) are satisfied only by
-// a top-level block of that name, never by a same-named platform under
-// another domain: a `binary_sensor: - platform: switch` mirror must not
-// pass for a `switch:` dependency. Guards the stem-match branch below.
-const PLATFORM_DOMAINS: ReadonlySet<string> = new Set(Object.values(ComponentCategory));
 
 /**
  * *component*'s dependencies minus those every referencing top-level entry
@@ -62,8 +54,10 @@ function valueGateHides(
  *    from the YAML scan, or from `resolvedPlatforms` on a merged-source
  *    config;
  *  - a configured platform's stem equals the dep and the dep isn't a
- *    platform domain — platform-style hubs (`atm90e32`) live under a
- *    domain (`sensor: - platform: atm90e32`), not at the top level.
+ *    platform domain of *index* — platform-style hubs (`atm90e32`) live
+ *    under a domain (`sensor: - platform: atm90e32`), not at the top
+ *    level, while a `binary_sensor: - platform: switch` mirror must not
+ *    pass for a `switch:` dependency.
  *
  * `presentComponents` is the caller's effective presence — the literal scan
  * widened via `withMergedSourcePresence` on merged-source configs; it
@@ -77,7 +71,8 @@ export function findMissingDependencies(
   dependencies: readonly string[],
   yaml: string,
   presentComponents?: ReadonlySet<string>,
-  resolvedPlatforms: readonly string[] = []
+  resolvedPlatforms: readonly string[] = [],
+  index: Pick<CatalogIndex, "components"> | null = getCachedCatalogIndex()
 ): string[] {
   // Most components declare no dependencies — skip the YAML scans.
   if (dependencies.length === 0) return [];
@@ -86,6 +81,7 @@ export function findMissingDependencies(
   const platforms = withMergedSourcePresence(configured, yaml, resolvedPlatforms);
   // Stems stay on the literal scan: a package-supplied bare dep is already
   // covered by the widened presentComponents.
+  const domains: ReadonlySet<string> = index ? platformDomains(index) : new Set();
   const platformStems = new Set<string>();
   for (const id of configured) {
     const dot = id.indexOf(".");
@@ -94,7 +90,7 @@ export function findMissingDependencies(
   return dependencies.filter((dep) => {
     if (hasComponentKey(present, dep)) return false;
     if (dep.includes(".")) return !platforms.has(dep);
-    if (!PLATFORM_DOMAINS.has(dep) && platformStems.has(dep)) return false;
+    if (!domains.has(dep) && platformStems.has(dep)) return false;
     return true;
   });
 }
@@ -202,7 +198,8 @@ export function resolveDepVerdict(opts: {
     live,
     opts.yaml,
     opts.present,
-    opts.resolvedPlatforms
+    opts.resolvedPlatforms,
+    opts.index
   ).filter((d) => !opts.provided.has(d));
   const wrongKind = wrongKindDependencies(
     opts.entries,

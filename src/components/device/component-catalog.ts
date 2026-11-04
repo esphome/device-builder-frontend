@@ -19,6 +19,10 @@ import { isVisible } from "../../util/is-visible.js";
 import { PagedListController } from "../../util/paged-list-controller.js";
 import { ResizeController } from "../../util/resize-controller.js";
 import { setsEqual } from "../../util/set-equal.js";
+import {
+  getCachedCatalogIndex,
+  platformDomains,
+} from "../../util/yaml-completion-catalog.js";
 import { renderLoadMoreFooter } from "../shared/load-more-footer.js";
 import { overflowingDescriptionIds } from "./component-catalog/description-overflow.js";
 import {
@@ -164,14 +168,13 @@ export class ESPHomeComponentCatalog extends LitElement {
     this._fetchComponents();
   }
 
-  // Filter to a specific component domain. A known ComponentCategory uses the
+  // Filter to a specific component domain. A catalog platform domain uses the
   // category filter (output.gpio, output.ledc, …); anything else may be a
   // component id/stem OR a homeless interface (voltage_sampler), so we probe
   // ``provides`` and fall back to a search when it yields nothing.
   public filterByDomain(domain: string) {
-    const isCategory = Object.values(ComponentCategory).includes(
-      domain as ComponentCategory
-    );
+    const index = getCachedCatalogIndex();
+    const isCategory = index !== null && platformDomains(index).has(domain);
     if (isCategory) {
       this._search = "";
       this._provides = "";
