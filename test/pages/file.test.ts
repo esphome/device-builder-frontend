@@ -46,6 +46,7 @@ interface PageView {
 
 function makePage(overrides: Partial<PageView> = {}): PageView {
   const page = new ESPHomePageFile() as unknown as PageView;
+  Object.defineProperty(page, "isConnected", { value: true, configurable: true });
   page.path = "common/base.yaml";
   page._load.state = "ready";
   page._yaml = "logger:\n";
@@ -128,7 +129,7 @@ describe("esphome-page-file save", () => {
     Object.assign(page, { path: "common/other.yaml", _savedYaml: "b: 1\n" });
     finish();
 
-    expect(await saved).toBe(true);
+    expect(await saved).toBe(false);
     expect(page._savedYaml).toBe("b: 1\n");
     // still announced, by name, for the file that was saved
     expect(getFileUsage).toHaveBeenCalledWith("common/base.yaml");
@@ -149,6 +150,18 @@ describe("esphome-page-file save", () => {
 
     expect(await Promise.all([first, second])).toEqual([true, true]);
     expect(updateConfig).toHaveBeenCalledTimes(1);
+  });
+
+  test("a save finishing after leaving the page doesn't resume the leave", async () => {
+    const page = makePage({ _yaml: "changed: 1\n" });
+    Object.defineProperty(page, "isConnected", { value: false });
+    page._api = {
+      updateConfig: vi.fn().mockResolvedValue(undefined),
+      getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: [] }),
+    } as unknown as ESPHomeAPI;
+
+    expect(await page._save()).toBe(false);
+    expect(page._savedYaml).toBe("changed: 1\n");
   });
 
   test("a save of another file does not join the write in flight", async () => {
@@ -265,6 +278,17 @@ describe("esphome-page-file delete", () => {
 
     expect(page._savedYaml).toBe(page._yaml);
     expect(navigate).toHaveBeenCalledWith("/packages");
+  });
+
+  test("a delete finishing after leaving the page doesn't navigate", () => {
+    const page = makePage({ _yaml: "unsaved: 1\n" });
+    Object.defineProperty(page, "isConnected", { value: false });
+
+    page._onDeleted(
+      new CustomEvent("file-deleted", { detail: { path: "common/base.yaml" } })
+    );
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   test("a delete of a file no longer open leaves this one alone", () => {
@@ -440,6 +464,46 @@ describe("esphome-page-file rename", () => {
     );
 
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  test("refuses a rename when edits arrived after the dialog opened", async () => {
+    const renameFile = vi.fn();
+    const page = makePage({ _yaml: "changed: 1\n" }) as unknown as RenameView;
+    page._api = { renameFile } as unknown as ESPHomeAPI;
+
+    await page._rename(
+      new CustomEvent("rename-file", {
+        detail: { path: "common/base.yaml", newPath: "common/main.yaml" },
+      })
+    );
+
+    expect(renameFile).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(
+      "packages.rename_save_first",
+      expect.anything()
+    );
+  });
+
+  test("the editor can't take edits until the rename finishes", async () => {
+    let finish!: (r: unknown) => void;
+    const page = makePage() as unknown as RenameView & { _renamingPath: string | null };
+    page._api = {
+      renameFile: vi.fn(() => new Promise((resolve) => (finish = resolve))),
+    } as unknown as ESPHomeAPI;
+
+    const renaming = page._rename(
+      new CustomEvent("rename-file", {
+        detail: { path: "common/base.yaml", newPath: "common/main.yaml" },
+      })
+    );
+    expect(page._renamingPath).toBe("common/base.yaml");
+    const [pane] = findTemplatesByAnchor(page.render(), 'class="editor-pane"');
+    expect(pane.strings.join("")).toContain("?inert=");
+    expect(pane.values).toContain(true);
+
+    finish({ path: "common/main.yaml", rewritten: [], unresolved: [] });
+    await renaming;
+    expect(page._renamingPath).toBeNull();
   });
 
   test("a failed rename stays put", async () => {

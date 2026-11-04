@@ -93,6 +93,8 @@ export class ESPHomePageFile extends LitElement {
   @state() private _yaml = "";
   @state() private _savedYaml = "";
   @state() private _saving = false;
+  /** The file a rename is moving: edits to it would be saved under the old name. */
+  @state() private _renamingPath: string | null = null;
   /** Navigator selection and the YAML range it highlights. */
   @state() private _selectedSection: string | null = null;
   @state() private _selectedFromLine?: number;
@@ -341,7 +343,7 @@ export class ESPHomePageFile extends LitElement {
                   <wa-icon library="mdi" name="content-save"></wa-icon>
                   ${this._localize(this._saving ? "file.saving" : "file.save")}
                 </button>
-                <div class="editor-pane">
+                <div class="editor-pane" ?inert=${this._renamingPath === this.path}>
                   <esphome-yaml-editor
                     completion
                     .filePath=${this.path}
@@ -437,10 +439,11 @@ export class ESPHomePageFile extends LitElement {
     }
     // Named in the toast, as the user may have moved on to another file.
     void this._announceSaved(path);
-    if (this.path !== path) return true;
+    // A leave waiting on this save was overtaken by the move to another file or page.
+    if (this.path !== path) return false;
     this._savedYaml = content;
     // Typed while saving: not clean, so "Save and leave" stays.
-    return this._yaml === content;
+    return this.isConnected && this._yaml === content;
   };
 
   /** Success toast; when devices use the file, it offers to install them. */
@@ -476,17 +479,27 @@ export class ESPHomePageFile extends LitElement {
   private _openRename = () => void this._renameDialog?.open(this.path);
 
   private _rename = async (e: CustomEvent<RenameFileDetail>) => {
-    const newPath = await renameFile(this._api, this._localize, e.detail);
-    // The user may have moved on while the rename ran.
-    if (newPath !== null && this.isConnected && this.path === e.detail.path) {
-      void navigate(fileEditorUrl(newPath));
+    // The dialog opens after a usage lookup, so edits can arrive after the button check.
+    if (this._isDirty) {
+      notifyError(this._localize("packages.rename_save_first"));
+      return;
+    }
+    this._renamingPath = e.detail.path;
+    try {
+      const newPath = await renameFile(this._api, this._localize, e.detail);
+      // The user may have moved on while the rename ran.
+      if (newPath !== null && this.isConnected && this.path === e.detail.path) {
+        await navigate(fileEditorUrl(newPath));
+      }
+    } finally {
+      this._renamingPath = null;
     }
   };
 
   private _confirmDelete = () => void this._deleteDialog?.open(this.path);
 
   private _onDeleted = (e: CustomEvent<{ path: string }>) => {
-    if (e.detail.path !== this.path) return;
+    if (!this.isConnected || e.detail.path !== this.path) return;
     // The file is gone; leaving must not prompt to save it back.
     this._savedYaml = this._yaml;
     void navigate("/packages");
