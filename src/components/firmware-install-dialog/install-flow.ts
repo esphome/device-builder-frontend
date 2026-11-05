@@ -180,6 +180,8 @@ export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise
     failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
     return;
   }
+  // Kept so download-ready can show the artifact's checksum.
+  host._binaries = binaries;
   await downloadSelectedBinary(host, binaries[0].file);
 }
 
@@ -207,6 +209,7 @@ export async function startArtifactDownload(
     return;
   }
   if (binaries.length === 1) {
+    host._binaries = binaries;
     await downloadSelectedBinary(host, binaries[0].file);
     return;
   }
@@ -245,15 +248,16 @@ export async function downloadSelectedBinary(
 }
 
 // A build that finished while the picker sat open replaced the files; re-read
-// the digests so a copied MD5 matches what downloads. A failed re-read drops
-// the digests rather than show ones that may be stale; the download goes on.
-// False when the dialog was closed or reopened meanwhile.
+// the checksum metadata so a copied MD5 matches what downloads. A failed
+// re-read drops the digests rather than show ones that may be stale. False
+// when the dialog was closed or reopened meanwhile.
 async function refreshDigests(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<boolean> {
   if (host._binaries.length === 0) return true;
   const stillCurrent = runGuard(host);
+  host._checksumsPending = true;
   let fresh: FirmwareBinary[];
   try {
     fresh = await host._api.firmwareGetBinaries(configuration);
@@ -262,12 +266,32 @@ async function refreshDigests(
     fresh = [];
   }
   if (!stillCurrent()) return false;
-  const digests = new Map(fresh.map((binary) => [binary.file, binary.md5]));
-  host._binaries = host._binaries.map((binary) => ({
-    ...binary,
-    md5: digests.get(binary.file),
-  }));
+  const byFile = new Map(fresh.map((binary) => [binary.file, binary]));
+  host._binaries = host._binaries.map((binary) => {
+    const latest = byFile.get(binary.file);
+    return {
+      ...binary,
+      download_name: latest?.download_name ?? binary.download_name,
+      md5: latest?.md5,
+    };
+  });
+  host._checksumsPending = host._activeJobs.has(configuration);
   return true;
+}
+
+/**
+ * Hold the shown checksums while a build for the device runs, and re-read
+ * them once it ends, so the picker and download-ready never offer a digest
+ * of artifacts a build just replaced.
+ */
+export function syncChecksumsWithBuilds(host: ESPHomeFirmwareInstallDialog): void {
+  const configuration = host._device?.configuration;
+  if (!configuration || host._binaries.length === 0) return;
+  if (host._activeJobs.has(configuration)) {
+    host._checksumsPending = true;
+  } else if (host._checksumsPending) {
+    void refreshDigests(host, configuration);
+  }
 }
 
 /**

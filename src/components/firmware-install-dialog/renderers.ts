@@ -239,29 +239,34 @@ function renderMd5(
         ariaLabel: host._localize("firmware.md5_toggle_aria", { title }),
         variant: "quiet",
         iconBefore: true,
-        body: () => html`
-          <div class="binary-checksum-panel">
-            ${renderCopyValue(host._localize, md5, {
-              ariaLabel: host._localize("firmware.copy_md5_aria", { title }),
-              title: host._localize("firmware.copy_md5"),
-              okKey: "firmware.md5_copied",
-              failKey: "firmware.md5_copy_failed",
-            })}
-            <button
-              type="button"
-              class="btn btn--ghost"
-              aria-label=${host._localize("firmware.download_md5_aria", { title })}
-              @click=${() =>
-                downloadBlob(
-                  `${md5}  ${binary.download_name}\n`,
-                  `${binary.download_name}.md5`,
-                  "text/plain"
-                )}
-            >
-              ${host._localize("firmware.download_md5")}
-            </button>
-          </div>
-        `,
+        body: () =>
+          host._checksumsPending
+            ? html`<span class="binary-checksum-pending">
+                ${host._localize("firmware.md5_pending")}
+              </span>`
+            : html`
+                <div class="binary-checksum-panel">
+                  ${renderCopyValue(host._localize, md5, {
+                    ariaLabel: host._localize("firmware.copy_md5_aria", { title }),
+                    title: host._localize("firmware.copy_md5"),
+                    okKey: "firmware.md5_copied",
+                    failKey: "firmware.md5_copy_failed",
+                  })}
+                  <button
+                    type="button"
+                    class="btn btn--ghost"
+                    aria-label=${host._localize("firmware.download_md5_aria", { title })}
+                    @click=${() =>
+                      downloadBlob(
+                        `${md5}  ${binary.download_name}\n`,
+                        `${binary.download_name}.md5`,
+                        "text/plain"
+                      )}
+                  >
+                    ${host._localize("firmware.download_md5")}
+                  </button>
+                </div>
+              `,
       })}
     </div>
   `;
@@ -296,17 +301,25 @@ function renderDownloadReadyExtra(
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
+  const downloaded = host._binaries.find(
+    (binary) => binary.download_name === host._downloadedFilename
+  );
   // Manual binary download: offer to pick a different format when more than
   // one was produced.
-  return host._binaries.length > 1
-    ? html`<button
-        type="button"
-        class="reset-suggestion-link"
-        @click=${() => (host._step = "choose-binary")}
-      >
-        ${host._localize("firmware.choose_binary_again")}
-      </button>`
-    : nothing;
+  return html`
+    ${downloaded ? renderMd5(host, downloaded, artifactTitle(host, downloaded)) : nothing}
+    ${
+      host._binaries.length > 1
+        ? html`<button
+            type="button"
+            class="reset-suggestion-link"
+            @click=${() => (host._step = "choose-binary")}
+          >
+            ${host._localize("firmware.choose_binary_again")}
+          </button>`
+        : nothing
+    }
+  `;
 }
 
 // The body a step adds under its status text; the steps are exclusive.

@@ -160,6 +160,10 @@ export const firmwareInstallDialogStyles = css`
   .binary-checksum .disclosure-panel {
     margin-top: var(--wa-space-2xs);
   }
+  .binary-checksum-pending {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+  }
   .binary-checksum-panel {
     display: flex;
     flex-wrap: wrap;

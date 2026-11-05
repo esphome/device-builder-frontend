@@ -49,6 +49,7 @@ import {
   showOtaLogs,
   startArtifactDownload,
   startDownload,
+  syncChecksumsWithBuilds,
 } from "./firmware-install-dialog/install-flow.js";
 import {
   cardState,
@@ -108,9 +109,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _jobs: Map<string, FirmwareJob> = new Map();
 
   // Active job per configuration — the download flow waits for a running
-  // build instead of reading artifacts it's rewriting (#1200). Not @state:
-  // read imperatively at download start, never in render.
+  // build instead of reading artifacts it's rewriting (#1200). @state so a
+  // build that starts or ends under the picker re-syncs the checksums.
   @consume({ context: activeJobsContext, subscribe: true })
+  @state()
   _activeJobs: Map<string, FirmwareJob> = new Map();
 
   // Suppress the "set up a build server" hint once a build server is paired.
@@ -154,6 +156,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _binaries: FirmwareBinary[] = [];
   // Artifact files whose MD5 disclosure is open.
   @state() _md5Expanded: ReadonlySet<string> = new Set();
+  // A build or digest re-read is replacing the shown checksums.
+  @state() _checksumsPending = false;
 
   // Reset per _init so an opt-out on one run doesn't persist. Only the
   // web-serial install connects to a device, so the toggle is install-only.
@@ -321,6 +325,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._downloadedFilename = "";
     this._binaries = [];
     this._md5Expanded = new Set();
+    this._checksumsPending = false;
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failureKind = null;
@@ -374,6 +379,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (changedProperties.has("_logsExpanded")) {
       this.toggleAttribute("expanded", this._logsExpanded);
     }
+    if (changedProperties.has("_activeJobs")) syncChecksumsWithBuilds(this);
   }
 
   // Close the dialog and open Settings → Send builds. The install flow ends

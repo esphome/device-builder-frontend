@@ -31,6 +31,7 @@ import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware
 import {
   downloadSelectedBinary,
   startDownload,
+  syncChecksumsWithBuilds,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
 
 const FACTORY: FirmwareBinary = {
@@ -210,6 +211,54 @@ describe("manual firmware-binary download flow", () => {
       "firmware.ota.bin"
     );
     expect(host._binaries[0].md5).toBe("o2");
+  });
+
+  it("keeps a single artifact so download-ready can show its checksum", async () => {
+    const single: FirmwareBinary = {
+      title: "Standard format",
+      file: "firmware.bin",
+      download_name: "device-firmware.bin",
+      md5: "abc",
+    };
+    const { host } = makeHost("binary-download", [single]);
+    await run(host);
+    expect(host._step).toBe("download-ready");
+    expect(host._binaries).toEqual([single]);
+  });
+
+  it("refreshes the download name with the digest", async () => {
+    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "old" }]);
+    host._binaries = [{ ...OTA, md5: "old" }];
+    api.firmwareGetBinaries.mockResolvedValueOnce([
+      { ...OTA, download_name: "renamed-firmware.ota.bin", md5: "new" },
+    ]);
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.ota.bin"
+    );
+    expect(host._binaries[0]).toMatchObject({
+      download_name: "renamed-firmware.ota.bin",
+      md5: "new",
+    });
+  });
+
+  it("holds the checksums while a build runs and re-reads them when it ends", async () => {
+    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    host._binaries = [{ ...OTA, md5: "a" }];
+    host._step = "choose-binary";
+    Object.assign(host, { _checksumsPending: false });
+
+    host._activeJobs.set("device.yaml", { job_id: "rebuild" });
+    syncChecksumsWithBuilds(dialog);
+    expect(dialog._checksumsPending).toBe(true);
+    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+
+    api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "b" }]);
+    host._activeJobs.delete("device.yaml");
+    syncChecksumsWithBuilds(dialog);
+    await vi.waitFor(() => expect(dialog._checksumsPending).toBe(false));
+    expect(host._binaries[0].md5).toBe("b");
   });
 
   it("fails cleanly when listing the binaries errors", async () => {

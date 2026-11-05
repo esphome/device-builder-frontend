@@ -22,7 +22,11 @@ vi.mock("../../src/util/download-text.js", async (orig) => ({
   downloadBlob,
 }));
 
-function renderRows(binaries: FirmwareBinary[], expanded: string[] = []) {
+function renderRows(
+  binaries: FirmwareBinary[],
+  expanded: string[] = [],
+  pending = false
+) {
   const host = {
     _step: "choose-binary",
     _binaries: binaries,
@@ -31,6 +35,7 @@ function renderRows(binaries: FirmwareBinary[], expanded: string[] = []) {
     _onChooseBinary: () => {},
     _md5Expanded: new Set(expanded),
     _toggleMd5: vi.fn(),
+    _checksumsPending: pending,
   };
   const container = renderInto(
     renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
@@ -134,5 +139,28 @@ describe("choose-binary artifact labels", () => {
       "kitchen-firmware.ota.bin.md5",
       "text/plain"
     );
+  });
+  it("blocks the checksum actions while a build replaces the artifacts", () => {
+    const container = renderRows([OTA_ROW], ["firmware.ota.bin"], true);
+    expect(container.querySelector(".copy-value")).toBeNull();
+    expect(container.textContent).not.toContain(OTA_ROW.md5);
+    expect(container.textContent).toContain("Updating the checksum");
+  });
+  it("shows the downloaded artifact's MD5 on download-ready", () => {
+    const host = {
+      _step: "download-ready",
+      _installer: "binary-download",
+      _binaries: [OTA_ROW],
+      _downloadedFilename: "kitchen-firmware.ota.bin",
+      _log: fakeLogBuffer(),
+      _localize: defaultLocalize,
+      _md5Expanded: new Set(["firmware.ota.bin"]),
+      _toggleMd5: vi.fn(),
+      _checksumsPending: false,
+    };
+    const container = renderInto(
+      renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
+    );
+    expect(container.querySelector(".copy-value")?.textContent).toContain(OTA_ROW.md5);
   });
 });
