@@ -6,7 +6,7 @@
  * translation (unknown type, or a type without a key). Uses the real English
  * localize so the localized path is actually exercised.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderInto } from "../_dom.js";
 import { fakeLogBuffer } from "../_fake-host.js";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
@@ -14,25 +14,25 @@ import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { renderStatusExtra } from "../../src/components/firmware-install-dialog/renderers.js";
 
-function renderRows(
-  binaries: FirmwareBinary[],
-  onChooseBinary: (file: string) => void = () => {},
-  onCopyMd5: (digest: string) => void = () => {}
-) {
+const copyWithToast = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("../../src/util/copy-address.js", () => ({
+  copyWithToast,
+  copyAddressToClipboard: vi.fn(),
+}));
+
+function renderRows(binaries: FirmwareBinary[]) {
   const host = {
     _step: "choose-binary",
     _binaries: binaries,
     _log: fakeLogBuffer(),
     _localize: defaultLocalize,
-    _onChooseBinary: onChooseBinary,
-    _copyMd5: onCopyMd5,
+    _onChooseBinary: () => {},
   };
   return renderInto(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog));
 }
 
 function rowsText(binaries: FirmwareBinary[]): string {
-  const container = renderRows(binaries);
-  return container.textContent ?? "";
+  return renderRows(binaries).textContent ?? "";
 }
 
 describe("choose-binary artifact labels", () => {
@@ -70,56 +70,26 @@ describe("choose-binary artifact labels", () => {
     expect(text).toContain("Factory format (Previously Modern)");
   });
 
-  it("shows MD5 copy and sidecar download actions beside each firmware", () => {
+  it("shows a per-artifact MD5 copy control only where the backend sent a digest", () => {
     const digest = "a".repeat(32);
-    const elfDigest = "b".repeat(32);
-    const selected: string[] = [];
-    const copied: string[] = [];
-    const container = renderRows(
-      [
-        {
-          title: "OTA Update",
-          file: "firmware.ota.bin",
-          type: "ota",
-          md5: digest,
-        },
-        {
-          title: "ELF (for debugging)",
-          file: "firmware.elf",
-          type: "elf",
-          md5: elfDigest,
-        },
-        {
-          title: "MD5 checksum for OTA Update",
-          file: "firmware.ota.bin.md5",
-          type: "md5",
-          description: digest,
-        },
-        {
-          title: "MD5 checksum for ELF (for debugging)",
-          file: "firmware.elf.md5",
-          type: "md5",
-          description: elfDigest,
-        },
-      ],
-      (file) => selected.push(file),
-      (value) => copied.push(value)
-    );
-    const text = container.textContent ?? "";
+    const container = renderRows([
+      { title: "OTA Update", file: "firmware.ota.bin", type: "ota", md5: digest },
+      { title: "ELF (for debugging)", file: "firmware.elf", type: "elf" },
+    ]);
 
-    expect(text).toContain(`MD5: ${digest}`);
-    expect(text).toContain(`MD5: ${elfDigest}`);
-    expect(text).toContain("ELF (debug symbols)");
-    expect(text).not.toContain("MD5 checksum for OTA update");
-    const copyButtons = container.querySelectorAll<HTMLButtonElement>(
-      '[aria-label="Copy MD5"]'
+    expect(container.querySelectorAll(".binary-option")).toHaveLength(2);
+    const copies = container.querySelectorAll<HTMLButtonElement>(
+      ".binary-checksum button"
     );
-    copyButtons.forEach((button) => button.click());
-    expect(copied).toEqual([digest, elfDigest]);
-    const downloadButtons = container.querySelectorAll<HTMLButtonElement>(
-      '[aria-label="Download .md5"]'
+    expect(copies).toHaveLength(1);
+    expect(copies[0].textContent).toContain(digest);
+    expect(copies[0].getAttribute("aria-label")).toBe("Copy the MD5 of OTA update");
+    copies[0].click();
+    expect(copyWithToast).toHaveBeenCalledWith(
+      defaultLocalize,
+      digest,
+      "firmware.md5_copied",
+      "firmware.md5_copy_failed"
     );
-    downloadButtons.forEach((button) => button.click());
-    expect(selected).toEqual(["firmware.ota.bin.md5", "firmware.elf.md5"]);
   });
 });

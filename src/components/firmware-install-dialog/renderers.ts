@@ -18,6 +18,7 @@ import {
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
+import { renderCopyValue } from "../shared/pairing-address.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -137,13 +138,8 @@ function downloadReadyTitle(host: ESPHomeFirmwareInstallDialog): string {
   if (flasherCopy) return host._localize(flasherCopy.titleKey);
   // binary-download
   const isElf = host._downloadedFilename.endsWith(".elf");
-  const isMd5 = host._downloadedFilename.endsWith(".md5");
   return host._localize(
-    isMd5
-      ? "firmware.md5_download_done_title"
-      : isElf
-        ? "firmware.elf_download_done_title"
-        : "firmware.binary_download_done_title"
+    isElf ? "firmware.elf_download_done_title" : "firmware.binary_download_done_title"
   );
 }
 
@@ -159,13 +155,8 @@ function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
   if (flasherCopy) return host._localize(flasherCopy.bodyKey, { filename });
   // binary-download
   const isElf = filename.endsWith(".elf");
-  const isMd5 = filename.endsWith(".md5");
   return host._localize(
-    isMd5
-      ? "firmware.md5_download_done_body"
-      : isElf
-        ? "firmware.elf_download_done_body"
-        : "firmware.binary_download_done_body",
+    isElf ? "firmware.elf_download_done_body" : "firmware.binary_download_done_body",
     { filename }
   );
 }
@@ -226,48 +217,21 @@ export function renderOffloadHintSlot(
 // picker (choose-binary), the "choose another format" link (download-ready),
 // and the collapsible compile / esptool log.
 
-function renderMd5Actions(
+function renderMd5(
   host: ESPHomeFirmwareInstallDialog,
-  binary: FirmwareBinary
+  binary: FirmwareBinary,
+  title: string
 ): TemplateResult | typeof nothing {
-  const digest = binary.md5;
-  if (!digest) return nothing;
-  const sidecarFile = `${binary.file}.md5`;
-  const hasSidecar = host._binaries.some((candidate) => candidate.file === sidecarFile);
-  const copyLabel = host._localize("firmware.copy_md5");
-  const downloadLabel = host._localize("firmware.download_md5");
-
+  if (!binary.md5) return nothing;
   return html`
     <div class="binary-checksum">
-      <span class="md5">
-        ${host._localize("firmware.md5_label")}: <code>${digest}</code>
-      </span>
-      <div class="binary-checksum-actions">
-        <button
-          type="button"
-          class="binary-checksum-action"
-          title=${copyLabel}
-          aria-label=${copyLabel}
-          @click=${() => void host._copyMd5(digest)}
-        >
-          <wa-icon library="mdi" name="content-copy"></wa-icon>
-          <span>${copyLabel}</span>
-        </button>
-        ${
-          hasSidecar
-            ? html`<button
-                type="button"
-                class="binary-checksum-action"
-                title=${downloadLabel}
-                aria-label=${downloadLabel}
-                @click=${() => host._onChooseBinary(sidecarFile)}
-              >
-                <wa-icon library="mdi" name="download"></wa-icon>
-                <span>${downloadLabel}</span>
-              </button>`
-            : nothing
-        }
-      </div>
+      ${host._localize("firmware.md5_label")}
+      ${renderCopyValue(host._localize, binary.md5, {
+        ariaLabel: host._localize("firmware.copy_md5_aria", { title }),
+        title: host._localize("firmware.copy_md5"),
+        okKey: "firmware.md5_copied",
+        failKey: "firmware.md5_copy_failed",
+      })}
     </div>
   `;
 }
@@ -275,24 +239,23 @@ function renderMd5Actions(
 function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   return html`
     <div class="binary-list">
-      ${host._binaries
-        .filter((binary) => binary.type !== "md5")
-        .map((binary) => {
-          const desc = artifactDescription(host, binary);
-          return html`
-            <div class="binary-entry">
-              <button
-                type="button"
-                class="binary-option"
-                @click=${() => host._onChooseBinary(binary.file)}
-              >
-                <span class="title">${artifactTitle(host, binary)}</span>
-                ${desc ? html`<span class="desc">${desc}</span>` : nothing}
-              </button>
-              ${renderMd5Actions(host, binary)}
-            </div>
-          `;
-        })}
+      ${host._binaries.map((binary) => {
+        const title = artifactTitle(host, binary);
+        const desc = artifactDescription(host, binary);
+        return html`
+          <div class="binary-entry">
+            <button
+              type="button"
+              class="binary-option"
+              @click=${() => host._onChooseBinary(binary.file)}
+            >
+              <span class="title">${title}</span>
+              ${desc ? html`<span class="desc">${desc}</span>` : nothing}
+            </button>
+            ${renderMd5(host, binary, title)}
+          </div>
+        `;
+      })}
     </div>
   `;
 }

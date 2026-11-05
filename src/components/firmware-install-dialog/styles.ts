@@ -117,12 +117,9 @@ export const firmwareInstallDialogStyles = css`
     text-align: left;
   }
   .binary-entry {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
     overflow: hidden;
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-m);
+    border-radius: var(--wa-border-radius-l);
     transition: border-color 0.12s;
   }
   .binary-entry:hover,
@@ -133,19 +130,16 @@ export const firmwareInstallDialogStyles = css`
     display: flex;
     flex-direction: column;
     gap: 2px;
+    box-sizing: border-box;
+    width: 100%;
     padding: var(--wa-space-s) var(--wa-space-m);
     border: none;
-    border-radius: 0;
     background: none;
     font: inherit;
     color: inherit;
     text-align: left;
     cursor: pointer;
-    transition:
-      background 0.12s,
-      border-color 0.12s;
-    width: 100%;
-    box-sizing: border-box;
+    transition: background 0.12s;
   }
   .binary-option:hover,
   .binary-option:focus-visible {
@@ -163,49 +157,14 @@ export const firmwareInstallDialogStyles = css`
   .binary-checksum {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: var(--wa-space-xs) var(--wa-space-s);
-    min-width: 0;
-    padding: var(--wa-space-xs) var(--wa-space-m);
-    border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-  }
-  .binary-checksum .md5 {
-    flex: 1 1 auto;
-    min-width: 0;
+    gap: var(--wa-space-xs);
+    padding: 0 var(--wa-space-m) var(--wa-space-xs);
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
   }
-  .binary-checksum .md5 code {
-    font: inherit;
-    user-select: all;
+  .binary-checksum code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     overflow-wrap: anywhere;
-  }
-  .binary-checksum-actions {
-    display: flex;
-    flex: 0 0 auto;
-    gap: var(--wa-space-xs);
-  }
-  .binary-checksum-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--wa-space-2xs);
-    min-height: 30px;
-    padding: 4px 8px;
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-m);
-    background: transparent;
-    color: var(--wa-color-text-normal);
-    font: inherit;
-    font-size: var(--wa-font-size-xs);
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .binary-checksum-action:hover,
-  .binary-checksum-action:focus-visible {
-    background: var(--esphome-tint);
-    color: var(--esphome-primary);
-    outline: none;
   }
 
   .footer {

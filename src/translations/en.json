@@ -531,7 +531,7 @@
     "download_type_elf_desc": "For decoding crash backtraces with the ESP stack trace decoder.",
     "md5_label": "MD5",
     "copy_md5": "Copy MD5",
-    "download_md5": "Download .md5",
+    "copy_md5_aria": "Copy the MD5 of {title}",
     "md5_copied": "Firmware MD5 copied to clipboard.",
     "md5_copy_failed": "Could not copy the MD5 checksum.",
     "download_type_bin": "Firmware image",
@@ -681,8 +681,6 @@
     "binary_download_done_body": "Saved as {filename}. Flash it to your device with your preferred tool.",
     "elf_download_done_title": "Debug symbols downloaded",
     "elf_download_done_body": "Saved as {filename}. Use it with the ESP stack trace decoder to decode crash backtraces.",
-    "md5_download_done_title": "MD5 checksum downloaded",
-    "md5_download_done_body": "Saved as {filename}. Use it to verify the matching firmware file.",
     "choose_binary_title": "Choose what to download",
     "choose_binary_desc": "Each option explains what it's for.",
     "choose_binary_again": "Download another format"
