@@ -4,7 +4,11 @@ import { FLASHER_HOST } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
 import type { FlasherStep, FlasherStepView } from "../../platforms/platform-support.js";
 import { devicePlatform } from "../../util/crash-report.js";
-import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
+import {
+  configurationStem,
+  downloadAnsiText,
+  downloadBlob,
+} from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -19,6 +23,7 @@ import {
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
 import { renderCopyValue } from "../shared/copy-value.js";
+import { renderDisclosure } from "../shared/disclosure.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -222,15 +227,41 @@ function renderMd5(
   binary: FirmwareBinary,
   title: string
 ): TemplateResult | typeof nothing {
-  if (!binary.md5) return nothing;
+  const md5 = binary.md5;
+  if (!md5) return nothing;
   return html`
     <div class="binary-checksum">
-      ${host._localize("firmware.md5_label")}
-      ${renderCopyValue(host._localize, binary.md5, {
-        ariaLabel: host._localize("firmware.copy_md5_aria", { title }),
-        title: host._localize("firmware.copy_md5"),
-        okKey: "firmware.md5_copied",
-        failKey: "firmware.md5_copy_failed",
+      ${renderDisclosure({
+        open: host._md5Expanded.has(binary.file),
+        onToggle: () => host._toggleMd5(binary.file),
+        localize: host._localize,
+        labelKey: "firmware.md5_label",
+        ariaLabel: host._localize("firmware.md5_toggle_aria", { title }),
+        variant: "quiet",
+        iconBefore: true,
+        body: () => html`
+          <div class="binary-checksum-panel">
+            ${renderCopyValue(host._localize, md5, {
+              ariaLabel: host._localize("firmware.copy_md5_aria", { title }),
+              title: host._localize("firmware.copy_md5"),
+              okKey: "firmware.md5_copied",
+              failKey: "firmware.md5_copy_failed",
+            })}
+            <button
+              type="button"
+              class="btn btn--ghost"
+              aria-label=${host._localize("firmware.download_md5_aria", { title })}
+              @click=${() =>
+                downloadBlob(
+                  `${md5}  ${binary.download_name}\n`,
+                  `${binary.download_name}.md5`,
+                  "text/plain"
+                )}
+            >
+              ${host._localize("firmware.download_md5")}
+            </button>
+          </div>
+        `,
       })}
     </div>
   `;

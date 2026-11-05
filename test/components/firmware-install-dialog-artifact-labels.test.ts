@@ -16,16 +16,26 @@ import { renderStatusExtra } from "../../src/components/firmware-install-dialog/
 
 const copyWithToast = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("../../src/util/copy-value.js", () => ({ copyWithToast }));
+const downloadBlob = vi.hoisted(() => vi.fn());
+vi.mock("../../src/util/download-text.js", async (orig) => ({
+  ...(await orig<typeof import("../../src/util/download-text.js")>()),
+  downloadBlob,
+}));
 
-function renderRows(binaries: FirmwareBinary[]) {
+function renderRows(binaries: FirmwareBinary[], expanded: string[] = []) {
   const host = {
     _step: "choose-binary",
     _binaries: binaries,
     _log: fakeLogBuffer(),
     _localize: defaultLocalize,
     _onChooseBinary: () => {},
+    _md5Expanded: new Set(expanded),
+    _toggleMd5: vi.fn(),
   };
-  return renderInto(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog));
+  const container = renderInto(
+    renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
+  );
+  return Object.assign(container, { host });
 }
 
 function rowsText(binaries: FirmwareBinary[]): string {
@@ -38,6 +48,7 @@ describe("choose-binary artifact labels", () => {
       {
         title: "ELF (for debugging)",
         file: "firmware.elf",
+        download_name: "kitchen-firmware.elf",
         type: "elf",
         description: "backend elf text",
       },
@@ -52,6 +63,7 @@ describe("choose-binary artifact labels", () => {
       {
         title: "Mystery artifact",
         file: "x.bin",
+        download_name: "kitchen-x.bin",
         type: "nope",
         description: "backend desc",
       },
@@ -62,31 +74,65 @@ describe("choose-binary artifact labels", () => {
 
   it("falls back to backend text when no type is present", () => {
     const text = rowsText([
-      { title: "Factory format (Previously Modern)", file: "firmware.factory.bin" },
+      {
+        title: "Factory format (Previously Modern)",
+        file: "firmware.factory.bin",
+        download_name: "kitchen-firmware.factory.bin",
+      },
     ]);
     expect(text).toContain("Factory format (Previously Modern)");
   });
 
-  it("shows a per-artifact MD5 copy control only where the backend sent a digest", () => {
-    const digest = "a".repeat(32);
-    const container = renderRows([
-      { title: "OTA Update", file: "firmware.ota.bin", type: "ota", md5: digest },
-      { title: "ELF (for debugging)", file: "firmware.elf", type: "elf" },
-    ]);
+  const OTA_ROW: FirmwareBinary = {
+    title: "OTA Update",
+    file: "firmware.ota.bin",
+    download_name: "kitchen-firmware.ota.bin",
+    type: "ota",
+    md5: "a".repeat(32),
+  };
+  const ELF_ROW: FirmwareBinary = {
+    title: "ELF (for debugging)",
+    file: "firmware.elf",
+    download_name: "kitchen-firmware.elf",
+    type: "elf",
+  };
+
+  it("keeps the MD5 collapsed behind a per-row toggle", () => {
+    const container = renderRows([OTA_ROW, ELF_ROW]);
 
     expect(container.querySelectorAll(".binary-option")).toHaveLength(2);
-    const copies = container.querySelectorAll<HTMLButtonElement>(
-      ".binary-checksum button"
-    );
-    expect(copies).toHaveLength(1);
-    expect(copies[0].textContent).toContain(digest);
-    expect(copies[0].getAttribute("aria-label")).toBe("Copy the MD5 of OTA update");
-    copies[0].click();
+    const toggles = container.querySelectorAll<HTMLButtonElement>(".disclosure-toggle");
+    expect(toggles).toHaveLength(1);
+    expect(toggles[0].getAttribute("aria-expanded")).toBe("false");
+    expect(toggles[0].getAttribute("aria-label")).toBe("MD5 of OTA update");
+    expect(container.textContent).not.toContain(OTA_ROW.md5);
+    toggles[0].click();
+    expect(container.host._toggleMd5).toHaveBeenCalledWith("firmware.ota.bin");
+  });
+
+  it("expanding shows the digest, its copy control and the .md5 download", () => {
+    const digest = OTA_ROW.md5!;
+    const container = renderRows([OTA_ROW, ELF_ROW], ["firmware.ota.bin"]);
+
+    const copy = container.querySelector<HTMLButtonElement>(".copy-value")!;
+    expect(copy.textContent).toContain(digest);
+    expect(copy.getAttribute("aria-label")).toBe("Copy the MD5 of OTA update");
+    copy.click();
     expect(copyWithToast).toHaveBeenCalledWith(
       defaultLocalize,
       digest,
       "firmware.md5_copied",
       "firmware.md5_copy_failed"
+    );
+
+    const download = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Download the .md5 file for OTA update"]'
+    )!;
+    download.click();
+    expect(downloadBlob).toHaveBeenCalledWith(
+      `${digest}  kitchen-firmware.ota.bin\n`,
+      "kitchen-firmware.ota.bin.md5",
+      "text/plain"
     );
   });
 });

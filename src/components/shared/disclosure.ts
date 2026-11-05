@@ -29,6 +29,8 @@ export type DisclosureOptions = DisclosureLabel & {
   disabled?: boolean;
   /** When set, ids the panel and wires `aria-controls` while open. */
   panelId?: string;
+  /** Accessible name when the visible label isn't unique on the page. */
+  ariaLabel?: string;
 };
 
 /**
@@ -54,6 +56,7 @@ export function renderDisclosure(opts: DisclosureOptions): TemplateResult {
       class="disclosure-toggle disclosure-toggle--${variant}"
       aria-expanded=${open ? "true" : "false"}
       aria-controls=${open && panelId ? panelId : nothing}
+      aria-label=${opts.ariaLabel ?? nothing}
       ?disabled=${opts.disabled ?? false}
       @click=${opts.onToggle}
     >

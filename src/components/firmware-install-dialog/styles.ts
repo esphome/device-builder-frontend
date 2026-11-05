@@ -155,12 +155,16 @@ export const firmwareInstallDialogStyles = css`
     color: var(--wa-color-text-quiet);
   }
   .binary-checksum {
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-xs);
     padding: 0 var(--wa-space-m) var(--wa-space-xs);
-    font-size: var(--wa-font-size-xs);
-    color: var(--wa-color-text-quiet);
+  }
+  .binary-checksum .disclosure-panel {
+    margin-top: var(--wa-space-2xs);
+  }
+  .binary-checksum-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--wa-space-xs) var(--wa-space-s);
   }
   .binary-checksum code {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;

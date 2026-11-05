@@ -33,6 +33,7 @@ import type { DetectedChip } from "../platforms/esp/index.js";
 import type { AnyBrowserInstall } from "../platforms/platform-support.js";
 import { copyValueStyles } from "../styles/copy-value.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
+import { disclosureStyles } from "../styles/disclosure.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { fireEvent } from "../util/fire-event.js";
@@ -151,6 +152,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Formats offered by the manual download picker; populated only when a
   // device produces more than one (e.g. ESP32 factory + OTA).
   @state() _binaries: FirmwareBinary[] = [];
+  // Artifact files whose MD5 disclosure is open.
+  @state() _md5Expanded: ReadonlySet<string> = new Set();
 
   // Reset per _init so an opt-out on one run doesn't persist. Only the
   // web-serial install connects to a device, so the toggle is install-only.
@@ -218,6 +221,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     espHomeStyles,
     firmwareInstallDialogStyles,
     copyValueStyles,
+    disclosureStyles,
     remoteBuildHintStyles,
     // Content-heavy (build status + expandable log): full-screen on mobile
     // so it doesn't overflow a centered box. #41
@@ -280,6 +284,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   }
 
   // Picked a format in the choose-binary step.
+  _toggleMd5(file: string) {
+    const next = new Set(this._md5Expanded);
+    if (!next.delete(file)) next.add(file);
+    this._md5Expanded = next;
+  }
+
   _onChooseBinary(file: string) {
     void downloadSelectedBinary(this, file);
   }
@@ -310,6 +320,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._flashPercent = 0;
     this._downloadedFilename = "";
     this._binaries = [];
+    this._md5Expanded = new Set();
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failureKind = null;
