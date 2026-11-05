@@ -8,8 +8,11 @@
  * `static styles` array.
  */
 import { css } from "lit";
+import { copyValueStyles } from "./copy-value.js";
 
 export const pairingAddressStyles = css`
+  ${copyValueStyles}
+
   .pairing-address summary {
     cursor: pointer;
     user-select: none;
@@ -58,42 +61,5 @@ export const pairingAddressStyles = css`
   .pairing-address-copy:focus-visible {
     outline: var(--esphome-focus-outline);
     outline-offset: -2px;
-  }
-
-  /* Click-to-copy address line (renderCopyAddress): the text is the button. */
-  .copy-address {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    gap: var(--wa-space-2xs);
-    margin-top: var(--wa-space-2xs);
-    padding: 2px 0;
-    background: none;
-    border: none;
-    border-radius: 4px;
-    color: var(--esphome-primary);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .copy-address code {
-    font-size: var(--wa-font-size-2xs);
-  }
-
-  /* Outranks a host's generic icon sizing (e.g. the option rows' 28px). */
-  button.copy-address wa-icon {
-    font-size: 14px;
-    color: inherit;
-  }
-
-  .copy-address:hover,
-  .copy-address:focus-visible {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .copy-address:focus-visible {
-    outline: var(--esphome-focus-outline);
-    outline-offset: 2px;
   }
 `;

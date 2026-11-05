@@ -129,6 +129,42 @@ describe("manual firmware-binary download flow", () => {
     expect(host._binaries).toHaveLength(2);
   });
 
+  it("re-reads the digests at download time so a rebuilt artifact shows its new MD5", async () => {
+    const { host, api } = makeHost("binary-download", [
+      { ...FACTORY, md5: "old-factory" },
+      { ...OTA, md5: "old-ota" },
+    ]);
+    await run(host); // lands on choose-binary
+    api.firmwareGetBinaries.mockResolvedValueOnce([
+      { ...FACTORY, md5: "new-factory" },
+      { ...OTA, md5: "new-ota" },
+    ]);
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.ota.bin"
+    );
+    expect(host._binaries.map((binary) => binary.md5)).toEqual([
+      "new-factory",
+      "new-ota",
+    ]);
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("still downloads when the digest re-read fails", async () => {
+    const { host, api } = makeHost("binary-download", [
+      { ...FACTORY, md5: "f" },
+      { ...OTA, md5: "o" },
+    ]);
+    await run(host);
+    api.firmwareGetBinaries.mockRejectedValueOnce(new Error("boom"));
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.ota.bin"
+    );
+    expect(host._binaries.map((binary) => binary.md5)).toEqual(["f", "o"]);
+    expect(host._step).toBe("download-ready");
+  });
+
   it("fails cleanly when listing the binaries errors", async () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     api.firmwareGetBinaries.mockRejectedValueOnce(new Error("boom"));

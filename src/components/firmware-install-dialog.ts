@@ -31,8 +31,8 @@ import {
 } from "../platforms/esp/dashboard.js";
 import type { DetectedChip } from "../platforms/esp/index.js";
 import type { AnyBrowserInstall } from "../platforms/platform-support.js";
+import { copyValueStyles } from "../styles/copy-value.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
-import { pairingAddressStyles } from "../styles/pairing-address.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { fireEvent } from "../util/fire-event.js";
@@ -217,7 +217,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   static styles = [
     espHomeStyles,
     firmwareInstallDialogStyles,
-    pairingAddressStyles,
+    copyValueStyles,
     remoteBuildHintStyles,
     // Content-heavy (build status + expandable log): full-screen on mobile
     // so it doesn't overflow a centered box. #41

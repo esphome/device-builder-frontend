@@ -15,10 +15,7 @@ import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware
 import { renderStatusExtra } from "../../src/components/firmware-install-dialog/renderers.js";
 
 const copyWithToast = vi.hoisted(() => vi.fn(async () => {}));
-vi.mock("../../src/util/copy-address.js", () => ({
-  copyWithToast,
-  copyAddressToClipboard: vi.fn(),
-}));
+vi.mock("../../src/util/copy-value.js", () => ({ copyWithToast }));
 
 function renderRows(binaries: FirmwareBinary[]) {
   const host = {

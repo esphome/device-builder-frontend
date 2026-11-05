@@ -18,7 +18,7 @@ import {
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
-import { renderCopyValue } from "../shared/pairing-address.js";
+import { renderCopyValue } from "../shared/copy-value.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type

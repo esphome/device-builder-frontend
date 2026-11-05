@@ -224,6 +224,7 @@ export async function downloadSelectedBinary(
   const device = host._device;
   if (!device) return;
   if (!(await artifactsSettled(host, device.configuration))) return;
+  await refreshDigests(host, device.configuration);
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).
@@ -241,6 +242,27 @@ export async function downloadSelectedBinary(
   }
   host._step = "download-ready";
   host._statusMessage = "";
+}
+
+// A build that finished while the picker sat open replaced the files; re-read
+// the digests so a copied MD5 matches what downloads. Best effort: a failed
+// re-read leaves the list as it was.
+async function refreshDigests(
+  host: ESPHomeFirmwareInstallDialog,
+  configuration: string
+): Promise<void> {
+  if (!host._binaries.some((binary) => binary.md5)) return;
+  let fresh: FirmwareBinary[];
+  try {
+    fresh = await host._api.firmwareGetBinaries(configuration);
+  } catch {
+    return;
+  }
+  const digests = new Map(fresh.map((binary) => [binary.file, binary.md5]));
+  host._binaries = host._binaries.map((binary) => ({
+    ...binary,
+    md5: digests.get(binary.file),
+  }));
 }
 
 /**
