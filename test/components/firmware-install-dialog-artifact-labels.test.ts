@@ -144,7 +144,7 @@ describe("choose-binary artifact labels", () => {
     const container = renderRows([OTA_ROW], ["firmware.ota.bin"], true);
     expect(container.querySelector(".copy-value")).toBeNull();
     expect(container.textContent).not.toContain(OTA_ROW.md5);
-    expect(container.textContent).toContain("Updating the checksum");
+    expect(container.textContent).toContain("Updating the checksum…");
   });
   it("shows the downloaded artifact's MD5 on download-ready", () => {
     const host = {

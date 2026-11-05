@@ -220,10 +220,12 @@ describe("manual firmware-binary download flow", () => {
       download_name: "device-firmware.bin",
       md5: "abc",
     };
-    const { host } = makeHost("binary-download", [single]);
+    const { host, api } = makeHost("binary-download", [single]);
     await run(host);
     expect(host._step).toBe("download-ready");
     expect(host._binaries).toEqual([single]);
+    // The list was just read, so no back-to-back digest re-read.
+    expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
   });
 
   it("refreshes the download name with the digest", async () => {

@@ -182,7 +182,7 @@ export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise
   }
   // Kept so download-ready can show the artifact's checksum.
   host._binaries = binaries;
-  await downloadSelectedBinary(host, binaries[0].file);
+  await downloadSelectedBinary(host, binaries[0].file, { fresh: true });
 }
 
 // Three-dot "Download". Compiles only when nothing is built, so an existing
@@ -210,7 +210,7 @@ export async function startArtifactDownload(
   }
   if (binaries.length === 1) {
     host._binaries = binaries;
-    await downloadSelectedBinary(host, binaries[0].file);
+    await downloadSelectedBinary(host, binaries[0].file, { fresh: true });
     return;
   }
   showBinaryPicker(host, binaries);
@@ -220,14 +220,16 @@ export async function startArtifactDownload(
 // paths and the picker; leaves _binaries intact for "download another format".
 // Re-settles at select time: the picker (or download-ready's "another
 // format") can sit open while a new build starts rewriting the file.
+// ``fresh``: *host._binaries* was just read, so the digest re-read is skipped.
 export async function downloadSelectedBinary(
   host: ESPHomeFirmwareInstallDialog,
-  file: string
+  file: string,
+  { fresh = false }: { fresh?: boolean } = {}
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
   if (!(await artifactsSettled(host, device.configuration))) return;
-  if (!(await refreshDigests(host, device.configuration))) return;
+  if (!fresh && !(await refreshDigests(host, device.configuration))) return;
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).
@@ -257,7 +259,6 @@ async function refreshDigests(
 ): Promise<boolean> {
   if (host._binaries.length === 0) return true;
   const stillCurrent = runGuard(host);
-  host._checksumsPending = true;
   let fresh: FirmwareBinary[];
   try {
     fresh = await host._api.firmwareGetBinaries(configuration);
