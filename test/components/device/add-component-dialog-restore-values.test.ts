@@ -123,7 +123,7 @@ describe("_returnValues across detour exits", () => {
     const { d, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({ "featured.bw15.b": step2 });
     d._selected = makeComponentEntry("output.gpio", {
-      category: ComponentCategory.OUTPUT,
+      category: "output",
     });
     d._bundleQueue = ["featured.bw15.b"];
     d._bundleProgress = { current: 1, total: 2, bundleName: "Bundle" };

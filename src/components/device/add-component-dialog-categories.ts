@@ -1,4 +1,4 @@
-import { type ComponentCategory, CORE_CATEGORIES } from "../../api/types/components.js";
+import { CORE_CATEGORIES } from "../../api/types/components.js";
 
 /**
  * Decide which categories to *exclude* from the catalog query
@@ -30,7 +30,7 @@ import { type ComponentCategory, CORE_CATEGORIES } from "../../api/types/compone
 export function chooseExcludeCategories(opts: {
   isCoreLocked: boolean;
   isInDepDetour: boolean;
-}): readonly ComponentCategory[] {
+}): readonly string[] {
   if (opts.isCoreLocked || opts.isInDepDetour) return [];
   return CORE_CATEGORIES;
 }

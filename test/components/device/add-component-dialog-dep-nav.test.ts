@@ -310,14 +310,14 @@ describe("matchesDepDomain", () => {
 
   test("matches by category for domain-level deps", () => {
     const gpio = makeComponentEntry("output.gpio", {
-      category: ComponentCategory.OUTPUT,
+      category: "output",
     });
     expect(matchesDepDomain(gpio, "output")).toBe(true);
   });
 
   test("rejects an off-domain catalog pick", () => {
     const sensor = makeComponentEntry("sensor.dht", {
-      category: ComponentCategory.SENSOR,
+      category: "sensor",
     });
     expect(matchesDepDomain(sensor, "output")).toBe(false);
   });
