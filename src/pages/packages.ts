@@ -5,7 +5,7 @@
  */
 import { consume } from "@lit/context";
 import {
-  mdiDeleteOutline,
+  mdiDelete,
   mdiDevices,
   mdiPackageVariantClosed,
   mdiPlus,
@@ -45,7 +45,7 @@ import "../components/packages/file-list-dialog.js";
 import "../components/packages/rename-file-dialog.js";
 
 registerMdiIcons({
-  "delete-outline": mdiDeleteOutline,
+  delete: mdiDelete,
   devices: mdiDevices,
   "package-variant-closed": mdiPackageVariantClosed,
   plus: mdiPlus,
@@ -200,6 +200,19 @@ export class ESPHomePagePackages extends LitElement {
       .row-action:hover {
         background: var(--wa-color-surface-lowered);
       }
+      .row-action--accent {
+        color: var(--esphome-primary);
+      }
+      .row-action--accent:hover {
+        background: var(--esphome-tint);
+        border-color: var(--esphome-tint-border);
+      }
+      .row-action--danger {
+        color: var(--esphome-error);
+      }
+      .row-action--danger:hover {
+        background: color-mix(in srgb, var(--esphome-error), transparent 92%);
+      }
       .row-action wa-icon,
       .primary wa-icon {
         font-size: 16px;
@@ -313,7 +326,7 @@ export class ESPHomePagePackages extends LitElement {
                 </button>
                 <button
                   type="button"
-                  class="row-action"
+                  class="row-action row-action--accent"
                   aria-label=${this._localize("packages.rename_named", { path })}
                   title=${this._localize("packages.rename")}
                   @click=${() => this._renameDialog?.open(path)}
@@ -322,12 +335,12 @@ export class ESPHomePagePackages extends LitElement {
                 </button>
                 <button
                   type="button"
-                  class="row-action"
+                  class="row-action row-action--danger"
                   aria-label=${this._localize("packages.delete_named", { path })}
                   title=${this._localize("packages.delete")}
                   @click=${() => this._deleteDialog?.open(path)}
                 >
-                  <wa-icon library="mdi" name="delete-outline"></wa-icon>
+                  <wa-icon library="mdi" name="delete"></wa-icon>
                 </button>
               </div>`
           )}

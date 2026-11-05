@@ -74,9 +74,9 @@ describe("esphome-page-file rendering", () => {
 
   test("offers Delete for a package but not for a top-level file", () => {
     const pkg = makePage().render();
-    expect(findTemplatesByAnchor(pkg, 'name="delete-outline"')).toHaveLength(1);
+    expect(findTemplatesByAnchor(pkg, 'name="delete"')).toHaveLength(1);
     const top = makePage({ path: "_shared.yaml" }).render();
-    expect(findTemplatesByAnchor(top, 'name="delete-outline"')).toHaveLength(0);
+    expect(findTemplatesByAnchor(top, 'name="delete"')).toHaveLength(0);
   });
 });
 

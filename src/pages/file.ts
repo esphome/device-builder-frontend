@@ -7,7 +7,7 @@
 import { consume } from "@lit/context";
 import {
   mdiContentSave,
-  mdiDeleteOutline,
+  mdiDelete,
   mdiDevices,
   mdiMenu,
   mdiRenameOutline,
@@ -62,7 +62,7 @@ import "../components/yaml-editor.js";
 
 registerMdiIcons({
   "content-save": mdiContentSave,
-  "delete-outline": mdiDeleteOutline,
+  delete: mdiDelete,
   devices: mdiDevices,
   menu: mdiMenu,
   "rename-outline": mdiRenameOutline,
@@ -227,6 +227,19 @@ export class ESPHomePageFile extends LitElement {
       .header-button:hover:not(:disabled) {
         background: var(--wa-color-surface-lowered);
       }
+      .header-button--accent {
+        color: var(--esphome-primary);
+      }
+      .header-button--accent:hover:not(:disabled) {
+        background: var(--esphome-tint);
+        border-color: var(--esphome-tint-border);
+      }
+      .header-button--danger {
+        color: var(--esphome-error);
+      }
+      .header-button--danger:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-error), transparent 92%);
+      }
       .header-button wa-icon {
         font-size: 16px;
       }
@@ -279,7 +292,7 @@ export class ESPHomePageFile extends LitElement {
             this._isPackage
               ? html`<button
                     type="button"
-                    class="header-button"
+                    class="header-button header-button--accent"
                     ?disabled=${this._isDirty}
                     title=${this._isDirty ? this._localize("packages.rename_save_first") : ""}
                     @click=${this._openRename}
@@ -289,10 +302,10 @@ export class ESPHomePageFile extends LitElement {
                   </button>
                   <button
                     type="button"
-                    class="header-button"
+                    class="header-button header-button--danger"
                     @click=${this._confirmDelete}
                   >
-                    <wa-icon library="mdi" name="delete-outline"></wa-icon>
+                    <wa-icon library="mdi" name="delete"></wa-icon>
                     ${this._localize("packages.delete")}
                   </button>`
               : null
