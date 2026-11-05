@@ -54,7 +54,7 @@ import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "./firmware-install-dialog.js";
 import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
 import type { ESPHomeLogsDialog } from "./logs-dialog.js";
-import { canResetBuildEnv } from "./remote-build-hint.js";
+import { canResetBuildEnv, resettablePairings } from "./remote-build-hint.js";
 import { firmwareJobsListStyles } from "./shared/firmware-jobs-list-styles.js";
 import "./firmware-install-dialog.js";
 import "./logs-dialog.js";
@@ -115,6 +115,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   // The pairing a pending remote-reset confirm targets; null when the
   // confirm dialog is closed.
   @state() private _pendingResetPeer: { pin_sha256: string; label: string } | null = null;
+  @state() private _pendingResetAll: PairingSummary[] = [];
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
@@ -160,12 +161,11 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   // Entry point for resetting every reset-capable build server at once.
   openResetAllPeerBuildEnv() {
-    if (this._resettablePairings().length === 0) return;
+    const targets = resettablePairings(this._pairings);
+    if (targets.length === 0) return;
+    // Snapshot so the confirmed set matches the count the dialog showed.
+    this._pendingResetAll = targets;
     this._resetAllConfirmDialog.open();
-  }
-
-  private _resettablePairings(): PairingSummary[] {
-    return Array.from(this._pairings?.values() ?? []).filter(canResetBuildEnv);
   }
 
   private _onRequestDownloadFirmware = async (e: CustomEvent<ConfiguredDevice>) => {
@@ -277,7 +277,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       <esphome-confirm-dialog
         id="reset-all-peers-confirm"
         heading=${this._localize("firmware_jobs.reset_all_peers_confirm_title", {
-          count: this._resettablePairings().length,
+          count: this._pendingResetAll.length,
         })}
         confirm-label=${this._localize("firmware_jobs.reset_all_peers_confirm_button")}
         message=${this._localize("firmware_jobs.reset_all_peers_confirm_message")}
@@ -350,7 +350,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   };
 
   private _onResetAllPeersConfirmed = async () => {
-    const targets = this._resettablePairings();
+    const targets = this._pendingResetAll;
     const results = await Promise.allSettled(
       targets.map((p) =>
         this._api.remoteBuildResetPeerBuildEnv({ pin_sha256: p.pin_sha256 })

@@ -176,6 +176,7 @@ describe("reset all build servers", () => {
   it("queues a reset per capable server and opens the jobs list", async () => {
     const { el, open } = makeTwo({ reset_build_env_supported: true });
     el._api.remoteBuildResetPeerBuildEnv.mockResolvedValue({} as FirmwareJob);
+    el.openResetAllPeerBuildEnv();
     await el._onResetAllPeersConfirmed();
     expect(el._api.remoteBuildResetPeerBuildEnv).toHaveBeenCalledWith({
       pin_sha256: PIN,
@@ -192,6 +193,7 @@ describe("reset all build servers", () => {
     el._api.remoteBuildResetPeerBuildEnv
       .mockResolvedValueOnce({} as FirmwareJob)
       .mockRejectedValueOnce(new Error("link down"));
+    el.openResetAllPeerBuildEnv();
     await el._onResetAllPeersConfirmed();
     expect(notifyError).toHaveBeenCalledTimes(1);
     expect(vi.mocked(notifyError).mock.calls[0][0] as string).toContain("mini");
@@ -202,9 +204,19 @@ describe("reset all build servers", () => {
   it("stays quiet and leaves the list closed when every reset fails", async () => {
     const { el, open } = makeTwo();
     el._api.remoteBuildResetPeerBuildEnv.mockRejectedValue(new Error("x"));
+    el.openResetAllPeerBuildEnv();
     await el._onResetAllPeersConfirmed();
     expect(notifyError).toHaveBeenCalledTimes(2);
     expect(notifySuccess).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
+  });
+
+  it("resets the servers the confirm was opened for, not a later set", async () => {
+    const { el } = makeTwo();
+    el._api.remoteBuildResetPeerBuildEnv.mockResolvedValue({} as FirmwareJob);
+    el.openResetAllPeerBuildEnv();
+    el._pairings = new Map();
+    await el._onResetAllPeersConfirmed();
+    expect(el._api.remoteBuildResetPeerBuildEnv).toHaveBeenCalledTimes(2);
   });
 });

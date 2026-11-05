@@ -40,7 +40,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-actions.js";
 import { headerActionsStyles } from "./esphome-header-actions.styles.js";
 import { OverflowMenuElement } from "./overflow-menu-element.js";
-import { canResetBuildEnv } from "./remote-build-hint.js";
+import { resettablePairings } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
@@ -301,8 +301,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                 </div>
                 ${
                   // Two or more: a single server already has its own reset button.
-                  Array.from(this._pairings?.values() ?? []).filter(canResetBuildEnv)
-                    .length >= 2
+                  resettablePairings(this._pairings).length >= 2
                     ? html`<div
                         class="menu-item"
                         role="menuitem"
