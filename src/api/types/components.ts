@@ -8,58 +8,17 @@ import type { PagedResponse } from "./protocol.js";
 
 // ─── Components ──────────────────────────────────────────────
 
-/** Component categories (matches backend ComponentCategory enum). */
+/**
+ * Categories the frontend names in code. A platform entry's category is its
+ * domain string (sensor, packet_interface), which has no member here.
+ */
 export enum ComponentCategory {
-  SENSOR = "sensor",
-  BINARY_SENSOR = "binary_sensor",
-  SWITCH = "switch",
-  LIGHT = "light",
-  FAN = "fan",
-  COVER = "cover",
-  CLIMATE = "climate",
-  BUTTON = "button",
-  NUMBER = "number",
-  SELECT = "select",
-  TEXT = "text",
-  TEXT_SENSOR = "text_sensor",
-  LOCK = "lock",
-  VALVE = "valve",
-  MEDIA_PLAYER = "media_player",
-  SPEAKER = "speaker",
-  MICROPHONE = "microphone",
-  CAMERA = "camera",
-  DISPLAY = "display",
-  TOUCHSCREEN = "touchscreen",
-  OUTPUT = "output",
-  DATETIME = "datetime",
-  EVENT = "event",
-  UPDATE = "update",
-  ALARM = "alarm_control_panel",
   CORE = "core",
   BUS = "bus",
   AUTOMATION = "automation",
-  // Platform-domain umbrellas — `ota.*` / `time.*` components carry
-  // these as their category. The regular component selector hides
-  // them since the OTA / time / update blocks belong in the core
-  // dialog (see CORE_CATEGORIES below).
-  OTA = "ota",
-  TIME = "time",
-  // Other platform domains tagged from the schema by the sync
-  // script. Listed so frontend code can reference them by enum.
-  AUDIO_ADC = "audio_adc",
-  AUDIO_DAC = "audio_dac",
-  BRIDGE = "bridge",
-  CANBUS = "canbus",
-  IMAGE = "image",
-  INFRARED = "infrared",
-  MEDIA_SOURCE = "media_source",
-  MOTION = "motion",
-  ONE_WIRE = "one_wire",
-  PACKET_TRANSPORT = "packet_transport",
-  RADIO_FREQUENCY = "radio_frequency",
-  STEPPER = "stepper",
-  WATER_HEATER = "water_heater",
   MISC = "misc",
+  OTA = "ota",
+  UPDATE = "update",
   // Synthetic category for components surfaced as board recommendations.
   // Featured entries are materialised on the fly from the board catalog
   // and only appear in API results when ``category=featured`` is the
@@ -90,7 +49,7 @@ export enum ComponentCategory {
  * YAML-key-level counterpart (which umbrella keys are categorized
  * as "Core" in the navigator) and stays aligned with this list.
  */
-export const CORE_CATEGORIES: ComponentCategory[] = [
+export const CORE_CATEGORIES: readonly string[] = [
   ComponentCategory.CORE,
   ComponentCategory.OTA,
   ComponentCategory.UPDATE,
@@ -101,7 +60,8 @@ export interface ComponentCatalogIndexEntry {
   id: string;
   name: string;
   description: string;
-  category: ComponentCategory;
+  /** A ComponentCategory value, or the platform domain for a dotted id. */
+  category: string;
   docs_url?: string;
   image_url?: string;
   /** Other components this one requires to be configured. */
@@ -132,7 +92,7 @@ export interface ComponentCatalogIndexEntry {
   /** Real catalog category behind a `featured` entry (`bus` for a featured
    *  `spi`), so the card can chip its type alongside its recommendation
    *  status. Null/absent on regular entries. */
-  underlying_category?: ComponentCategory | null;
+  underlying_category?: string | null;
 }
 
 export interface ComponentCatalogEntry extends ComponentCatalogIndexEntry {

@@ -10,6 +10,12 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@home-assistant/webawesome/dist/components/badge/badge.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("../../../src/util/yaml-completion-catalog.js", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../src/util/yaml-completion-catalog.js")
+  >()),
+  getCachedCatalogIndex: () => ({ components: [{ id: "sensor.dht" }] }),
+}));
 
 import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ESPHomeComponentCatalog } from "../../../src/components/device/component-catalog.js";

@@ -16,7 +16,6 @@ vi.mock("../../../src/components/device/component-catalog.js", () => ({}));
 vi.mock("sonner-js", () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import type { BoardCatalogEntry } from "../../../src/api/types/boards.js";
-import { ComponentCategory } from "../../../src/api/types/components.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeAddComponentDialogHost } from "./_add-component-dialog-host.js";
@@ -94,7 +93,7 @@ describe("add-component-dialog selects what it added", () => {
     const { dialog, d } = makeDialog();
     d._selected = makeComponentEntry("featured.apollo-esk-1.boot_button", {
       name: "Boot Button",
-      category: ComponentCategory.BINARY_SENSOR,
+      category: "binary_sensor",
     });
     const seen = capture(dialog);
 
@@ -110,7 +109,7 @@ describe("add-component-dialog selects what it added", () => {
     const { dialog, d } = makeDialog();
     d._selected = makeComponentEntry("featured.apollo-esk-1.boot_button", {
       name: "Boot Button",
-      category: ComponentCategory.BINARY_SENSOR,
+      category: "binary_sensor",
     });
     const highlights = captureHighlight(dialog);
 
@@ -124,7 +123,7 @@ describe("add-component-dialog selects what it added", () => {
     const { dialog, d } = makeDialog();
     d._selected = makeComponentEntry("binary_sensor.gpio", {
       name: "GPIO Binary Sensor",
-      category: ComponentCategory.BINARY_SENSOR,
+      category: "binary_sensor",
     });
     const seen = capture(dialog);
 
@@ -141,7 +140,7 @@ describe("add-component-dialog selects what it added", () => {
     const { dialog, d } = makeDialog();
     d._selected = makeComponentEntry("featured.apollo-esk-1.unknown", {
       name: "Mystery",
-      category: ComponentCategory.BINARY_SENSOR,
+      category: "binary_sensor",
     });
     const seen = capture(dialog);
 
@@ -160,7 +159,7 @@ describe("add-component-dialog selects what it added", () => {
     const { dialog, d } = makeDialog();
     d._selected = makeComponentEntry("featured.apollo-esk-1.led", {
       name: "LED",
-      category: ComponentCategory.LIGHT,
+      category: "light",
     });
     const seen = capture(dialog);
 
@@ -181,7 +180,7 @@ describe("add-component-dialog selects what it added", () => {
     const { dialog, d } = makeDialog();
     d._selected = makeComponentEntry(id, {
       name: "Mystery",
-      category: ComponentCategory.BINARY_SENSOR,
+      category: "binary_sensor",
     });
     const seen = capture(dialog);
 
@@ -194,11 +193,11 @@ describe("add-component-dialog selects what it added", () => {
     const { dialog, d, addComponent, getComponentBodies } = makeDialog();
     getComponentBodies.mockResolvedValue({
       "featured.apollo-esk-1.led": makeComponentEntry("featured.apollo-esk-1.led", {
-        category: ComponentCategory.LIGHT,
+        category: "light",
       }),
       "featured.apollo-esk-1.boot_button": makeComponentEntry(
         "featured.apollo-esk-1.boot_button",
-        { category: ComponentCategory.BINARY_SENSOR }
+        { category: "binary_sensor" }
       ),
     });
     addComponent
@@ -229,10 +228,10 @@ describe("add-component-dialog selects what it added", () => {
     getComponentBodies.mockResolvedValue({
       "featured.apollo-esk-1.boot_button": makeComponentEntry(
         "featured.apollo-esk-1.boot_button",
-        { category: ComponentCategory.BINARY_SENSOR }
+        { category: "binary_sensor" }
       ),
       "featured.apollo-esk-1.led": makeComponentEntry("featured.apollo-esk-1.led", {
-        category: ComponentCategory.LIGHT,
+        category: "light",
       }),
     });
     addComponent.mockResolvedValueOnce({ yaml: MERGED });
@@ -261,7 +260,7 @@ describe("add-component-dialog selects what it added", () => {
     getComponentBodies.mockResolvedValue({
       "featured.apollo-esk-1.boot_button": makeComponentEntry(
         "featured.apollo-esk-1.boot_button",
-        { category: ComponentCategory.BINARY_SENSOR }
+        { category: "binary_sensor" }
       ),
     });
     // `motion_module` is already in YAML, so the member is skipped.
