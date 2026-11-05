@@ -163,4 +163,22 @@ describe("choose-binary artifact labels", () => {
     );
     expect(container.querySelector(".copy-value")?.textContent).toContain(OTA_ROW.md5);
   });
+  it("says the MD5 is unavailable after a failed re-read dropped it", () => {
+    const host = {
+      _step: "choose-binary",
+      _binaries: [{ ...OTA_ROW, md5: undefined }, ELF_ROW],
+      _log: fakeLogBuffer(),
+      _localize: defaultLocalize,
+      _onChooseBinary: () => {},
+      _md5Expanded: new Set<string>(),
+      _toggleMd5: vi.fn(),
+      _checksumsPending: false,
+      _checksumsUnavailable: true,
+    };
+    const container = renderInto(
+      renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
+    );
+    expect(container.querySelectorAll(".binary-checksum")).toHaveLength(1);
+    expect(container.textContent).toContain("MD5 unavailable");
+  });
 });

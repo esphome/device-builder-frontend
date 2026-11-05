@@ -158,6 +158,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _md5Expanded: ReadonlySet<string> = new Set();
   // A build or digest re-read is replacing the shown checksums.
   @state() _checksumsPending = false;
+  // The last digest re-read failed, so the checksums were dropped.
+  @state() _checksumsUnavailable = false;
+  // The in-flight digest re-read every caller in this run shares.
+  _digestRefresh?: Promise<boolean>;
 
   // Reset per _init so an opt-out on one run doesn't persist. Only the
   // web-serial install connects to a device, so the toggle is install-only.
@@ -326,6 +330,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._binaries = [];
     this._md5Expanded = new Set();
     this._checksumsPending = false;
+    this._checksumsUnavailable = false;
+    this._digestRefresh = undefined;
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failureKind = null;

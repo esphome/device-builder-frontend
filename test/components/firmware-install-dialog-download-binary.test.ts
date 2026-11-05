@@ -175,6 +175,9 @@ describe("manual firmware-binary download flow", () => {
     expect(host._binaries.map((binary) => binary.md5)).toEqual([undefined, undefined]);
     expect(host._binaries).toHaveLength(2);
     expect(warn).toHaveBeenCalled();
+    expect((host as unknown as ESPHomeFirmwareInstallDialog)._checksumsUnavailable).toBe(
+      true
+    );
     expect(host._step).toBe("download-ready");
   });
 
@@ -260,6 +263,27 @@ describe("manual firmware-binary download flow", () => {
     host._activeJobs.delete("device.yaml");
     syncChecksumsWithBuilds(dialog);
     await vi.waitFor(() => expect(dialog._checksumsPending).toBe(false));
+    expect(host._binaries[0].md5).toBe("b");
+  });
+
+  it("shares one in-flight digest re-read across callers", async () => {
+    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    host._binaries = [{ ...OTA, md5: "a" }];
+    Object.assign(host, { _checksumsPending: true });
+    let release!: (value: FirmwareBinary[]) => void;
+    api.firmwareGetBinaries.mockImplementationOnce(
+      () => new Promise<FirmwareBinary[]>((resolve) => (release = resolve))
+    );
+
+    syncChecksumsWithBuilds(dialog);
+    syncChecksumsWithBuilds(dialog); // another job update while the read is in flight
+    const download = downloadSelectedBinary(dialog, "firmware.ota.bin");
+    await vi.waitFor(() => expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1));
+    release([{ ...OTA, md5: "b" }]);
+    await download;
+
+    expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
     expect(host._binaries[0].md5).toBe("b");
   });
 

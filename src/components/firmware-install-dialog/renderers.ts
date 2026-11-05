@@ -228,7 +228,15 @@ function renderMd5(
   title: string
 ): TemplateResult | typeof nothing {
   const md5 = binary.md5;
-  if (!md5) return nothing;
+  if (!md5) {
+    return host._checksumsUnavailable && binary.type !== "elf"
+      ? html`<div class="binary-checksum">
+          <span class="binary-checksum-pending">
+            ${host._localize("firmware.md5_unavailable")}
+          </span>
+        </div>`
+      : nothing;
+  }
   return html`
     <div class="binary-checksum">
       ${renderDisclosure({

@@ -251,23 +251,37 @@ export async function downloadSelectedBinary(
 
 // A build that finished while the picker sat open replaced the files; re-read
 // the checksum metadata so a copied MD5 matches what downloads. A failed
-// re-read drops the digests rather than show ones that may be stale. False
-// when the dialog was closed or reopened meanwhile.
-async function refreshDigests(
+// re-read drops the digests rather than show ones that may be stale. Callers
+// in one run share the in-flight read. False when the dialog was closed or
+// reopened meanwhile.
+function refreshDigests(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<boolean> {
-  if (host._binaries.length === 0) return true;
+  if (host._binaries.length === 0) return Promise.resolve(true);
+  if (!host._digestRefresh) {
+    const refresh = readDigests(host, configuration).finally(() => {
+      if (host._digestRefresh === refresh) host._digestRefresh = undefined;
+    });
+    host._digestRefresh = refresh;
+  }
+  return host._digestRefresh;
+}
+
+async function readDigests(
+  host: ESPHomeFirmwareInstallDialog,
+  configuration: string
+): Promise<boolean> {
   const stillCurrent = runGuard(host);
-  let fresh: FirmwareBinary[];
+  let fresh: FirmwareBinary[] | null;
   try {
     fresh = await host._api.firmwareGetBinaries(configuration);
   } catch (err) {
     console.warn("Could not refresh firmware digests", err);
-    fresh = [];
+    fresh = null;
   }
   if (!stillCurrent()) return false;
-  const byFile = new Map(fresh.map((binary) => [binary.file, binary]));
+  const byFile = new Map((fresh ?? []).map((binary) => [binary.file, binary]));
   host._binaries = host._binaries.map((binary) => {
     const latest = byFile.get(binary.file);
     return {
@@ -276,6 +290,7 @@ async function refreshDigests(
       md5: latest?.md5,
     };
   });
+  host._checksumsUnavailable = fresh === null;
   host._checksumsPending = host._activeJobs.has(configuration);
   return true;
 }
