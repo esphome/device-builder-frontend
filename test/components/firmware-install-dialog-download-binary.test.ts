@@ -28,10 +28,10 @@ import {
   JobStatus,
 } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import { syncChecksumsWithBuilds } from "../../src/components/firmware-install-dialog/checksums.js";
 import {
   downloadSelectedBinary,
   startDownload,
-  syncChecksumsWithBuilds,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
 
 const FACTORY: FirmwareBinary = {
@@ -175,7 +175,7 @@ describe("manual firmware-binary download flow", () => {
     expect(host._binaries.map((binary) => binary.md5)).toEqual([undefined, undefined]);
     expect(host._binaries).toHaveLength(2);
     expect(warn).toHaveBeenCalled();
-    expect((host as unknown as ESPHomeFirmwareInstallDialog)._checksumsUnavailable).toBe(
+    expect((host as unknown as ESPHomeFirmwareInstallDialog)._checksums.unavailable).toBe(
       true
     );
     expect(host._step).toBe("download-ready");
@@ -252,17 +252,16 @@ describe("manual firmware-binary download flow", () => {
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     host._binaries = [{ ...OTA, md5: "a" }];
     host._step = "choose-binary";
-    Object.assign(host, { _checksumsPending: false });
 
     host._activeJobs.set("device.yaml", { job_id: "rebuild" });
     syncChecksumsWithBuilds(dialog);
-    expect(dialog._checksumsPending).toBe(true);
+    expect(dialog._checksums.pending).toBe(true);
     expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
 
     api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "b" }]);
     host._activeJobs.delete("device.yaml");
     syncChecksumsWithBuilds(dialog);
-    await vi.waitFor(() => expect(dialog._checksumsPending).toBe(false));
+    await vi.waitFor(() => expect(dialog._checksums.pending).toBe(false));
     expect(host._binaries[0].md5).toBe("b");
   });
 
@@ -270,7 +269,7 @@ describe("manual firmware-binary download flow", () => {
     const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     host._binaries = [{ ...OTA, md5: "a" }];
-    Object.assign(host, { _checksumsPending: true });
+    host._checksums = { ...host._checksums, pending: true };
     let release!: (value: FirmwareBinary[]) => void;
     api.firmwareGetBinaries.mockImplementationOnce(
       () => new Promise<FirmwareBinary[]>((resolve) => (release = resolve))

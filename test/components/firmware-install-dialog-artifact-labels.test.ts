@@ -12,6 +12,7 @@ import { fakeLogBuffer } from "../_fake-host.js";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import { initialChecksums } from "../../src/components/firmware-install-dialog/checksums.js";
 import { renderStatusExtra } from "../../src/components/firmware-install-dialog/renderers.js";
 
 const copyWithToast = vi.hoisted(() => vi.fn(async () => {}));
@@ -33,9 +34,7 @@ function renderRows(
     _log: fakeLogBuffer(),
     _localize: defaultLocalize,
     _onChooseBinary: () => {},
-    _md5Expanded: new Set(expanded),
-    _toggleMd5: vi.fn(),
-    _checksumsPending: pending,
+    _checksums: { ...initialChecksums(), expanded: new Set(expanded), pending },
   };
   const container = renderInto(
     renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
@@ -112,7 +111,7 @@ describe("choose-binary artifact labels", () => {
     expect(toggles[0].getAttribute("aria-label")).toBe("MD5 of OTA update");
     expect(container.textContent).not.toContain(OTA_ROW.md5);
     toggles[0].click();
-    expect(container.host._toggleMd5).toHaveBeenCalledWith("firmware.ota.bin");
+    expect(container.host._checksums.expanded.has("firmware.ota.bin")).toBe(true);
   });
 
   it("expanding shows the digest, its copy control and the .md5 download", () => {
@@ -146,17 +145,19 @@ describe("choose-binary artifact labels", () => {
     expect(container.textContent).not.toContain(OTA_ROW.md5);
     expect(container.textContent).toContain("Updating the checksum…");
   });
-  it("shows the downloaded artifact's MD5 on download-ready", () => {
+  it("shows the downloaded artifact's MD5 on download-ready, matched by file", () => {
     const host = {
       _step: "download-ready",
       _installer: "binary-download",
       _binaries: [OTA_ROW],
-      _downloadedFilename: "kitchen-firmware.ota.bin",
+      _downloadedFilename: "renamed-firmware.ota.bin",
       _log: fakeLogBuffer(),
       _localize: defaultLocalize,
-      _md5Expanded: new Set(["firmware.ota.bin"]),
-      _toggleMd5: vi.fn(),
-      _checksumsPending: false,
+      _checksums: {
+        ...initialChecksums(),
+        expanded: new Set(["firmware.ota.bin"]),
+        downloadedFile: "firmware.ota.bin",
+      },
     };
     const container = renderInto(
       renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
@@ -170,10 +171,7 @@ describe("choose-binary artifact labels", () => {
       _log: fakeLogBuffer(),
       _localize: defaultLocalize,
       _onChooseBinary: () => {},
-      _md5Expanded: new Set<string>(),
-      _toggleMd5: vi.fn(),
-      _checksumsPending: false,
-      _checksumsUnavailable: true,
+      _checksums: { ...initialChecksums(), unavailable: true },
     };
     const container = renderInto(
       renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)

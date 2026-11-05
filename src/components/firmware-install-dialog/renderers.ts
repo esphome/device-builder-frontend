@@ -24,6 +24,7 @@ import {
 import { canResetBuildEnv } from "../remote-build-hint.js";
 import { renderCopyValue } from "../shared/copy-value.js";
 import { renderDisclosure } from "../shared/disclosure.js";
+import { toggleMd5 } from "./checksums.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -229,7 +230,7 @@ function renderMd5(
 ): TemplateResult | typeof nothing {
   const md5 = binary.md5;
   if (!md5) {
-    return host._checksumsUnavailable && binary.type !== "elf"
+    return host._checksums.unavailable && binary.type !== "elf"
       ? html`<div class="binary-checksum">
           <span class="binary-checksum-pending">
             ${host._localize("firmware.md5_unavailable")}
@@ -240,15 +241,15 @@ function renderMd5(
   return html`
     <div class="binary-checksum">
       ${renderDisclosure({
-        open: host._md5Expanded.has(binary.file),
-        onToggle: () => host._toggleMd5(binary.file),
+        open: host._checksums.expanded.has(binary.file),
+        onToggle: () => toggleMd5(host, binary.file),
         localize: host._localize,
         labelKey: "firmware.md5_label",
         ariaLabel: host._localize("firmware.md5_toggle_aria", { title }),
         variant: "quiet",
         iconBefore: true,
         body: () =>
-          host._checksumsPending
+          host._checksums.pending
             ? html`<span class="binary-checksum-pending">
                 ${host._localize("firmware.md5_pending")}
               </span>`
@@ -310,7 +311,7 @@ function renderDownloadReadyExtra(
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
   const downloaded = host._binaries.find(
-    (binary) => binary.download_name === host._downloadedFilename
+    (binary) => binary.file === host._checksums.downloadedFile
   );
   // Manual binary download: offer to pick a different format when more than
   // one was produced.

@@ -10,6 +10,7 @@ import { dispatchShowLogsAfterInstall } from "../../util/post-install-dispatch.j
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
+import { refreshDigests, updateChecksums } from "./checksums.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
@@ -230,6 +231,7 @@ export async function downloadSelectedBinary(
   if (!device) return;
   if (!(await artifactsSettled(host, device.configuration))) return;
   if (!fresh && !(await refreshDigests(host, device.configuration))) return;
+  updateChecksums(host, { downloadedFile: file });
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).
@@ -247,67 +249,6 @@ export async function downloadSelectedBinary(
   }
   host._step = "download-ready";
   host._statusMessage = "";
-}
-
-// A build that finished while the picker sat open replaced the files; re-read
-// the checksum metadata so a copied MD5 matches what downloads. A failed
-// re-read drops the digests rather than show ones that may be stale. Callers
-// in one run share the in-flight read. False when the dialog was closed or
-// reopened meanwhile.
-function refreshDigests(
-  host: ESPHomeFirmwareInstallDialog,
-  configuration: string
-): Promise<boolean> {
-  if (host._binaries.length === 0) return Promise.resolve(true);
-  if (!host._digestRefresh) {
-    const refresh = readDigests(host, configuration).finally(() => {
-      if (host._digestRefresh === refresh) host._digestRefresh = undefined;
-    });
-    host._digestRefresh = refresh;
-  }
-  return host._digestRefresh;
-}
-
-async function readDigests(
-  host: ESPHomeFirmwareInstallDialog,
-  configuration: string
-): Promise<boolean> {
-  const stillCurrent = runGuard(host);
-  let fresh: FirmwareBinary[] | null;
-  try {
-    fresh = await host._api.firmwareGetBinaries(configuration);
-  } catch (err) {
-    console.warn("Could not refresh firmware digests", err);
-    fresh = null;
-  }
-  if (!stillCurrent()) return false;
-  const byFile = new Map((fresh ?? []).map((binary) => [binary.file, binary]));
-  host._binaries = host._binaries.map((binary) => {
-    const latest = byFile.get(binary.file);
-    return {
-      ...binary,
-      download_name: latest?.download_name ?? binary.download_name,
-      md5: latest?.md5,
-    };
-  });
-  host._checksumsUnavailable = fresh === null;
-  host._checksumsPending = host._activeJobs.has(configuration);
-  return true;
-}
-
-/**
- * Hold the shown checksums while a build for the device runs, and re-read
- * them once it ends, so the picker and download-ready never offer a digest
- * of artifacts a build just replaced.
- */
-export function syncChecksumsWithBuilds(host: ESPHomeFirmwareInstallDialog): void {
-  const configuration = host._device?.configuration;
-  if (!configuration || host._binaries.length === 0) return;
-  if (host._activeJobs.has(configuration)) {
-    host._checksumsPending = true;
-  } else if (host._checksumsPending) {
-    void refreshDigests(host, configuration);
-  }
 }
 
 /**

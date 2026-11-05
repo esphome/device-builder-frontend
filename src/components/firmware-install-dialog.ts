@@ -44,12 +44,16 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import { resetForRetry } from "./firmware-install-dialog/browser-flash-steps.js";
 import {
+  type ChecksumState,
+  initialChecksums,
+  syncChecksumsWithBuilds,
+} from "./firmware-install-dialog/checksums.js";
+import {
   downloadSelectedBinary,
   flipToLogs,
   showOtaLogs,
   startArtifactDownload,
   startDownload,
-  syncChecksumsWithBuilds,
 } from "./firmware-install-dialog/install-flow.js";
 import {
   cardState,
@@ -154,14 +158,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // Formats offered by the manual download picker; populated only when a
   // device produces more than one (e.g. ESP32 factory + OTA).
   @state() _binaries: FirmwareBinary[] = [];
-  // Artifact files whose MD5 disclosure is open.
-  @state() _md5Expanded: ReadonlySet<string> = new Set();
-  // A build or digest re-read is replacing the shown checksums.
-  @state() _checksumsPending = false;
-  // The last digest re-read failed, so the checksums were dropped.
-  @state() _checksumsUnavailable = false;
-  // The in-flight digest re-read every caller in this run shares.
-  _digestRefresh?: Promise<boolean>;
+  @state() _checksums: ChecksumState = initialChecksums();
 
   // Reset per _init so an opt-out on one run doesn't persist. Only the
   // web-serial install connects to a device, so the toggle is install-only.
@@ -291,12 +288,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startArtifactDownload(this);
   }
 
-  _toggleMd5(file: string) {
-    const next = new Set(this._md5Expanded);
-    if (!next.delete(file)) next.add(file);
-    this._md5Expanded = next;
-  }
-
   // Picked a format in the choose-binary step.
   _onChooseBinary(file: string) {
     void downloadSelectedBinary(this, file);
@@ -328,10 +319,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._flashPercent = 0;
     this._downloadedFilename = "";
     this._binaries = [];
-    this._md5Expanded = new Set();
-    this._checksumsPending = false;
-    this._checksumsUnavailable = false;
-    this._digestRefresh = undefined;
+    this._checksums = initialChecksums();
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failureKind = null;
