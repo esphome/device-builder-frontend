@@ -224,7 +224,7 @@ export async function downloadSelectedBinary(
   const device = host._device;
   if (!device) return;
   if (!(await artifactsSettled(host, device.configuration))) return;
-  await refreshDigests(host, device.configuration);
+  if (!(await refreshDigests(host, device.configuration))) return;
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).
@@ -247,11 +247,12 @@ export async function downloadSelectedBinary(
 // A build that finished while the picker sat open replaced the files; re-read
 // the digests so a copied MD5 matches what downloads. A failed re-read drops
 // the digests rather than show ones that may be stale; the download goes on.
+// False when the dialog was closed or reopened meanwhile.
 async function refreshDigests(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
-): Promise<void> {
-  if (!host._binaries.some((binary) => binary.md5)) return;
+): Promise<boolean> {
+  if (host._binaries.length === 0) return true;
   const stillCurrent = runGuard(host);
   let fresh: FirmwareBinary[];
   try {
@@ -260,12 +261,13 @@ async function refreshDigests(
     console.warn("Could not refresh firmware digests", err);
     fresh = [];
   }
-  if (!stillCurrent()) return;
+  if (!stillCurrent()) return false;
   const digests = new Map(fresh.map((binary) => [binary.file, binary.md5]));
   host._binaries = host._binaries.map((binary) => ({
     ...binary,
     md5: digests.get(binary.file),
   }));
+  return true;
 }
 
 /**

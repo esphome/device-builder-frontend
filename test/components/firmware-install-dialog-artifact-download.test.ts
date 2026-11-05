@@ -31,11 +31,20 @@ import {
   startArtifactDownload,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
 
-const FACTORY: FirmwareBinary = { title: "Factory format", file: "firmware.factory.bin" };
-const OTA: FirmwareBinary = { title: "OTA format", file: "firmware.ota.bin" };
+const FACTORY: FirmwareBinary = {
+  title: "Factory format",
+  file: "firmware.factory.bin",
+  download_name: "device-firmware.factory.bin",
+};
+const OTA: FirmwareBinary = {
+  title: "OTA format",
+  file: "firmware.ota.bin",
+  download_name: "device-firmware.ota.bin",
+};
 const ELF: FirmwareBinary = {
   title: "ELF (for debugging)",
   file: "firmware.elf",
+  download_name: "device-firmware.elf",
   description: "Debug symbols for the ESP stack trace decoder.",
 };
 
@@ -45,9 +54,12 @@ type FollowCbs = {
 };
 
 // get_binaries can return a different list on each call (empty before a
-// compile, populated after), so accept a queue of results.
+// compile, populated after), so accept a queue of results; later calls (the
+// digest re-read at download time) repeat the last one.
 function makeHost(getBinariesResults: FirmwareBinary[][]) {
-  const firmwareGetBinaries = vi.fn();
+  const firmwareGetBinaries = vi
+    .fn()
+    .mockResolvedValue(getBinariesResults[getBinariesResults.length - 1] ?? []);
   for (const result of getBinariesResults) {
     firmwareGetBinaries.mockResolvedValueOnce(result);
   }

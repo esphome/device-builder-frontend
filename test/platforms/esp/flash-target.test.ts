@@ -9,7 +9,11 @@ import { describe, expect, it } from "vitest";
 import type { FirmwareBinary } from "../../../src/api/types/firmware-jobs.js";
 import { pickFlashTarget } from "../../../src/platforms/esp/web-serial-install.js";
 
-const bin = (file: string): FirmwareBinary => ({ title: file, file });
+const bin = (file: string): FirmwareBinary => ({
+  title: file,
+  file,
+  download_name: file,
+});
 
 describe("pickFlashTarget", () => {
   // esptool-js reports the chip *description*, not the bare family name.

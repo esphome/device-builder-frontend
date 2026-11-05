@@ -10,6 +10,7 @@ import type { ESPHomeFirmwareInstallDialog } from "../../../src/components/firmw
 export const bin = (file: string, type?: string): FirmwareBinary => ({
   file,
   title: file,
+  download_name: file,
   type,
 });
 

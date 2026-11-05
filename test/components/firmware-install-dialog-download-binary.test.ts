@@ -177,9 +177,10 @@ describe("manual firmware-binary download flow", () => {
     expect(host._step).toBe("download-ready");
   });
 
-  it("leaves a reopened dialog's digests alone when the re-read lands late", async () => {
+  it("leaves a reopened dialog alone when the re-read lands late", async () => {
     const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "mine" }]);
     host._binaries = [{ ...OTA, md5: "mine" }];
+    host._step = "choose-binary";
     api.firmwareGetBinaries.mockImplementationOnce(async () => {
       host._installRun += 1; // closed and reopened while the re-read was in flight
       return [{ ...OTA, md5: "old-run" }];
@@ -189,6 +190,26 @@ describe("manual firmware-binary download flow", () => {
       "firmware.ota.bin"
     );
     expect(host._binaries[0].md5).toBe("mine");
+    expect(host._step).toBe("choose-binary");
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("restores the digests on the next download after a failed re-read", async () => {
+    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "o" }]);
+    host._binaries = [{ ...OTA, md5: "o" }];
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    api.firmwareGetBinaries.mockRejectedValueOnce(new Error("boom"));
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.ota.bin"
+    );
+    expect(host._binaries[0].md5).toBeUndefined();
+    api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "o2" }]);
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.ota.bin"
+    );
+    expect(host._binaries[0].md5).toBe("o2");
   });
 
   it("fails cleanly when listing the binaries errors", async () => {
