@@ -4,7 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeApp } from "../../src/components/app-shell.js";
-import { handleJobEvent, seedJobs } from "../../src/components/app-shell/jobs.js";
+import {
+  handleJobEvent,
+  onFirmwareHistoryCleared,
+  seedJobs,
+} from "../../src/components/app-shell/jobs.js";
 
 function makeHost(): ESPHomeApp {
   return {
@@ -256,5 +260,31 @@ describe("follow_jobs snapshot replay", () => {
     vi.runAllTimers();
     expect(host._firmwareJobs.get("a")!.status).toBe(JobStatus.COMPLETED);
     expect(host._activeJobs.size).toBe(0);
+  });
+
+  it("does not restore cleared history from buffered frames", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ job_id: "a", status: JobStatus.COMPLETED })
+    );
+    onFirmwareHistoryCleared(host);
+    vi.runAllTimers();
+    expect(host._firmwareJobs.size).toBe(0);
+  });
+
+  it("keeps the active map identity when a batch only adds finished jobs", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    const before = host._activeJobs;
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ job_id: "a", status: JobStatus.COMPLETED })
+    );
+    vi.runAllTimers();
+    expect(host._activeJobs).toBe(before);
   });
 });
