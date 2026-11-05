@@ -19,6 +19,7 @@ import type { ESPHomeAPI } from "../api/index.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import type { ESPHomeDeleteFileDialog } from "../components/packages/delete-file-dialog.js";
 import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
 import type {
@@ -51,6 +52,7 @@ import { secretsStyles } from "./secrets.styles.js";
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../components/confirm-dialog.js";
 import "../components/device/device-navigator.js";
 import "../components/packages/delete-file-dialog.js";
 import "../components/packages/file-list-dialog.js";
@@ -129,6 +131,9 @@ export class ESPHomePageFile extends LitElement {
   @query("esphome-rename-file-dialog")
   private _renameDialog?: ESPHomeRenameFileDialog;
 
+  @query("esphome-confirm-dialog")
+  private _reloadDialog?: ESPHomeConfirmDialog;
+
   private _unsavedGuard = new UnsavedGuard();
 
   protected readonly _saveShortcut = new SaveShortcutController(this, () => {
@@ -159,6 +164,8 @@ export class ESPHomePageFile extends LitElement {
 
   protected willUpdate(changed: PropertyValues<this>) {
     if (changed.has("path") && this.path) {
+      // A pending "discard and reload" was about the previous file.
+      this._reloadDialog?.close();
       // A discarded buffer of the previous file must not be saved into this one.
       this._yaml = this._savedYaml = "";
       // Nor may its navigator selection highlight lines of this one.
@@ -365,6 +372,13 @@ export class ESPHomePageFile extends LitElement {
         @save=${() => this._unsavedGuard.onSave()}
         @cancel=${() => this._unsavedGuard.onCancel()}
       ></esphome-unsaved-changes-dialog>
+      <esphome-confirm-dialog
+        destructive
+        heading=${this._localize("file.reload_title")}
+        message=${this._localize("file.reload_message")}
+        confirm-label=${this._localize("file.reload_confirm")}
+        @confirm=${this._load.retry}
+      ></esphome-confirm-dialog>
       <esphome-delete-file-dialog
         @file-deleted=${this._onDeleted}
       ></esphome-delete-file-dialog>
@@ -426,7 +440,10 @@ export class ESPHomePageFile extends LitElement {
           action: {
             label: this._localize("file.reload"),
             onClick: () => {
-              if (this.path === path) void this._load.start();
+              if (this.path !== path) return;
+              // Reloading replaces the buffer, so unsaved edits need a confirmation.
+              if (this._isDirty) this._reloadDialog?.open();
+              else void this._load.start();
             },
           },
         });

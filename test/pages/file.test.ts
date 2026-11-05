@@ -216,6 +216,45 @@ describe("esphome-page-file save", () => {
     expect(start).not.toHaveBeenCalled();
   });
 
+  describe("Reload from a conflict toast", () => {
+    const conflict = async (page: PageView) => {
+      page._api = {
+        updateConfig: vi
+          .fn()
+          .mockRejectedValue(new APIError("precondition_failed", "differs")),
+      } as unknown as ESPHomeAPI;
+      await page._save();
+      const open = vi.fn();
+      Object.defineProperty(page, "_reloadDialog", { value: { open } });
+      const start = vi
+        .spyOn(page._load as unknown as { start(): Promise<void> }, "start")
+        .mockResolvedValue();
+      return { open, start };
+    };
+
+    test("asks before throwing away unsaved edits", async () => {
+      const page = makePage({ _yaml: "new: 1\n" });
+      const { open, start } = await conflict(page);
+
+      lastToastOptions(toast.error).action!.onClick();
+
+      expect(open).toHaveBeenCalledOnce();
+      expect(start).not.toHaveBeenCalled();
+      expect(page._yaml).toBe("new: 1\n");
+    });
+
+    test("reloads straight away once the edits are reverted", async () => {
+      const page = makePage({ _yaml: "new: 1\n" });
+      const { open, start } = await conflict(page);
+
+      page._yaml = page._savedYaml;
+      lastToastOptions(toast.error).action!.onClick();
+
+      expect(open).not.toHaveBeenCalled();
+      expect(start).toHaveBeenCalledOnce();
+    });
+  });
+
   test("any other failure toasts the backend detail", async () => {
     const page = makePage({ _yaml: "new: 1\n" });
     page._api = {

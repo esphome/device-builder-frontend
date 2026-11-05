@@ -1993,6 +1993,9 @@
     "save_error": "Failed to save the file",
     "changed_on_disk": "The file changed outside the dashboard since you opened it. Reload to see the current version; your edits are not saved.",
     "reload": "Reload",
+    "reload_title": "Discard your edits?",
+    "reload_message": "Reloading replaces the editor with the version on disk. Your unsaved edits will be lost.",
+    "reload_confirm": "Discard and reload",
     "unsaved_title": "Unsaved changes",
     "unsaved_message": "You have unsaved changes to this file. If you leave without saving, they will be lost."
   },
