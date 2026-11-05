@@ -10,8 +10,10 @@ export interface ChecksumState {
   pending: boolean;
   /** The last digest re-read failed, so the checksums were dropped. */
   unavailable: boolean;
-  /** The artifact ``file`` the last download fetched. */
-  downloadedFile: string;
+  /** The row the last download fetched, as it was when downloaded. */
+  downloaded?: FirmwareBinary;
+  /** Bumped when a build starts; a re-read sent before it is discarded. */
+  generation: number;
   /** The in-flight digest re-read every caller in this run shares. */
   refresh?: Promise<boolean>;
 }
@@ -20,7 +22,7 @@ export const initialChecksums = (): ChecksumState => ({
   expanded: new Set(),
   pending: false,
   unavailable: false,
-  downloadedFile: "",
+  generation: 0,
 });
 
 export function updateChecksums(
@@ -61,6 +63,7 @@ async function readDigests(
   configuration: string
 ): Promise<boolean> {
   const stillCurrent = runGuard(host);
+  const { generation } = host._checksums;
   let fresh: FirmwareBinary[] | null;
   try {
     fresh = await host._api.firmwareGetBinaries(configuration);
@@ -69,15 +72,20 @@ async function readDigests(
     fresh = null;
   }
   if (!stillCurrent()) return false;
-  const byFile = new Map((fresh ?? []).map((binary) => [binary.file, binary]));
-  host._binaries = host._binaries.map((binary) => {
-    const latest = byFile.get(binary.file);
-    return {
-      ...binary,
-      download_name: latest?.download_name ?? binary.download_name,
-      md5: latest?.md5,
-    };
-  });
+  // A build started after this read was sent; the next re-read replaces it.
+  if (host._checksums.generation !== generation) return true;
+  if (fresh === null) {
+    host._binaries = host._binaries.map((binary) => ({ ...binary, md5: undefined }));
+  } else {
+    // A row missing from the answer is an artifact the build no longer has.
+    const byFile = new Map(fresh.map((binary) => [binary.file, binary]));
+    host._binaries = host._binaries.flatMap((binary) => {
+      const latest = byFile.get(binary.file);
+      return latest
+        ? [{ ...binary, download_name: latest.download_name, md5: latest.md5 }]
+        : [];
+    });
+  }
   updateChecksums(host, {
     unavailable: fresh === null,
     pending: host._activeJobs.has(configuration),
@@ -92,9 +100,15 @@ async function readDigests(
  */
 export function syncChecksumsWithBuilds(host: ESPHomeFirmwareInstallDialog): void {
   const configuration = host._device?.configuration;
-  if (!configuration || host._binaries.length === 0) return;
+  if (!configuration || !host._open || host._binaries.length === 0) return;
   if (host._activeJobs.has(configuration)) {
-    if (!host._checksums.pending) updateChecksums(host, { pending: true });
+    if (!host._checksums.pending || host._checksums.refresh) {
+      updateChecksums(host, {
+        pending: true,
+        refresh: undefined,
+        generation: host._checksums.generation + 1,
+      });
+    }
   } else if (host._checksums.pending) {
     void refreshDigests(host, configuration);
   }

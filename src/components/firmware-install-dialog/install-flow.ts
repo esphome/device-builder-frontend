@@ -220,9 +220,17 @@ export async function downloadSelectedBinary(
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
+  // A build the settle waits out rewrites the artifacts a fresh list described.
+  const rebuilding = host._activeJobs.has(device.configuration);
   if (!(await artifactsSettled(host, device.configuration))) return;
-  if (!fresh && !(await refreshDigests(host, device.configuration))) return;
-  updateChecksums(host, { downloadedFile: file });
+  if ((!fresh || rebuilding) && !(await refreshDigests(host, device.configuration)))
+    return;
+  const downloaded = host._binaries.find((binary) => binary.file === file);
+  if (host._binaries.length > 0 && !downloaded) {
+    host._fail(host._localize("firmware.artifact_gone"));
+    return;
+  }
+  updateChecksums(host, { downloaded });
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).

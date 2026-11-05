@@ -145,18 +145,20 @@ describe("choose-binary artifact labels", () => {
     expect(container.textContent).not.toContain(OTA_ROW.md5);
     expect(container.textContent).toContain("Updating the checksum…");
   });
-  it("shows the downloaded artifact's MD5 on download-ready, matched by file", () => {
+  it("shows the downloaded row's MD5 on download-ready, not the live list's", () => {
     const host = {
       _step: "download-ready",
       _installer: "binary-download",
-      _binaries: [OTA_ROW],
+      // A later build replaced the live row; download-ready keeps the snapshot.
+      _binaries: [{ ...OTA_ROW, md5: "b".repeat(32) }],
       _downloadedFilename: "renamed-firmware.ota.bin",
       _log: fakeLogBuffer(),
       _localize: defaultLocalize,
       _checksums: {
         ...initialChecksums(),
         expanded: new Set(["firmware.ota.bin"]),
-        downloadedFile: "firmware.ota.bin",
+        downloaded: OTA_ROW,
+        pending: true,
       },
     };
     const container = renderInto(

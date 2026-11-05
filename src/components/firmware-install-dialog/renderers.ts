@@ -223,14 +223,16 @@ export function renderOffloadHintSlot(
 // picker (choose-binary), the "choose another format" link (download-ready),
 // and the collapsible compile / esptool log.
 
+// ``snapshot``: *binary* is a downloaded row, so live build state doesn't apply.
 function renderMd5(
   host: ESPHomeFirmwareInstallDialog,
   binary: FirmwareBinary,
-  title: string
+  title: string,
+  snapshot = false
 ): TemplateResult | typeof nothing {
   const md5 = binary.md5;
   if (!md5) {
-    return host._checksums.unavailable && binary.type !== "elf"
+    return !snapshot && host._checksums.unavailable && binary.type !== "elf"
       ? html`<div class="binary-checksum">
           <span class="binary-checksum-pending">
             ${host._localize("firmware.md5_unavailable")}
@@ -249,7 +251,7 @@ function renderMd5(
         variant: "quiet",
         iconBefore: true,
         body: () =>
-          host._checksums.pending
+          !snapshot && host._checksums.pending
             ? html`<span class="binary-checksum-pending">
                 ${host._localize("firmware.md5_pending")}
               </span>`
@@ -310,13 +312,12 @@ function renderDownloadReadyExtra(
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
-  const downloaded = host._binaries.find(
-    (binary) => binary.file === host._checksums.downloadedFile
-  );
+  // The row as downloaded, not the live list a later build may replace.
+  const downloaded = host._checksums.downloaded;
   // Manual binary download: offer to pick a different format when more than
   // one was produced.
   return html`
-    ${downloaded ? renderMd5(host, downloaded, artifactTitle(host, downloaded)) : nothing}
+    ${downloaded ? renderMd5(host, downloaded, artifactTitle(host, downloaded), true) : nothing}
     ${
       host._binaries.length > 1
         ? html`<button

@@ -534,6 +534,7 @@
     "copy_md5_aria": "Copy the MD5 of {title}",
     "md5_toggle_aria": "MD5 of {title}",
     "md5_pending": "Updating the checksum…",
+    "artifact_gone": "That file is no longer in the build. Open Download again to choose from the current files.",
     "md5_unavailable": "MD5 unavailable right now; it's read again on the next download.",
     "download_md5": "Download .md5",
     "download_md5_aria": "Download the .md5 file for {title}",
