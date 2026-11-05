@@ -9,8 +9,8 @@ import { installLog } from "../../components/firmware-install-dialog/browser-fla
 import {
   compileOrFail,
   finishWithLogsPort,
-  runGuard,
 } from "../../components/firmware-install-dialog/install-flow.js";
+import { runGuard } from "../../components/firmware-install-dialog/run-guard.js";
 import { fetchBoard } from "../../util/board-body-cache.js";
 import { chipNameToVariant, chipPlatformFamily } from "../../util/chip-variant.js";
 import { getErrorMessage } from "../../util/error-message.js";

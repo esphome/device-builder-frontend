@@ -11,6 +11,7 @@ import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { refreshDigests, updateChecksums } from "./checksums.js";
+import { runGuard } from "./run-guard.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
@@ -67,16 +68,6 @@ export function showOtaLogs(host: ESPHomeFirmwareInstallDialog): void {
     reopenInstall: () => host.reopen(),
   });
   if (handled) host._open = false;
-}
-
-/**
- * Whether the dialog is still open on the install run it is on now. A
- * dismissal only flips the open flag; a reopen, for the same device or
- * another, starts the next run.
- */
-export function runGuard(host: ESPHomeFirmwareInstallDialog): () => boolean {
-  const run = host._installRun;
-  return () => host._installRun === run && host._open;
 }
 
 // Compile, surfacing a failure on the dialog. Returns false so the caller bails.

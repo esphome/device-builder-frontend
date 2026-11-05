@@ -1,6 +1,6 @@
 import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { runGuard } from "./install-flow.js";
+import { runGuard } from "./run-guard.js";
 
 /** The install dialog's per-run MD5 state. */
 export interface ChecksumState {
