@@ -48,11 +48,8 @@ import {
 } from "../components/dashboard/install.js";
 import { relinkLive } from "../components/dashboard/live-rebind.js";
 import {
-  cacheView,
-  readCachedView,
-  saveDashboardPrefs,
+  DashboardViewPrefsController,
   saveTablePreference,
-  seedDashboardPreferences,
 } from "../components/dashboard/prefs.js";
 import {
   renderCardGrid,
@@ -99,8 +96,6 @@ import {
   apiContext,
   buildOffloadPairingsContext,
   buildServerPeersContext,
-  type DashboardPrefs,
-  dashboardPrefsContext,
   devicesContext,
   devicesLoadedContext,
   expertModeContext,
@@ -240,10 +235,7 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: prefsLoadedContext, subscribe: true })
   @state()
   _prefsLoaded = false;
-  @consume({ context: dashboardPrefsContext, subscribe: true })
-  @state()
-  _dashboardPrefs: DashboardPrefs | null = null;
-  _prefsSeeded = false;
+  _viewPrefs = new DashboardViewPrefsController(this);
 
   @consume({ context: buildServerPeersContext, subscribe: true })
   @state()
@@ -419,7 +411,6 @@ export class ESPHomePageDashboard extends LitElement {
     // else mounts — a refresh, deep link, or browser-back must land
     // the user on the same view they left, not the default-empty
     // state that would otherwise flash through on first paint.
-    this._view = readCachedView() ?? this._view;
     this._hydrateFromUrl();
     this.setAttribute("view", this._view);
     this.toggleAttribute("yaml", this._yamlMode);
@@ -585,8 +576,7 @@ export class ESPHomePageDashboard extends LitElement {
       this._search = "";
       this._yamlSearch.clear();
     }
-    seedDashboardPreferences(this);
-    if (this.getAttribute("view") !== this._view) this.setAttribute("view", this._view);
+    if (changed.has("_view")) this.setAttribute("view", this._view);
     if (changed.has("_yamlMode")) this.toggleAttribute("yaml", this._yamlMode);
     // ``has-discovered`` is the hook that adds top padding for the
     // discovery banner. Track the same condition the banner renders
@@ -928,14 +918,7 @@ export class ESPHomePageDashboard extends LitElement {
     return this._computeLabelUsageMemo(this._devices);
   }
 
-  _enterDeviceView = (view: DashboardView) => {
-    // YAML is a third view option: clicking cards or table exits YAML
-    // search and returns to the device list.
-    if (this._yamlMode) this._setSearchMode(false);
-    this._view = view;
-    cacheView(view);
-    saveDashboardPrefs(this, { dashboard_view: view }).catch(() => {});
-  };
+  _enterDeviceView = (view: DashboardView) => this._viewPrefs.enterView(view);
 
   _toggleSelectMode = () => {
     if (this._selectMode) {

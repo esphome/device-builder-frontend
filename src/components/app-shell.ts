@@ -18,11 +18,7 @@ import type {
 import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
 import { type ExperienceLevel, Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
-import type {
-  DashboardPrefs,
-  DashboardPrefsChange,
-  RemoteBuildJobState,
-} from "../context/index.js";
+import type { DashboardPrefs, RemoteBuildJobState } from "../context/index.js";
 import {
   activeJobsContext,
   apiConnectedContext,
@@ -91,7 +87,6 @@ import {
   loadOnboardingState,
   loadPreferences,
   loadRemoteBuildSettings,
-  onDashboardPrefsChanged,
 } from "./app-shell/data-load.js";
 import { handleEvent } from "./app-shell/events.js";
 import {
@@ -103,6 +98,7 @@ import { consumePreAuthExhaustion, createRouter } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
+  onSetDashboardPrefs,
   onSetExpertMode,
   onSetHideDeviceBuilder,
   onSetLanguage,
@@ -182,12 +178,8 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: experienceLevelContext })
   @state()
   _experienceLevel: ExperienceLevel | null = null;
-  @provide({ context: remoteComputeOnlyContext })
-  @state()
-  _remoteComputeOnly = false;
-  @provide({ context: hideDeviceBuilderContext })
-  @state()
-  _hideDeviceBuilder = false;
+  @provide({ context: remoteComputeOnlyContext }) @state() _remoteComputeOnly = false;
+  @provide({ context: hideDeviceBuilderContext }) @state() _hideDeviceBuilder = false;
   // Default true until the subscribe snapshot delivers preferences, matching
   // the backend default so the expert toggle paints as on before first load.
   @provide({ context: versionHistoryEnabledContext })
@@ -196,9 +188,7 @@ export class ESPHomeApp extends LitElement {
   // False until the subscribe snapshot delivers preferences; the dashboard
   // waits on it before honouring remote_compute_only so the accordion's
   // default section can't flip after first paint.
-  @provide({ context: prefsLoadedContext })
-  @state()
-  _prefsLoaded = false;
+  @provide({ context: prefsLoadedContext }) @state() _prefsLoaded = false;
   @provide({ context: dashboardPrefsContext })
   @state()
   _dashboardPrefs: DashboardPrefs | null = null;
@@ -273,11 +263,6 @@ export class ESPHomeApp extends LitElement {
   // value. A counter, not a boolean: it guards more than one write path, so
   // two overlapping writes must both settle before the gate reopens.
   _prefsWritesInFlight = 0;
-  // Dashboard view/table writes not yet settled, and their merged patches; a
-  // snapshot reseed reapplies these so it can't undo a write it predates.
-  _dashboardWritesInFlight = 0;
-  _pendingDashboardPrefs: Partial<DashboardPrefs> = {};
-  _dashboardWroteSinceSnapshot = false;
   // Same gate for the offloader-settings writes (remote-builds master,
   // version-match policy, include-local-in-pool): while one is outstanding,
   // the INITIAL_STATE reseed skips re-applying these three so a reconnect
@@ -540,8 +525,7 @@ export class ESPHomeApp extends LitElement {
       ${this._connectionLost ? renderReconnectPill(this._localize) : nothing}
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
-        @dashboard-prefs-changed=${(e: CustomEvent<DashboardPrefsChange>) =>
-          onDashboardPrefsChanged(this, e)}
+        @set-dashboard-prefs=${(e: CustomEvent) => onSetDashboardPrefs(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}

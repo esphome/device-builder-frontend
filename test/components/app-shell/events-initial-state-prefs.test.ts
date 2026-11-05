@@ -98,13 +98,26 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     });
   });
 
-  it("publishes the dashboard slice even while a Settings write is in flight", () => {
+  it("seeds the dashboard slice on the first snapshot even while a write is in flight", () => {
     const host = makeHost();
     host._prefsWritesInFlight = 1;
     dispatch(
       host,
       snapshot(prefs({ dashboard_view: "table" as UserPreferences["dashboard_view"] }))
     );
+    expect(host._dashboardPrefs?.dashboard_view).toBe("table");
+  });
+
+  it("keeps a seeded dashboard slice while a write is in flight", () => {
+    const host = makeHost();
+    dispatch(host, snapshot(prefs()));
+    host._prefsWritesInFlight = 1;
+    host._dashboardPrefs = {
+      ...host._dashboardPrefs!,
+      dashboard_view: "table" as UserPreferences["dashboard_view"],
+    };
+    // A reconnect snapshot that predates the optimistic write.
+    dispatch(host, snapshot(prefs()));
     expect(host._dashboardPrefs?.dashboard_view).toBe("table");
   });
 

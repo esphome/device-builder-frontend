@@ -1,10 +1,55 @@
+import { ContextConsumer } from "@lit/context";
 import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
+import type { ReactiveController } from "lit";
 import { DashboardView, SortDirection } from "../../api/types/system.js";
-import type { DashboardPrefs, DashboardPrefsChange } from "../../context/index.js";
+import { type DashboardPrefs, dashboardPrefsContext } from "../../context/index.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
-import { pickDashboardPrefs } from "../app-shell/data-load.js";
+import { readDashboardUrl } from "../../util/dashboard-url.js";
 
 const VIEW_STORAGE_KEY = "esphome-dashboard-view";
+
+/** Restores, seeds and persists the dashboard's view and table preferences. */
+export class DashboardViewPrefsController implements ReactiveController {
+  private _seeded = false;
+  /** A deep-linked or user-picked view, which seeding must not overwrite. */
+  private _viewChosen = false;
+
+  constructor(private readonly _host: ESPHomePageDashboard) {
+    // Registered before the consumer so hostConnected restores before it seeds.
+    _host.addController(this);
+    new ContextConsumer(_host, {
+      context: dashboardPrefsContext,
+      subscribe: true,
+      callback: (prefs) => this._seed(prefs),
+    });
+  }
+
+  /** Paint the deep-linked view, else this browser's cached one, before preferences arrive. */
+  hostConnected(): void {
+    const urlView = readDashboardUrl().view;
+    this._viewChosen = urlView !== undefined;
+    this._host._view = urlView ?? readCachedView() ?? this._host._view;
+  }
+
+  /** Switch the device list to *view* and persist it. */
+  enterView(view: DashboardView): void {
+    const host = this._host;
+    // YAML is a third view option: clicking cards or table exits YAML
+    // search and returns to the device list.
+    if (host._yamlMode) host._setSearchMode(false);
+    host._view = view;
+    this._viewChosen = true;
+    cacheView(view);
+    saveDashboardPrefs(host, { dashboard_view: view });
+  }
+
+  /** Seed once per mount, so a reconnect snapshot can't undo a toggle. */
+  private _seed(prefs: DashboardPrefs | null | undefined): void {
+    if (!prefs || this._seeded) return;
+    this._seeded = true;
+    applyDashboardPreferences(this._host, prefs, { skipView: this._viewChosen });
+  }
+}
 
 /** This browser's last dashboard view, or ``null`` when unknown or unreadable. */
 export function readCachedView(): DashboardView | null {
@@ -25,20 +70,16 @@ export function cacheView(view: DashboardView): void {
   }
 }
 
-/** Apply the shell's dashboard prefs once per mount, so a reconnect can't undo a toggle. */
-export function seedDashboardPreferences(host: ESPHomePageDashboard): void {
-  if (!host._dashboardPrefs || host._prefsSeeded) return;
-  host._prefsSeeded = true;
-  applyDashboardPreferences(host, host._dashboardPrefs);
-}
-
 /** Copy the view and table preferences onto the dashboard host. */
 export function applyDashboardPreferences(
   host: ESPHomePageDashboard,
-  prefs: DashboardPrefs
+  prefs: DashboardPrefs,
+  { skipView = false } = {}
 ): void {
-  host._view = prefs.dashboard_view;
-  cacheView(prefs.dashboard_view);
+  if (!skipView) {
+    host._view = prefs.dashboard_view;
+    cacheView(prefs.dashboard_view);
+  }
   host._tablePageSize = prefs.table_page_size;
   host._tableColumnVisibility = prefs.table_column_visibility;
   if (prefs.table_sort_column) {
@@ -53,28 +94,18 @@ export function applyDashboardPreferences(
   }
 }
 
-/**
- * Persist *patch* and hand it to app-shell, which seeds the next mount from it.
- *
- * app-shell keeps the patch on top of any snapshot until the write settles,
- * then takes the server's values: the write's reply, or a refetch when the
- * write fails (nothing new if that fails too).
- */
-export async function saveDashboardPrefs(
+/** Ask app-shell to persist *patch*; it owns the write and the copy remounts seed from. */
+export function saveDashboardPrefs(
   host: ESPHomePageDashboard,
   patch: Partial<DashboardPrefs>
-): Promise<void> {
-  publishDashboardPrefs(host, { prefs: patch, phase: "start" });
-  let settled: Partial<DashboardPrefs> = {};
-  try {
-    settled = pickDashboardPrefs(await host._api.updatePreferences(patch));
-  } catch (err) {
-    const current = await host._api.getPreferences().catch(() => null);
-    if (current) settled = pickDashboardPrefs(current);
-    throw err;
-  } finally {
-    publishDashboardPrefs(host, { prefs: settled, phase: "settle" });
-  }
+): void {
+  host.dispatchEvent(
+    new CustomEvent("set-dashboard-prefs", {
+      detail: patch,
+      bubbles: true,
+      composed: true,
+    })
+  );
 }
 
 /** Persist a table preference and mirror it onto the host state that seeds a remounted table. */
@@ -105,17 +136,6 @@ export function saveTablePreference(host: ESPHomePageDashboard, e: CustomEvent):
     return;
   }
   // The mirror is kept on failure — cosmetic prefs, self-healing on
-  // the next mount — but a failing write shouldn't be invisible.
-  saveDashboardPrefs(host, patch).catch((err) => {
-    console.warn("Failed to save table preferences", err);
-  });
-}
-
-function publishDashboardPrefs(
-  host: ESPHomePageDashboard,
-  detail: DashboardPrefsChange
-): void {
-  host.dispatchEvent(
-    new CustomEvent("dashboard-prefs-changed", { detail, bubbles: true, composed: true })
-  );
+  // the next mount; app-shell logs the failing write.
+  saveDashboardPrefs(host, patch);
 }

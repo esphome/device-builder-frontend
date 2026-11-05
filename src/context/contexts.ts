@@ -190,19 +190,12 @@ export type DashboardPrefs = Pick<
   | "table_sort_direction"
 >;
 
-/** Detail of ``dashboard-prefs-changed``: a dashboard write starting or settling. */
-export interface DashboardPrefsChange {
-  /** Fields to merge into app-shell's copy: the patch on start, server values on settle. */
-  prefs: Partial<DashboardPrefs>;
-  phase: "start" | "settle";
-}
-
 /**
  * Context for the dashboard's saved view and table preferences.
  *
  * ``null`` until the first ``initial_state`` snapshot. app-shell owns it and
- * merges the dashboard's own writes, so a remounted dashboard seeds from what
- * was last saved rather than the first-load snapshot.
+ * performs the dashboard's writes (``set-dashboard-prefs``), so a remounted
+ * dashboard seeds from what was last saved rather than the first-load snapshot.
  */
 export const dashboardPrefsContext = createContext<DashboardPrefs | null>(
   Symbol("esphome-dashboard-prefs")
