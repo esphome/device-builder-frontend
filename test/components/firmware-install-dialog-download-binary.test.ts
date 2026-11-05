@@ -150,18 +150,21 @@ describe("manual firmware-binary download flow", () => {
     expect(host._step).toBe("download-ready");
   });
 
-  it("still downloads when the digest re-read fails", async () => {
+  it("drops the digests but still downloads when the re-read fails", async () => {
     const { host, api } = makeHost("binary-download", [
       { ...FACTORY, md5: "f" },
       { ...OTA, md5: "o" },
     ]);
     await run(host);
     api.firmwareGetBinaries.mockRejectedValueOnce(new Error("boom"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await downloadSelectedBinary(
       host as unknown as ESPHomeFirmwareInstallDialog,
       "firmware.ota.bin"
     );
-    expect(host._binaries.map((binary) => binary.md5)).toEqual(["f", "o"]);
+    expect(host._binaries.map((binary) => binary.md5)).toEqual([undefined, undefined]);
+    expect(host._binaries).toHaveLength(2);
+    expect(warn).toHaveBeenCalled();
     expect(host._step).toBe("download-ready");
   });
 

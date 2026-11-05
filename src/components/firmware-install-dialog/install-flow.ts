@@ -245,8 +245,8 @@ export async function downloadSelectedBinary(
 }
 
 // A build that finished while the picker sat open replaced the files; re-read
-// the digests so a copied MD5 matches what downloads. Best effort: a failed
-// re-read leaves the list as it was.
+// the digests so a copied MD5 matches what downloads. A failed re-read drops
+// the digests rather than show ones that may be stale; the download goes on.
 async function refreshDigests(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
@@ -255,8 +255,9 @@ async function refreshDigests(
   let fresh: FirmwareBinary[];
   try {
     fresh = await host._api.firmwareGetBinaries(configuration);
-  } catch {
-    return;
+  } catch (err) {
+    console.warn("Could not refresh firmware digests", err);
+    fresh = [];
   }
   const digests = new Map(fresh.map((binary) => [binary.file, binary.md5]));
   host._binaries = host._binaries.map((binary) => ({
