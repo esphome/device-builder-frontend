@@ -13,17 +13,14 @@ vi.mock("sonner-js", () => ({
 }));
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-import {
-  type ComponentCatalogEntry,
-  ComponentCategory,
-} from "../../../src/api/types/components.js";
+import { type ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
 import { loadConfig } from "../../../src/components/device/device-section-config/loading.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 const SLIMS: ComponentCatalogEntry[] = [
-  makeComponentEntry("switch.gpio", { category: ComponentCategory.SWITCH }),
+  makeComponentEntry("switch.gpio", { category: "switch" }),
 ];
 
 // One catalog shape for the whole file — loadCatalog memoizes its promise

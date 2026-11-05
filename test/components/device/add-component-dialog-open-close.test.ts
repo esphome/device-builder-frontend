@@ -8,7 +8,7 @@
  * form-view back button renders in the wrapper's header-prefix slot and
  * returns to the catalog.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import "../../_mock-webawesome.js";
 
@@ -27,6 +27,7 @@ vi.mock("../../../src/components/device/component-catalog.js", () => {
 
 import { mount } from "../../_dom.js";
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
+import { _clearCatalogCache } from "../../../src/util/yaml-completion-catalog.js";
 
 const dialog = (el: ESPHomeAddComponentDialog): HTMLElement =>
   el.shadowRoot!.querySelector("esphome-base-dialog")!;
@@ -77,5 +78,51 @@ describe("add-component-dialog open/close contract", () => {
     expect(
       el.shadowRoot!.querySelector('button.back-button[slot="header-prefix"]')
     ).toBeNull();
+  });
+});
+
+describe("add-component-dialog openWithSearch catalog wait", () => {
+  afterEach(() => {
+    _clearCatalogCache();
+    vi.restoreAllMocks();
+  });
+
+  /** Dialog whose catalog fetch resolves only when the returned release() runs. */
+  async function pendingCatalog() {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const getComponents = vi.fn(async () => {
+      await gate;
+      return { components: [], categories: [], total: 0, offset: 0, limit: 200 };
+    });
+    const el = await mount(new ESPHomeAddComponentDialog());
+    Object.assign(el as unknown as Record<string, unknown>, { _api: { getComponents } });
+    const catalogEl = el.shadowRoot!.querySelector("esphome-component-catalog")!;
+    const filter = vi.spyOn(
+      catalogEl as unknown as { filterByDomain(d: string): void },
+      "filterByDomain"
+    );
+    return { el, filter, release };
+  }
+
+  it("filters to the domain once the catalog loads", async () => {
+    const { el, filter, release } = await pendingCatalog();
+    el.openWithSearch("output");
+    await el.updateComplete;
+    expect(filter).not.toHaveBeenCalled();
+    release();
+    await vi.waitFor(() => expect(filter).toHaveBeenCalledWith("output"));
+  });
+
+  it("drops the late filter when the dialog reopened first", async () => {
+    const { el, filter, release } = await pendingCatalog();
+    el.openWithSearch("output");
+    el.open();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await el.updateComplete;
+    expect(filter).not.toHaveBeenCalled();
   });
 });

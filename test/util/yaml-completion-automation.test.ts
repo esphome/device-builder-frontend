@@ -19,8 +19,8 @@ import { makeComponentEntry } from "./_make-component-entry.js";
 
 const SLIM = [
   makeComponentEntry("esphome", { category: ComponentCategory.CORE }),
-  makeComponentEntry("binary_sensor.gpio", { category: ComponentCategory.BINARY_SENSOR }),
-  makeComponentEntry("switch.gpio", { category: ComponentCategory.SWITCH }),
+  makeComponentEntry("binary_sensor.gpio", { category: "binary_sensor" }),
+  makeComponentEntry("switch.gpio", { category: "switch" }),
 ];
 
 const fakeApi = {

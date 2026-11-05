@@ -17,7 +17,7 @@ const SLIM = [
   ...["esphome", "wifi", "logger", "esp32"].map((id) =>
     makeComponentEntry(id, { category: ComponentCategory.CORE })
   ),
-  makeComponentEntry("sensor.template", { category: ComponentCategory.SENSOR }),
+  makeComponentEntry("sensor.template", { category: "sensor" }),
 ];
 
 const BODIES: Record<
