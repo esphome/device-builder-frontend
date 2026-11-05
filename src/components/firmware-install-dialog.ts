@@ -283,13 +283,13 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startArtifactDownload(this);
   }
 
-  // Picked a format in the choose-binary step.
   _toggleMd5(file: string) {
     const next = new Set(this._md5Expanded);
     if (!next.delete(file)) next.add(file);
     this._md5Expanded = next;
   }
 
+  // Picked a format in the choose-binary step.
   _onChooseBinary(file: string) {
     void downloadSelectedBinary(this, file);
   }

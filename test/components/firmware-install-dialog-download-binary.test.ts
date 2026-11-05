@@ -33,10 +33,15 @@ import {
   startDownload,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
 
-const FACTORY: FirmwareBinary = { title: "Factory format", file: "firmware.factory.bin" };
+const FACTORY: FirmwareBinary = {
+  title: "Factory format",
+  file: "firmware.factory.bin",
+  download_name: "device-firmware.factory.bin",
+};
 const OTA: FirmwareBinary = {
   title: "OTA format",
   file: "firmware.ota.bin",
+  download_name: "device-firmware.ota.bin",
   description: "For OTA updating a device.",
 };
 
@@ -101,7 +106,11 @@ describe("manual firmware-binary download flow", () => {
   });
 
   it("downloads directly when the device produces a single format", async () => {
-    const single: FirmwareBinary = { title: "Standard format", file: "firmware.bin" };
+    const single: FirmwareBinary = {
+      title: "Standard format",
+      file: "firmware.bin",
+      download_name: "device-firmware.bin",
+    };
     const { host, api } = makeHost("binary-download", [single]);
     await run(host);
     expect(api.firmwareDownloadUrl).toHaveBeenCalledWith("device.yaml", "firmware.bin");
@@ -166,6 +175,20 @@ describe("manual firmware-binary download flow", () => {
     expect(host._binaries).toHaveLength(2);
     expect(warn).toHaveBeenCalled();
     expect(host._step).toBe("download-ready");
+  });
+
+  it("leaves a reopened dialog's digests alone when the re-read lands late", async () => {
+    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "mine" }]);
+    host._binaries = [{ ...OTA, md5: "mine" }];
+    api.firmwareGetBinaries.mockImplementationOnce(async () => {
+      host._installRun += 1; // closed and reopened while the re-read was in flight
+      return [{ ...OTA, md5: "old-run" }];
+    });
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.ota.bin"
+    );
+    expect(host._binaries[0].md5).toBe("mine");
   });
 
   it("fails cleanly when listing the binaries errors", async () => {

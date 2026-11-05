@@ -252,6 +252,7 @@ async function refreshDigests(
   configuration: string
 ): Promise<void> {
   if (!host._binaries.some((binary) => binary.md5)) return;
+  const stillCurrent = runGuard(host);
   let fresh: FirmwareBinary[];
   try {
     fresh = await host._api.firmwareGetBinaries(configuration);
@@ -259,6 +260,7 @@ async function refreshDigests(
     console.warn("Could not refresh firmware digests", err);
     fresh = [];
   }
+  if (!stillCurrent()) return;
   const digests = new Map(fresh.map((binary) => [binary.file, binary.md5]));
   host._binaries = host._binaries.map((binary) => ({
     ...binary,
