@@ -91,6 +91,18 @@ const footerValuesDeep = (host: ReturnType<typeof footerHost>) => {
 };
 
 describe("firmware-install-dialog footer", () => {
+  it("offers another format beside Close when the build produced several", () => {
+    const host = { ...footerHost("download-ready"), _binaries: [{}, {}] };
+    const values = footerValuesDeep(host);
+    expect(values).toContain("firmware.choose_binary_again");
+    expect(values).toContain("command.close");
+  });
+
+  it("offers only Close when the build produced one format", () => {
+    const host = { ...footerHost("download-ready"), _binaries: [{}] };
+    expect(footerValuesDeep(host)).not.toContain("firmware.choose_binary_again");
+  });
+
   it.each(["rp2-bootsel", "rp2-wait"])(
     "offers Close, Reset Device and Flash on the %s step with WebUSB",
     (step) => {

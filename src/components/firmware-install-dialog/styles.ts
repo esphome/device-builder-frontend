@@ -150,6 +150,7 @@ export const firmwareInstallDialogStyles = css`
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: center;
     gap: var(--wa-space-xs) var(--wa-space-s);
     margin-top: var(--wa-space-m);
   }
