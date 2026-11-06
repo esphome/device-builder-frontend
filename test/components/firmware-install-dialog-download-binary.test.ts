@@ -193,4 +193,14 @@ describe("manual firmware-binary download flow", () => {
     expect(host._step).toBe("download-ready");
     expect(host._downloadedMd5).toBeUndefined();
   });
+
+  it("drops a listing failure that lands after the dialog was reopened", async () => {
+    const { host, api } = makeHost("binary-download", [OTA]);
+    api.firmwareGetBinaries.mockImplementationOnce(async () => {
+      host._installRun += 1;
+      throw new Error("NOT_FOUND");
+    });
+    await run(host);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
 });

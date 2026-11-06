@@ -116,10 +116,12 @@ export async function fetchBinaries(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<FirmwareBinary[] | null> {
+  const stillCurrent = runGuard(host);
   try {
     return await host._api.firmwareGetBinaries(configuration);
   } catch {
-    host._fail(host._localize("firmware.download_failed"));
+    // A failure that lands after a close/reopen belongs to the old run.
+    if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
     return null;
   }
 }
