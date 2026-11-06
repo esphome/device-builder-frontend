@@ -31,20 +31,11 @@ import {
   startArtifactDownload,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
 
-const FACTORY: FirmwareBinary = {
-  title: "Factory format",
-  file: "firmware.factory.bin",
-  download_name: "device-firmware.factory.bin",
-};
-const OTA: FirmwareBinary = {
-  title: "OTA format",
-  file: "firmware.ota.bin",
-  download_name: "device-firmware.ota.bin",
-};
+const FACTORY: FirmwareBinary = { title: "Factory format", file: "firmware.factory.bin" };
+const OTA: FirmwareBinary = { title: "OTA format", file: "firmware.ota.bin" };
 const ELF: FirmwareBinary = {
   title: "ELF (for debugging)",
   file: "firmware.elf",
-  download_name: "device-firmware.elf",
   description: "Debug symbols for the ESP stack trace decoder.",
 };
 

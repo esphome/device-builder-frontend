@@ -116,34 +116,26 @@ export const firmwareInstallDialogStyles = css`
     margin-top: var(--wa-space-m);
     text-align: left;
   }
-  .binary-entry {
-    overflow: hidden;
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-l);
-    transition: border-color 0.12s;
-  }
-  .binary-entry:hover,
-  .binary-entry:focus-within {
-    border-color: var(--esphome-primary);
-  }
   .binary-option {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    box-sizing: border-box;
-    width: 100%;
     padding: var(--wa-space-s) var(--wa-space-m);
-    border: none;
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-l);
     background: none;
     font: inherit;
     color: inherit;
     text-align: left;
     cursor: pointer;
-    transition: background 0.12s;
+    transition:
+      background 0.12s,
+      border-color 0.12s;
   }
   .binary-option:hover,
   .binary-option:focus-visible {
     background: var(--esphome-tint);
+    border-color: var(--esphome-primary);
     outline: none;
   }
   .binary-option .title {
@@ -154,21 +146,16 @@ export const firmwareInstallDialogStyles = css`
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
   }
-  .binary-checksum {
-    padding: 0 var(--wa-space-m) var(--wa-space-xs);
-  }
-  .binary-checksum .disclosure-panel {
-    margin-top: var(--wa-space-2xs);
-  }
-  .binary-checksum-pending {
-    font-size: var(--wa-font-size-xs);
-    color: var(--wa-color-text-quiet);
-  }
-  .binary-checksum-panel {
+  .download-md5 {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--wa-space-xs) var(--wa-space-s);
+    margin-top: var(--wa-space-m);
+  }
+  .download-md5-label {
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-quiet);
   }
 
   .footer {

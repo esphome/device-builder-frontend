@@ -23,9 +23,6 @@ import {
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
 import { renderCopyValue } from "../shared/copy-value.js";
-import { renderDisclosure } from "../shared/disclosure.js";
-import { listStale, runningBuild, toggleMd5 } from "./checksums.js";
-import { reopenPicker } from "./install-flow.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -224,82 +221,50 @@ export function renderOffloadHintSlot(
 // picker (choose-binary), the "choose another format" link (download-ready),
 // and the collapsible compile / esptool log.
 
-// Why a picker row's listed digest is withheld right now, if it is.
-function pickerNote(host: ESPHomeFirmwareInstallDialog): string | null {
-  if (runningBuild(host)) return "firmware.md5_pending";
-  return listStale(host) ? "firmware.md5_stale" : null;
-}
-
-function renderMd5(
-  host: ESPHomeFirmwareInstallDialog,
-  binary: FirmwareBinary,
-  title: string,
-  note: string | null
-): TemplateResult | typeof nothing {
-  const md5 = binary.md5;
-  if (!md5) return nothing;
+function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   return html`
-    <div class="binary-checksum">
-      ${renderDisclosure({
-        open: host._checksums.expanded.has(binary.file),
-        onToggle: () => toggleMd5(host, binary.file),
-        localize: host._localize,
-        labelKey: "firmware.md5_label",
-        ariaLabel: host._localize("firmware.md5_toggle_aria", { title }),
-        variant: "quiet",
-        iconBefore: true,
-        body: () =>
-          note
-            ? html`<span class="binary-checksum-pending">${host._localize(note)}</span>`
-            : html`
-                <div class="binary-checksum-panel">
-                  ${renderCopyValue(host._localize, md5, {
-                    ariaLabel: host._localize("firmware.copy_md5_aria", { title }),
-                    title: host._localize("firmware.copy_md5"),
-                    okKey: "firmware.md5_copied",
-                    failKey: "firmware.md5_copy_failed",
-                  })}
-                  <button
-                    type="button"
-                    class="btn btn--ghost"
-                    aria-label=${host._localize("firmware.download_md5_aria", { title })}
-                    @click=${() =>
-                      downloadBlob(
-                        `${md5}  ${binary.download_name}\n`,
-                        `${binary.download_name}.md5`,
-                        "text/plain"
-                      )}
-                  >
-                    ${host._localize("firmware.download_md5")}
-                  </button>
-                </div>
-              `,
+    <div class="binary-list">
+      ${host._binaries.map((binary) => {
+        const desc = artifactDescription(host, binary);
+        return html`
+          <button
+            type="button"
+            class="binary-option"
+            @click=${() => host._onChooseBinary(binary.file)}
+          >
+            <span class="title">${artifactTitle(host, binary)}</span>
+            ${desc ? html`<span class="desc">${desc}</span>` : nothing}
+          </button>
+        `;
       })}
     </div>
   `;
 }
 
-function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
-  const note = pickerNote(host);
+// The downloaded file's MD5, to copy or save as an md5sum file beside it.
+function renderDownloadMd5(
+  host: ESPHomeFirmwareInstallDialog
+): TemplateResult | typeof nothing {
+  const md5 = host._downloadedMd5;
+  if (!md5) return nothing;
+  const filename = host._downloadedFilename;
   return html`
-    <div class="binary-list">
-      ${host._binaries.map((binary) => {
-        const title = artifactTitle(host, binary);
-        const desc = artifactDescription(host, binary);
-        return html`
-          <div class="binary-entry">
-            <button
-              type="button"
-              class="binary-option"
-              @click=${() => host._onChooseBinary(binary.file)}
-            >
-              <span class="title">${title}</span>
-              ${desc ? html`<span class="desc">${desc}</span>` : nothing}
-            </button>
-            ${renderMd5(host, binary, title, note)}
-          </div>
-        `;
+    <div class="download-md5">
+      <span class="download-md5-label">${host._localize("firmware.md5_label")}</span>
+      ${renderCopyValue(host._localize, md5, {
+        ariaLabel: host._localize("firmware.copy_md5_aria", { filename }),
+        title: host._localize("firmware.copy_md5"),
+        okKey: "firmware.md5_copied",
+        failKey: "firmware.md5_copy_failed",
       })}
+      <button
+        type="button"
+        class="btn btn--ghost"
+        aria-label=${host._localize("firmware.download_md5_aria", { filename })}
+        @click=${() => downloadBlob(`${md5}  ${filename}\n`, `${filename}.md5`, "text/plain")}
+      >
+        ${host._localize("firmware.download_md5")}
+      </button>
     </div>
   `;
 }
@@ -309,21 +274,16 @@ function renderDownloadReadyExtra(
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
-  const downloaded = host._checksums.downloaded;
   // Manual binary download: offer to pick a different format when more than
   // one was produced.
   return html`
-    ${
-      downloaded
-        ? renderMd5(host, downloaded, artifactTitle(host, downloaded), null)
-        : nothing
-    }
+    ${renderDownloadMd5(host)}
     ${
       host._binaries.length > 1
         ? html`<button
             type="button"
             class="reset-suggestion-link"
-            @click=${() => void reopenPicker(host)}
+            @click=${() => (host._step = "choose-binary")}
           >
             ${host._localize("firmware.choose_binary_again")}
           </button>`

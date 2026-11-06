@@ -1512,12 +1512,7 @@ export class ESPHomeAPI {
     return this.sendCommand<FirmwareBinary[]>("firmware/get_binaries", { configuration });
   }
 
-  /**
-   * Mint a single-use token authorizing the HTTP download of one artifact.
-   *
-   * The reply carries the served file's name and, except for the ELF or a
-   * file that couldn't be hashed, its md5.
-   */
+  /** Mint a single-use token authorizing the HTTP download of one artifact. */
   async firmwareDownloadToken(
     configuration: string,
     file: string
@@ -1538,15 +1533,11 @@ export class ESPHomeAPI {
   async firmwareDownloadUrl(
     configuration: string,
     file: string
-  ): Promise<{ url: string; filename: string; md5?: string }> {
-    const { token, filename, md5 } = await this.firmwareDownloadToken(
-      configuration,
-      file
-    );
+  ): Promise<Omit<FirmwareDownloadToken, "token"> & { url: string }> {
+    const { token, ...reply } = await this.firmwareDownloadToken(configuration, file);
     return {
       url: `${BASE_PATH}api/firmware/download?token=${encodeURIComponent(token)}`,
-      filename,
-      md5,
+      ...reply,
     };
   }
 
