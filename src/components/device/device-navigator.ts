@@ -27,11 +27,7 @@ import {
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
-  getCachedCatalogIndex,
-  loadCatalog,
-} from "../../util/yaml-completion-catalog.js";
-import {
-  categorizeSections,
+  catalogCoreKeys,
   parseYamlAutomations,
   parseYamlTopLevelSections,
   sectionKeyOf,
@@ -40,12 +36,9 @@ import {
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
+import { CatalogIndexController } from "./catalog-index-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
-import {
-  deriveNavigatorBuckets,
-  type NavigatorBuckets,
-  navigatorCoreKeys,
-} from "./navigator-buckets.js";
+import { deriveNavigatorBuckets, type NavigatorBuckets } from "./navigator-buckets.js";
 import { groupRowsByDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
 import { type NavAction, renderNavSection } from "./navigator-render.js";
@@ -127,8 +120,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
    *  edit, not per render. See {@link deriveNavigatorBuckets}. */
   private _deriveBuckets = memoizeOne(deriveNavigatorBuckets);
 
+  private readonly _catalogIndex = new CatalogIndexController(this, () => this._api);
+
   private _buckets(): NavigatorBuckets {
-    return this._deriveBuckets(this.yaml, navigatorCoreKeys(getCachedCatalogIndex()));
+    return this._deriveBuckets(this.yaml, catalogCoreKeys(this._catalogIndex.index()));
   }
 
   /** Memoised on the rows identity so the Components regroup is stable
@@ -567,8 +562,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
    */
   private _kickoffNameResolves(): void {
     if (!this._api) return;
-    const sections = parseYamlTopLevelSections(this.yaml);
-    const { core, components } = categorizeSections(sections);
+    const { core, components } = this._buckets();
     const platform = this.platform || undefined;
     for (const item of [...core, ...components]) {
       const id = sectionKeyOf(item);
@@ -583,10 +577,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // "Switch → On Turn On" instead of the raw YAML key. The
     // controller re-renders the host when the fetch lands.
     this._triggerCatalog.ensure();
-    // Core grouping widens to the catalog's core categories once it loads.
-    if (!getCachedCatalogIndex()) {
-      void loadCatalog(this._api).then(() => this.requestUpdate());
-    }
   }
 
   private _onItemHover(line: number, fromLine: number, toLine: number) {

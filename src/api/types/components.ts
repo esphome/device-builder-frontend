@@ -47,7 +47,7 @@ export enum ComponentCategory {
  *
  * The navigator's "Core" group is every catalog entry in these
  * categories plus the static `CORE_KEYS` in `util/yaml-sections.ts`
- * (see `navigatorCoreKeys`).
+ * (see `catalogCoreKeys`).
  */
 export const CORE_CATEGORIES: readonly string[] = [
   ComponentCategory.CORE,

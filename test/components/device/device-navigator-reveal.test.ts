@@ -23,6 +23,7 @@ import {
   type RevealState,
   sectionIndexForLine,
 } from "../../../src/components/device/navigator-reveal-controller.js";
+import { CORE_KEYS } from "../../../src/util/yaml-sections.js";
 import { clickSubgroup, sectionLine } from "./_navigator-fixtures.js";
 
 const YAML = [
@@ -77,7 +78,7 @@ async function mount(openSections: Set<number>): Promise<{
 
 describe("sectionIndexForLine", () => {
   it("maps a line to its bucket (core/components/automations)", () => {
-    const buckets = deriveNavigatorBuckets(YAML);
+    const buckets = deriveNavigatorBuckets(YAML, CORE_KEYS);
     expect(sectionIndexForLine(buckets, buckets.core[0].fromLine)).toBe(0);
     expect(sectionIndexForLine(buckets, buckets.components[0].fromLine)).toBe(1);
     expect(sectionIndexForLine(buckets, 9999)).toBe(-1);
@@ -89,7 +90,7 @@ describe("sectionIndexForLine", () => {
 // returning to a still-collapsed section re-reveals it.
 describe("NavigatorRevealController one-shot latch", () => {
   it("re-reveals after an index===-1 line breaks the selection run", () => {
-    const buckets = deriveNavigatorBuckets(YAML);
+    const buckets = deriveNavigatorBuckets(YAML, CORE_KEYS);
     const sLine = sensorLine();
     const reveals: number[] = [];
     const host = {

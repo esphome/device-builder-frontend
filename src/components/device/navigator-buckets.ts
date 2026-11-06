@@ -1,10 +1,6 @@
-import memoizeOne from "memoize-one";
-import { CORE_CATEGORIES } from "../../api/types/components.js";
 import { parseSubstitutions } from "../../util/substitutions.js";
-import type { CatalogIndex } from "../../util/yaml-completion-catalog.js";
 import {
   categorizeSections,
-  CORE_KEYS,
   parseYamlAutomations,
   parseYamlTopLevelSections,
   type YamlSection,
@@ -25,7 +21,7 @@ export interface NavigatorBuckets {
  */
 export function deriveNavigatorBuckets(
   yaml: string,
-  coreKeys: ReadonlySet<string> = CORE_KEYS
+  coreKeys: ReadonlySet<string>
 ): NavigatorBuckets {
   const {
     core,
@@ -51,17 +47,3 @@ export function deriveNavigatorBuckets(
     .sort((a, b) => a.fromLine - b.fromLine);
   return { core, components, automations, substitutions: parseSubstitutions(yaml) };
 }
-
-/** `CORE_KEYS` plus the domain of every catalog entry in `CORE_CATEGORIES`. */
-export const navigatorCoreKeys = memoizeOne(
-  (catalog: CatalogIndex | null): ReadonlySet<string> => {
-    if (!catalog) return CORE_KEYS;
-    const keys = new Set(CORE_KEYS);
-    for (const category of CORE_CATEGORIES) {
-      for (const entry of catalog.byCategory.get(category) ?? []) {
-        keys.add(entry.id.split(".", 1)[0]);
-      }
-    }
-    return keys;
-  }
-);

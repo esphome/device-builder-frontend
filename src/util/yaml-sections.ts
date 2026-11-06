@@ -1,5 +1,9 @@
+import memoizeOne from "memoize-one";
+import { CORE_CATEGORIES } from "../api/types/components.js";
 import { TARGET_PLATFORM_KEYS } from "./component-presence.js";
+import { parseCatalogId } from "./config-entry-yaml-scan.js";
 import { parseYamlAutomations } from "./yaml-automations.js";
+import type { CatalogIndex } from "./yaml-completion-catalog.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 import {
@@ -33,10 +37,7 @@ export interface CategorizedSections {
   automations: YamlSection[];
 }
 
-// ESPHome system/platform keys → Core configuration. The navigator
-// widens this with every catalog entry whose category is in
-// `CORE_CATEGORIES` once the catalog loads (`navigatorCoreKeys`); this
-// static set covers the first paint and the callers without a catalog.
+// Static Core keys; `catalogCoreKeys` adds the catalog's core-category domains.
 //
 // Two umbrella YAML keys (`ota`, `update`) appear here without
 // matching catalog entries — those domains only have platform
@@ -69,9 +70,6 @@ export const CORE_KEYS = new Set([
   "debug",
   "preferences",
   "update",
-  "http_request",
-  "socket",
-  "async_tcp",
   // Device-wide config keys (not strictly components — no C++
   // implementation — but they share the top-level YAML namespace
   // alongside real components).
@@ -86,6 +84,20 @@ export const CORE_KEYS = new Set([
   "globals",
 ]);
 
+/** `CORE_KEYS` plus the domain of every catalog entry in `CORE_CATEGORIES`. */
+export const catalogCoreKeys = memoizeOne(
+  (catalog: CatalogIndex | null): ReadonlySet<string> => {
+    if (!catalog) return CORE_KEYS;
+    const keys = new Set(CORE_KEYS);
+    for (const category of CORE_CATEGORIES) {
+      for (const entry of catalog.byCategory.get(category) ?? []) {
+        keys.add(parseCatalogId(entry.id).domain);
+      }
+    }
+    return keys;
+  }
+);
+
 // Automation/logic keys → Automations
 // In ESPHome, automations are inline on_* handlers within components.
 // `script` and `interval` are the standalone automation-adjacent
@@ -94,7 +106,7 @@ export const AUTOMATION_KEYS = new Set(["script", "interval"]);
 
 export function categorizeSections(
   sections: YamlSection[],
-  coreKeys: ReadonlySet<string> = CORE_KEYS
+  coreKeys: ReadonlySet<string>
 ): CategorizedSections {
   const core: YamlSection[] = [];
   const components: YamlSection[] = [];
