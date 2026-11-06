@@ -276,6 +276,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       ></esphome-confirm-dialog>
       <esphome-confirm-dialog
         id="reset-all-peers-confirm"
+        ?destructive=${true}
         heading=${this._localize("firmware_jobs.reset_all_peers_confirm_title", {
           count: this._pendingResetAll.length,
         })}
