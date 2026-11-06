@@ -137,16 +137,25 @@ function showBinaryPicker(
 /** Back to the picker, re-reading the list only when a build replaced it. */
 export async function reopenPicker(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const configuration = host._device?.configuration;
+  if (host._checksums.reading) return;
   // A read mid-build would list digests the build is about to replace.
   if (!configuration || !host._checksums.stale || buildRunning(host)) {
     host._step = "choose-binary";
     return;
   }
   // Cleared first: a build starting during the read marks it stale again.
-  updateChecksums(host, { stale: false });
+  updateChecksums(host, { stale: false, reading: true });
   const stillCurrent = runGuard(host);
-  const binaries = await fetchBinaries(host, configuration);
-  if (!binaries || !stillCurrent()) return;
+  let binaries: FirmwareBinary[];
+  try {
+    binaries = await host._api.firmwareGetBinaries(configuration);
+  } catch {
+    if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
+    return;
+  } finally {
+    if (stillCurrent()) updateChecksums(host, { reading: false });
+  }
+  if (!stillCurrent()) return;
   if (binaries.length === 0) {
     failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
     return;

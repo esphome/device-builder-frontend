@@ -7,6 +7,8 @@ export interface ChecksumState {
   expanded: ReadonlySet<string>;
   /** A build ran since the list was read, so its digests may be outdated. */
   stale: boolean;
+  /** The picker's list is being re-read; reopening waits for it. */
+  reading: boolean;
   /** The row the last download fetched. */
   downloaded?: FirmwareBinary;
   /** That download waited out a build, so the row's digest may be outdated. */
@@ -16,6 +18,7 @@ export interface ChecksumState {
 export const initialChecksums = (): ChecksumState => ({
   expanded: new Set(),
   stale: false,
+  reading: false,
   downloadedStale: false,
 });
 

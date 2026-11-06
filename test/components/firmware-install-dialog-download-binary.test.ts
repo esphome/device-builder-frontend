@@ -229,6 +229,39 @@ describe("manual firmware-binary download flow", () => {
     expect(host._fail).toHaveBeenCalledWith("firmware.no_binaries");
   });
 
+  it("ignores a second reopen while the stale re-read is in flight", async () => {
+    const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    await run(host);
+    host._step = "download-ready";
+    dialog._checksums = { ...dialog._checksums, stale: true };
+    let release!: (value: FirmwareBinary[]) => void;
+    api.firmwareGetBinaries.mockImplementationOnce(
+      () => new Promise<FirmwareBinary[]>((resolve) => (release = resolve))
+    );
+    const first = reopenPicker(dialog);
+    await reopenPicker(dialog); // double click
+    expect(host._step).toBe("download-ready");
+    release([{ ...OTA, md5: "new" }]);
+    await first;
+    expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(2);
+    expect(host._step).toBe("choose-binary");
+    expect(host._binaries).toEqual([{ ...OTA, md5: "new" }]);
+  });
+
+  it("leaves a reopened dialog alone when an old re-read fails late", async () => {
+    const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    await run(host);
+    dialog._checksums = { ...dialog._checksums, stale: true };
+    api.firmwareGetBinaries.mockImplementationOnce(async () => {
+      host._installRun += 1; // closed and reopened while the read was in flight
+      throw new Error("boom");
+    });
+    await reopenPicker(dialog);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
   it("ignores build updates once the dialog is closed", () => {
     const { host } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
