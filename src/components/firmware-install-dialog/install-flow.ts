@@ -10,7 +10,12 @@ import { dispatchShowLogsAfterInstall } from "../../util/post-install-dispatch.j
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { listStale, runningBuild, updateChecksums } from "./checksums.js";
+import {
+  listStale,
+  runningBuild,
+  syncChecksumsWithBuilds,
+  updateChecksums,
+} from "./checksums.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
@@ -117,6 +122,8 @@ export async function fetchBinaries(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<FirmwareBinary[] | null> {
+  // Counted now, not at the next render, so the flow's own compile is in the baseline.
+  syncChecksumsWithBuilds(host);
   updateChecksums(host, { reading: true, listedAt: host._checksums.builds });
   const stillCurrent = runGuard(host);
   try {

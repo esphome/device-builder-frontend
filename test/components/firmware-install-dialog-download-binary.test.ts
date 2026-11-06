@@ -201,8 +201,8 @@ describe("manual firmware-binary download flow", () => {
   it("the flow's own finished compile, still listed during the read, isn't a new build", async () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    // Listed but never rendered: the read itself must count it.
     host._activeJobs.set("device.yaml", { job_id: "j1", job_type: JobType.COMPILE });
-    syncChecksumsWithBuilds(dialog);
     api.firmwareGetBinaries.mockImplementationOnce(async () => {
       syncChecksumsWithBuilds(dialog);
       host._activeJobs.delete("device.yaml");
