@@ -11,6 +11,7 @@ import {
 } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import { handleEvent } from "../../../src/components/app-shell/events.js";
+import type { DashboardPrefs } from "../../../src/context/index.js";
 
 function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
   return {
@@ -35,6 +36,7 @@ function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
 function makeHost() {
   return {
     _prefsLoaded: false,
+    _dashboardPrefs: null as DashboardPrefs | null,
     _prefsWritesInFlight: 0,
     _experienceLevel: null as ExperienceLevel | null,
     _remoteComputeOnly: false,
@@ -79,6 +81,44 @@ describe("handleEvent INITIAL_STATE preferences", () => {
     expect(host._experienceLevel).toBe(ExperienceLevel.EXPERT);
     expect(host._remoteComputeOnly).toBe(true);
     expect(host.applyTheme).toHaveBeenCalledWith("dark");
+  });
+
+  it("publishes the dashboard slice so the dashboard can seed its view on first paint", () => {
+    const host = makeHost();
+    dispatch(
+      host,
+      snapshot(prefs({ dashboard_view: "table" as UserPreferences["dashboard_view"] }))
+    );
+    expect(host._dashboardPrefs).toEqual({
+      dashboard_view: "table",
+      table_page_size: 25,
+      table_column_visibility: {},
+      table_sort_column: null,
+      table_sort_direction: null,
+    });
+  });
+
+  it("seeds the dashboard slice on the first snapshot even while a write is in flight", () => {
+    const host = makeHost();
+    host._prefsWritesInFlight = 1;
+    dispatch(
+      host,
+      snapshot(prefs({ dashboard_view: "table" as UserPreferences["dashboard_view"] }))
+    );
+    expect(host._dashboardPrefs?.dashboard_view).toBe("table");
+  });
+
+  it("keeps a seeded dashboard slice while a write is in flight", () => {
+    const host = makeHost();
+    dispatch(host, snapshot(prefs()));
+    host._prefsWritesInFlight = 1;
+    host._dashboardPrefs = {
+      ...host._dashboardPrefs!,
+      dashboard_view: "table" as UserPreferences["dashboard_view"],
+    };
+    // A reconnect snapshot that predates the optimistic write.
+    dispatch(host, snapshot(prefs()));
+    expect(host._dashboardPrefs?.dashboard_view).toBe("table");
   });
 
   it("does not throw or drop the rest of the snapshot when preferences is absent", () => {

@@ -11,8 +11,10 @@ import {
   type SupportedLocale,
   writeStoredLocale,
 } from "../../common/localize.js";
+import type { DashboardPrefs } from "../../context/index.js";
 import { notifyError } from "../../util/notify.js";
 import type { ESPHomeApp } from "../app-shell.js";
+import { pickDashboardPrefs } from "./data-load.js";
 import { patchOffloadPairing } from "./events.js";
 
 interface OptimisticSetting<T> {
@@ -64,6 +66,32 @@ export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
     .finally(() => {
       host._prefsWritesInFlight -= 1;
     });
+}
+
+// Dashboard view/table prefs: app-shell's copy seeds every dashboard mount, so the
+// write lives here rather than on the (often already detached) dashboard element.
+// A failure reverts the copy and is logged; the mounted page keeps its choice.
+export function onSetDashboardPrefs(
+  host: ESPHomeApp,
+  e: CustomEvent<Partial<DashboardPrefs>>
+): void {
+  const patch = e.detail;
+  void optimisticSetting(host, {
+    get: () => host._dashboardPrefs,
+    set: (v) => {
+      host._dashboardPrefs = v;
+    },
+    write: async () => {
+      const saved = pickDashboardPrefs(await host._api.updatePreferences(patch));
+      // Only the last write in flight sees every earlier one in its reply.
+      if (host._prefsWritesInFlight === 1) host._dashboardPrefs = saved;
+    },
+    value: host._dashboardPrefs && { ...host._dashboardPrefs, ...patch },
+    warn: "Failed to save dashboard preferences:",
+    inFlight: (active) => {
+      host._prefsWritesInFlight += active ? 1 : -1;
+    },
+  });
 }
 
 // experience_level is the single source of truth; EXPERT unlocks the power-user
