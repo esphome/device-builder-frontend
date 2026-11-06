@@ -1,5 +1,6 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { vi } from "vitest";
+import { initialChecksums } from "../src/components/firmware-install-dialog/checksums.js";
 import { LogBuffer } from "../src/util/log-buffer.js";
 
 /** Minimal ReactiveControllerHost for controller unit tests. */
@@ -42,6 +43,7 @@ export function fakeLogBuffer(): LogBuffer {
  * running jobs (none) and the compile clocks.
  */
 export const fakeBuildState = () => ({
-  _activeJobs: new Map<string, { job_id: string }>(),
+  _activeJobs: new Map<string, { job_id: string; job_type?: string }>(),
+  _checksums: initialChecksums(),
   _timer: { noteLine: vi.fn(), reset: vi.fn() },
 });

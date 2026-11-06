@@ -1,0 +1,17 @@
+import type { LocalizeFunc } from "../common/localize.js";
+import { copyToClipboard } from "./copy-to-clipboard.js";
+import { notify } from "./notify.js";
+
+/** Copy *value* and toast the outcome with the *okKey* / *failKey* strings. */
+export async function copyWithToast(
+  localize: LocalizeFunc,
+  value: string,
+  okKey: string,
+  failKey: string
+): Promise<void> {
+  if (await copyToClipboard(value)) {
+    notify.success(localize(okKey));
+  } else {
+    notify.warning(localize(failKey));
+  }
+}

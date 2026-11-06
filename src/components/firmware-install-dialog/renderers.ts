@@ -4,7 +4,11 @@ import { FLASHER_HOST } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
 import type { FlasherStep, FlasherStepView } from "../../platforms/platform-support.js";
 import { devicePlatform } from "../../util/crash-report.js";
-import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
+import {
+  configurationStem,
+  downloadAnsiText,
+  downloadBlob,
+} from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -18,6 +22,10 @@ import {
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
+import { renderCopyValue } from "../shared/copy-value.js";
+import { renderDisclosure } from "../shared/disclosure.js";
+import { buildRunning, toggleMd5 } from "./checksums.js";
+import { reopenPicker } from "./install-flow.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -216,20 +224,79 @@ export function renderOffloadHintSlot(
 // picker (choose-binary), the "choose another format" link (download-ready),
 // and the collapsible compile / esptool log.
 
+// Why a picker row's listed digest is withheld right now, if it is.
+function pickerNote(host: ESPHomeFirmwareInstallDialog): string | null {
+  if (buildRunning(host)) return "firmware.md5_pending";
+  return host._checksums.stale ? "firmware.md5_stale" : null;
+}
+
+function renderMd5(
+  host: ESPHomeFirmwareInstallDialog,
+  binary: FirmwareBinary,
+  title: string,
+  note: string | null
+): TemplateResult | typeof nothing {
+  const md5 = binary.md5;
+  if (!md5) return nothing;
+  return html`
+    <div class="binary-checksum">
+      ${renderDisclosure({
+        open: host._checksums.expanded.has(binary.file),
+        onToggle: () => toggleMd5(host, binary.file),
+        localize: host._localize,
+        labelKey: "firmware.md5_label",
+        ariaLabel: host._localize("firmware.md5_toggle_aria", { title }),
+        variant: "quiet",
+        iconBefore: true,
+        body: () =>
+          note
+            ? html`<span class="binary-checksum-pending">${host._localize(note)}</span>`
+            : html`
+                <div class="binary-checksum-panel">
+                  ${renderCopyValue(host._localize, md5, {
+                    ariaLabel: host._localize("firmware.copy_md5_aria", { title }),
+                    title: host._localize("firmware.copy_md5"),
+                    okKey: "firmware.md5_copied",
+                    failKey: "firmware.md5_copy_failed",
+                  })}
+                  <button
+                    type="button"
+                    class="btn btn--ghost"
+                    aria-label=${host._localize("firmware.download_md5_aria", { title })}
+                    @click=${() =>
+                      downloadBlob(
+                        `${md5}  ${binary.download_name}\n`,
+                        `${binary.download_name}.md5`,
+                        "text/plain"
+                      )}
+                  >
+                    ${host._localize("firmware.download_md5")}
+                  </button>
+                </div>
+              `,
+      })}
+    </div>
+  `;
+}
+
 function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   return html`
     <div class="binary-list">
       ${host._binaries.map((binary) => {
+        const title = artifactTitle(host, binary);
         const desc = artifactDescription(host, binary);
         return html`
-          <button
-            type="button"
-            class="binary-option"
-            @click=${() => host._onChooseBinary(binary.file)}
-          >
-            <span class="title">${artifactTitle(host, binary)}</span>
-            ${desc ? html`<span class="desc">${desc}</span>` : nothing}
-          </button>
+          <div class="binary-entry">
+            <button
+              type="button"
+              class="binary-option"
+              @click=${() => host._onChooseBinary(binary.file)}
+            >
+              <span class="title">${title}</span>
+              ${desc ? html`<span class="desc">${desc}</span>` : nothing}
+            </button>
+            ${renderMd5(host, binary, title, pickerNote(host))}
+          </div>
         `;
       })}
     </div>
@@ -241,17 +308,32 @@ function renderDownloadReadyExtra(
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
+  const downloaded = host._checksums.downloaded;
   // Manual binary download: offer to pick a different format when more than
   // one was produced.
-  return host._binaries.length > 1
-    ? html`<button
-        type="button"
-        class="reset-suggestion-link"
-        @click=${() => (host._step = "choose-binary")}
-      >
-        ${host._localize("firmware.choose_binary_again")}
-      </button>`
-    : nothing;
+  return html`
+    ${
+      downloaded
+        ? renderMd5(
+            host,
+            downloaded,
+            artifactTitle(host, downloaded),
+            host._checksums.downloadedStale ? "firmware.md5_stale" : null
+          )
+        : nothing
+    }
+    ${
+      host._binaries.length > 1
+        ? html`<button
+            type="button"
+            class="reset-suggestion-link"
+            @click=${() => void reopenPicker(host)}
+          >
+            ${host._localize("firmware.choose_binary_again")}
+          </button>`
+        : nothing
+    }
+  `;
 }
 
 // The body a step adds under its status text; the steps are exclusive.
