@@ -24,7 +24,8 @@ import {
 import { canResetBuildEnv } from "../remote-build-hint.js";
 import { renderCopyValue } from "../shared/copy-value.js";
 import { renderDisclosure } from "../shared/disclosure.js";
-import { toggleMd5 } from "./checksums.js";
+import { buildRunning, toggleMd5 } from "./checksums.js";
+import { reopenPicker } from "./install-flow.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -223,23 +224,18 @@ export function renderOffloadHintSlot(
 // picker (choose-binary), the "choose another format" link (download-ready),
 // and the collapsible compile / esptool log.
 
-// ``snapshot``: *binary* is a downloaded row, so live build state doesn't apply.
 function renderMd5(
   host: ESPHomeFirmwareInstallDialog,
   binary: FirmwareBinary,
-  title: string,
-  snapshot = false
+  title: string
 ): TemplateResult | typeof nothing {
   const md5 = binary.md5;
-  if (!md5) {
-    return !snapshot && host._checksums.unavailable && binary.type !== "elf"
-      ? html`<div class="binary-checksum">
-          <span class="binary-checksum-pending">
-            ${host._localize("firmware.md5_unavailable")}
-          </span>
-        </div>`
-      : nothing;
-  }
+  if (!md5) return nothing;
+  const note = buildRunning(host)
+    ? "firmware.md5_pending"
+    : host._checksums.stale
+      ? "firmware.md5_stale"
+      : null;
   return html`
     <div class="binary-checksum">
       ${renderDisclosure({
@@ -251,10 +247,8 @@ function renderMd5(
         variant: "quiet",
         iconBefore: true,
         body: () =>
-          !snapshot && host._checksums.pending
-            ? html`<span class="binary-checksum-pending">
-                ${host._localize("firmware.md5_pending")}
-              </span>`
+          note
+            ? html`<span class="binary-checksum-pending">${host._localize(note)}</span>`
             : html`
                 <div class="binary-checksum-panel">
                   ${renderCopyValue(host._localize, md5, {
@@ -312,18 +306,17 @@ function renderDownloadReadyExtra(
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
-  // The row as downloaded, not the live list a later build may replace.
   const downloaded = host._checksums.downloaded;
   // Manual binary download: offer to pick a different format when more than
   // one was produced.
   return html`
-    ${downloaded ? renderMd5(host, downloaded, artifactTitle(host, downloaded), true) : nothing}
+    ${downloaded ? renderMd5(host, downloaded, artifactTitle(host, downloaded)) : nothing}
     ${
       host._binaries.length > 1
         ? html`<button
             type="button"
             class="reset-suggestion-link"
-            @click=${() => (host._step = "choose-binary")}
+            @click=${() => void reopenPicker(host)}
           >
             ${host._localize("firmware.choose_binary_again")}
           </button>`

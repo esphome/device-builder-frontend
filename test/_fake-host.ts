@@ -43,7 +43,7 @@ export function fakeLogBuffer(): LogBuffer {
  * running jobs (none) and the compile clocks.
  */
 export const fakeBuildState = () => ({
-  _activeJobs: new Map<string, { job_id: string }>(),
+  _activeJobs: new Map<string, { job_id: string; job_type?: string }>(),
   _checksums: initialChecksums(),
   _timer: { noteLine: vi.fn(), reset: vi.fn() },
 });

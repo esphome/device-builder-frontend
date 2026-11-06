@@ -54,12 +54,9 @@ type FollowCbs = {
 };
 
 // get_binaries can return a different list on each call (empty before a
-// compile, populated after), so accept a queue of results; later calls (the
-// digest re-read at download time) repeat the last one.
+// compile, populated after), so accept a queue of results.
 function makeHost(getBinariesResults: FirmwareBinary[][]) {
-  const firmwareGetBinaries = vi
-    .fn()
-    .mockResolvedValue(getBinariesResults[getBinariesResults.length - 1] ?? []);
+  const firmwareGetBinaries = vi.fn();
   for (const result of getBinariesResults) {
     firmwareGetBinaries.mockResolvedValueOnce(result);
   }

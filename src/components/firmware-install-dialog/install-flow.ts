@@ -10,8 +10,7 @@ import { dispatchShowLogsAfterInstall } from "../../util/post-install-dispatch.j
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { refreshDigests, updateChecksums } from "./checksums.js";
-import { runGuard } from "./run-guard.js";
+import { updateChecksums } from "./checksums.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
@@ -70,6 +69,16 @@ export function showOtaLogs(host: ESPHomeFirmwareInstallDialog): void {
   if (handled) host._open = false;
 }
 
+/**
+ * Whether the dialog is still open on the install run it is on now. A
+ * dismissal only flips the open flag; a reopen, for the same device or
+ * another, starts the next run.
+ */
+export function runGuard(host: ESPHomeFirmwareInstallDialog): () => boolean {
+  const run = host._installRun;
+  return () => host._installRun === run && host._open;
+}
+
 // Compile, surfacing a failure on the dialog. Returns false so the caller bails.
 // A build someone else started for the device is waited out first: compiling
 // now would supersede it (#1202). The wait sits here, behind whatever the flow
@@ -125,6 +134,20 @@ function showBinaryPicker(
   host._step = "choose-binary";
 }
 
+/** Back to the picker, re-reading the list only when a build replaced it. */
+export async function reopenPicker(host: ESPHomeFirmwareInstallDialog): Promise<void> {
+  const configuration = host._device?.configuration;
+  if (!configuration || !host._checksums.stale) {
+    host._step = "choose-binary";
+    return;
+  }
+  // Cleared first: a build starting during the read marks it stale again.
+  updateChecksums(host, { stale: false });
+  const stillCurrent = runGuard(host);
+  const binaries = await fetchBinaries(host, configuration);
+  if (binaries && stillCurrent()) showBinaryPicker(host, binaries);
+}
+
 // Reached after a *successful* compile when there's nothing to flash. A remote
 // build that returned an EMPTY list is a packaging / transfer problem on the
 // build server, so name it. Binaries that came back but aren't web-flashable
@@ -174,7 +197,7 @@ export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise
   }
   // Kept so download-ready can show the artifact's checksum.
   host._binaries = binaries;
-  await downloadSelectedBinary(host, binaries[0].file, { fresh: true });
+  await downloadSelectedBinary(host, binaries[0].file);
 }
 
 // Three-dot "Download". Compiles only when nothing is built, so an existing
@@ -202,7 +225,7 @@ export async function startArtifactDownload(
   }
   if (binaries.length === 1) {
     host._binaries = binaries;
-    await downloadSelectedBinary(host, binaries[0].file, { fresh: true });
+    await downloadSelectedBinary(host, binaries[0].file);
     return;
   }
   showBinaryPicker(host, binaries);
@@ -212,25 +235,19 @@ export async function startArtifactDownload(
 // paths and the picker; leaves _binaries intact for "download another format".
 // Re-settles at select time: the picker (or download-ready's "another
 // format") can sit open while a new build starts rewriting the file.
-// ``fresh``: *host._binaries* was just read, so the digest re-read is skipped.
 export async function downloadSelectedBinary(
   host: ESPHomeFirmwareInstallDialog,
-  file: string,
-  { fresh = false }: { fresh?: boolean } = {}
+  file: string
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
-  // A build the settle waits out rewrites the artifacts a fresh list described.
-  const rebuilding = host._activeJobs.has(device.configuration);
   if (!(await artifactsSettled(host, device.configuration))) return;
-  if ((!fresh || rebuilding) && !(await refreshDigests(host, device.configuration)))
-    return;
-  const downloaded = host._binaries.find((binary) => binary.file === file);
-  if (host._binaries.length > 0 && !downloaded) {
-    host._fail(host._localize("firmware.artifact_gone"));
-    return;
-  }
-  updateChecksums(host, { downloaded });
+  // A build the settle waited out marked the listed digests stale.
+  updateChecksums(host, {
+    downloaded: host._checksums.stale
+      ? undefined
+      : host._binaries.find((binary) => binary.file === file),
+  });
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).

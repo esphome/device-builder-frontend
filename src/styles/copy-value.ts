@@ -1,4 +1,4 @@
-/** Click-to-copy code value (`renderCopyValue`): the text is the button. */
+/** Click-to-copy code value (renderCopyValue): the text is the button. */
 import { css } from "lit";
 
 export const copyValueStyles = css`

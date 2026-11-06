@@ -13,7 +13,7 @@ export interface CopyValueLabels {
   failKey: string;
 }
 
-/** A click-to-copy code value; pair with `copyValueStyles`. */
+/** A click-to-copy code value; pair with copyValueStyles. */
 export function renderCopyValue(
   localize: LocalizeFunc,
   value: string,

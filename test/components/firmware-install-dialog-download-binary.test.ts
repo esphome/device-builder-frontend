@@ -26,11 +26,13 @@ import {
   type FirmwareBinary,
   JobSource,
   JobStatus,
+  JobType,
 } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { syncChecksumsWithBuilds } from "../../src/components/firmware-install-dialog/checksums.js";
 import {
   downloadSelectedBinary,
+  reopenPicker,
   startDownload,
 } from "../../src/components/firmware-install-dialog/install-flow.js";
 
@@ -139,84 +141,7 @@ describe("manual firmware-binary download flow", () => {
     expect(host._binaries).toHaveLength(2);
   });
 
-  it("re-reads the digests at download time so a rebuilt artifact shows its new MD5", async () => {
-    const { host, api } = makeHost("binary-download", [
-      { ...FACTORY, md5: "old-factory" },
-      { ...OTA, md5: "old-ota" },
-    ]);
-    await run(host); // lands on choose-binary
-    api.firmwareGetBinaries.mockResolvedValueOnce([
-      { ...FACTORY, md5: "new-factory" },
-      { ...OTA, md5: "new-ota" },
-    ]);
-    await downloadSelectedBinary(
-      host as unknown as ESPHomeFirmwareInstallDialog,
-      "firmware.ota.bin"
-    );
-    expect(host._binaries.map((binary) => binary.md5)).toEqual([
-      "new-factory",
-      "new-ota",
-    ]);
-    expect(host._step).toBe("download-ready");
-  });
-
-  it("drops the digests but still downloads when the re-read fails", async () => {
-    const { host, api } = makeHost("binary-download", [
-      { ...FACTORY, md5: "f" },
-      { ...OTA, md5: "o" },
-    ]);
-    await run(host);
-    api.firmwareGetBinaries.mockRejectedValueOnce(new Error("boom"));
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    await downloadSelectedBinary(
-      host as unknown as ESPHomeFirmwareInstallDialog,
-      "firmware.ota.bin"
-    );
-    expect(host._binaries.map((binary) => binary.md5)).toEqual([undefined, undefined]);
-    expect(host._binaries).toHaveLength(2);
-    expect(warn).toHaveBeenCalled();
-    expect((host as unknown as ESPHomeFirmwareInstallDialog)._checksums.unavailable).toBe(
-      true
-    );
-    expect(host._step).toBe("download-ready");
-  });
-
-  it("leaves a reopened dialog alone when the re-read lands late", async () => {
-    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "mine" }]);
-    host._binaries = [{ ...OTA, md5: "mine" }];
-    host._step = "choose-binary";
-    api.firmwareGetBinaries.mockImplementationOnce(async () => {
-      host._installRun += 1; // closed and reopened while the re-read was in flight
-      return [{ ...OTA, md5: "old-run" }];
-    });
-    await downloadSelectedBinary(
-      host as unknown as ESPHomeFirmwareInstallDialog,
-      "firmware.ota.bin"
-    );
-    expect(host._binaries[0].md5).toBe("mine");
-    expect(host._step).toBe("choose-binary");
-    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
-  });
-
-  it("restores the digests on the next download after a failed re-read", async () => {
-    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "o" }]);
-    host._binaries = [{ ...OTA, md5: "o" }];
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    api.firmwareGetBinaries.mockRejectedValueOnce(new Error("boom"));
-    await downloadSelectedBinary(
-      host as unknown as ESPHomeFirmwareInstallDialog,
-      "firmware.ota.bin"
-    );
-    expect(host._binaries[0].md5).toBeUndefined();
-    api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "o2" }]);
-    await downloadSelectedBinary(
-      host as unknown as ESPHomeFirmwareInstallDialog,
-      "firmware.ota.bin"
-    );
-    expect(host._binaries[0].md5).toBe("o2");
-  });
-
-  it("keeps a single artifact so download-ready can show its checksum", async () => {
+  it("keeps a single artifact and records it for download-ready", async () => {
     const single: FirmwareBinary = {
       title: "Standard format",
       file: "firmware.bin",
@@ -225,72 +150,49 @@ describe("manual firmware-binary download flow", () => {
     };
     const { host, api } = makeHost("binary-download", [single]);
     await run(host);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     expect(host._step).toBe("download-ready");
     expect(host._binaries).toEqual([single]);
-    // The list was just read, so no back-to-back digest re-read.
+    expect(dialog._checksums.downloaded).toEqual(single);
     expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshes the download name with the digest", async () => {
-    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "old" }]);
-    host._binaries = [{ ...OTA, md5: "old" }];
-    api.firmwareGetBinaries.mockResolvedValueOnce([
-      { ...OTA, download_name: "renamed-firmware.ota.bin", md5: "new" },
-    ]);
-    await downloadSelectedBinary(
-      host as unknown as ESPHomeFirmwareInstallDialog,
-      "firmware.ota.bin"
-    );
-    expect(host._binaries[0]).toMatchObject({
-      download_name: "renamed-firmware.ota.bin",
-      md5: "new",
-    });
-  });
-
-  it("holds the checksums while a build runs and re-reads them when it ends", async () => {
-    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
+  it("marks the digests stale once a build runs under the picker", () => {
+    const { host } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     host._binaries = [{ ...OTA, md5: "a" }];
-    host._step = "choose-binary";
-
-    host._activeJobs.set("device.yaml", { job_id: "rebuild" });
+    host._activeJobs.set("device.yaml", { job_id: "upload", job_type: JobType.UPLOAD });
     syncChecksumsWithBuilds(dialog);
-    expect(dialog._checksums.pending).toBe(true);
-    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
-
-    api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "b" }]);
+    expect(dialog._checksums.stale).toBe(false);
+    host._activeJobs.set("device.yaml", { job_id: "rebuild", job_type: JobType.COMPILE });
+    syncChecksumsWithBuilds(dialog);
     host._activeJobs.delete("device.yaml");
     syncChecksumsWithBuilds(dialog);
-    await vi.waitFor(() => expect(dialog._checksums.pending).toBe(false));
-    expect(host._binaries[0].md5).toBe("b");
+    expect(dialog._checksums.stale).toBe(true);
   });
 
-  it("shares one in-flight digest re-read across callers", async () => {
-    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
+  it("reopening a stale picker re-reads the list exactly once", async () => {
+    const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
-    host._binaries = [{ ...OTA, md5: "a" }];
-    host._checksums = { ...host._checksums, pending: true };
-    let release!: (value: FirmwareBinary[]) => void;
-    api.firmwareGetBinaries.mockImplementationOnce(
-      () => new Promise<FirmwareBinary[]>((resolve) => (release = resolve))
-    );
-
-    syncChecksumsWithBuilds(dialog);
-    syncChecksumsWithBuilds(dialog); // another job update while the read is in flight
-    const download = downloadSelectedBinary(dialog, "firmware.ota.bin");
-    await vi.waitFor(() => expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1));
-    release([{ ...OTA, md5: "b" }]);
-    await download;
-
+    await run(host); // choose-binary, one read
+    await reopenPicker(dialog); // not stale: no read
     expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
-    expect(host._binaries[0].md5).toBe("b");
+
+    dialog._checksums = { ...dialog._checksums, stale: true };
+    api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "new" }]);
+    await reopenPicker(dialog);
+    expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(2);
+    expect(host._step).toBe("choose-binary");
+    expect(host._binaries).toEqual([{ ...OTA, md5: "new" }]);
+    expect(dialog._checksums.stale).toBe(false);
   });
 
-  it("re-reads a fresh list when the download waited out a build", async () => {
-    const single: FirmwareBinary = { ...OTA, md5: "before" };
-    const { host, api } = makeHost("binary-download", [single]);
-    host._binaries = [single];
-    host._activeJobs.set("device.yaml", { job_id: "rebuild" });
+  it("records no MD5 for download-ready when the download waited out a build", async () => {
+    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "before" }]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    host._binaries = [{ ...OTA, md5: "before" }];
+    host._activeJobs.set("device.yaml", { job_id: "rebuild", job_type: JobType.COMPILE });
+    syncChecksumsWithBuilds(dialog);
     api.firmwareFollowJob.mockImplementationOnce(
       (_id: string, cbs: { onResult: (d: unknown) => void }) => {
         host._activeJobs.delete("device.yaml");
@@ -298,60 +200,20 @@ describe("manual firmware-binary download flow", () => {
         return "s2";
       }
     );
-    api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "after" }]);
-    await downloadSelectedBinary(
-      host as unknown as ESPHomeFirmwareInstallDialog,
-      "firmware.ota.bin",
-      { fresh: true }
-    );
-    expect(host._binaries[0].md5).toBe("after");
-  });
-
-  it("drops a row the re-read no longer lists and refuses to download it", async () => {
-    const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
-    host._binaries = [FACTORY, OTA];
-    api.firmwareGetBinaries.mockResolvedValueOnce([FACTORY]);
-    await downloadSelectedBinary(
-      host as unknown as ESPHomeFirmwareInstallDialog,
-      "firmware.ota.bin"
-    );
-    expect(host._binaries.map((binary) => binary.file)).toEqual(["firmware.factory.bin"]);
-    expect(host._fail).toHaveBeenCalledWith("firmware.artifact_gone");
-    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
-  });
-
-  it("discards a re-read sent before a build started", async () => {
-    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
-    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
-    host._binaries = [{ ...OTA, md5: "a" }];
-    host._checksums = { ...host._checksums, pending: true };
-    let release!: (value: FirmwareBinary[]) => void;
-    api.firmwareGetBinaries.mockImplementationOnce(
-      () => new Promise<FirmwareBinary[]>((resolve) => (release = resolve))
-    );
-    syncChecksumsWithBuilds(dialog); // build A ended: read sent
-    host._activeJobs.set("device.yaml", { job_id: "b" });
-    syncChecksumsWithBuilds(dialog); // build B starts
-    api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "from-b" }]);
-    host._activeJobs.delete("device.yaml");
-    syncChecksumsWithBuilds(dialog); // build B ends: a new read
-    release([{ ...OTA, md5: "from-a" }]);
-    await vi.waitFor(() => expect(dialog._checksums.pending).toBe(false));
-    expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(2);
-    expect(host._binaries[0].md5).toBe("from-b");
+    await downloadSelectedBinary(dialog, "firmware.ota.bin");
+    expect(host._step).toBe("download-ready");
+    expect(dialog._checksums.downloaded).toBeUndefined();
+    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
   });
 
   it("ignores build updates once the dialog is closed", () => {
-    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
+    const { host } = makeHost("binary-download", [{ ...OTA, md5: "a" }]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     host._binaries = [{ ...OTA, md5: "a" }];
     host._open = false;
-    host._activeJobs.set("device.yaml", { job_id: "x" });
+    host._activeJobs.set("device.yaml", { job_id: "x", job_type: JobType.COMPILE });
     syncChecksumsWithBuilds(dialog);
-    host._activeJobs.delete("device.yaml");
-    syncChecksumsWithBuilds(dialog);
-    expect(dialog._checksums.pending).toBe(false);
-    expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+    expect(dialog._checksums.stale).toBe(false);
   });
 
   it("fails cleanly when listing the binaries errors", async () => {

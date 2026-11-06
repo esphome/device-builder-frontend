@@ -171,7 +171,7 @@ export const firmwareInstallDialogStyles = css`
     gap: var(--wa-space-xs) var(--wa-space-s);
   }
   .binary-checksum code {
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--wa-font-family-code);
     overflow-wrap: anywhere;
   }
 

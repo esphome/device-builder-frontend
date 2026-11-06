@@ -144,9 +144,9 @@ export interface FirmwareJobResult {
 export interface FirmwareBinary {
   title: string;
   file: string;
-  // Filename the HTTP download saves ``file`` under.
+  // Filename the HTTP download saves file under.
   download_name: string;
-  // Hex MD5 digest of ``file``; absent for ``firmware.elf``.
+  // Hex MD5 digest of file; absent for firmware.elf.
   md5?: string;
   // Optional subtext from ESPHome's get_download_types; not every platform supplies one.
   description?: string;

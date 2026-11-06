@@ -26,7 +26,7 @@ vi.mock("../../src/util/download-text.js", async (orig) => ({
 function renderRows(
   binaries: FirmwareBinary[],
   expanded: string[] = [],
-  pending = false
+  { building = false, stale = false } = {}
 ) {
   const host = {
     _step: "choose-binary",
@@ -34,7 +34,11 @@ function renderRows(
     _log: fakeLogBuffer(),
     _localize: defaultLocalize,
     _onChooseBinary: () => {},
-    _checksums: { ...initialChecksums(), expanded: new Set(expanded), pending },
+    _checksums: { ...initialChecksums(), expanded: new Set(expanded), stale },
+    _device: { configuration: "kitchen.yaml" },
+    _activeJobs: new Map(
+      building ? [["kitchen.yaml", { job_id: "j", job_type: "compile" }]] : []
+    ),
   };
   const container = renderInto(
     renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
@@ -139,17 +143,24 @@ describe("choose-binary artifact labels", () => {
       "text/plain"
     );
   });
-  it("blocks the checksum actions while a build replaces the artifacts", () => {
-    const container = renderRows([OTA_ROW], ["firmware.ota.bin"], true);
+  it("hides the digest and its controls while a build runs", () => {
+    const container = renderRows([OTA_ROW], ["firmware.ota.bin"], { building: true });
     expect(container.querySelector(".copy-value")).toBeNull();
     expect(container.textContent).not.toContain(OTA_ROW.md5);
-    expect(container.textContent).toContain("Updating the checksum…");
+    expect(container.textContent).toContain("A build is running");
   });
-  it("shows the downloaded row's MD5 on download-ready, not the live list's", () => {
+
+  it("asks to reopen once a build made the listed digests stale", () => {
+    const container = renderRows([OTA_ROW], ["firmware.ota.bin"], { stale: true });
+    expect(container.querySelector(".copy-value")).toBeNull();
+    expect(container.textContent).toContain("Reopen the download");
+  });
+
+  it("shows the recorded row's MD5 on download-ready", () => {
     const host = {
       _step: "download-ready",
       _installer: "binary-download",
-      // A later build replaced the live row; download-ready keeps the snapshot.
+      // The live row differs; download-ready renders the recorded one.
       _binaries: [{ ...OTA_ROW, md5: "b".repeat(32) }],
       _downloadedFilename: "renamed-firmware.ota.bin",
       _log: fakeLogBuffer(),
@@ -158,27 +169,12 @@ describe("choose-binary artifact labels", () => {
         ...initialChecksums(),
         expanded: new Set(["firmware.ota.bin"]),
         downloaded: OTA_ROW,
-        pending: true,
       },
+      _activeJobs: new Map(),
     };
     const container = renderInto(
       renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
     );
     expect(container.querySelector(".copy-value")?.textContent).toContain(OTA_ROW.md5);
-  });
-  it("says the MD5 is unavailable after a failed re-read dropped it", () => {
-    const host = {
-      _step: "choose-binary",
-      _binaries: [{ ...OTA_ROW, md5: undefined }, ELF_ROW],
-      _log: fakeLogBuffer(),
-      _localize: defaultLocalize,
-      _onChooseBinary: () => {},
-      _checksums: { ...initialChecksums(), unavailable: true },
-    };
-    const container = renderInto(
-      renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog)
-    );
-    expect(container.querySelectorAll(".binary-checksum")).toHaveLength(1);
-    expect(container.textContent).toContain("MD5 unavailable");
   });
 });
