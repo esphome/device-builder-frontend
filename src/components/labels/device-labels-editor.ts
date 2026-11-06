@@ -381,7 +381,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
                     </button>
                     ${renderLabelRowActions(
                       this._localize,
-                      () => (this._editingLabel = label),
+                      () => void this._startRename(label),
                       () => fireEvent(this, "request-delete-label", label)
                     )}
                   </div>`;
@@ -408,6 +408,13 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   private _onCreateSubmitting = () => {
     this._pendingCreateConfig = this.device.configuration;
   };
+
+  /** Switch the form to renaming *label* and bring it into view. */
+  private async _startRename(label: Label) {
+    this._editingLabel = label;
+    await this.updateComplete;
+    this._createForm?.scrollIntoView({ block: "nearest" });
+  }
 
   private _stopRename = () => {
     this._editingLabel = null;

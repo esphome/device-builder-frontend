@@ -327,6 +327,16 @@ describe("device-labels-editor catalog management", () => {
     expect(form(el).editing).toEqual(other);
   });
 
+  it("scrolls the rename form into view", async () => {
+    const el = await mountWithCatalog();
+    const scroll = vi.fn();
+    form(el).scrollIntoView = scroll;
+    actions(el)[0].click();
+    await el.updateComplete;
+    await el.updateComplete;
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+  });
+
   it("drops edit mode when the label leaves the catalog", async () => {
     const el = await mountWithCatalog();
     actions(el)[0].click();
