@@ -1,0 +1,47 @@
+---
+name: Close untitled issues
+
+on:
+  schedule:
+    - cron: "15 */6 * * *"  # Every 6 hours
+  workflow_dispatch:
+
+# Deny by default; the job opts in to exactly what it needs.
+permissions: {}
+
+jobs:
+  untitled:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write  # comment on and close untitled issues
+    steps:
+      - uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const GRACE_MS = 48 * 60 * 60 * 1000;
+            // The placeholder the bug form used to prefill as the title.
+            const PLACEHOLDER_RE = /^\s*\[web\.esphome\.io\]\s*/i;
+            const CLOSE =
+              "Closing because this issue was never given a title. If it is a web.esphome.io bug, " +
+              "please open a new issue with a title that describes the problem.\n\n" +
+              "This tracker is for web.esphome.io bugs, not a support queue. For help with " +
+              "a device or a config, please ask on the [ESPHome Discord](https://discord.gg/KhAMKrd) " +
+              "or the [community forum](https://community.home-assistant.io/c/esphome/).";
+
+            const { owner, repo } = context.repo;
+            const cutoff = Date.now() - GRACE_MS;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: "open", per_page: 100,
+            });
+            for (const issue of issues) {
+              if (issue.pull_request) continue;
+              if (issue.title.replace(PLACEHOLDER_RE, "").trim() !== "") continue;
+              if (Date.parse(issue.created_at) > cutoff) continue;
+              core.info(`Closing untitled issue #${issue.number}`);
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: issue.number, body: CLOSE,
+              });
+              await github.rest.issues.update({
+                owner, repo, issue_number: issue.number, state: "closed", state_reason: "not_planned",
+              });
+            }
