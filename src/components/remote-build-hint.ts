@@ -17,6 +17,13 @@ export function canResetBuildEnv(pairing: PairingSummary): boolean {
   );
 }
 
+/** Every reset-capable build server in *pairings* (the "reset all" targets). */
+export function resettablePairings(
+  pairings: ReadonlyMap<string, PairingSummary> | null | undefined
+): PairingSummary[] {
+  return Array.from(pairings?.values() ?? []).filter(canResetBuildEnv);
+}
+
 /** Route *pin*'s confirm-then-follow remote reset to the firmware-jobs dialog. */
 export function requestResetPeerBuildEnv(el: HTMLElement, pin: string): void {
   fireEvent(el, "open-reset-peer-build-env", { pin_sha256: pin });

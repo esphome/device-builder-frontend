@@ -15,7 +15,7 @@ vi.mock("../../src/util/notify.js", () => ({
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
 import type { PairingSummary } from "../../src/api/types/remote-build.js";
 import { ESPHomeFirmwareJobsDialog } from "../../src/components/firmware-jobs-dialog.js";
-import { notifyError } from "../../src/util/notify.js";
+import { notifyError, notifySuccess } from "../../src/util/notify.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -52,7 +52,10 @@ interface DialogInternals {
   _pendingResetPeer: { pin_sha256: string; label: string } | null;
   _jobDisplayName: (job: FirmwareJob) => string;
   openResetPeerBuildEnv(pin: string): void;
+  openResetAllPeerBuildEnv(): void;
+  _resetAllConfirmDialog: { open: ReturnType<typeof vi.fn> };
   _onResetPeerConfirmed: () => Promise<void>;
+  _onResetAllPeersConfirmed: () => Promise<void>;
 }
 
 function makeDialog(overrides: Partial<PairingSummary> = {}) {
@@ -138,5 +141,82 @@ describe("_onResetPeerConfirmed", () => {
     await el._onResetPeerConfirmed();
     expect(el._api.remoteBuildResetPeerBuildEnv).not.toHaveBeenCalled();
     expect(followJob).not.toHaveBeenCalled();
+  });
+});
+
+describe("reset all build servers", () => {
+  const PIN_B = "b".repeat(64);
+
+  function makeTwo(overrides: Partial<PairingSummary> = {}) {
+    const { el, confirm } = makeDialog();
+    el._pairings = new Map([
+      [PIN, pairing()],
+      [PIN_B, pairing({ pin_sha256: PIN_B, label: "mini", ...overrides })],
+    ]);
+    const allConfirm = { open: vi.fn() };
+    Object.defineProperty(el, "_resetAllConfirmDialog", { value: allConfirm });
+    const open = vi.fn();
+    Object.defineProperty(el, "open", { value: open });
+    return { el, confirm, allConfirm, open };
+  }
+
+  it("opens the confirm only when a capable server exists", () => {
+    const { el, allConfirm } = makeTwo();
+    el.openResetAllPeerBuildEnv();
+    expect(allConfirm.open).toHaveBeenCalledTimes(1);
+
+    const none = makeDialog({ connected: false });
+    Object.defineProperty(none.el, "_resetAllConfirmDialog", {
+      value: { open: vi.fn() },
+    });
+    none.el.openResetAllPeerBuildEnv();
+    expect(none.el._resetAllConfirmDialog.open).not.toHaveBeenCalled();
+  });
+
+  it("queues a reset per capable server and opens the jobs list", async () => {
+    const { el, open } = makeTwo({ reset_build_env_supported: true });
+    el._api.remoteBuildResetPeerBuildEnv.mockResolvedValue({} as FirmwareJob);
+    el.openResetAllPeerBuildEnv();
+    await el._onResetAllPeersConfirmed();
+    expect(el._api.remoteBuildResetPeerBuildEnv).toHaveBeenCalledWith({
+      pin_sha256: PIN,
+    });
+    expect(el._api.remoteBuildResetPeerBuildEnv).toHaveBeenCalledWith({
+      pin_sha256: PIN_B,
+    });
+    expect(notifySuccess).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the servers that fail and still opens the list for the rest", async () => {
+    const { el, open } = makeTwo();
+    el._api.remoteBuildResetPeerBuildEnv
+      .mockResolvedValueOnce({} as FirmwareJob)
+      .mockRejectedValueOnce(new Error("link down"));
+    el.openResetAllPeerBuildEnv();
+    await el._onResetAllPeersConfirmed();
+    expect(notifyError).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(notifyError).mock.calls[0][0] as string).toContain("mini");
+    expect(notifySuccess).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays quiet and leaves the list closed when every reset fails", async () => {
+    const { el, open } = makeTwo();
+    el._api.remoteBuildResetPeerBuildEnv.mockRejectedValue(new Error("x"));
+    el.openResetAllPeerBuildEnv();
+    await el._onResetAllPeersConfirmed();
+    expect(notifyError).toHaveBeenCalledTimes(2);
+    expect(notifySuccess).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("resets the servers the confirm was opened for, not a later set", async () => {
+    const { el } = makeTwo();
+    el._api.remoteBuildResetPeerBuildEnv.mockResolvedValue({} as FirmwareJob);
+    el.openResetAllPeerBuildEnv();
+    el._pairings = new Map();
+    await el._onResetAllPeersConfirmed();
+    expect(el._api.remoteBuildResetPeerBuildEnv).toHaveBeenCalledTimes(2);
   });
 });

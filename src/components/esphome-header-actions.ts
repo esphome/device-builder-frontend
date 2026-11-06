@@ -21,9 +21,11 @@ import type { AdoptableDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { JobStatus } from "../api/types/firmware-jobs.js";
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   buildOffloadAlertsContext,
+  buildOffloadPairingsContext,
   desktopUpdateCapableContext,
   firmwareJobsContext,
   importableDevicesContext,
@@ -38,6 +40,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-actions.js";
 import { headerActionsStyles } from "./esphome-header-actions.styles.js";
 import { OverflowMenuElement } from "./overflow-menu-element.js";
+import { resettablePairings } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
@@ -89,6 +92,11 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
   @consume({ context: buildOffloadAlertsContext, subscribe: true })
   @state()
   private _offloaderAlerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
+
+  /** Paired build servers, for the "reset all build servers" menu entry. */
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  private _pairings: Map<string, PairingSummary> | null = null;
 
   /** True on the dashboard route. Dashboard-only menu entries
    *  (Archived Devices) hide elsewhere; their dialog is hosted on the
@@ -291,6 +299,21 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                   <wa-icon library="mdi" name="cog-refresh"></wa-icon>
                   ${this._localize("layout.reset_build_env")}
                 </div>
+                ${
+                  // Two or more: a single server already has its own reset button.
+                  resettablePairings(this._pairings).length >= 2
+                    ? html`<div
+                        class="menu-item"
+                        role="menuitem"
+                        tabindex="0"
+                        @click=${this._openResetAllPeerBuildEnv}
+                        @keydown=${this._onItemKeydown}
+                      >
+                        <wa-icon library="mdi" name="cog-refresh"></wa-icon>
+                        ${this._localize("layout.reset_all_build_servers")}
+                      </div>`
+                    : nothing
+                }
                 <div class="menu-divider" role="separator"></div>
                 <div
                   class="menu-item"
@@ -408,6 +431,11 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
   private _openResetBuildEnv() {
     this._close();
     fireEvent(this, "open-reset-build-env");
+  }
+
+  private _openResetAllPeerBuildEnv() {
+    this._close();
+    fireEvent(this, "open-reset-all-peer-build-env");
   }
 
   private _openSettings() {
