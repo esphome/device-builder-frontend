@@ -274,22 +274,7 @@ function renderDownloadReadyExtra(
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
-  // Manual binary download: offer to pick a different format when more than
-  // one was produced.
-  return html`
-    ${renderDownloadMd5(host)}
-    ${
-      host._binaries.length > 1
-        ? html`<button
-            type="button"
-            class="reset-suggestion-link"
-            @click=${() => (host._step = "choose-binary")}
-          >
-            ${host._localize("firmware.choose_binary_again")}
-          </button>`
-        : nothing
-    }
-  `;
+  return renderDownloadMd5(host);
 }
 
 // The body a step adds under its status text; the steps are exclusive.
@@ -426,9 +411,19 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
         </div>
       `;
     }
-    // binary-download
+    // binary-download: back to the picker when more than one format was built.
     return html`
       <div class="footer">
+        ${
+          host._binaries.length > 1
+            ? html`<button
+                class="btn btn--ghost"
+                @click=${() => (host._step = "choose-binary")}
+              >
+                ${host._localize("firmware.choose_binary_again")}
+              </button>`
+            : nothing
+        }
         <button class="btn btn--primary" @click=${host._close}>
           ${host._localize("command.close")}
         </button>
