@@ -33,12 +33,10 @@ export interface CategorizedSections {
   automations: YamlSection[];
 }
 
-// ESPHome system/platform keys → Core configuration. This list MUST
-// stay in sync with `CORE_CATEGORIES` in `api/types.ts` and the
-// backend's `category: "core"` (defined in
-// `script/sync_components.py` → `_CATEGORY_OVERRIDES`) so the
-// navigator's "Core" group lists exactly the components the
-// "Add core configuration" dialog offers.
+// ESPHome system/platform keys → Core configuration. The navigator
+// widens this with every catalog entry whose category is in
+// `CORE_CATEGORIES` once the catalog loads (`navigatorCoreKeys`); this
+// static set covers the first paint and the callers without a catalog.
 //
 // Two umbrella YAML keys (`ota`, `update`) appear here without
 // matching catalog entries — those domains only have platform
@@ -71,6 +69,9 @@ export const CORE_KEYS = new Set([
   "debug",
   "preferences",
   "update",
+  "http_request",
+  "socket",
+  "async_tcp",
   // Device-wide config keys (not strictly components — no C++
   // implementation — but they share the top-level YAML namespace
   // alongside real components).
@@ -91,13 +92,16 @@ export const CORE_KEYS = new Set([
 // top-level keys.
 export const AUTOMATION_KEYS = new Set(["script", "interval"]);
 
-export function categorizeSections(sections: YamlSection[]): CategorizedSections {
+export function categorizeSections(
+  sections: YamlSection[],
+  coreKeys: ReadonlySet<string> = CORE_KEYS
+): CategorizedSections {
   const core: YamlSection[] = [];
   const components: YamlSection[] = [];
   const automations: YamlSection[] = [];
 
   for (const section of sections) {
-    if (CORE_KEYS.has(section.key)) {
+    if (coreKeys.has(section.key)) {
       core.push(section);
     } else if (AUTOMATION_KEYS.has(section.key)) {
       automations.push(section);

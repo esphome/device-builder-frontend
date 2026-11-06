@@ -547,6 +547,25 @@ describe("categorizeSections", () => {
     expect(automations).toEqual([]);
   });
 
+  it("puts the catalog's networking core components into core", () => {
+    const { core, components } = categorizeSections([
+      mk("http_request"),
+      mk("socket"),
+      mk("async_tcp"),
+    ]);
+    expect(core.map((s) => s.key)).toEqual(["http_request", "socket", "async_tcp"]);
+    expect(components).toEqual([]);
+  });
+
+  it("uses a caller-supplied core key set", () => {
+    const { core, components } = categorizeSections(
+      [mk("esphome"), mk("sensor")],
+      new Set(["sensor"])
+    );
+    expect(core.map((s) => s.key)).toEqual(["sensor"]);
+    expect(components.map((s) => s.key)).toEqual(["esphome"]);
+  });
+
   it("puts script/interval into automations and globals into core", () => {
     const { core, automations } = categorizeSections([
       mk("script"),

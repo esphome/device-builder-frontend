@@ -27,6 +27,10 @@ import {
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
+  getCachedCatalogIndex,
+  loadCatalog,
+} from "../../util/yaml-completion-catalog.js";
+import {
   categorizeSections,
   parseYamlAutomations,
   parseYamlTopLevelSections,
@@ -37,7 +41,11 @@ import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
-import { deriveNavigatorBuckets, type NavigatorBuckets } from "./navigator-buckets.js";
+import {
+  deriveNavigatorBuckets,
+  type NavigatorBuckets,
+  navigatorCoreKeys,
+} from "./navigator-buckets.js";
 import { groupRowsByDomain } from "./navigator-groups.js";
 import { type NavRow, resolveBucketLabels } from "./navigator-labels.js";
 import { type NavAction, renderNavSection } from "./navigator-render.js";
@@ -101,7 +109,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   protected readonly _reveal = new NavigatorRevealController(this, () => ({
     selectedLine: this._selectedLine,
-    buckets: this._deriveBuckets(this.yaml),
+    buckets: this._buckets(),
     openSections: this.openSections,
     filtering: this._query.trim().length > 0,
   }));
@@ -118,6 +126,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
   /** Memoised on the YAML source so the parse pipeline runs once per
    *  edit, not per render. See {@link deriveNavigatorBuckets}. */
   private _deriveBuckets = memoizeOne(deriveNavigatorBuckets);
+
+  private _buckets(): NavigatorBuckets {
+    return this._deriveBuckets(this.yaml, navigatorCoreKeys(getCachedCatalogIndex()));
+  }
 
   /** Memoised on the rows identity so the Components regroup is stable
    *  across idle re-renders (selection/hover); collapse is render-time. */
@@ -285,7 +297,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   protected render() {
-    const buckets = this._deriveBuckets(this.yaml);
+    const buckets = this._buckets();
     const { core, components, automations } = buckets;
     const isGroupOpen = (key: string) => !this._collapsedGroups.has(key);
 
@@ -571,6 +583,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // "Switch → On Turn On" instead of the raw YAML key. The
     // controller re-renders the host when the fetch lands.
     this._triggerCatalog.ensure();
+    // Core grouping widens to the catalog's core categories once it loads.
+    if (!getCachedCatalogIndex()) {
+      void loadCatalog(this._api).then(() => this.requestUpdate());
+    }
   }
 
   private _onItemHover(line: number, fromLine: number, toLine: number) {

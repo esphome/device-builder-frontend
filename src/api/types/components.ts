@@ -45,9 +45,9 @@ export enum ComponentCategory {
  * `time:` block is the exception. It lives in the regular component
  * selector under its own "Time" category.
  *
- * The frontend's CORE_KEYS in `util/yaml-sections.ts` is the
- * YAML-key-level counterpart (which umbrella keys are categorized
- * as "Core" in the navigator) and stays aligned with this list.
+ * The navigator's "Core" group is every catalog entry in these
+ * categories plus the static `CORE_KEYS` in `util/yaml-sections.ts`
+ * (see `navigatorCoreKeys`).
  */
 export const CORE_CATEGORIES: readonly string[] = [
   ComponentCategory.CORE,
