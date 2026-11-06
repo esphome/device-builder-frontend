@@ -10,7 +10,7 @@ import { dispatchShowLogsAfterInstall } from "../../util/post-install-dispatch.j
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { buildRunning, updateChecksums } from "./checksums.js";
+import { buildRunning, runningBuild, updateChecksums } from "./checksums.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
@@ -112,16 +112,24 @@ export async function compileOrFail(
 }
 
 // List build artefacts, surfacing a failure on the dialog. Returns null so the
-// caller bails.
+// caller bails. A build running during the read marks the new list stale.
 export async function fetchBinaries(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<FirmwareBinary[] | null> {
+  updateChecksums(host, {
+    stale: false,
+    reading: true,
+    priorBuild: runningBuild(host)?.job_id,
+  });
+  const stillCurrent = runGuard(host);
   try {
     return await host._api.firmwareGetBinaries(configuration);
   } catch {
-    host._fail(host._localize("firmware.download_failed"));
+    if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
     return null;
+  } finally {
+    if (stillCurrent()) updateChecksums(host, { reading: false });
   }
 }
 
@@ -143,19 +151,9 @@ export async function reopenPicker(host: ESPHomeFirmwareInstallDialog): Promise<
     host._step = "choose-binary";
     return;
   }
-  // Cleared first: a build starting during the read marks it stale again.
-  updateChecksums(host, { stale: false, reading: true });
   const stillCurrent = runGuard(host);
-  let binaries: FirmwareBinary[];
-  try {
-    binaries = await host._api.firmwareGetBinaries(configuration);
-  } catch {
-    if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
-    return;
-  } finally {
-    if (stillCurrent()) updateChecksums(host, { reading: false });
-  }
-  if (!stillCurrent()) return;
+  const binaries = await fetchBinaries(host, configuration);
+  if (!binaries || !stillCurrent()) return;
   if (binaries.length === 0) {
     failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
     return;

@@ -1,4 +1,8 @@
-import { type FirmwareBinary, JobType } from "../../api/types/firmware-jobs.js";
+import {
+  type FirmwareBinary,
+  type FirmwareJob,
+  JobType,
+} from "../../api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 
 /** The install dialog's per-run MD5 state. */
@@ -7,8 +11,10 @@ export interface ChecksumState {
   expanded: ReadonlySet<string>;
   /** A build ran since the list was read, so its digests may be outdated. */
   stale: boolean;
-  /** The picker's list is being re-read; reopening waits for it. */
+  /** The list is being read; reopening waits for it. */
   reading: boolean;
+  /** The build entry present when the read started, already finished for this flow. */
+  priorBuild?: string;
   /** The row the last download fetched. */
   downloaded?: FirmwareBinary;
   /** That download waited out a build, so the row's digest may be outdated. */
@@ -35,17 +41,26 @@ export function toggleMd5(host: ESPHomeFirmwareInstallDialog, file: string): voi
   updateChecksums(host, { expanded });
 }
 
-/** Whether a job that rewrites the device's build artifacts is running now. */
-export function buildRunning(host: ESPHomeFirmwareInstallDialog): boolean {
+/** The running job that rewrites the device's build artifacts, if any. */
+export function runningBuild(
+  host: ESPHomeFirmwareInstallDialog
+): FirmwareJob | undefined {
   const configuration = host._device?.configuration;
   const job =
     configuration === undefined ? undefined : host._activeJobs.get(configuration);
   // An upload only flashes the existing image.
-  return job !== undefined && job.job_type !== JobType.UPLOAD;
+  return job?.job_type === JobType.UPLOAD ? undefined : job;
 }
 
-/** Mark the listed digests stale once a build for the device runs under them. */
+export const buildRunning = (host: ESPHomeFirmwareInstallDialog): boolean =>
+  runningBuild(host) !== undefined;
+
+/** Mark the digests stale once a new build for the device runs during or after their read. */
 export function syncChecksumsWithBuilds(host: ESPHomeFirmwareInstallDialog): void {
-  if (!host._open || host._binaries.length === 0 || host._checksums.stale) return;
-  if (buildRunning(host)) updateChecksums(host, { stale: true });
+  const { stale, reading, priorBuild } = host._checksums;
+  if (!host._open || stale || (!reading && host._binaries.length === 0)) return;
+  const job = runningBuild(host);
+  // The flow's own compile can still be listed after its result arrived.
+  if (job !== undefined && job.job_id !== priorBuild)
+    updateChecksums(host, { stale: true });
 }

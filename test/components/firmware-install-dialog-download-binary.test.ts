@@ -171,6 +171,40 @@ describe("manual firmware-binary download flow", () => {
     expect(dialog._checksums.stale).toBe(true);
   });
 
+  it("a build that starts and ends during the first read still marks the list stale", async () => {
+    const single = { ...OTA, md5: "old" };
+    const { host, api } = makeHost("binary-download", [single]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    api.firmwareGetBinaries.mockImplementationOnce(async () => {
+      host._activeJobs.set("device.yaml", {
+        job_id: "rebuild",
+        job_type: JobType.COMPILE,
+      });
+      syncChecksumsWithBuilds(dialog);
+      host._activeJobs.delete("device.yaml");
+      syncChecksumsWithBuilds(dialog);
+      return [single];
+    });
+    await run(host);
+    expect(host._step).toBe("download-ready");
+    expect(dialog._checksums.downloadedStale).toBe(true);
+  });
+
+  it("the flow's own finished compile, still listed during the read, isn't a new build", async () => {
+    const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    host._activeJobs.set("device.yaml", { job_id: "j1", job_type: JobType.COMPILE });
+    api.firmwareGetBinaries.mockImplementationOnce(async () => {
+      syncChecksumsWithBuilds(dialog);
+      host._activeJobs.delete("device.yaml");
+      syncChecksumsWithBuilds(dialog);
+      return [FACTORY, OTA];
+    });
+    await run(host);
+    expect(host._step).toBe("choose-binary");
+    expect(dialog._checksums.stale).toBe(false);
+  });
+
   it("reopening a stale picker re-reads the list exactly once", async () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
