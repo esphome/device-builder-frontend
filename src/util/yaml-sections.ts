@@ -1,5 +1,9 @@
+import memoizeOne from "memoize-one";
+import { CORE_CATEGORIES } from "../api/types/components.js";
 import { TARGET_PLATFORM_KEYS } from "./component-presence.js";
+import { parseCatalogId } from "./config-entry-yaml-scan.js";
 import { parseYamlAutomations } from "./yaml-automations.js";
+import type { CatalogIndex } from "./yaml-completion-catalog.js";
 import { splitYamlDocLines } from "./yaml-doc-lines.js";
 import { TOP_LEVEL_KEY_RE } from "./yaml-section-lexer.js";
 import {
@@ -33,12 +37,7 @@ export interface CategorizedSections {
   automations: YamlSection[];
 }
 
-// ESPHome system/platform keys → Core configuration. This list MUST
-// stay in sync with `CORE_CATEGORIES` in `api/types.ts` and the
-// backend's `category: "core"` (defined in
-// `script/sync_components.py` → `_CATEGORY_OVERRIDES`) so the
-// navigator's "Core" group lists exactly the components the
-// "Add core configuration" dialog offers.
+// Static Core keys; `catalogCoreKeys` adds the catalog's core-category domains.
 //
 // Two umbrella YAML keys (`ota`, `update`) appear here without
 // matching catalog entries — those domains only have platform
@@ -85,19 +84,36 @@ export const CORE_KEYS = new Set([
   "globals",
 ]);
 
+/** `CORE_KEYS` plus the domain of every catalog entry in `CORE_CATEGORIES`. */
+export const catalogCoreKeys = memoizeOne(
+  (catalog: CatalogIndex | null): ReadonlySet<string> => {
+    if (!catalog) return CORE_KEYS;
+    const keys = new Set(CORE_KEYS);
+    for (const category of CORE_CATEGORIES) {
+      for (const entry of catalog.byCategory.get(category) ?? []) {
+        keys.add(parseCatalogId(entry.id).domain);
+      }
+    }
+    return keys;
+  }
+);
+
 // Automation/logic keys → Automations
 // In ESPHome, automations are inline on_* handlers within components.
 // `script` and `interval` are the standalone automation-adjacent
 // top-level keys.
 export const AUTOMATION_KEYS = new Set(["script", "interval"]);
 
-export function categorizeSections(sections: YamlSection[]): CategorizedSections {
+export function categorizeSections(
+  sections: YamlSection[],
+  coreKeys: ReadonlySet<string>
+): CategorizedSections {
   const core: YamlSection[] = [];
   const components: YamlSection[] = [];
   const automations: YamlSection[] = [];
 
   for (const section of sections) {
-    if (CORE_KEYS.has(section.key)) {
+    if (coreKeys.has(section.key)) {
       core.push(section);
     } else if (AUTOMATION_KEYS.has(section.key)) {
       automations.push(section);

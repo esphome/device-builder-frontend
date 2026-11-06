@@ -10,14 +10,17 @@ import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { stripRedundantComponentSuffix } from "../../../util/component-title.js";
 import { parseCatalogId } from "../../../util/config-entry-yaml-scan.js";
 import { instanceScopes, triggerAppliesTo } from "../../../util/trigger-scopes.js";
-import { CORE_KEYS } from "../../../util/yaml-sections.js";
+import { getCachedCatalogIndex } from "../../../util/yaml-completion-catalog.js";
+import { catalogCoreKeys } from "../../../util/yaml-sections.js";
 
 /** The instance's display label: its ``name:`` when set, else the catalog
  *  title (core titles trimmed like the navigator), else its id. */
 export function instanceName(device: AvailableComponentInstance): string {
   if (device.name) return device.name;
   if (device.title) {
-    return CORE_KEYS.has(componentDomain(device.component_id))
+    return catalogCoreKeys(getCachedCatalogIndex()).has(
+      componentDomain(device.component_id)
+    )
       ? stripRedundantComponentSuffix(device.title)
       : device.title;
   }

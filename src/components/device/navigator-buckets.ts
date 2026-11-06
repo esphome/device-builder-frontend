@@ -19,12 +19,15 @@ export interface NavigatorBuckets {
  * buckets. Two parser passes and three list traversals collapse into a
  * single result; the navigator memoises it on the YAML source.
  */
-export function deriveNavigatorBuckets(yaml: string): NavigatorBuckets {
+export function deriveNavigatorBuckets(
+  yaml: string,
+  coreKeys: ReadonlySet<string>
+): NavigatorBuckets {
   const {
     core,
     components,
     automations: topLevelAutomations,
-  } = categorizeSections(parseYamlTopLevelSections(yaml));
+  } = categorizeSections(parseYamlTopLevelSections(yaml), coreKeys);
   // ``parseYamlAutomations`` enumerates individual ``script:`` /
   // ``interval:`` list items as stable-keyed entries; drop the bare
   // top-level blocks so each automation shows up exactly once.
