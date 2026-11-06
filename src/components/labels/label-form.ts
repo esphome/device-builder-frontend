@@ -522,10 +522,13 @@ export class ESPHomeLabelForm extends LitElement {
             composed: true,
           })
         );
-        this._name = "";
-        this._color = null;
-        this._colorManual = false;
-        if (!this.defaultOpen) this._open = false;
+        // A rename opened while the create was pending owns the inputs now.
+        if (this.editing === null) {
+          this._name = "";
+          this._color = null;
+          this._colorManual = false;
+          if (!this.defaultOpen) this._open = false;
+        }
       }
     } catch (err) {
       console.warn(editing ? "label update failed" : "label create failed", err);
