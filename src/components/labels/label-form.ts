@@ -1,8 +1,8 @@
 /**
  * Inline label form — handles both creating a new label and
  * editing an existing one (rename and / or recolor). Shared by the
- * device-drawer label editor (create only, dialog-mounted) and the
- * dashboard's labels filter (create + edit, popover-mounted).
+ * device-drawer label editor and the dashboard's label dialog, both
+ * create + edit.
  *
  * The two modes share the entire form layout (name input + colour-
  * swatch radiogroup + submit / cancel buttons); the differences

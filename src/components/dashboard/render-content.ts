@@ -1,6 +1,10 @@
 import type { ColumnVisibilityState, SortingState } from "@tanstack/lit-table";
 import { html, type TemplateResult } from "lit";
-import type { AdoptableDevice, ConfiguredDevice } from "../../api/types/devices.js";
+import type {
+  AdoptableDevice,
+  ConfiguredDevice,
+  Label,
+} from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { matchesDeviceSearch } from "../../util/device-filter.js";
 import {
@@ -310,6 +314,9 @@ export function renderDrawer(host: ESPHomePageDashboard): TemplateResult {
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) => {
         host._drawerOpen = false;
         host._openCommand(e.detail, "clean");
+      }}
+      @request-delete-label=${(e: CustomEvent<Label>) => {
+        host._openConfirm({ kind: "delete-label", label: e.detail });
       }}
     ></esphome-device-drawer>
   `;
