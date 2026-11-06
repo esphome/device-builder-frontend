@@ -394,7 +394,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
             .editing=${this._editingLabel}
             @submitting=${this._onCreateSubmitting}
             @label-created=${this._onCreateResolved}
-            @label-saved=${this._stopRename}
+            @label-saved=${this._onLabelSaved}
             @form-cancel=${this._stopRename}
           ></esphome-label-form>
         </div>
@@ -411,6 +411,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
   private _stopRename = () => {
     this._editingLabel = null;
+  };
+
+  /** Leave rename mode unless the user moved on to another label mid-save. */
+  private _onLabelSaved = (e: CustomEvent<Label>) => {
+    if (this._editingLabel?.id === e.detail.id) this._stopRename();
   };
 
   /** Leave rename mode and collapse the create form. */

@@ -312,6 +312,21 @@ describe("device-labels-editor catalog management", () => {
     expect(form(el).editing).toBeNull();
   });
 
+  it("a late save for one label keeps another label's rename open", async () => {
+    const el = await mountWithCatalog();
+    const other = { id: "b", name: "Garage", color: null };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._catalog = [LABEL, other];
+    await el.updateComplete;
+    actions(el)[2].click();
+    await el.updateComplete;
+    expect(form(el).editing).toEqual(other);
+
+    form(el).dispatchEvent(new CustomEvent("label-saved", { detail: LABEL }));
+    await el.updateComplete;
+    expect(form(el).editing).toEqual(other);
+  });
+
   it("drops edit mode when the label leaves the catalog", async () => {
     const el = await mountWithCatalog();
     actions(el)[0].click();
