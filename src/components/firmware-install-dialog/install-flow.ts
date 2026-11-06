@@ -10,7 +10,7 @@ import { dispatchShowLogsAfterInstall } from "../../util/post-install-dispatch.j
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { updateChecksums } from "./checksums.js";
+import { buildRunning, updateChecksums } from "./checksums.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
@@ -137,7 +137,8 @@ function showBinaryPicker(
 /** Back to the picker, re-reading the list only when a build replaced it. */
 export async function reopenPicker(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const configuration = host._device?.configuration;
-  if (!configuration || !host._checksums.stale) {
+  // A read mid-build would list digests the build is about to replace.
+  if (!configuration || !host._checksums.stale || buildRunning(host)) {
     host._step = "choose-binary";
     return;
   }
@@ -145,7 +146,12 @@ export async function reopenPicker(host: ESPHomeFirmwareInstallDialog): Promise<
   updateChecksums(host, { stale: false });
   const stillCurrent = runGuard(host);
   const binaries = await fetchBinaries(host, configuration);
-  if (binaries && stillCurrent()) showBinaryPicker(host, binaries);
+  if (!binaries || !stillCurrent()) return;
+  if (binaries.length === 0) {
+    failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
+    return;
+  }
+  showBinaryPicker(host, binaries);
 }
 
 // Reached after a *successful* compile when there's nothing to flash. A remote
@@ -244,9 +250,8 @@ export async function downloadSelectedBinary(
   if (!(await artifactsSettled(host, device.configuration))) return;
   // A build the settle waited out marked the listed digests stale.
   updateChecksums(host, {
-    downloaded: host._checksums.stale
-      ? undefined
-      : host._binaries.find((binary) => binary.file === file),
+    downloaded: host._binaries.find((binary) => binary.file === file),
+    downloadedStale: host._checksums.stale,
   });
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the

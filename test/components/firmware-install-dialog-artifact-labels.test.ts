@@ -177,4 +177,37 @@ describe("choose-binary artifact labels", () => {
     );
     expect(container.querySelector(".copy-value")?.textContent).toContain(OTA_ROW.md5);
   });
+
+  it("keeps the downloaded digest on download-ready while a later build runs", () => {
+    const container = renderDownloadReady({ building: true });
+    expect(container.querySelector(".copy-value")?.textContent).toContain(OTA_ROW.md5);
+  });
+
+  it("says why download-ready withholds a digest the download outdated", () => {
+    const container = renderDownloadReady({ downloadedStale: true });
+    expect(container.querySelector(".copy-value")).toBeNull();
+    expect(container.textContent).toContain("Reopen the download");
+  });
+
+  function renderDownloadReady({ building = false, downloadedStale = false } = {}) {
+    const host = {
+      _step: "download-ready",
+      _installer: "binary-download",
+      _binaries: [OTA_ROW],
+      _downloadedFilename: OTA_ROW.download_name,
+      _log: fakeLogBuffer(),
+      _localize: defaultLocalize,
+      _device: { configuration: "kitchen.yaml" },
+      _activeJobs: new Map(
+        building ? [["kitchen.yaml", { job_id: "j", job_type: "compile" }]] : []
+      ),
+      _checksums: {
+        ...initialChecksums(),
+        expanded: new Set(["firmware.ota.bin"]),
+        downloaded: OTA_ROW,
+        downloadedStale,
+      },
+    };
+    return renderInto(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog));
+  }
 });

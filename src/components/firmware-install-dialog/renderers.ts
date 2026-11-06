@@ -224,18 +224,20 @@ export function renderOffloadHintSlot(
 // picker (choose-binary), the "choose another format" link (download-ready),
 // and the collapsible compile / esptool log.
 
+// Why a picker row's listed digest is withheld right now, if it is.
+function pickerNote(host: ESPHomeFirmwareInstallDialog): string | null {
+  if (buildRunning(host)) return "firmware.md5_pending";
+  return host._checksums.stale ? "firmware.md5_stale" : null;
+}
+
 function renderMd5(
   host: ESPHomeFirmwareInstallDialog,
   binary: FirmwareBinary,
-  title: string
+  title: string,
+  note: string | null
 ): TemplateResult | typeof nothing {
   const md5 = binary.md5;
   if (!md5) return nothing;
-  const note = buildRunning(host)
-    ? "firmware.md5_pending"
-    : host._checksums.stale
-      ? "firmware.md5_stale"
-      : null;
   return html`
     <div class="binary-checksum">
       ${renderDisclosure({
@@ -293,7 +295,7 @@ function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
               <span class="title">${title}</span>
               ${desc ? html`<span class="desc">${desc}</span>` : nothing}
             </button>
-            ${renderMd5(host, binary, title)}
+            ${renderMd5(host, binary, title, pickerNote(host))}
           </div>
         `;
       })}
@@ -310,7 +312,16 @@ function renderDownloadReadyExtra(
   // Manual binary download: offer to pick a different format when more than
   // one was produced.
   return html`
-    ${downloaded ? renderMd5(host, downloaded, artifactTitle(host, downloaded)) : nothing}
+    ${
+      downloaded
+        ? renderMd5(
+            host,
+            downloaded,
+            artifactTitle(host, downloaded),
+            host._checksums.downloadedStale ? "firmware.md5_stale" : null
+          )
+        : nothing
+    }
     ${
       host._binaries.length > 1
         ? html`<button

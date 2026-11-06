@@ -187,7 +187,7 @@ describe("manual firmware-binary download flow", () => {
     expect(dialog._checksums.stale).toBe(false);
   });
 
-  it("records no MD5 for download-ready when the download waited out a build", async () => {
+  it("flags the recorded row stale when the download waited out a build", async () => {
     const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "before" }]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     host._binaries = [{ ...OTA, md5: "before" }];
@@ -202,8 +202,31 @@ describe("manual firmware-binary download flow", () => {
     );
     await downloadSelectedBinary(dialog, "firmware.ota.bin");
     expect(host._step).toBe("download-ready");
-    expect(dialog._checksums.downloaded).toBeUndefined();
+    expect(dialog._checksums.downloaded?.file).toBe("firmware.ota.bin");
+    expect(dialog._checksums.downloadedStale).toBe(true);
     expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
+  });
+
+  it("doesn't re-read a stale picker while a build still runs", async () => {
+    const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    await run(host);
+    dialog._checksums = { ...dialog._checksums, stale: true };
+    host._activeJobs.set("device.yaml", { job_id: "b", job_type: JobType.COMPILE });
+    await reopenPicker(dialog);
+    expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
+    expect(dialog._checksums.stale).toBe(true);
+    expect(host._step).toBe("choose-binary");
+  });
+
+  it("fails cleanly when a stale picker's re-read comes back empty", async () => {
+    const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    await run(host);
+    dialog._checksums = { ...dialog._checksums, stale: true };
+    api.firmwareGetBinaries.mockResolvedValueOnce([]);
+    await reopenPicker(dialog);
+    expect(host._fail).toHaveBeenCalledWith("firmware.no_binaries");
   });
 
   it("ignores build updates once the dialog is closed", () => {

@@ -7,13 +7,16 @@ export interface ChecksumState {
   expanded: ReadonlySet<string>;
   /** A build ran since the list was read, so its digests may be outdated. */
   stale: boolean;
-  /** The row the last download fetched, when its digest was current. */
+  /** The row the last download fetched. */
   downloaded?: FirmwareBinary;
+  /** That download waited out a build, so the row's digest may be outdated. */
+  downloadedStale: boolean;
 }
 
 export const initialChecksums = (): ChecksumState => ({
   expanded: new Set(),
   stale: false,
+  downloadedStale: false,
 });
 
 export function updateChecksums(
