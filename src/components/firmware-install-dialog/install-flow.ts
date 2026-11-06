@@ -230,16 +230,19 @@ export async function downloadSelectedBinary(
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).
   host._step = "downloading";
+  const stillCurrent = runGuard(host);
   try {
     const { url, filename, md5 } = await host._api.firmwareDownloadUrl(
       device.configuration,
       file
     );
+    // A reply that lands after a close/reopen belongs to the old run.
+    if (!stillCurrent()) return;
     triggerDownload(url, filename);
     host._downloadedFilename = filename;
     host._downloadedMd5 = md5;
   } catch {
-    host._fail(host._localize("firmware.download_failed"));
+    if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
     return;
   }
   host._step = "download-ready";

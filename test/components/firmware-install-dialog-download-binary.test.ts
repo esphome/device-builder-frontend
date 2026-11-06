@@ -203,4 +203,26 @@ describe("manual firmware-binary download flow", () => {
     await run(host);
     expect(host._fail).not.toHaveBeenCalled();
   });
+
+  it("ignores a download token reply that lands after the dialog was reopened", async () => {
+    const { host, api } = makeHost("binary-download", [OTA]);
+    api.firmwareDownloadUrl.mockImplementationOnce(async () => {
+      host._installRun += 1;
+      return { url: "/api/firmware/download?token=old", filename: "old.bin", md5: "old" };
+    });
+    await run(host);
+    expect(triggerDownload).not.toHaveBeenCalled();
+    expect(host._downloadedMd5).toBeUndefined();
+    expect(host._step).not.toBe("download-ready");
+  });
+
+  it("drops a download token failure that lands after the dialog was reopened", async () => {
+    const { host, api } = makeHost("binary-download", [OTA]);
+    api.firmwareDownloadUrl.mockImplementationOnce(async () => {
+      host._installRun += 1;
+      throw new Error("NOT_FOUND");
+    });
+    await run(host);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
 });
