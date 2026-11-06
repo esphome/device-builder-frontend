@@ -10,12 +10,6 @@ import { dispatchShowLogsAfterInstall } from "../../util/post-install-dispatch.j
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import {
-  listStale,
-  runningBuild,
-  syncChecksumsWithBuilds,
-  updateChecksums,
-} from "./checksums.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
@@ -117,22 +111,18 @@ export async function compileOrFail(
 }
 
 // List build artefacts, surfacing a failure on the dialog. Returns null so the
-// caller bails. A build seen during or after the read makes the list stale.
+// caller bails.
 export async function fetchBinaries(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<FirmwareBinary[] | null> {
-  // Counted now, not at the next render, so the flow's own compile is in the baseline.
-  syncChecksumsWithBuilds(host);
-  updateChecksums(host, { reading: true, listedAt: host._checksums.builds });
   const stillCurrent = runGuard(host);
   try {
     return await host._api.firmwareGetBinaries(configuration);
   } catch {
+    // A failure that lands after a close/reopen belongs to the old run.
     if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
     return null;
-  } finally {
-    if (stillCurrent()) updateChecksums(host, { reading: false });
   }
 }
 
@@ -143,25 +133,6 @@ function showBinaryPicker(
   host._binaries = binaries;
   host._statusMessage = "";
   host._step = "choose-binary";
-}
-
-/** Back to the picker, re-reading the list only when a build replaced it. */
-export async function reopenPicker(host: ESPHomeFirmwareInstallDialog): Promise<void> {
-  const configuration = host._device?.configuration;
-  if (host._checksums.reading) return;
-  // A read mid-build would list digests the build is about to replace.
-  if (!configuration || !listStale(host) || runningBuild(host)) {
-    host._step = "choose-binary";
-    return;
-  }
-  const stillCurrent = runGuard(host);
-  const binaries = await fetchBinaries(host, configuration);
-  if (!binaries || !stillCurrent()) return;
-  if (binaries.length === 0) {
-    failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
-    return;
-  }
-  showBinaryPicker(host, binaries);
 }
 
 // Reached after a *successful* compile when there's nothing to flash. A remote
@@ -211,8 +182,6 @@ export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise
     failNoBinaries(host, { isWebFlasher: false, isEmpty: true });
     return;
   }
-  // Kept so download-ready can show the artifact's checksum.
-  host._binaries = binaries;
   await downloadSelectedBinary(host, binaries[0].file);
 }
 
@@ -240,7 +209,6 @@ export async function startArtifactDownload(
     return;
   }
   if (binaries.length === 1) {
-    host._binaries = binaries;
     await downloadSelectedBinary(host, binaries[0].file);
     return;
   }
@@ -258,22 +226,23 @@ export async function downloadSelectedBinary(
   const device = host._device;
   if (!device) return;
   if (!(await artifactsSettled(host, device.configuration))) return;
-  // A build the settle waited out made the listed digests stale.
-  const binary = host._binaries.find((b) => b.file === file);
-  updateChecksums(host, { downloaded: binary && { binary, stale: listStale(host) } });
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).
   host._step = "downloading";
+  const stillCurrent = runGuard(host);
   try {
-    const { url, filename } = await host._api.firmwareDownloadUrl(
+    const { url, filename, md5 } = await host._api.firmwareDownloadUrl(
       device.configuration,
       file
     );
+    // A reply that lands after a close/reopen belongs to the old run.
+    if (!stillCurrent()) return;
     triggerDownload(url, filename);
     host._downloadedFilename = filename;
+    host._downloadedMd5 = md5;
   } catch {
-    host._fail(host._localize("firmware.download_failed"));
+    if (stillCurrent()) host._fail(host._localize("firmware.download_failed"));
     return;
   }
   host._step = "download-ready";

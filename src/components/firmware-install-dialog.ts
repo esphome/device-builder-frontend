@@ -33,7 +33,6 @@ import type { DetectedChip } from "../platforms/esp/index.js";
 import type { AnyBrowserInstall } from "../platforms/platform-support.js";
 import { copyValueStyles } from "../styles/copy-value.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
-import { disclosureStyles } from "../styles/disclosure.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
 import { fireEvent } from "../util/fire-event.js";
@@ -43,11 +42,6 @@ import { LONG_TOAST_DURATION_MS, notifyInfo } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { RunTimerController } from "../util/run-timer-controller.js";
 import { resetForRetry } from "./firmware-install-dialog/browser-flash-steps.js";
-import {
-  type ChecksumState,
-  initialChecksums,
-  syncChecksumsWithBuilds,
-} from "./firmware-install-dialog/checksums.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
@@ -113,10 +107,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _jobs: Map<string, FirmwareJob> = new Map();
 
   // Active job per configuration — the download flow waits for a running
-  // build instead of reading artifacts it's rewriting (#1200). @state so a
-  // build that starts or ends under the picker re-syncs the checksums.
+  // build instead of reading artifacts it's rewriting (#1200). Not @state:
+  // read imperatively at download start, never in render.
   @consume({ context: activeJobsContext, subscribe: true })
-  @state()
   _activeJobs: Map<string, FirmwareJob> = new Map();
 
   // Suppress the "set up a build server" hint once a build server is paired.
@@ -154,11 +147,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _logsExpanded = false;
   @state() _flashPercent = 0;
   @state() _downloadedFilename = "";
+  // The downloaded file's MD5 from its download token; unset for the ELF.
+  @state() _downloadedMd5?: string;
 
   // Formats offered by the manual download picker; populated only when a
   // device produces more than one (e.g. ESP32 factory + OTA).
   @state() _binaries: FirmwareBinary[] = [];
-  @state() _checksums: ChecksumState = initialChecksums();
 
   // Reset per _init so an opt-out on one run doesn't persist. Only the
   // web-serial install connects to a device, so the toggle is install-only.
@@ -226,7 +220,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     espHomeStyles,
     firmwareInstallDialogStyles,
     copyValueStyles,
-    disclosureStyles,
     remoteBuildHintStyles,
     // Content-heavy (build status + expandable log): full-screen on mobile
     // so it doesn't overflow a centered box. #41
@@ -318,8 +311,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._logsExpanded = false;
     this._flashPercent = 0;
     this._downloadedFilename = "";
+    this._downloadedMd5 = undefined;
     this._binaries = [];
-    this._checksums = initialChecksums();
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failureKind = null;
@@ -373,7 +366,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (changedProperties.has("_logsExpanded")) {
       this.toggleAttribute("expanded", this._logsExpanded);
     }
-    if (changedProperties.has("_activeJobs")) syncChecksumsWithBuilds(this);
   }
 
   // Close the dialog and open Settings → Send builds. The install flow ends

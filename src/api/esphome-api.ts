@@ -56,6 +56,7 @@ import type {
 } from "./types/event-subscription.js";
 import type {
   FirmwareBinary,
+  FirmwareDownloadToken,
   FirmwareJob,
   FirmwareJobResult,
 } from "./types/firmware-jobs.js";
@@ -1515,11 +1516,11 @@ export class ESPHomeAPI {
   async firmwareDownloadToken(
     configuration: string,
     file: string
-  ): Promise<{ token: string; filename: string }> {
-    return this.sendCommand<{ token: string; filename: string }>(
-      "firmware/download_token",
-      { configuration, file }
-    );
+  ): Promise<FirmwareDownloadToken> {
+    return this.sendCommand<FirmwareDownloadToken>("firmware/download_token", {
+      configuration,
+      file,
+    });
   }
 
   /**
@@ -1532,11 +1533,11 @@ export class ESPHomeAPI {
   async firmwareDownloadUrl(
     configuration: string,
     file: string
-  ): Promise<{ url: string; filename: string }> {
-    const { token, filename } = await this.firmwareDownloadToken(configuration, file);
+  ): Promise<Omit<FirmwareDownloadToken, "token"> & { url: string }> {
+    const { token, ...reply } = await this.firmwareDownloadToken(configuration, file);
     return {
       url: `${BASE_PATH}api/firmware/download?token=${encodeURIComponent(token)}`,
-      filename,
+      ...reply,
     };
   }
 
