@@ -258,20 +258,20 @@ export async function downloadSelectedBinary(
   const device = host._device;
   if (!device) return;
   if (!(await artifactsSettled(host, device.configuration))) return;
-  // A build the settle waited out made the listed digests stale.
   const binary = host._binaries.find((b) => b.file === file);
-  updateChecksums(host, { downloaded: binary && { binary, stale: listStale(host) } });
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).
   host._step = "downloading";
   try {
-    const { url, filename } = await host._api.firmwareDownloadUrl(
+    const { url, filename, md5 } = await host._api.firmwareDownloadUrl(
       device.configuration,
       file
     );
     triggerDownload(url, filename);
     host._downloadedFilename = filename;
+    // The token's digest is of the file this download serves, not the listing.
+    updateChecksums(host, { downloaded: binary && { ...binary, md5 } });
   } catch {
     host._fail(host._localize("firmware.download_failed"));
     return;

@@ -315,12 +315,7 @@ function renderDownloadReadyExtra(
   return html`
     ${
       downloaded
-        ? renderMd5(
-            host,
-            downloaded.binary,
-            artifactTitle(host, downloaded.binary),
-            downloaded.stale ? "firmware.md5_stale" : null
-          )
+        ? renderMd5(host, downloaded, artifactTitle(host, downloaded), null)
         : nothing
     }
     ${

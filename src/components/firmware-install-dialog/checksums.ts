@@ -17,8 +17,8 @@ export interface ChecksumState {
   listedAt: number;
   /** The list is being read; reopening waits for it. */
   reading: boolean;
-  /** The row the last download fetched, and whether a build had replaced its digest. */
-  downloaded?: { binary: FirmwareBinary; stale: boolean };
+  /** The row the last download fetched, carrying its download token's digest. */
+  downloaded?: FirmwareBinary;
 }
 
 export const initialChecksums = (): ChecksumState => ({

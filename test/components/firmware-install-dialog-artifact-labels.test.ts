@@ -174,7 +174,7 @@ describe("choose-binary artifact labels", () => {
       _checksums: {
         ...initialChecksums(),
         expanded: new Set(["firmware.ota.bin"]),
-        downloaded: { binary: OTA_ROW, stale: false },
+        downloaded: OTA_ROW,
       },
       _activeJobs: new Map(),
     };
@@ -189,13 +189,13 @@ describe("choose-binary artifact labels", () => {
     expect(container.querySelector(".copy-value")?.textContent).toContain(OTA_ROW.md5);
   });
 
-  it("says why download-ready withholds a digest the download outdated", () => {
-    const container = renderDownloadReady({ stale: true });
+  it("shows no checksum on download-ready when the download token had none", () => {
+    const container = renderDownloadReady({ withMd5: false });
     expect(container.querySelector(".copy-value")).toBeNull();
-    expect(container.textContent).toContain("Reopen the download");
+    expect(container.querySelector(".binary-checksum")).toBeNull();
   });
 
-  function renderDownloadReady({ building = false, stale = false } = {}) {
+  function renderDownloadReady({ building = false, withMd5 = true } = {}) {
     const host = {
       _step: "download-ready",
       _installer: "binary-download",
@@ -210,7 +210,7 @@ describe("choose-binary artifact labels", () => {
       _checksums: {
         ...initialChecksums(),
         expanded: new Set(["firmware.ota.bin"]),
-        downloaded: { binary: OTA_ROW, stale },
+        downloaded: withMd5 ? OTA_ROW : { ...OTA_ROW, md5: undefined },
       },
     };
     return renderInto(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog));

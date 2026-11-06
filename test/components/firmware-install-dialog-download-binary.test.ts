@@ -67,6 +67,7 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     firmwareDownloadUrl: vi.fn().mockResolvedValue({
       url: "/api/firmware/download?token=tok",
       filename: "device-firmware.bin",
+      md5: "served",
     }),
   };
   const host = {
@@ -161,8 +162,31 @@ describe("manual firmware-binary download flow", () => {
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     expect(host._step).toBe("download-ready");
     expect(host._binaries).toEqual([single]);
-    expect(dialog._checksums.downloaded).toEqual({ binary: single, stale: false });
+    // The listed "abc" is replaced by the digest of the file the download served.
+    expect(dialog._checksums.downloaded).toEqual({ ...single, md5: "served" });
     expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
+  });
+
+  it("never falls back to the listed digest when the token carries none", async () => {
+    const single = { ...OTA, md5: "listed" };
+    const { host, api } = makeHost("binary-download", [single]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    api.firmwareDownloadUrl.mockResolvedValueOnce({
+      url: "/api/firmware/download?token=tok",
+      filename: "device-firmware.ota.bin",
+    });
+    await run(host);
+    expect(host._step).toBe("download-ready");
+    expect(dialog._checksums.downloaded?.file).toBe("firmware.ota.bin");
+    expect(dialog._checksums.downloaded?.md5).toBeUndefined();
+  });
+
+  it("records nothing for download-ready when the token mint fails", async () => {
+    const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "listed" }]);
+    const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
+    api.firmwareDownloadUrl.mockRejectedValueOnce(new Error("NOT_FOUND"));
+    await run(host);
+    expect(dialog._checksums.downloaded).toBeUndefined();
   });
 
   it("marks the digests stale once a build runs under the picker", () => {
@@ -179,7 +203,7 @@ describe("manual firmware-binary download flow", () => {
     expect(listStale(dialog)).toBe(true);
   });
 
-  it("a build that starts and ends during the first read still marks the list stale", async () => {
+  it("a build that starts and ends during the first read can't put its old digest on download-ready", async () => {
     const single = { ...OTA, md5: "old" };
     const { host, api } = makeHost("binary-download", [single]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
@@ -195,7 +219,8 @@ describe("manual firmware-binary download flow", () => {
     });
     await run(host);
     expect(host._step).toBe("download-ready");
-    expect(dialog._checksums.downloaded?.stale).toBe(true);
+    expect(listStale(dialog)).toBe(true);
+    expect(dialog._checksums.downloaded?.md5).toBe("served");
   });
 
   it("the flow's own finished compile, still listed during the read, isn't a new build", async () => {
@@ -230,7 +255,7 @@ describe("manual firmware-binary download flow", () => {
     expect(listStale(dialog)).toBe(false);
   });
 
-  it("flags the recorded row stale when the download waited out a build", async () => {
+  it("shows the served file's digest when the download waited out a build", async () => {
     const { host, api } = makeHost("binary-download", [{ ...OTA, md5: "before" }]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     host._binaries = [{ ...OTA, md5: "before" }];
@@ -245,8 +270,7 @@ describe("manual firmware-binary download flow", () => {
     );
     await downloadSelectedBinary(dialog, "firmware.ota.bin");
     expect(host._step).toBe("download-ready");
-    expect(dialog._checksums.downloaded?.binary.file).toBe("firmware.ota.bin");
-    expect(dialog._checksums.downloaded?.stale).toBe(true);
+    expect(dialog._checksums.downloaded).toEqual({ ...OTA, md5: "served" });
     expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
   });
 

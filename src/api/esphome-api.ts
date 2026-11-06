@@ -56,6 +56,7 @@ import type {
 } from "./types/event-subscription.js";
 import type {
   FirmwareBinary,
+  FirmwareDownloadToken,
   FirmwareJob,
   FirmwareJobResult,
 } from "./types/firmware-jobs.js";
@@ -1511,15 +1512,20 @@ export class ESPHomeAPI {
     return this.sendCommand<FirmwareBinary[]>("firmware/get_binaries", { configuration });
   }
 
-  /** Mint a single-use token authorizing the HTTP download of one artifact. */
+  /**
+   * Mint a single-use token authorizing the HTTP download of one artifact.
+   *
+   * The reply carries the served file's name and, except for the ELF or a
+   * file that couldn't be hashed, its md5.
+   */
   async firmwareDownloadToken(
     configuration: string,
     file: string
-  ): Promise<{ token: string; filename: string }> {
-    return this.sendCommand<{ token: string; filename: string }>(
-      "firmware/download_token",
-      { configuration, file }
-    );
+  ): Promise<FirmwareDownloadToken> {
+    return this.sendCommand<FirmwareDownloadToken>("firmware/download_token", {
+      configuration,
+      file,
+    });
   }
 
   /**
@@ -1532,11 +1538,15 @@ export class ESPHomeAPI {
   async firmwareDownloadUrl(
     configuration: string,
     file: string
-  ): Promise<{ url: string; filename: string }> {
-    const { token, filename } = await this.firmwareDownloadToken(configuration, file);
+  ): Promise<{ url: string; filename: string; md5?: string }> {
+    const { token, filename, md5 } = await this.firmwareDownloadToken(
+      configuration,
+      file
+    );
     return {
       url: `${BASE_PATH}api/firmware/download?token=${encodeURIComponent(token)}`,
       filename,
+      md5,
     };
   }
 

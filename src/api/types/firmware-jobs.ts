@@ -141,6 +141,13 @@ export interface FirmwareJobResult {
   queued_update_armed: boolean;
 }
 
+// firmware/download_token's reply; md5 is of the file the download serves.
+export interface FirmwareDownloadToken {
+  token: string;
+  filename: string;
+  md5?: string;
+}
+
 export interface FirmwareBinary {
   title: string;
   file: string;
