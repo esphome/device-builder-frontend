@@ -74,7 +74,7 @@ function flushSnapshots(host: ESPHomeApp): void {
     if (isTerminalJobStatus(job.status)) {
       // Terminal replays belong only in history; release a stale slot they supersede.
       for (const key of keys) {
-        if (host._activeJobs.get(key)?.job_id !== job.job_id) continue;
+        if ((active ?? host._activeJobs).get(key)?.job_id !== job.job_id) continue;
         active = active ?? new Map(host._activeJobs);
         active.delete(key);
       }

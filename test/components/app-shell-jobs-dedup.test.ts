@@ -287,4 +287,22 @@ describe("follow_jobs snapshot replay", () => {
     vi.runAllTimers();
     expect(host._activeJobs).toBe(before);
   });
+
+  it("keeps a slot set earlier in the batch when a later terminal frame is for another job", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    const base = { configuration: "a.yaml" };
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ ...base, job_id: "u", status: JobStatus.QUEUED })
+    );
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ ...base, job_id: "c", status: JobStatus.COMPLETED })
+    );
+    vi.runAllTimers();
+    expect(host._activeJobs.get("a.yaml")!.job_id).toBe("u");
+  });
 });
