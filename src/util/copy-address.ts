@@ -12,10 +12,5 @@ export function copyAddressToClipboard(
   localize: LocalizeFunc,
   value: string
 ): Promise<void> {
-  return copyWithToast(
-    localize,
-    value,
-    ADDRESS_COPY_TOASTS.okKey,
-    ADDRESS_COPY_TOASTS.failKey
-  );
+  return copyWithToast(localize, value, ADDRESS_COPY_TOASTS);
 }

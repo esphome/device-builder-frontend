@@ -10,7 +10,12 @@ import { dispatchShowLogsAfterInstall } from "../../util/post-install-dispatch.j
 import { resumeFollowOnReady } from "../../util/resume-follow.js";
 import { isValidationFailureLine } from "../../util/validation-log.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { buildRunning, runningBuild, updateChecksums } from "./checksums.js";
+import {
+  listStale,
+  runningBuild,
+  syncChecksumsWithBuilds,
+  updateChecksums,
+} from "./checksums.js";
 
 export function compileFailureDetail(err: unknown): string {
   return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
@@ -112,16 +117,14 @@ export async function compileOrFail(
 }
 
 // List build artefacts, surfacing a failure on the dialog. Returns null so the
-// caller bails. A build running during the read marks the new list stale.
+// caller bails. A build seen during or after the read makes the list stale.
 export async function fetchBinaries(
   host: ESPHomeFirmwareInstallDialog,
   configuration: string
 ): Promise<FirmwareBinary[] | null> {
-  updateChecksums(host, {
-    stale: false,
-    reading: true,
-    priorBuild: runningBuild(host)?.job_id,
-  });
+  // Counted now, not at the next render, so the flow's own compile is in the baseline.
+  syncChecksumsWithBuilds(host);
+  updateChecksums(host, { reading: true, listedAt: host._checksums.builds });
   const stillCurrent = runGuard(host);
   try {
     return await host._api.firmwareGetBinaries(configuration);
@@ -147,7 +150,7 @@ export async function reopenPicker(host: ESPHomeFirmwareInstallDialog): Promise<
   const configuration = host._device?.configuration;
   if (host._checksums.reading) return;
   // A read mid-build would list digests the build is about to replace.
-  if (!configuration || !host._checksums.stale || buildRunning(host)) {
+  if (!configuration || !listStale(host) || runningBuild(host)) {
     host._step = "choose-binary";
     return;
   }
@@ -255,11 +258,9 @@ export async function downloadSelectedBinary(
   const device = host._device;
   if (!device) return;
   if (!(await artifactsSettled(host, device.configuration))) return;
-  // A build the settle waited out marked the listed digests stale.
-  updateChecksums(host, {
-    downloaded: host._binaries.find((binary) => binary.file === file),
-    downloadedStale: host._checksums.stale,
-  });
+  // A build the settle waited out made the listed digests stale.
+  const binary = host._binaries.find((b) => b.file === file);
+  updateChecksums(host, { downloaded: binary && { binary, stale: listStale(host) } });
   host._statusMessage = host._localize("firmware.status_downloading");
   // Distinct from the compile steps: the byte fetch isn't cancelable, so the
   // footer must not offer Stop (see renderFooter).

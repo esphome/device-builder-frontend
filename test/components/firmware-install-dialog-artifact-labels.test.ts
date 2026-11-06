@@ -34,7 +34,11 @@ function renderRows(
     _log: fakeLogBuffer(),
     _localize: defaultLocalize,
     _onChooseBinary: () => {},
-    _checksums: { ...initialChecksums(), expanded: new Set(expanded), stale },
+    _checksums: {
+      ...initialChecksums(),
+      expanded: new Set(expanded),
+      builds: stale ? 1 : 0,
+    },
     _device: { configuration: "kitchen.yaml" },
     _activeJobs: new Map(
       building ? [["kitchen.yaml", { job_id: "j", job_type: "compile" }]] : []
@@ -129,8 +133,10 @@ describe("choose-binary artifact labels", () => {
     expect(copyWithToast).toHaveBeenCalledWith(
       defaultLocalize,
       digest,
-      "firmware.md5_copied",
-      "firmware.md5_copy_failed"
+      expect.objectContaining({
+        okKey: "firmware.md5_copied",
+        failKey: "firmware.md5_copy_failed",
+      })
     );
 
     const download = container.querySelector<HTMLButtonElement>(
@@ -168,7 +174,7 @@ describe("choose-binary artifact labels", () => {
       _checksums: {
         ...initialChecksums(),
         expanded: new Set(["firmware.ota.bin"]),
-        downloaded: OTA_ROW,
+        downloaded: { binary: OTA_ROW, stale: false },
       },
       _activeJobs: new Map(),
     };
@@ -184,12 +190,12 @@ describe("choose-binary artifact labels", () => {
   });
 
   it("says why download-ready withholds a digest the download outdated", () => {
-    const container = renderDownloadReady({ downloadedStale: true });
+    const container = renderDownloadReady({ stale: true });
     expect(container.querySelector(".copy-value")).toBeNull();
     expect(container.textContent).toContain("Reopen the download");
   });
 
-  function renderDownloadReady({ building = false, downloadedStale = false } = {}) {
+  function renderDownloadReady({ building = false, stale = false } = {}) {
     const host = {
       _step: "download-ready",
       _installer: "binary-download",
@@ -204,8 +210,7 @@ describe("choose-binary artifact labels", () => {
       _checksums: {
         ...initialChecksums(),
         expanded: new Set(["firmware.ota.bin"]),
-        downloaded: OTA_ROW,
-        downloadedStale,
+        downloaded: { binary: OTA_ROW, stale },
       },
     };
     return renderInto(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog));
