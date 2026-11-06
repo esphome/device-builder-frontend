@@ -70,8 +70,8 @@ export class NavigatorRevealController implements ReactiveController {
     if (this._revealed !== key) this._revealed = null;
     if (this._scrolled === key) return;
     if (index === -1) {
-      // No navigator row for this line (e.g. an unscoped automation); latch so
-      // a later update doesn't treat it as a fresh selection.
+      // No navigator row for this line (e.g. an unscoped automation); overwrite
+      // the previous row's scroll latch so returning to it scrolls it again.
       this._scrolled = key;
       return;
     }
