@@ -25,13 +25,13 @@ jobs:
               "Closing because this issue was never given a title. If it is a web.esphome.io bug, " +
               "please open a new issue with a title that describes the problem.\n\n" +
               "This tracker is for web.esphome.io bugs, not a support queue. For help with " +
-              "a device or a config, please ask on the [ESPHome Discord](https://discord.gg/KhAMKrd) " +
+              "a device or a config, please ask in the [Discord channel](https://discord.gg/Rf2jWGVjaK) " +
               "or the [community forum](https://community.home-assistant.io/c/esphome/).";
 
             const { owner, repo } = context.repo;
             const cutoff = Date.now() - GRACE_MS;
             const issues = await github.paginate(github.rest.issues.listForRepo, {
-              owner, repo, state: "open", per_page: 100,
+              owner, repo, state: "open", labels: "web.esphome.io", per_page: 100,
             });
             for (const issue of issues) {
               if (issue.pull_request) continue;
