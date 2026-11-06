@@ -170,10 +170,6 @@ export const firmwareInstallDialogStyles = css`
     align-items: center;
     gap: var(--wa-space-xs) var(--wa-space-s);
   }
-  .binary-checksum code {
-    font-family: var(--wa-font-family-code);
-    overflow-wrap: anywhere;
-  }
 
   .footer {
     display: flex;

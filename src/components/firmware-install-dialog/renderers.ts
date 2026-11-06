@@ -24,7 +24,7 @@ import {
 import { canResetBuildEnv } from "../remote-build-hint.js";
 import { renderCopyValue } from "../shared/copy-value.js";
 import { renderDisclosure } from "../shared/disclosure.js";
-import { buildRunning, toggleMd5 } from "./checksums.js";
+import { listStale, runningBuild, toggleMd5 } from "./checksums.js";
 import { reopenPicker } from "./install-flow.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
@@ -226,8 +226,8 @@ export function renderOffloadHintSlot(
 
 // Why a picker row's listed digest is withheld right now, if it is.
 function pickerNote(host: ESPHomeFirmwareInstallDialog): string | null {
-  if (buildRunning(host)) return "firmware.md5_pending";
-  return host._checksums.stale ? "firmware.md5_stale" : null;
+  if (runningBuild(host)) return "firmware.md5_pending";
+  return listStale(host) ? "firmware.md5_stale" : null;
 }
 
 function renderMd5(
@@ -280,6 +280,7 @@ function renderMd5(
 }
 
 function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
+  const note = pickerNote(host);
   return html`
     <div class="binary-list">
       ${host._binaries.map((binary) => {
@@ -295,7 +296,7 @@ function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
               <span class="title">${title}</span>
               ${desc ? html`<span class="desc">${desc}</span>` : nothing}
             </button>
-            ${renderMd5(host, binary, title, pickerNote(host))}
+            ${renderMd5(host, binary, title, note)}
           </div>
         `;
       })}
@@ -316,9 +317,9 @@ function renderDownloadReadyExtra(
       downloaded
         ? renderMd5(
             host,
-            downloaded,
-            artifactTitle(host, downloaded),
-            host._checksums.downloadedStale ? "firmware.md5_stale" : null
+            downloaded.binary,
+            artifactTitle(host, downloaded.binary),
+            downloaded.stale ? "firmware.md5_stale" : null
           )
         : nothing
     }

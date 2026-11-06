@@ -29,7 +29,10 @@ import {
   JobType,
 } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { syncChecksumsWithBuilds } from "../../src/components/firmware-install-dialog/checksums.js";
+import {
+  listStale,
+  syncChecksumsWithBuilds,
+} from "../../src/components/firmware-install-dialog/checksums.js";
 import {
   downloadSelectedBinary,
   reopenPicker,
@@ -94,6 +97,11 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
   return { host, api };
 }
 
+// A build counted after the list was read.
+const markStale = (dialog: ESPHomeFirmwareInstallDialog): void => {
+  dialog._checksums = { ...dialog._checksums, builds: dialog._checksums.listedAt + 1 };
+};
+
 const run = (host: ReturnType<typeof makeHost>["host"]) =>
   startDownload(host as unknown as ESPHomeFirmwareInstallDialog);
 
@@ -153,7 +161,7 @@ describe("manual firmware-binary download flow", () => {
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     expect(host._step).toBe("download-ready");
     expect(host._binaries).toEqual([single]);
-    expect(dialog._checksums.downloaded).toEqual(single);
+    expect(dialog._checksums.downloaded).toEqual({ binary: single, stale: false });
     expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
   });
 
@@ -163,12 +171,12 @@ describe("manual firmware-binary download flow", () => {
     host._binaries = [{ ...OTA, md5: "a" }];
     host._activeJobs.set("device.yaml", { job_id: "upload", job_type: JobType.UPLOAD });
     syncChecksumsWithBuilds(dialog);
-    expect(dialog._checksums.stale).toBe(false);
+    expect(listStale(dialog)).toBe(false);
     host._activeJobs.set("device.yaml", { job_id: "rebuild", job_type: JobType.COMPILE });
     syncChecksumsWithBuilds(dialog);
     host._activeJobs.delete("device.yaml");
     syncChecksumsWithBuilds(dialog);
-    expect(dialog._checksums.stale).toBe(true);
+    expect(listStale(dialog)).toBe(true);
   });
 
   it("a build that starts and ends during the first read still marks the list stale", async () => {
@@ -187,13 +195,14 @@ describe("manual firmware-binary download flow", () => {
     });
     await run(host);
     expect(host._step).toBe("download-ready");
-    expect(dialog._checksums.downloadedStale).toBe(true);
+    expect(dialog._checksums.downloaded?.stale).toBe(true);
   });
 
   it("the flow's own finished compile, still listed during the read, isn't a new build", async () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     host._activeJobs.set("device.yaml", { job_id: "j1", job_type: JobType.COMPILE });
+    syncChecksumsWithBuilds(dialog);
     api.firmwareGetBinaries.mockImplementationOnce(async () => {
       syncChecksumsWithBuilds(dialog);
       host._activeJobs.delete("device.yaml");
@@ -202,7 +211,7 @@ describe("manual firmware-binary download flow", () => {
     });
     await run(host);
     expect(host._step).toBe("choose-binary");
-    expect(dialog._checksums.stale).toBe(false);
+    expect(listStale(dialog)).toBe(false);
   });
 
   it("reopening a stale picker re-reads the list exactly once", async () => {
@@ -212,13 +221,13 @@ describe("manual firmware-binary download flow", () => {
     await reopenPicker(dialog); // not stale: no read
     expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
 
-    dialog._checksums = { ...dialog._checksums, stale: true };
+    markStale(dialog);
     api.firmwareGetBinaries.mockResolvedValueOnce([{ ...OTA, md5: "new" }]);
     await reopenPicker(dialog);
     expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(2);
     expect(host._step).toBe("choose-binary");
     expect(host._binaries).toEqual([{ ...OTA, md5: "new" }]);
-    expect(dialog._checksums.stale).toBe(false);
+    expect(listStale(dialog)).toBe(false);
   });
 
   it("flags the recorded row stale when the download waited out a build", async () => {
@@ -236,8 +245,8 @@ describe("manual firmware-binary download flow", () => {
     );
     await downloadSelectedBinary(dialog, "firmware.ota.bin");
     expect(host._step).toBe("download-ready");
-    expect(dialog._checksums.downloaded?.file).toBe("firmware.ota.bin");
-    expect(dialog._checksums.downloadedStale).toBe(true);
+    expect(dialog._checksums.downloaded?.binary.file).toBe("firmware.ota.bin");
+    expect(dialog._checksums.downloaded?.stale).toBe(true);
     expect(api.firmwareGetBinaries).not.toHaveBeenCalled();
   });
 
@@ -245,11 +254,11 @@ describe("manual firmware-binary download flow", () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     await run(host);
-    dialog._checksums = { ...dialog._checksums, stale: true };
+    markStale(dialog);
     host._activeJobs.set("device.yaml", { job_id: "b", job_type: JobType.COMPILE });
     await reopenPicker(dialog);
     expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(1);
-    expect(dialog._checksums.stale).toBe(true);
+    expect(listStale(dialog)).toBe(true);
     expect(host._step).toBe("choose-binary");
   });
 
@@ -257,7 +266,7 @@ describe("manual firmware-binary download flow", () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     await run(host);
-    dialog._checksums = { ...dialog._checksums, stale: true };
+    markStale(dialog);
     api.firmwareGetBinaries.mockResolvedValueOnce([]);
     await reopenPicker(dialog);
     expect(host._fail).toHaveBeenCalledWith("firmware.no_binaries");
@@ -268,7 +277,7 @@ describe("manual firmware-binary download flow", () => {
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     await run(host);
     host._step = "download-ready";
-    dialog._checksums = { ...dialog._checksums, stale: true };
+    markStale(dialog);
     let release!: (value: FirmwareBinary[]) => void;
     api.firmwareGetBinaries.mockImplementationOnce(
       () => new Promise<FirmwareBinary[]>((resolve) => (release = resolve))
@@ -287,7 +296,7 @@ describe("manual firmware-binary download flow", () => {
     const { host, api } = makeHost("binary-download", [FACTORY, OTA]);
     const dialog = host as unknown as ESPHomeFirmwareInstallDialog;
     await run(host);
-    dialog._checksums = { ...dialog._checksums, stale: true };
+    markStale(dialog);
     api.firmwareGetBinaries.mockImplementationOnce(async () => {
       host._installRun += 1; // closed and reopened while the read was in flight
       throw new Error("boom");
@@ -303,7 +312,7 @@ describe("manual firmware-binary download flow", () => {
     host._open = false;
     host._activeJobs.set("device.yaml", { job_id: "x", job_type: JobType.COMPILE });
     syncChecksumsWithBuilds(dialog);
-    expect(dialog._checksums.stale).toBe(false);
+    expect(listStale(dialog)).toBe(false);
   });
 
   it("fails cleanly when listing the binaries errors", async () => {

@@ -18,7 +18,9 @@ export const copyValueStyles = css`
   }
 
   .copy-value code {
+    font-family: var(--wa-font-family-code);
     font-size: var(--wa-font-size-2xs);
+    overflow-wrap: anywhere;
   }
 
   /* Outranks a host's generic icon sizing (e.g. the option rows' 28px). */

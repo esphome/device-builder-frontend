@@ -9,23 +9,23 @@ import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js
 export interface ChecksumState {
   /** Artifact files whose MD5 disclosure is open. */
   expanded: ReadonlySet<string>;
-  /** A build ran since the list was read, so its digests may be outdated. */
-  stale: boolean;
+  /** Artifact-writing builds seen for the device while the dialog is open. */
+  builds: number;
+  /** The last build counted, so each job counts once. */
+  lastBuild?: string;
+  /** The builds count when the listed digests were read. */
+  listedAt: number;
   /** The list is being read; reopening waits for it. */
   reading: boolean;
-  /** The build entry present when the read started, already finished for this flow. */
-  priorBuild?: string;
-  /** The row the last download fetched. */
-  downloaded?: FirmwareBinary;
-  /** That download waited out a build, so the row's digest may be outdated. */
-  downloadedStale: boolean;
+  /** The row the last download fetched, and whether a build had replaced its digest. */
+  downloaded?: { binary: FirmwareBinary; stale: boolean };
 }
 
 export const initialChecksums = (): ChecksumState => ({
   expanded: new Set(),
-  stale: false,
+  builds: 0,
+  listedAt: 0,
   reading: false,
-  downloadedStale: false,
 });
 
 export function updateChecksums(
@@ -52,15 +52,14 @@ export function runningBuild(
   return job?.job_type === JobType.UPLOAD ? undefined : job;
 }
 
-export const buildRunning = (host: ESPHomeFirmwareInstallDialog): boolean =>
-  runningBuild(host) !== undefined;
+/** Whether a build ran during or after the read of the listed digests. */
+export const listStale = (host: ESPHomeFirmwareInstallDialog): boolean =>
+  host._checksums.builds !== host._checksums.listedAt;
 
-/** Mark the digests stale once a new build for the device runs during or after their read. */
+/** Count each artifact-writing build the open dialog sees, once per job. */
 export function syncChecksumsWithBuilds(host: ESPHomeFirmwareInstallDialog): void {
-  const { stale, reading, priorBuild } = host._checksums;
-  if (!host._open || stale || (!reading && host._binaries.length === 0)) return;
   const job = runningBuild(host);
-  // The flow's own compile can still be listed after its result arrived.
-  if (job !== undefined && job.job_id !== priorBuild)
-    updateChecksums(host, { stale: true });
+  if (!host._open || job === undefined || job.job_id === host._checksums.lastBuild)
+    return;
+  updateChecksums(host, { builds: host._checksums.builds + 1, lastBuild: job.job_id });
 }
