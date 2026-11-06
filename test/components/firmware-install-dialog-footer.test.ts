@@ -98,6 +98,17 @@ describe("firmware-install-dialog footer", () => {
     expect(values).toContain("command.close");
   });
 
+  it("sends another format back to the picker", () => {
+    const host = { ...footerHost("download-ready"), _binaries: [{}, {}] };
+    const handlers = footerValuesDeep(host).filter(
+      (v): v is () => void => typeof v === "function" && !vi.isMockFunction(v)
+    );
+    expect(handlers).toHaveLength(1);
+    handlers[0]();
+    expect(host._step).toBe("choose-binary");
+    expect(host._close).not.toHaveBeenCalled();
+  });
+
   it("offers only Close when the build produced one format", () => {
     const host = { ...footerHost("download-ready"), _binaries: [{}] };
     expect(footerValuesDeep(host)).not.toContain("firmware.choose_binary_again");
