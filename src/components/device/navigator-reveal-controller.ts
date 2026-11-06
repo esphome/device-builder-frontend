@@ -30,19 +30,21 @@ export function sectionIndexForLine(buckets: NavigatorBuckets, line: number): nu
 /**
  * Reveal the externally-selected nav row (YAML cursor / URL restore):
  * expand its collapsed section, then scroll it into view on the next render.
- * Latches the scrolled line so idle re-renders (hover, search) don't re-scroll.
+ * Latches the scrolled row (line and section) so idle re-renders (hover,
+ * search) don't re-scroll.
  *
  * Opening fires the idempotent 'section-reveal' (a set, not a toggle), so a
  * reveal that re-fires for the same row can't close the section it opened.
  */
 export class NavigatorRevealController implements ReactiveController {
-  private _scrolledLine: number | null = null;
+  /** ``line:section`` of the last scrolled row. */
+  private _scrolled: string | null = null;
   // Section reveal is one-shot per selected line. The scroll below only
   // latches once the row is actually visible, and a row inside a collapsed
   // subgroup never gets there; without this guard every later render
   // re-fires section-reveal, forcing the cursor's section back open and
   // locking the user out of toggling any other section.
-  private _revealedLine: number | null = null;
+  private _revealed: string | null = null;
 
   constructor(
     private readonly _host: RevealHost,
@@ -54,30 +56,30 @@ export class NavigatorRevealController implements ReactiveController {
   hostUpdated(): void {
     const { selectedLine, buckets, openSections, filtering } = this._read();
     if (selectedLine === null) {
-      this._scrolledLine = null;
-      this._revealedLine = null;
+      this._scrolled = null;
+      this._revealed = null;
       return;
     }
-    // The selection genuinely moved to a different line: drop the stale latch
-    // so a line whose reveal never scroll-latched (collapsed subgroup) can
-    // reveal again when the user clicks back to it. Same-line re-renders keep
-    // the latch, which is what prevents the toggle lock-out / snap-back.
-    if (this._revealedLine !== null && this._revealedLine !== selectedLine) {
-      this._revealedLine = null;
-    }
-    if (selectedLine === this._scrolledLine) return;
     const index = sectionIndexForLine(buckets, selectedLine);
+    const key = `${selectedLine}:${index}`;
+    // The selection genuinely moved to a different row (line or section): drop
+    // the stale latch so a line whose reveal never scroll-latched (collapsed
+    // subgroup) can reveal again when the user clicks back to it. Same-row
+    // re-renders keep the latch, which is what prevents the toggle lock-out /
+    // snap-back.
+    if (this._revealed !== key) this._revealed = null;
+    if (this._scrolled === key) return;
     if (index === -1) {
-      // No navigator row for this line (e.g. an unscoped automation); latch so
-      // we don't re-scan the buckets on every later update.
-      this._scrolledLine = selectedLine;
+      // No navigator row for this line (e.g. an unscoped automation); overwrite
+      // the previous row's scroll latch so returning to it scrolls it again.
+      this._scrolled = key;
       return;
     }
-    if (!filtering && !openSections.has(index) && this._revealedLine !== selectedLine) {
+    if (!filtering && !openSections.has(index) && this._revealed !== key) {
       // Ask the page to open it once, then bail; the re-render re-enters with
       // the row. Latch *before* dispatch (below) so a manual re-close of this
       // section can't re-trigger the forced open on a later render.
-      this._revealedLine = selectedLine;
+      this._revealed = key;
       this._host.dispatchEvent(
         new CustomEvent("section-reveal", {
           detail: { index },
@@ -92,7 +94,7 @@ export class NavigatorRevealController implements ReactiveController {
     // here too — without it a section opened by URL never marks the line
     // handled, so closing it (by opening another section) re-fires the reveal
     // and snaps it back open.
-    this._revealedLine = selectedLine;
+    this._revealed = key;
     // Latch only on a confirmed scroll so the reveal retries when the row
     // becomes scrollable: querySelector misses a row that isn't rendered yet
     // (collapsed Components subgroup), and getClientRects catches one that is
@@ -100,7 +102,7 @@ export class NavigatorRevealController implements ReactiveController {
     const row = this._host.renderRoot.querySelector(".nav-item--selected");
     if (row && row.getClientRects().length > 0) {
       row.scrollIntoView({ block: "nearest" });
-      this._scrolledLine = selectedLine;
+      this._scrolled = key;
     }
   }
 }

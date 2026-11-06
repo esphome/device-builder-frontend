@@ -56,6 +56,7 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     firmwareDownloadUrl: vi.fn().mockResolvedValue({
       url: "/api/firmware/download?token=tok",
       filename: "device-firmware.bin",
+      md5: "served",
     }),
   };
   const host = {
@@ -66,6 +67,7 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
     _statusMessage: "",
     _binaries: [] as FirmwareBinary[],
     _downloadedFilename: "",
+    _downloadedMd5: undefined as string | undefined,
     _log: fakeLogBuffer(),
     _failureKind: null,
     _jobId: "",
@@ -171,5 +173,56 @@ describe("manual firmware-binary download flow", () => {
     );
     expect(host._step).toBe("download-ready");
     expect(host._binaries).toHaveLength(2);
+  });
+
+  it("keeps the download token's MD5 for download-ready", async () => {
+    const { host } = makeHost("binary-download", [OTA]);
+    await run(host);
+    expect(host._step).toBe("download-ready");
+    expect(host._downloadedMd5).toBe("served");
+  });
+
+  it("clears an earlier MD5 when the next download's token carries none", async () => {
+    const { host, api } = makeHost("binary-download", [OTA]);
+    host._downloadedMd5 = "earlier";
+    api.firmwareDownloadUrl.mockResolvedValueOnce({
+      url: "/api/firmware/download?token=tok",
+      filename: "device-firmware.elf",
+    });
+    await run(host);
+    expect(host._step).toBe("download-ready");
+    expect(host._downloadedMd5).toBeUndefined();
+  });
+
+  it("drops a listing failure that lands after the dialog was reopened", async () => {
+    const { host, api } = makeHost("binary-download", [OTA]);
+    api.firmwareGetBinaries.mockImplementationOnce(async () => {
+      host._installRun += 1;
+      throw new Error("NOT_FOUND");
+    });
+    await run(host);
+    expect(host._fail).not.toHaveBeenCalled();
+  });
+
+  it("ignores a download token reply that lands after the dialog was reopened", async () => {
+    const { host, api } = makeHost("binary-download", [OTA]);
+    api.firmwareDownloadUrl.mockImplementationOnce(async () => {
+      host._installRun += 1;
+      return { url: "/api/firmware/download?token=old", filename: "old.bin", md5: "old" };
+    });
+    await run(host);
+    expect(triggerDownload).not.toHaveBeenCalled();
+    expect(host._downloadedMd5).toBeUndefined();
+    expect(host._step).not.toBe("download-ready");
+  });
+
+  it("drops a download token failure that lands after the dialog was reopened", async () => {
+    const { host, api } = makeHost("binary-download", [OTA]);
+    api.firmwareDownloadUrl.mockImplementationOnce(async () => {
+      host._installRun += 1;
+      throw new Error("NOT_FOUND");
+    });
+    await run(host);
+    expect(host._fail).not.toHaveBeenCalled();
   });
 });

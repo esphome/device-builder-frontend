@@ -1,15 +1,16 @@
 import type { LocalizeFunc } from "../common/localize.js";
-import { copyToClipboard } from "./copy-to-clipboard.js";
-import { notify } from "./notify.js";
+import { copyWithToast } from "./copy-value.js";
+
+/** Toast keys for every address copy control. */
+export const ADDRESS_COPY_TOASTS = {
+  okKey: "settings.remote_build_address_copied",
+  failKey: "settings.remote_build_address_copy_failed",
+} as const;
 
 /** Copy *value* and toast the outcome; shared by every address copy control. */
-export async function copyAddressToClipboard(
+export function copyAddressToClipboard(
   localize: LocalizeFunc,
   value: string
 ): Promise<void> {
-  if (await copyToClipboard(value)) {
-    notify.success(localize("settings.remote_build_address_copied"));
-  } else {
-    notify.warning(localize("settings.remote_build_address_copy_failed"));
-  }
+  return copyWithToast(localize, value, ADDRESS_COPY_TOASTS);
 }

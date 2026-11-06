@@ -4,7 +4,11 @@ import { FLASHER_HOST } from "../../common/docs.js";
 import { activeLocale } from "../../common/localize.js";
 import type { FlasherStep, FlasherStepView } from "../../platforms/platform-support.js";
 import { devicePlatform } from "../../util/crash-report.js";
-import { configurationStem, downloadAnsiText } from "../../util/download-text.js";
+import {
+  configurationStem,
+  downloadAnsiText,
+  downloadBlob,
+} from "../../util/download-text.js";
 import { formatElapsed } from "../../util/format-job-time.js";
 import { pairingDisplayNameForPin } from "../../util/pairing-display-name.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
@@ -18,6 +22,7 @@ import {
   renderValidationFailureSuggestion,
 } from "../process-terminal/reset-suggestion.js";
 import { canResetBuildEnv } from "../remote-build-hint.js";
+import { renderCopyValue } from "../shared/copy-value.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -236,22 +241,40 @@ function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   `;
 }
 
+// The downloaded file's MD5, to copy or save as an md5sum file beside it.
+function renderDownloadMd5(
+  host: ESPHomeFirmwareInstallDialog
+): TemplateResult | typeof nothing {
+  const md5 = host._downloadedMd5;
+  if (!md5) return nothing;
+  const filename = host._downloadedFilename;
+  return html`
+    <div class="download-md5">
+      <span class="download-md5-label">${host._localize("firmware.md5_label")}</span>
+      ${renderCopyValue(host._localize, md5, {
+        ariaLabel: host._localize("firmware.copy_md5_aria", { filename }),
+        title: host._localize("firmware.copy_md5"),
+        okKey: "firmware.md5_copied",
+        failKey: "firmware.md5_copy_failed",
+      })}
+      <button
+        type="button"
+        class="btn btn--ghost"
+        aria-label=${host._localize("firmware.download_md5_aria", { filename })}
+        @click=${() => downloadBlob(`${md5}  ${filename}\n`, `${filename}.md5`, "text/plain")}
+      >
+        ${host._localize("firmware.download_md5")}
+      </button>
+    </div>
+  `;
+}
+
 function renderDownloadReadyExtra(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
   // web-flash: the action is the "Open USB flasher" footer button; no extra body.
   if (host._installer === "web-flash") return nothing;
-  // Manual binary download: offer to pick a different format when more than
-  // one was produced.
-  return host._binaries.length > 1
-    ? html`<button
-        type="button"
-        class="reset-suggestion-link"
-        @click=${() => (host._step = "choose-binary")}
-      >
-        ${host._localize("firmware.choose_binary_again")}
-      </button>`
-    : nothing;
+  return renderDownloadMd5(host);
 }
 
 // The body a step adds under its status text; the steps are exclusive.
@@ -388,9 +411,19 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
         </div>
       `;
     }
-    // binary-download
+    // binary-download: back to the picker when more than one format was built.
     return html`
       <div class="footer">
+        ${
+          host._binaries.length > 1
+            ? html`<button
+                class="btn btn--ghost"
+                @click=${() => (host._step = "choose-binary")}
+              >
+                ${host._localize("firmware.choose_binary_again")}
+              </button>`
+            : nothing
+        }
         <button class="btn btn--primary" @click=${host._close}>
           ${host._localize("command.close")}
         </button>

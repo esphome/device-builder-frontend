@@ -27,7 +27,7 @@ import {
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
-  categorizeSections,
+  catalogCoreKeys,
   parseYamlAutomations,
   parseYamlTopLevelSections,
   sectionKeyOf,
@@ -36,6 +36,7 @@ import {
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import type { HighlightRange } from "../yaml-editor.js";
 import { CacheTickController } from "./cache-tick-controller.js";
+import { CatalogIndexController } from "./catalog-index-controller.js";
 import { deviceNavigatorStyles } from "./device-navigator.styles.js";
 import { deriveNavigatorBuckets, type NavigatorBuckets } from "./navigator-buckets.js";
 import { groupRowsByDomain } from "./navigator-groups.js";
@@ -101,7 +102,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   protected readonly _reveal = new NavigatorRevealController(this, () => ({
     selectedLine: this._selectedLine,
-    buckets: this._deriveBuckets(this.yaml),
+    buckets: this._buckets(),
     openSections: this.openSections,
     filtering: this._query.trim().length > 0,
   }));
@@ -118,6 +119,12 @@ export class ESPHomeDeviceNavigator extends LitElement {
   /** Memoised on the YAML source so the parse pipeline runs once per
    *  edit, not per render. See {@link deriveNavigatorBuckets}. */
   private _deriveBuckets = memoizeOne(deriveNavigatorBuckets);
+
+  private readonly _catalogIndex = new CatalogIndexController(this, () => this._api);
+
+  private _buckets(): NavigatorBuckets {
+    return this._deriveBuckets(this.yaml, catalogCoreKeys(this._catalogIndex.index()));
+  }
 
   /** Memoised on the rows identity so the Components regroup is stable
    *  across idle re-renders (selection/hover); collapse is render-time. */
@@ -285,7 +292,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   protected render() {
-    const buckets = this._deriveBuckets(this.yaml);
+    const buckets = this._buckets();
     const { core, components, automations } = buckets;
     const isGroupOpen = (key: string) => !this._collapsedGroups.has(key);
 
@@ -555,8 +562,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
    */
   private _kickoffNameResolves(): void {
     if (!this._api) return;
-    const sections = parseYamlTopLevelSections(this.yaml);
-    const { core, components } = categorizeSections(sections);
+    const { core, components } = this._buckets();
     const platform = this.platform || undefined;
     for (const item of [...core, ...components]) {
       const id = sectionKeyOf(item);

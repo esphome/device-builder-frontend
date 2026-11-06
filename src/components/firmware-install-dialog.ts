@@ -31,6 +31,7 @@ import {
 } from "../platforms/esp/dashboard.js";
 import type { DetectedChip } from "../platforms/esp/index.js";
 import type { AnyBrowserInstall } from "../platforms/platform-support.js";
+import { copyValueStyles } from "../styles/copy-value.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { initialDarkMode } from "../util/dark-mode.js";
@@ -146,6 +147,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _logsExpanded = false;
   @state() _flashPercent = 0;
   @state() _downloadedFilename = "";
+  // The downloaded file's MD5 from its download token; unset for the ELF.
+  @state() _downloadedMd5?: string;
 
   // Formats offered by the manual download picker; populated only when a
   // device produces more than one (e.g. ESP32 factory + OTA).
@@ -216,6 +219,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   static styles = [
     espHomeStyles,
     firmwareInstallDialogStyles,
+    copyValueStyles,
     remoteBuildHintStyles,
     // Content-heavy (build status + expandable log): full-screen on mobile
     // so it doesn't overflow a centered box. #41
@@ -307,6 +311,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._logsExpanded = false;
     this._flashPercent = 0;
     this._downloadedFilename = "";
+    this._downloadedMd5 = undefined;
     this._binaries = [];
     this._showLogsAfterInstall = true;
     this._installer = null;

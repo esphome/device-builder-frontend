@@ -2477,6 +2477,19 @@ describe("ESPHomeAPI — firmware download (HTTP)", () => {
     });
   });
 
+  it("passes the served file's md5 through with the download URL", async () => {
+    const api = makeApi();
+    vi.spyOn(api, "firmwareDownloadToken").mockResolvedValue({
+      token: "t",
+      filename: "kitchen-firmware.factory.bin",
+      md5: "d41d8cd98f00b204e9800998ecf8427e",
+    });
+
+    const result = await api.firmwareDownloadUrl("kitchen.yaml", "firmware.factory.bin");
+
+    expect(result.md5).toBe("d41d8cd98f00b204e9800998ecf8427e");
+  });
+
   it("fetches the bytes for Web Serial flashing", async () => {
     const api = makeApi();
     vi.spyOn(api, "firmwareDownloadUrl").mockResolvedValue({

@@ -20,6 +20,7 @@ import toast from "sonner-js";
 import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { ESPHomeAddComponentDialog } from "../../../src/components/device/add-component-dialog.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
+import { _clearCatalogCache } from "../../../src/util/yaml-completion-catalog.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 import { makeEthernetEntry } from "../../util/_make-ethernet-entry.js";
@@ -51,6 +52,7 @@ function select(dialog: ESPHomeAddComponentDialog, id: string) {
 describe("add-component-dialog skips the form for configless components", () => {
   afterEach(() => {
     _clearComponentCache();
+    _clearCatalogCache();
     vi.clearAllMocks();
   });
 
@@ -433,6 +435,16 @@ describe("add-component-dialog skips the form for configless components", () => 
       dependencies: ["atm90e32"],
     });
     const { dialog, addComponent } = makeDialog(entry);
+    // The stem only satisfies the dep once the catalog index names its domains.
+    const catalog = [makeComponentEntry("sensor.atm90e32", { category: "sensor" })];
+    const api = (dialog as unknown as { _api: Record<string, unknown> })._api;
+    api.getComponents = vi.fn().mockResolvedValue({
+      components: catalog,
+      categories: [],
+      total: 1,
+      offset: 0,
+      limit: 200,
+    });
     dialog.yaml = "sensor:\n  - platform: atm90e32\n";
 
     await select(dialog, "socket");

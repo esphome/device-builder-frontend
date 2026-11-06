@@ -62,4 +62,31 @@ describe("choose-binary artifact labels", () => {
     ]);
     expect(text).toContain("Factory format (Previously Modern)");
   });
+
+  function renderDownloadReady(md5: string | undefined) {
+    const host = {
+      _step: "download-ready",
+      _installer: "binary-download",
+      _binaries: [],
+      _downloadedFilename: "kitchen-firmware.ota.bin",
+      _downloadedMd5: md5,
+      _log: fakeLogBuffer(),
+      _localize: defaultLocalize,
+    };
+    return renderInto(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog));
+  }
+
+  it("shows the downloaded file's MD5 on download-ready", () => {
+    const md5 = "a".repeat(32);
+    const container = renderDownloadReady(md5);
+    expect(container.querySelector(".download-md5 .copy-value")?.textContent).toContain(
+      md5
+    );
+    expect(container.textContent).toContain("Download .md5");
+  });
+
+  it("shows no checksum on download-ready without one", () => {
+    const container = renderDownloadReady(undefined);
+    expect(container.querySelector(".download-md5")).toBeNull();
+  });
 });
