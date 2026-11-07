@@ -41,7 +41,7 @@ import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { navigate } from "../util/navigation.js";
-import { notifyError, notifySuccess } from "../util/notify.js";
+import { LONG_TOAST_DURATION_MS, notifyError, notifySuccess } from "../util/notify.js";
 import { NowTickController } from "../util/now-tick-controller.js";
 import { pairingDisplayName } from "../util/pairing-display-name.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -367,15 +367,29 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
         this._localize("firmware_jobs.reset_peer_failed", {
           label: pairingDisplayName(targets[i]),
           detail: getErrorMessage(result.reason),
-        })
+        }),
+        { duration: LONG_TOAST_DURATION_MS }
       );
     });
     if (started === 0) return;
+    const failed = started < targets.length;
     notifySuccess(
-      this._localize("firmware_jobs.reset_all_peers_started", { count: started })
+      this._localize("firmware_jobs.reset_all_peers_started", { count: started }),
+      // On a partial failure the jobs list stays closed: the modal would
+      // sit above the toaster and hide which servers refused (they have
+      // no job row). Offer the list from the toast instead.
+      failed
+        ? {
+            duration: LONG_TOAST_DURATION_MS,
+            action: {
+              label: this._localize("firmware_jobs.menu_item"),
+              onClick: () => this.open(),
+            },
+          }
+        : undefined
     );
     // The wipes run as ordinary jobs; show the list so they can be watched.
-    this.open();
+    if (!failed) this.open();
   };
 
   private _onClearHistory = async () => {

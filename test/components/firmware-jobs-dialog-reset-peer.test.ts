@@ -188,7 +188,7 @@ describe("reset all build servers", () => {
     expect(open).toHaveBeenCalledTimes(1);
   });
 
-  it("reports the servers that fail and still opens the list for the rest", async () => {
+  it("reports failures and offers the list instead of hiding them", async () => {
     const { el, open } = makeTwo();
     el._api.remoteBuildResetPeerBuildEnv
       .mockResolvedValueOnce({} as FirmwareJob)
@@ -198,6 +198,12 @@ describe("reset all build servers", () => {
     expect(notifyError).toHaveBeenCalledTimes(1);
     expect(vi.mocked(notifyError).mock.calls[0][0] as string).toContain("mini");
     expect(notifySuccess).toHaveBeenCalledTimes(1);
+    // The modal would hide the error toast, so the list waits for the user.
+    expect(open).not.toHaveBeenCalled();
+    const options = vi.mocked(notifySuccess).mock.calls[0][1] as {
+      action: { onClick: () => void };
+    };
+    options.action.onClick();
     expect(open).toHaveBeenCalledTimes(1);
   });
 
