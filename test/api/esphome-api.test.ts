@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stubStorage } from "../_storage.js";
-import { APIError, CommandTimeoutError } from "../../src/api/api-error.js";
+import {
+  APIError,
+  ClientValidationError,
+  CommandTimeoutError,
+} from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
   fireDocumentEvent,
@@ -2510,6 +2514,189 @@ describe("ESPHomeAPI — firmware download (HTTP)", () => {
     await expect(
       api.firmwareDownloadBytes("kitchen.yaml", "missing.bin")
     ).rejects.toThrow(/404/);
+  });
+});
+
+describe("ESPHomeAPI — firmware repository", () => {
+  afterEach(() => {
+    uninstallMockWebSocket();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("downloads an authenticated repository attachment and honors its filename", async () => {
+    const api = makeApi();
+    Object.assign(api, { _authToken: "stored-session-token" });
+    const blob = new Blob(["yaml content"], { type: "text/yaml" });
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      headers: { get: () => 'attachment; filename="kitchen-1.0.0.yaml"' },
+      blob: async () => blob,
+    }));
+    vi.stubGlobal("fetch", fetchFn);
+
+    const result = await api.firmwareRepositoryDownload("kitchen", "1.0.0", "yaml");
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      "/api/firmware_repository/download?device=kitchen&version=1.0.0&file=yaml",
+      { headers: { Authorization: "Bearer stored-session-token" } }
+    );
+    expect(result).toEqual({ blob, filename: "kitchen-1.0.0.yaml" });
+  });
+
+  it("includes the artifact type when downloading an OTA or factory file", async () => {
+    const api = makeApi();
+    Object.assign(api, { _authToken: "stored-session-token" });
+    const blob = new Blob(["factory firmware"]);
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      headers: { get: () => 'attachment; filename="kitchen-1.0.0-factory.bin"' },
+      blob: async () => blob,
+    }));
+    vi.stubGlobal("fetch", fetchFn);
+
+    const result = await api.firmwareRepositoryDownload(
+      "kitchen",
+      "1.0.0",
+      "bin",
+      "factory"
+    );
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      "/api/firmware_repository/download?device=kitchen&version=1.0.0&file=bin&type=factory",
+      { headers: { Authorization: "Bearer stored-session-token" } }
+    );
+    expect(result).toEqual({ blob, filename: "kitchen-1.0.0-factory.bin" });
+  });
+
+  it("lists repository records", async () => {
+    installMockWebSocket();
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const pending = api.firmwareRepositoryList();
+    const sent = ws.sentAs<{ command: string; message_id: string }>(0);
+    expect(sent.command).toBe("firmware_repository/list");
+    ws.receive({ message_id: sent.message_id, result: [] });
+
+    await expect(pending).resolves.toEqual([]);
+  });
+
+  it("lists, creates, and deletes firmware repository access tokens", async () => {
+    installMockWebSocket();
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const listing = api.firmwareRepositoryAccessTokens();
+    const listCommand = ws.sentAs<{ command: string; message_id: string }>(0);
+    expect(listCommand.command).toBe("config/list_firmware_repository_tokens");
+    const tokenInfo = {
+      id: "token-id",
+      name: "Kitchen",
+      last_four: "a1b2",
+      created_at: "2026-11-09T12:00:00Z",
+    };
+    ws.receive({ message_id: listCommand.message_id, result: [tokenInfo] });
+    await expect(listing).resolves.toEqual([tokenInfo]);
+
+    const creating = api.firmwareRepositoryAddAccessToken("Kitchen");
+    const addCommand = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: unknown;
+    }>(1);
+    expect(addCommand.command).toBe("config/add_firmware_repository_token");
+    expect(addCommand.args).toEqual({ name: "Kitchen" });
+    const created = { ...tokenInfo, token: "one-time-secret" };
+    ws.receive({ message_id: addCommand.message_id, result: created });
+    await expect(creating).resolves.toEqual(created);
+
+    const deleting = api.firmwareRepositoryDeleteAccessToken("token-id");
+    const deleteCommand = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: unknown;
+    }>(2);
+    expect(deleteCommand.command).toBe("config/delete_firmware_repository_token");
+    expect(deleteCommand.args).toEqual({ token_id: "token-id" });
+    ws.receive({ message_id: deleteCommand.message_id, result: {} });
+    await expect(deleting).resolves.toBeUndefined();
+  });
+
+  it("rejects a missing firmware repository summary with a validation code", async () => {
+    const api = makeApi();
+
+    await expect(
+      api.firmwareRepositorySave("kitchen.yaml", { summary: "  " })
+    ).rejects.toMatchObject({
+      name: "ClientValidationError",
+      errorCode: "firmware_repository_summary_required",
+    } satisfies Partial<ClientValidationError>);
+  });
+
+  it("saves the compiled firmware for a configuration", async () => {
+    installMockWebSocket();
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const pending = api.firmwareRepositorySave("kitchen.yaml", {
+      summary: "  Stable release  ",
+      release_url: "  https://example.com/releases/1.0.0  ",
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: unknown;
+    }>(0);
+    expect(sent.command).toBe("firmware_repository/save");
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      summary: "Stable release",
+      release_url: "https://example.com/releases/1.0.0",
+    });
+    const record = {
+      device: "kitchen",
+      version: "1.0.0",
+      status: "saved",
+      yaml: "kitchen/1.0.0.yaml",
+      bin: "kitchen/1.0.0.bin",
+      md5: "0123456789abcdef0123456789abcdef",
+      saved_at: "2026-11-08T00:00:00Z",
+    };
+    ws.receive({ message_id: sent.message_id, result: record });
+
+    await expect(pending).resolves.toEqual(record);
+  });
+
+  it("publishes and deletes a selected version", async () => {
+    installMockWebSocket();
+    const api = makeApi();
+    const ws = await connect(api);
+
+    const publishing = api.firmwareRepositoryPublish("kitchen", "1.0.0");
+    const publishCommand = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: unknown;
+    }>(0);
+    expect(publishCommand.command).toBe("firmware_repository/publish");
+    expect(publishCommand.args).toEqual({ device: "kitchen", version: "1.0.0" });
+    ws.receive({
+      message_id: publishCommand.message_id,
+      result: { device: "kitchen", version: "1.0.0", status: "published" },
+    });
+    await expect(publishing).resolves.toMatchObject({ status: "published" });
+
+    const deleting = api.firmwareRepositoryDelete("kitchen", "1.0.0");
+    const deleteCommand = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: unknown;
+    }>(1);
+    expect(deleteCommand.command).toBe("firmware_repository/delete");
+    expect(deleteCommand.args).toEqual({ device: "kitchen", version: "1.0.0" });
+    ws.receive({ message_id: deleteCommand.message_id, result: null });
+    await expect(deleting).resolves.toBeUndefined();
   });
 });
 

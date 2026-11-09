@@ -231,6 +231,9 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
       @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
+      @save-firmware-repository=${(e: CustomEvent<ConfiguredDevice>) =>
+        host._saveFirmwareRepository(e.detail)}
+      @open-firmware-repository=${host._openFirmwareRepository}
       @clear-queued-update=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmClearQueuedUpdate(e.detail)}
       @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -347,6 +350,9 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
       @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
+      @save-firmware-repository=${(e: CustomEvent<ConfiguredDevice>) =>
+        host._saveFirmwareRepository(e.detail)}
+      @open-firmware-repository=${host._openFirmwareRepository}
       @clear-queued-update=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmClearQueuedUpdate(e.detail)}
       @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>

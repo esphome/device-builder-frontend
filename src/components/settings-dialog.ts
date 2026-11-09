@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiArchiveOutline,
   mdiClose,
   mdiHandshake,
   mdiHandshakeOutline,
@@ -31,12 +32,14 @@ import { type Section, type SectionDef, SECTIONS } from "./settings-dialog/types
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./settings-dialog/appearance-section.js";
+import "./settings-dialog/firmware-repository-section.js";
 import "./settings-dialog/build-offload-section.js";
 import "./settings-dialog/build-server-section.js";
 import "./settings-dialog/language-section.js";
 import "./settings-dialog/pairing-requests-section.js";
 
 registerMdiIcons({
+  "archive-outline": mdiArchiveOutline,
   close: mdiClose,
   handshake: mdiHandshake,
   "handshake-outline": mdiHandshakeOutline,
@@ -179,6 +182,8 @@ export class ESPHomeSettingsDialog extends LitElement {
     switch (this._section) {
       case "appearance":
         return html`<esphome-settings-appearance></esphome-settings-appearance>`;
+      case "firmware_repository":
+        return html`<esphome-settings-firmware-repository></esphome-settings-firmware-repository>`;
       case "language":
         return html`<esphome-settings-language></esphome-settings-language>`;
       case "build_server":

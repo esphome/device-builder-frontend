@@ -13,6 +13,9 @@ export function applyPreferences(host: ESPHomeApp, prefs: UserPreferences): void
   host._remoteComputeOnly = prefs.remote_compute_only;
   host._hideDeviceBuilder = prefs.hide_device_builder;
   host._versionHistoryEnabled = prefs.version_history_enabled;
+  host._firmwareRepositoryAccessEnabled = prefs.firmware_repository_access_enabled;
+  host._firmwareRepositoryAuthenticatePublic =
+    prefs.firmware_repository_authenticate_public;
 }
 
 export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {

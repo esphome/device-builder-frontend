@@ -1,7 +1,9 @@
 import { consume } from "@lit/context";
 import {
+  mdiArchiveOutline,
   mdiBroom,
   mdiCheckCircleOutline,
+  mdiContentSave,
   mdiDotsVertical,
   mdiMemory,
   mdiOpenInNew,
@@ -20,16 +22,17 @@ import { OverflowMenuElement } from "../overflow-menu-element.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  "archive-outline": mdiArchiveOutline,
   broom: mdiBroom,
   "check-circle-outline": mdiCheckCircleOutline,
+  "content-save": mdiContentSave,
   "dots-vertical": mdiDotsVertical,
   memory: mdiMemory,
   "open-in-new": mdiOpenInNew,
   "text-box-outline": mdiTextBoxOutline,
 });
 
-/** Editor bottom-bar overflow menu: device-scoped actions (Analyze memory in
- *  Expert Mode, Clean build, Visit web UI, Validate, Logs). */
+/** Editor bottom-bar overflow menu: device-scoped actions. */
 @customElement("esphome-device-actions-menu")
 export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -145,6 +148,22 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
                     ? this._localize("dashboard.action_clean_build_busy")
                     : null,
                 })}
+                ${this._renderItem({
+                  icon: "content-save",
+                  labelKey: "firmware_repository.save_action",
+                  onSelect: this._onSaveRepository,
+                  disabledTitle: this.busy
+                    ? this._localize("dashboard.action_clean_build_busy")
+                    : this.validateDisabled
+                      ? this._localize("firmware_repository.save_unsaved")
+                      : null,
+                })}
+                ${this._renderItem({
+                  icon: "archive-outline",
+                  labelKey: "firmware_repository.manage_action",
+                  onSelect: this._onOpenRepository,
+                  disabledTitle: null,
+                })}
                 <div class="menu-divider" role="separator"></div>
                 ${
                   this.webUiUrl
@@ -222,6 +241,17 @@ export class ESPHomeDeviceActionsMenu extends OverflowMenuElement {
     if (this.busy || this.validateDisabled) return;
     this._close();
     this._emit("analyze-memory");
+  };
+
+  private _onSaveRepository = () => {
+    if (this.busy || this.validateDisabled) return;
+    this._close();
+    this._emit("save-firmware-repository");
+  };
+
+  private _onOpenRepository = () => {
+    this._close();
+    this._emit("open-firmware-repository");
   };
 }
 

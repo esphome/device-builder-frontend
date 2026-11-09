@@ -258,6 +258,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       @request-open-editor=${host._onRequestOpenEditor}
       @request-change-board=${host._onRequestChangeBoard}
     ></esphome-firmware-install-dialog>
+    <esphome-firmware-repository-dialog></esphome-firmware-repository-dialog>
     <esphome-board-reselect-dialog></esphome-board-reselect-dialog>
     <esphome-logs-dialog></esphome-logs-dialog>
     <esphome-install-method-dialog

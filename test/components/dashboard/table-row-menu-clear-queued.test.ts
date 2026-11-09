@@ -39,3 +39,42 @@ describe("table-row-menu clear-queued-update item", () => {
     expect(findClearItem(el)).toBeUndefined();
   });
 });
+
+describe("table-row-menu firmware repository actions", () => {
+  async function mountMenu(busy = false): Promise<ESPHomeTableRowMenu> {
+    return mount(new ESPHomeTableRowMenu(), {
+      device: makeConfiguredDevice(),
+      position: { x: 10, y: 10 },
+      busy,
+    });
+  }
+
+  it("emits save and open events from the same menu used by cards and tables", async () => {
+    const el = await mountMenu();
+    const save = findMenuItem(el, "firmware_repository.save_action") as HTMLElement;
+    const onSave = vi.fn();
+    const onManage = vi.fn();
+    el.addEventListener("save-firmware-repository", onSave);
+    el.addEventListener("open-firmware-repository", onManage);
+
+    save.click();
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const manageMenu = await mountMenu();
+    manageMenu.addEventListener("open-firmware-repository", onManage);
+    (
+      findMenuItem(manageMenu, "firmware_repository.manage_action") as HTMLElement
+    ).click();
+    expect(onManage).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables saving while a firmware job is active", async () => {
+    const el = await mountMenu(true);
+    const save = findMenuItem(el, "firmware_repository.save_action") as HTMLElement;
+    const onSave = vi.fn();
+    el.addEventListener("save-firmware-repository", onSave);
+
+    expect(save.classList.contains("menu-item--disabled")).toBe(true);
+    save.click();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});
