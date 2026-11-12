@@ -31,6 +31,29 @@ describe("device-card encryption indicator uses the raw pending flag", () => {
   });
 });
 
+describe("device-card status badge with no network", () => {
+  it("renders no status badge for a non-online device", async () => {
+    for (const state of [DeviceState.OFFLINE, DeviceState.UNKNOWN]) {
+      const el = await mount({ state, noNetwork: true, nameAddMacSuffix: true });
+      expect(el.shadowRoot!.querySelector(".device-status")).toBeNull();
+      expect(el.shadowRoot!.querySelector("#status-untracked")).toBeNull();
+      el.remove();
+    }
+  });
+
+  it("keeps a real ONLINE verdict", async () => {
+    const el = await mount({ state: DeviceState.ONLINE, noNetwork: true });
+    expect(el.shadowRoot!.querySelector(".device-status")!.textContent).toContain(
+      "dashboard.online"
+    );
+  });
+
+  it("still shows the busy badge", async () => {
+    const el = await mount({ state: DeviceState.OFFLINE, noNetwork: true, busy: true });
+    expect(el.shadowRoot!.querySelector(".device-status.busy")).not.toBeNull();
+  });
+});
+
 describe("device-card status badge with name_add_mac_suffix", () => {
   it("replaces OFFLINE and UNKNOWN with the untracked badge + tooltip", async () => {
     for (const state of [DeviceState.OFFLINE, DeviceState.UNKNOWN]) {

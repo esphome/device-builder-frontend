@@ -95,6 +95,7 @@ describe("renderFacets", () => {
     const host = makeHost({
       _devices: [
         {
+          loaded_integrations: [],
           update_available: true,
           api_enabled: true,
           runtime_state: { state: "online", active_source: "mdns" },
@@ -118,6 +119,7 @@ describe("renderFacets", () => {
     const host = makeHost({
       _devices: [
         {
+          loaded_integrations: [],
           has_pending_changes: true,
           runtime_state: { state: "online", active_source: "mdns" },
         },
@@ -135,6 +137,7 @@ describe("renderFacets", () => {
   const areaDevices = (n: number) =>
     Array.from({ length: n }, (_, i) => ({
       area: `Area ${i}`,
+      loaded_integrations: [],
       runtime_state: { state: "unknown" },
     }));
 

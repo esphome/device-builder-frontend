@@ -16,7 +16,11 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
-import { isStatusUntracked } from "../../util/device-status.js";
+import {
+  hasNoNetwork,
+  isStatusHidden,
+  isStatusUntracked,
+} from "../../util/device-status.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { fireEvent } from "../../util/fire-event.js";
@@ -318,6 +322,10 @@ export class ESPHomeDeviceDrawer extends LitElement {
     if (!device) return nothing;
 
     const rt = device.runtime_state;
+    const statusHidden = isStatusHidden(
+      rt.state,
+      hasNoNetwork(device.loaded_integrations)
+    );
     const untracked = isStatusUntracked(rt.state, device.name_add_mac_suffix);
     const online = rt.state === DeviceState.ONLINE;
     const offline = !untracked && rt.state === DeviceState.OFFLINE;
@@ -355,24 +363,28 @@ export class ESPHomeDeviceDrawer extends LitElement {
           </button>
         </div>
 
-        <div class="status-banner ${stateClass}">
-          <span class="status-dot ${stateClass}"></span>
-          <wa-icon library="mdi" name=${stateIcon}></wa-icon>
-          ${stateLabel}
-          ${
-            online || untracked
-              ? nothing
-              : html`<button
-                  class="troubleshoot-btn"
-                  @click=${() =>
-                    fireEvent(this, "open-troubleshoot", {
-                      configuration: device.configuration,
-                    })}
-                >
-                  ${this._localize("troubleshoot.open")}
-                </button>`
-          }
-        </div>
+        ${
+          statusHidden
+            ? nothing
+            : html` <div class="status-banner ${stateClass}">
+                <span class="status-dot ${stateClass}"></span>
+                <wa-icon library="mdi" name=${stateIcon}></wa-icon>
+                ${stateLabel}
+                ${
+                  online || untracked
+                    ? nothing
+                    : html`<button
+                        class="troubleshoot-btn"
+                        @click=${() =>
+                          fireEvent(this, "open-troubleshoot", {
+                            configuration: device.configuration,
+                          })}
+                      >
+                        ${this._localize("troubleshoot.open")}
+                      </button>`
+                }
+              </div>`
+        }
 
         <div class="body">
           <esphome-device-drawer-content

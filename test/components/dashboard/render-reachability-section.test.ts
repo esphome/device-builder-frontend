@@ -48,12 +48,17 @@ function reachability(
 function renderCalls(
   r: ReachabilityStateEvent | null,
   deviceState: DeviceState = DeviceState.ONLINE,
-  device: { offline_since?: number | null; name_add_mac_suffix?: boolean } = {}
+  device: {
+    offline_since?: number | null;
+    name_add_mac_suffix?: boolean;
+    loaded_integrations?: string[];
+  } = {}
 ): Array<[string, Record<string, unknown> | undefined]> {
   const calls: Array<[string, Record<string, unknown> | undefined]> = [];
   const host = {
     device: {
       name_add_mac_suffix: device.name_add_mac_suffix ?? false,
+      loaded_integrations: device.loaded_integrations ?? [],
       runtime_state: { state: deviceState, offline_since: device.offline_since ?? null },
     },
     _reachability: r,
@@ -154,6 +159,14 @@ describe("renderReachabilitySection - offline duration row", () => {
     const calls = renderCalls(reachability(), DeviceState.OFFLINE, {
       offline_since: OFFLINE_SINCE,
       name_add_mac_suffix: true,
+    });
+    expect(hasRow(calls)).toBe(false);
+  });
+
+  it("is absent for a device with no network component", () => {
+    const calls = renderCalls(reachability(), DeviceState.OFFLINE, {
+      offline_since: OFFLINE_SINCE,
+      loaded_integrations: ["api"],
     });
     expect(hasRow(calls)).toBe(false);
   });

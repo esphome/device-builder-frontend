@@ -5,7 +5,7 @@ import type {
   ReachabilityStateEvent,
 } from "../../../api/types/reachability.js";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
-import { offlineSeconds } from "../../../util/device-status.js";
+import { hasNoNetwork, offlineSeconds } from "../../../util/device-status.js";
 import { mdnsExpiryPhase, type MdnsExpiryPhase } from "../../../util/mdns-expiry.js";
 import {
   ageOf,
@@ -44,6 +44,7 @@ export function renderReachabilitySection(
     ? offlineSeconds(
         device.runtime_state.state,
         device.name_add_mac_suffix,
+        hasNoNetwork(device.loaded_integrations),
         device.runtime_state.offline_since ?? null,
         now
       )

@@ -99,6 +99,26 @@ describe("computeUpdateFacet", () => {
   });
 });
 
+describe("computeStateFacet no-network devices", () => {
+  it("counts a hidden-status device in no bucket", () => {
+    const hidden = device({
+      configuration: "h.yaml",
+      loaded_integrations: ["api"],
+      runtime_state: { state: DeviceState.OFFLINE },
+    });
+    const online = device({
+      configuration: "o.yaml",
+      runtime_state: { state: DeviceState.ONLINE },
+    });
+    const out = computeStateFacet([hidden, online], identityLocalize);
+    const countById = Object.fromEntries(out.map((o) => [o.id, o.count]));
+    expect(countById[DeviceState.ONLINE]).toBe(1);
+    expect(countById[DeviceState.OFFLINE]).toBe(0);
+    expect(countById[DeviceState.UNKNOWN]).toBe(0);
+    expect(countById.untracked).toBeUndefined();
+  });
+});
+
 describe("computeNetworkFacet", () => {
   it("tallies raw wire values, drops unannounced links, and counts offline devices", () => {
     expect(
