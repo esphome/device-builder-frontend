@@ -97,13 +97,13 @@ importers:
     devDependencies:
       '@rspack/core':
         specifier: 2.3.1
-        version: 2.3.1(@swc/helpers@0.5.23)
+        version: 2.3.1(@swc/helpers@0.5.24)
       '@rspack/dev-server':
         specifier: 2.2.2
-        version: 2.2.2(@rspack/core@2.3.1(@swc/helpers@0.5.23))
+        version: 2.2.2(@rspack/core@2.3.1(@swc/helpers@0.5.24))
       '@swc/helpers':
-        specifier: 0.5.23
-        version: 0.5.23
+        specifier: 0.5.24
+        version: 0.5.24
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
@@ -564,8 +564,8 @@ packages:
   '@shoelace-style/localize@3.2.2':
     resolution: {integrity: sha512-h3+2/cFWGaw3KQUwintkP4Cy3PtrVW//ysr9DM5nOfIXYekgrHwsELk/nyxc8hmjVP/Kcon7KCzvUtSwUBipfQ==}
 
-  '@swc/helpers@0.5.23':
-    resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
+  '@swc/helpers@0.5.24':
+    resolution: {integrity: sha512-6tcXo4kA8HgGO7AVmawB57RYi/piBPYVHVcO6dXjX+SZw8GoHmi262sp4v2Ha2kNP9Cx84qei27yT+fjS1lxgg==}
 
   '@tanstack/lit-store@0.14.2':
     resolution: {integrity: sha512-8qd6sFKha8u4VDzHXYhb/PtEPmXuWrtrJVr6C4KGFpK6PMKSTNK/pR4jvEXRfS7zZppQ8z08UMz7pwl7D+xTQw==}
@@ -1031,6 +1031,7 @@ packages:
 
   improv-wifi-serial-sdk@2.8.1:
     resolution: {integrity: sha512-KU2D7bNbdUDUX0JK2nQGTGTuxJNH+loXyMR6DXBIzAh4/2dwiR2cxK0igvl+dLWjf4wRv43iUn/eQuUClw5V3g==}
+    deprecated: Moved to @improv-wifi/serial-sdk
 
   imurmurhash@0.1.4:
     resolution: {integrity: sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==}
@@ -1844,28 +1845,26 @@ snapshots:
       '@rspack/binding-win32-ia32-msvc': 2.3.1
       '@rspack/binding-win32-x64-msvc': 2.3.1
 
-  '@rspack/core@2.3.1(@swc/helpers@0.5.23)':
+  '@rspack/core@2.3.1(@swc/helpers@0.5.24)':
     dependencies:
       '@rspack/binding': 2.3.1
     optionalDependencies:
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.24
 
-  '@rspack/dev-middleware@2.0.6(@rspack/core@2.3.1(@swc/helpers@0.5.23))':
+  '@rspack/dev-middleware@2.0.6(@rspack/core@2.3.1(@swc/helpers@0.5.24))':
     optionalDependencies:
-      '@rspack/core': 2.3.1(@swc/helpers@0.5.23)
+      '@rspack/core': 2.3.1(@swc/helpers@0.5.24)
 
-  '@rspack/dev-server@2.2.2(@rspack/core@2.3.1(@swc/helpers@0.5.23))':
+  '@rspack/dev-server@2.2.2(@rspack/core@2.3.1(@swc/helpers@0.5.24))':
     dependencies:
-      '@rspack/core': 2.3.1(@swc/helpers@0.5.23)
-      '@rspack/dev-middleware': 2.0.6(@rspack/core@2.3.1(@swc/helpers@0.5.23))
+      '@rspack/core': 2.3.1(@swc/helpers@0.5.24)
+      '@rspack/dev-middleware': 2.0.6(@rspack/core@2.3.1(@swc/helpers@0.5.24))
 
   '@shoelace-style/animations@1.2.0': {}
 
   '@shoelace-style/localize@3.2.2': {}
 
-  '@swc/helpers@0.5.23':
-    dependencies:
-      tslib: 2.8.1
+  '@swc/helpers@0.5.24': {}
 
   '@tanstack/lit-store@0.14.2(lit@3.3.3)':
     dependencies:
