@@ -59,6 +59,12 @@ export const headerActionsStyles = css`
      local to this menu. */
   .menu {
     min-width: 220px;
+    /* Fixed below the header with no natural bound; on short screens
+       (landscape wall tablets) the lower rows would fall off-screen
+       out of reach, so cap to the viewport and scroll inside. */
+    max-height: calc(100dvh - var(--esphome-header-height, 48px) - var(--wa-space-s));
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .menu-item wa-icon {
