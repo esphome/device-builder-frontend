@@ -1,10 +1,14 @@
 // Live-jobs dedup keys on (config, type) so an install's compile and upload
 // both survive — the upload's terminal must not evict the compile (#1131).
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeApp } from "../../src/components/app-shell.js";
-import { handleJobEvent } from "../../src/components/app-shell/jobs.js";
+import {
+  handleJobEvent,
+  onFirmwareHistoryCleared,
+  seedJobs,
+} from "../../src/components/app-shell/jobs.js";
 
 function makeHost(): ESPHomeApp {
   return {
@@ -162,5 +166,143 @@ describe("terminal analyze-memory jobs never enter history", () => {
       })
     );
     expect(new Set(host._firmwareJobs.keys())).toEqual(new Set(["c"]));
+  });
+});
+
+describe("follow_jobs snapshot replay", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("applies a burst of snapshot frames in one pass", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    let sets = 0;
+    let jobs = host._firmwareJobs;
+    Object.defineProperty(host, "_firmwareJobs", {
+      get: () => jobs,
+      set: (v) => {
+        sets++;
+        jobs = v;
+      },
+    });
+    for (const id of ["a", "b", "c"]) {
+      handleJobEvent(host, "snapshot", done({ job_id: id }));
+    }
+    expect(sets).toBe(0);
+    vi.runAllTimers();
+    expect(sets).toBe(1);
+    expect(new Set(host._firmwareJobs.keys())).toEqual(new Set(["a", "b", "c"]));
+  });
+
+  it("keeps a live event that raced ahead of the buffered snapshot", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    handleJobEvent(host, "snapshot", makeJob({ job_id: "a", status: JobStatus.QUEUED }));
+    handleJobEvent(
+      host,
+      "job_started",
+      makeJob({ job_id: "a", status: JobStatus.RUNNING })
+    );
+    vi.runAllTimers();
+    expect(host._firmwareJobs.get("a")!.status).toBe(JobStatus.RUNNING);
+  });
+
+  it("does not resurrect a job that a live terminal event removed", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    const memory = {
+      job_id: "m",
+      job_type: JobType.ANALYZE_MEMORY,
+      configuration: "a.yaml",
+    };
+    handleJobEvent(host, "snapshot", makeJob({ ...memory, status: JobStatus.RUNNING }));
+    handleJobEvent(
+      host,
+      "job_completed",
+      makeJob({ ...memory, status: JobStatus.COMPLETED })
+    );
+    vi.runAllTimers();
+    expect(host._firmwareJobs.has("m")).toBe(false);
+    expect(host._activeJobs.has("a.yaml")).toBe(false);
+  });
+
+  it("keeps the active slot picked by a live event", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    const base = { configuration: "a.yaml" };
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ ...base, job_id: "c", status: JobStatus.QUEUED })
+    );
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ ...base, job_id: "u", status: JobStatus.QUEUED })
+    );
+    handleJobEvent(
+      host,
+      "job_started",
+      makeJob({ ...base, job_id: "c", status: JobStatus.RUNNING })
+    );
+    vi.runAllTimers();
+    expect(host._activeJobs.get("a.yaml")!.job_id).toBe("c");
+  });
+
+  it("lets a replay frame replace an older initial-state row", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    seedJobs(host, [makeJob({ job_id: "a", status: JobStatus.RUNNING })]);
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ job_id: "a", status: JobStatus.COMPLETED })
+    );
+    vi.runAllTimers();
+    expect(host._firmwareJobs.get("a")!.status).toBe(JobStatus.COMPLETED);
+    expect(host._activeJobs.size).toBe(0);
+  });
+
+  it("does not restore cleared history from buffered frames", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ job_id: "a", status: JobStatus.COMPLETED })
+    );
+    onFirmwareHistoryCleared(host);
+    vi.runAllTimers();
+    expect(host._firmwareJobs.size).toBe(0);
+  });
+
+  it("keeps the active map identity when a batch only adds finished jobs", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    const before = host._activeJobs;
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ job_id: "a", status: JobStatus.COMPLETED })
+    );
+    vi.runAllTimers();
+    expect(host._activeJobs).toBe(before);
+  });
+
+  it("keeps a slot set earlier in the batch when a later terminal frame is for another job", () => {
+    vi.useFakeTimers();
+    const host = makeHost();
+    const base = { configuration: "a.yaml" };
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ ...base, job_id: "u", status: JobStatus.QUEUED })
+    );
+    handleJobEvent(
+      host,
+      "snapshot",
+      makeJob({ ...base, job_id: "c", status: JobStatus.COMPLETED })
+    );
+    vi.runAllTimers();
+    expect(host._activeJobs.get("a.yaml")!.job_id).toBe("u");
   });
 });
