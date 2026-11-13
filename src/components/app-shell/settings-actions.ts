@@ -154,6 +154,46 @@ export function onSetVersionHistoryEnabled(
   });
 }
 
+export function onSetFirmwareRepositoryAccessEnabled(
+  host: ESPHomeApp,
+  e: CustomEvent<boolean>
+): void {
+  void optimisticSetting(host, {
+    get: () => host._firmwareRepositoryAccessEnabled,
+    set: (v) => {
+      host._firmwareRepositoryAccessEnabled = v;
+    },
+    write: () =>
+      host._api.updatePreferences({ firmware_repository_access_enabled: e.detail }),
+    value: e.detail,
+    toastKey: "settings.firmware_repository_save_failed",
+    warn: "Failed to save firmware-repository-access-enabled:",
+    inFlight: (active) => {
+      host._prefsWritesInFlight += active ? 1 : -1;
+    },
+  });
+}
+
+export function onSetFirmwareRepositoryAuthenticatePublic(
+  host: ESPHomeApp,
+  e: CustomEvent<boolean>
+): void {
+  void optimisticSetting(host, {
+    get: () => host._firmwareRepositoryAuthenticatePublic,
+    set: (v) => {
+      host._firmwareRepositoryAuthenticatePublic = v;
+    },
+    write: () =>
+      host._api.updatePreferences({ firmware_repository_authenticate_public: e.detail }),
+    value: e.detail,
+    toastKey: "settings.firmware_repository_save_failed",
+    warn: "Failed to save firmware-repository-authenticate-public:",
+    inFlight: (active) => {
+      host._prefsWritesInFlight += active ? 1 : -1;
+    },
+  });
+}
+
 // Optimistic flip with revert-on-failure for security-sensitive toggles.
 // _remoteBuildSetInFlight gates loadRemoteBuildSettings so a reconnect
 // racing the write can't clobber the optimistic value.

@@ -29,6 +29,7 @@ import type {
 } from "../components/device/section-editor.js";
 import { layoutRevealingAnchor } from "../components/device/tour-reveal-layout.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import type { ESPHomeFirmwareRepositoryDialog } from "../components/firmware-repository/esphome-firmware-repository-dialog.js";
 import { tourAnchor } from "../components/guided-tour/tour-anchor.js";
 import { TourLayoutController } from "../components/guided-tour/tour-layout-controller.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
@@ -120,6 +121,7 @@ import "../components/device/board-reselect-dialog.js";
 import "../components/device/device-editor.js";
 import "../components/device/device-navigator.js";
 import "../components/firmware-install-dialog.js";
+import "../components/firmware-repository/esphome-firmware-repository-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/logs-dialog.js";
 import "../components/unsaved-changes-dialog.js";
@@ -441,6 +443,9 @@ export class ESPHomePageDevice extends LitElement {
 
   @query("esphome-firmware-install-dialog")
   private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+
+  @query("esphome-firmware-repository-dialog")
+  private _firmwareRepositoryDialog!: ESPHomeFirmwareRepositoryDialog;
 
   @query("esphome-logs-dialog")
   private _logsDialog!: ESPHomeLogsDialog;
@@ -1278,6 +1283,23 @@ export class ESPHomePageDevice extends LitElement {
     if (this._device) this._commandDialog.openForDevice(this._device, "analyze_memory");
   };
 
+  private _onEditorSaveFirmwareRepository = () => {
+    if (!this.id || this._isDirty || this._activeJobs.has(this.id)) return;
+    this._firmwareRepositoryDialog?.openSave(
+      this.id,
+      this._device?.friendly_name || this._device?.name
+    );
+  };
+
+  private _onEditorOpenFirmwareRepository = () => {
+    if (this._device) {
+      this._firmwareRepositoryDialog?.open(
+        this._device.configuration,
+        this._device.friendly_name || this._device.name
+      );
+    }
+  };
+
   /** Catch ``request-open-editor`` from the post-validation-failure
    *  hint. ``stopPropagation`` to prevent any future higher-level
    *  listener from also acting on the event. Two cases:
@@ -1598,6 +1620,8 @@ export class ESPHomePageDevice extends LitElement {
         @open-logs=${this._onEditorOpenLogs}
         @clean-build=${this._onEditorCleanBuild}
         @analyze-memory=${this._onEditorAnalyzeMemory}
+        @save-firmware-repository=${this._onEditorSaveFirmwareRepository}
+        @open-firmware-repository=${this._onEditorOpenFirmwareRepository}
         ?hasUnsavedEdits=${this._isDirty}
         ?saving=${this._saving}
         ?showModified=${this._device ? showPendingChanges(this._device) : false}
@@ -1639,7 +1663,8 @@ export class ESPHomePageDevice extends LitElement {
               </div>`
             : nothing
         }
-      </esphome-device-editor>`;
+      </esphome-device-editor>
+      <esphome-firmware-repository-dialog></esphome-firmware-repository-dialog>`;
   }
 
   /** The editor's stand-in until the config lands. A gone config is

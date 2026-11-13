@@ -39,6 +39,8 @@ import {
   experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,
+  firmwareRepositoryAccessEnabledContext,
+  firmwareRepositoryAuthenticatePublicContext,
   hideDeviceBuilderContext,
   importableDevicesContext,
   integrationDocsContext,
@@ -98,6 +100,8 @@ import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
   onSetExpertMode,
+  onSetFirmwareRepositoryAccessEnabled,
+  onSetFirmwareRepositoryAuthenticatePublic,
   onSetHideDeviceBuilder,
   onSetLanguage,
   onSetOffloaderIncludeLocal,
@@ -187,6 +191,12 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: versionHistoryEnabledContext })
   @state()
   _versionHistoryEnabled = true;
+  @provide({ context: firmwareRepositoryAccessEnabledContext })
+  @state()
+  _firmwareRepositoryAccessEnabled = false;
+  @provide({ context: firmwareRepositoryAuthenticatePublicContext })
+  @state()
+  _firmwareRepositoryAuthenticatePublic = true;
   // False until the subscribe snapshot delivers preferences; the dashboard
   // waits on it before honouring remote_compute_only so the accordion's
   // default section can't flip after first paint.
@@ -569,6 +579,10 @@ export class ESPHomeApp extends LitElement {
           onSetHideDeviceBuilder(this, e)}
         @set-version-history-enabled=${(e: CustomEvent<boolean>) =>
           onSetVersionHistoryEnabled(this, e)}
+        @set-firmware-repository-access-enabled=${(e: CustomEvent<boolean>) =>
+          onSetFirmwareRepositoryAccessEnabled(this, e)}
+        @set-firmware-repository-authenticate-public=${(e: CustomEvent<boolean>) =>
+          onSetFirmwareRepositoryAuthenticatePublic(this, e)}
         @set-remote-build-enabled=${(e: CustomEvent<boolean>) =>
           onSetRemoteBuildEnabled(this, e)}
         @set-remote-build-cleanup-ttl=${(e: CustomEvent<number>) =>

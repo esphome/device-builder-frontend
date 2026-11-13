@@ -18,6 +18,8 @@ export {
   experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,
+  firmwareRepositoryAccessEnabledContext,
+  firmwareRepositoryAuthenticatePublicContext,
   hideDeviceBuilderContext,
   importableDevicesContext,
   integrationDocsContext,
