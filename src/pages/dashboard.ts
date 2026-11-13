@@ -47,7 +47,10 @@ import {
   showJobProgress,
 } from "../components/dashboard/install.js";
 import { relinkLive } from "../components/dashboard/live-rebind.js";
-import { loadPreferences, saveTablePreference } from "../components/dashboard/prefs.js";
+import {
+  DashboardViewPrefsController,
+  saveTablePreference,
+} from "../components/dashboard/prefs.js";
 import {
   renderCardGrid,
   renderDiscoveredSection,
@@ -232,6 +235,7 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: prefsLoadedContext, subscribe: true })
   @state()
   _prefsLoaded = false;
+  _viewPrefs = new DashboardViewPrefsController(this);
 
   @consume({ context: buildServerPeersContext, subscribe: true })
   @state()
@@ -594,7 +598,6 @@ export class ESPHomePageDashboard extends LitElement {
       "remote-open",
       this._stacks.show && !this._stacks.remoteCollapsed
     );
-    if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.
     // Resolve any URL-sourced pending label names the moment it does.
     if (changed.has("_labelsCatalog")) this._resolvePendingLabelNames();
@@ -915,13 +918,7 @@ export class ESPHomePageDashboard extends LitElement {
     return this._computeLabelUsageMemo(this._devices);
   }
 
-  _enterDeviceView = (view: DashboardView) => {
-    // YAML is a third view option: clicking cards or table exits YAML
-    // search and returns to the device list.
-    if (this._yamlMode) this._setSearchMode(false);
-    this._view = view;
-    this._api.updatePreferences({ dashboard_view: view }).catch(() => {});
-  };
+  _enterDeviceView = (view: DashboardView) => this._viewPrefs.enterView(view);
 
   _toggleSelectMode = () => {
     if (this._selectMode) {

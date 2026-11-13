@@ -35,7 +35,7 @@ import { type RemoteBuildJobState } from "../../context/index.js";
 import { anchorOffline } from "../../util/device-status.js";
 import { seededMap } from "../../util/snapshot.js";
 import type { ESPHomeApp } from "../app-shell.js";
-import { applyPreferences } from "./data-load.js";
+import { applyPreferences, pickDashboardPrefs } from "./data-load.js";
 import { seedJobs } from "./jobs.js";
 
 // Merge a partial diff into the matching offloader pairing row keyed by pin_sha256.
@@ -79,6 +79,9 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       host._prefsLoaded = true;
       if (preferences && host._prefsWritesInFlight === 0) {
         applyPreferences(host, preferences);
+      } else if (preferences && !host._dashboardPrefs) {
+        // The dashboard has no other source; seed it even while a write is in flight.
+        host._dashboardPrefs = pickDashboardPrefs(preferences);
       }
       host._devices = devices.map((d) => anchorOffline(d));
       host._importableDevices = importable;

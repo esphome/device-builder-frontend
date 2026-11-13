@@ -10,6 +10,7 @@ import {
 } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
+  applyPreferences,
   loadOnboardingState,
   loadPreferences,
 } from "../../../src/components/app-shell/data-load.js";
@@ -147,5 +148,29 @@ describe("loadPreferences (post-wizard context refresh)", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe("applyPreferences", () => {
+  it("publishes the dashboard's view and table slice", () => {
+    const host = {
+      applyTheme: vi.fn(),
+      _dashboardPrefs: null,
+    } as unknown as ESPHomeApp;
+    applyPreferences(host, {
+      dashboard_view: "table",
+      table_page_size: 50,
+      table_column_visibility: { ip: false },
+      table_sort_column: "name",
+      table_sort_direction: "desc",
+      theme: "dark",
+    } as unknown as UserPreferences);
+    expect(host._dashboardPrefs).toEqual({
+      dashboard_view: "table",
+      table_page_size: 50,
+      table_column_visibility: { ip: false },
+      table_sort_column: "name",
+      table_sort_direction: "desc",
+    });
   });
 });
