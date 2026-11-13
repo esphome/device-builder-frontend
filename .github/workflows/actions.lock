@@ -34,6 +34,9 @@ workflows:
         - 'pnpm/action-setup@v6.1.0'
         - 'pypa/gh-action-pypi-publish@v1.14.3'
         - 'release-drafter/release-drafter@v7.10.0'
+    '.github/workflows/request-copilot-review.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'actions/github-script@v9.0.0'
     '.github/workflows/test.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
