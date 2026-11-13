@@ -4,7 +4,11 @@ import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
-import { isStatusUntracked } from "../../util/device-status.js";
+import {
+  hasNoNetwork,
+  isStatusHidden,
+  isStatusUntracked,
+} from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatFileSize } from "../../util/format-file-size.js";
@@ -106,6 +110,9 @@ export function createDeviceColumns(
           }
         }
         const state = info.getValue() as DeviceState;
+        if (isStatusHidden(state, hasNoNetwork(row._device.loaded_integrations))) {
+          return html`<span class="cell-status"></span>`;
+        }
         // "No status" opens the dialog's untracked explainer; inert
         // only while selecting, like the other dots.
         if (isStatusUntracked(state, row._device.name_add_mac_suffix)) {

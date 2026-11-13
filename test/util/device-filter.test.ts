@@ -133,6 +133,21 @@ describe("applyFacetFilters", () => {
     ).toEqual([offline]);
   });
 
+  it("state facet drops hidden-status (no network) devices from every bucket", () => {
+    const hidden = device({
+      name: "h",
+      loaded_integrations: ["api"],
+      runtime_state: { state: DeviceState.OFFLINE },
+    });
+    const offline = device({ name: "o", runtime_state: { state: DeviceState.OFFLINE } });
+    expect(
+      applyFacetFilters(
+        [hidden, offline],
+        selection({ selectedStates: [DeviceState.OFFLINE, "untracked"] })
+      )
+    ).toEqual([offline]);
+  });
+
   it("update-status facet is AND across selected buckets", () => {
     const updatable = device({ name: "u", update_available: true });
     const modified = device({ name: "m", has_pending_changes: true });

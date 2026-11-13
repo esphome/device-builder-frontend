@@ -42,7 +42,10 @@ const DARK_PROBE: DeviceTroubleshootResult = {
 function drawerShowsMdnsRow(r: ReachabilityStateEvent): boolean {
   const keys: string[] = [];
   const host = {
-    device: { runtime_state: { state: DeviceState.OFFLINE } },
+    device: {
+      loaded_integrations: [],
+      runtime_state: { state: DeviceState.OFFLINE },
+    },
     _reachability: r,
     _reachabilityAnchorMs: Date.now(),
     _localize: (key: string) => {

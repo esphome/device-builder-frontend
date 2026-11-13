@@ -30,6 +30,33 @@ describe("device-drawer untracked header", () => {
     expect(html).not.toContain("network-off-outline");
   });
 
+  it("omits the whole status banner for a no-network device, flagged or not", async () => {
+    for (const flagged of [false, true]) {
+      const el = await mountDrawer({
+        device: makeConfiguredDevice({
+          name_add_mac_suffix: flagged,
+          loaded_integrations: ["api"],
+          runtime_state: { state: DeviceState.OFFLINE },
+        }),
+      });
+      const root = el.shadowRoot!;
+      expect(root.querySelector(".status-banner")).toBeNull();
+      expect(root.querySelector(".troubleshoot-btn")).toBeNull();
+      expect(root.innerHTML).not.toContain("dashboard.status_untracked");
+      el.remove();
+    }
+  });
+
+  it("keeps the banner for a no-network device that is online", async () => {
+    const el = await mountDrawer({
+      device: makeConfiguredDevice({
+        loaded_integrations: ["api"],
+        runtime_state: { state: DeviceState.ONLINE },
+      }),
+    });
+    expect(el.shadowRoot!.querySelector(".status-banner.online")).not.toBeNull();
+  });
+
   it("keeps Device Offline for an unflagged offline device", async () => {
     const el = await mountDrawer({
       device: makeConfiguredDevice({ runtime_state: { state: DeviceState.OFFLINE } }),
