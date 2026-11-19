@@ -17,7 +17,7 @@ import type {
   PeerSummary,
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
-import type { ExperienceLevel } from "../api/types/system.js";
+import type { ExperienceLevel, UserPreferences } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /** Context for the ESPHome API client instance. */
@@ -179,6 +179,27 @@ export const versionHistoryEnabledContext = createContext<boolean>(
  * known (``remote_compute_only`` would still be at its permissive default).
  */
 export const prefsLoadedContext = createContext<boolean>(Symbol("esphome-prefs-loaded"));
+
+/** The dashboard's view and table preferences. */
+export type DashboardPrefs = Pick<
+  UserPreferences,
+  | "dashboard_view"
+  | "table_page_size"
+  | "table_column_visibility"
+  | "table_sort_column"
+  | "table_sort_direction"
+>;
+
+/**
+ * Context for the dashboard's saved view and table preferences.
+ *
+ * ``null`` until the first ``initial_state`` snapshot. app-shell owns it and
+ * performs the dashboard's writes (``set-dashboard-prefs``), so a remounted
+ * dashboard seeds from what was last saved rather than the first-load snapshot.
+ */
+export const dashboardPrefsContext = createContext<DashboardPrefs | null>(
+  Symbol("esphome-dashboard-prefs")
+);
 
 /**
  * Context for the receiver-side remote-build master switch.

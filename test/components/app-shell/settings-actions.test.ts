@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flush, identityLocalize } from "../../_dom.js";
 import type { VersionMatchPolicy } from "../../../src/api/types/event-subscription.js";
 import type { PairingSummary } from "../../../src/api/types/remote-build.js";
-import { ExperienceLevel } from "../../../src/api/types/system.js";
+import { ExperienceLevel, type UserPreferences } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
+  onSetDashboardPrefs,
   onSetExpertMode,
   onSetHideDeviceBuilder,
   onSetOffloaderIncludeLocal,
@@ -15,6 +16,7 @@ import {
   onSetTheme,
   onSetVersionHistoryEnabled,
 } from "../../../src/components/app-shell/settings-actions.js";
+import type { DashboardPrefs } from "../../../src/context/index.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock("sonner-js", () => ({
@@ -578,5 +580,94 @@ describe("prefs-write in-flight counter", () => {
     resolvers[1]();
     await flush();
     expect(host._prefsWritesInFlight).toBe(0);
+  });
+});
+
+describe("onSetDashboardPrefs", () => {
+  const slice = (over: Partial<DashboardPrefs> = {}): DashboardPrefs => ({
+    dashboard_view: "cards" as DashboardPrefs["dashboard_view"],
+    table_page_size: 25,
+    table_column_visibility: {},
+    table_sort_column: null,
+    table_sort_direction: null,
+    ...over,
+  });
+  const TABLE = "table" as DashboardPrefs["dashboard_view"];
+  const reply = (over: Partial<DashboardPrefs>) =>
+    ({ ...slice(over), theme: "system" }) as unknown as UserPreferences;
+
+  function makeHost(updatePreferences: (p: Partial<DashboardPrefs>) => Promise<unknown>) {
+    return {
+      _dashboardPrefs: slice() as DashboardPrefs | null,
+      _prefsWritesInFlight: 0,
+      _localize: identityLocalize as ESPHomeApp["_localize"],
+      _api: { updatePreferences: vi.fn(updatePreferences) },
+    };
+  }
+  const send = (host: ReturnType<typeof makeHost>, patch: Partial<DashboardPrefs>) =>
+    onSetDashboardPrefs(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("set-dashboard-prefs", { detail: patch })
+    );
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("applies the patch optimistically, then the reply, under the in-flight guard", async () => {
+    const host = makeHost(async (p) => reply({ ...p, table_page_size: 50 }));
+    send(host, { dashboard_view: TABLE });
+    expect(host._dashboardPrefs?.dashboard_view).toBe(TABLE);
+    expect(host._prefsWritesInFlight).toBe(1);
+    await flush();
+    expect(host._api.updatePreferences).toHaveBeenCalledWith({ dashboard_view: TABLE });
+    expect(host._prefsWritesInFlight).toBe(0);
+    // The reply also carries fields changed elsewhere.
+    expect(host._dashboardPrefs).toEqual(
+      slice({ dashboard_view: TABLE, table_page_size: 50 })
+    );
+  });
+
+  it("reverts the copy and logs, without a toast, when the write fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    toastError.mockClear();
+    const boom = new Error("not connected");
+    const host = makeHost(async () => {
+      throw boom;
+    });
+    send(host, { dashboard_view: TABLE });
+    await flush();
+    expect(host._dashboardPrefs).toEqual(slice());
+    expect(host._prefsWritesInFlight).toBe(0);
+    expect(warn).toHaveBeenCalledWith("Failed to save dashboard preferences:", boom);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("does not let an earlier reply undo a later write still in flight", async () => {
+    const releases: Array<() => void> = [];
+    const host = makeHost(
+      (p) =>
+        new Promise((resolve) => {
+          releases.push(() => resolve(reply(p)));
+        })
+    );
+    send(host, { table_page_size: 50 });
+    send(host, { dashboard_view: TABLE });
+    releases[0](); // its reply predates the second write
+    await flush();
+    expect(host._dashboardPrefs?.dashboard_view).toBe(TABLE);
+    releases[1]();
+    await flush();
+    expect(host._prefsWritesInFlight).toBe(0);
+  });
+
+  it("still sends the write before the first snapshot, leaving the copy unset", async () => {
+    const host = makeHost(async (p) => reply(p));
+    host._dashboardPrefs = null;
+    send(host, { dashboard_view: TABLE });
+    expect(host._dashboardPrefs).toBeNull();
+    await flush();
+    expect(host._api.updatePreferences).toHaveBeenCalledWith({ dashboard_view: TABLE });
+    expect((host._dashboardPrefs as DashboardPrefs | null)?.dashboard_view).toBe(TABLE);
   });
 });
