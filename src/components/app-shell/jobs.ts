@@ -38,7 +38,60 @@ export function clearRecentJobs(host: ESPHomeApp): void {
   host._recentJobs = new Map();
 }
 
+// follow_jobs replays one "snapshot" frame per stored job. Applying each as it
+// arrives re-renders every jobs consumer per frame, so buffer them and apply
+// the burst in one pass (~one frame later). Any other job event flushes the
+// buffer first, so frames are always applied in arrival order.
+const SNAPSHOT_FLUSH_MS = 16;
+const pendingSnapshots = new WeakMap<
+  ESPHomeApp,
+  { jobs: FirmwareJob[]; timer: ReturnType<typeof setTimeout> }
+>();
+
+function queueSnapshot(host: ESPHomeApp, job: FirmwareJob): void {
+  const pending = pendingSnapshots.get(host);
+  if (pending) {
+    pending.jobs.push(job);
+    return;
+  }
+  const jobs = [job];
+  const timer = setTimeout(() => flushSnapshots(host), SNAPSHOT_FLUSH_MS);
+  pendingSnapshots.set(host, { jobs, timer });
+}
+
+function flushSnapshots(host: ESPHomeApp): void {
+  const pending = pendingSnapshots.get(host);
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pendingSnapshots.delete(host);
+  // Same per-job effect as upsertJob (one map build for the whole burst), except
+  // a terminal frame also releases the active slot it supersedes.
+  const all = new Map(host._firmwareJobs);
+  let active: Map<string, FirmwareJob> | null = null;
+  for (const job of pending.jobs) {
+    all.set(job.job_id, job);
+    const keys = [job.configuration, ...renameKeys(job)];
+    if (isTerminalJobStatus(job.status)) {
+      // Terminal replays belong only in history; release a stale slot they supersede.
+      for (const key of keys) {
+        if ((active ?? host._activeJobs).get(key)?.job_id !== job.job_id) continue;
+        active = active ?? new Map(host._activeJobs);
+        active.delete(key);
+      }
+      continue;
+    }
+    active = active ?? new Map(host._activeJobs);
+    for (const key of keys) active.set(key, job);
+  }
+  host._firmwareJobs = all;
+  // Publish only on change: a new identity re-renders every device row.
+  if (active !== null) host._activeJobs = active;
+}
+
 export function subscribeToFollowJobs(host: ESPHomeApp): void {
+  const stale = pendingSnapshots.get(host);
+  if (stale) clearTimeout(stale.timer);
+  pendingSnapshots.delete(host);
   host._activeJobs = new Map();
   host._firmwareJobs = new Map();
   clearRecentJobs(host);
@@ -73,8 +126,11 @@ export function seedJobs(host: ESPHomeApp, jobs: FirmwareJob[]): void {
 }
 
 export function handleJobEvent(host: ESPHomeApp, event: string, data: unknown): void {
+  if (event !== "snapshot") flushSnapshots(host);
   switch (event) {
     case "snapshot":
+      queueSnapshot(host, data as FirmwareJob);
+      break;
     case "job_queued":
     case "job_started":
       upsertJob(host, data as FirmwareJob);
@@ -205,6 +261,8 @@ function markJobRecent(host: ESPHomeApp, job: FirmwareJob): void {
 
 export function onFirmwareHistoryCleared(host: ESPHomeApp): void {
   // firmware/clear doesn't broadcast — prune retained terminals locally.
+  // Flush first so buffered replay frames can't restore what was just cleared.
+  flushSnapshots(host);
   const next = new Map<string, FirmwareJob>();
   for (const [id, job] of host._firmwareJobs) {
     if (!isTerminalJobStatus(job.status)) next.set(id, job);
