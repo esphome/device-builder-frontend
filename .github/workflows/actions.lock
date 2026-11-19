@@ -21,6 +21,7 @@ workflows:
         - 'actions/upload-pages-artifact@v5.0.0'
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/lock.yml': []
+    '.github/workflows/pr-event.yml': []
     '.github/workflows/pr-labels.yaml':
         - 'actions/github-script@v9.0.0'
     '.github/workflows/release.yml':
