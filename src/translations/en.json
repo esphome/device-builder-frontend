@@ -1658,6 +1658,7 @@
     "storage_total": "of {size}",
     "storage_bar_aria": "{free} free of {total}",
     "storage_measuring": "Measuring disk usage. This takes up to a minute after the dashboard starts.",
+    "storage_failed": "Couldn't measure disk usage. The dashboard logs have the details. It tries again after the next install, or within 15 minutes.",
     "storage_low": "Only {size} left. Builds can fail when the disk fills up. Resetting the build environment frees the toolchains and caches; they download again on the next build.",
     "storage_used_by_esphome": "Used by ESPHome",
     "storage_builds": "Device builds",

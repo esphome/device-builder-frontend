@@ -10,6 +10,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import {
   devicesContext,
   diskUsageContext,
+  diskUsageFailedContext,
   localizeContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -51,6 +52,10 @@ export class ESPHomeSettingsStorage extends LitElement {
   @consume({ context: diskUsageContext, subscribe: true })
   @state()
   private _usage: DiskUsage | null = null;
+
+  @consume({ context: diskUsageFailedContext, subscribe: true })
+  @state()
+  private _failed = false;
 
   @consume({ context: devicesContext, subscribe: true })
   @state()
@@ -186,8 +191,11 @@ export class ESPHomeSettingsStorage extends LitElement {
 
   protected render() {
     const usage = this._usage;
-    if (usage === null)
-      return renderStatusRow(this._localize, "settings.storage_measuring");
+    if (usage === null) {
+      return this._failed
+        ? renderStatusRow(this._localize, "settings.storage_failed", "alert")
+        : renderStatusRow(this._localize, "settings.storage_measuring");
+    }
     return html`
       <h3 class="section-heading">${this._localize("settings.storage_disk")}</h3>
       ${this._renderLowSpace(usage)}

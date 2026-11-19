@@ -34,6 +34,7 @@ function device(name: string, build_size_bytes: number): ConfiguredDevice {
 interface Internals {
   _localize: LocalizeFunc;
   _usage: DiskUsage | null;
+  _failed: boolean;
   _devices: ConfiguredDevice[];
 }
 
@@ -56,6 +57,14 @@ describe("esphome-settings-storage", () => {
       "settings.storage_measuring"
     );
     expect(root.querySelector(".bar")).toBeNull();
+  });
+
+  it("says the measurement failed instead of measuring forever", async () => {
+    const root = await render({ _usage: null, _failed: true });
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain(
+      "settings.storage_failed"
+    );
+    expect(text(root)).not.toContain("settings.storage_measuring");
   });
 
   it("renders free space, the bar and each category", async () => {

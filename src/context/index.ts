@@ -16,6 +16,7 @@ export {
   devicesContext,
   devicesLoadedContext,
   diskUsageContext,
+  diskUsageFailedContext,
   experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,

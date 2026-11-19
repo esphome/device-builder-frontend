@@ -47,6 +47,8 @@ export enum DeviceEventType {
   JOB_FAILED = "job_failed",
   // Backend remeasured disk usage (after a job, or free space moved).
   DISK_USAGE_UPDATED = "disk_usage_updated",
+  // The first measurement failed; there is no DiskUsage to show yet.
+  DISK_USAGE_FAILED = "disk_usage_failed",
   // Remote-build events.
   REMOTE_BUILD_IDENTITY_ROTATED = "remote_build_identity_rotated",
   REMOTE_BUILD_LISTENER_CHANGED = "remote_build_listener_changed",
@@ -229,6 +231,8 @@ export interface InitialStateEventData {
   /** Last disk measurement. Absent until the backend's first walk
    *  finishes (~30 s after it starts). */
   disk_usage?: DiskUsage;
+  /** Present instead of `disk_usage` when that first walk failed. */
+  disk_usage_failed?: true;
   /** Offloader-side master "Remote builds enabled" toggle (7b).
    *  When `false`, the backend's ``pick_build_path`` short-
    *  circuits every install to LOCAL; paired peer-link

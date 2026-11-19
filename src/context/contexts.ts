@@ -470,6 +470,11 @@ export const diskUsageContext = createContext<DiskUsage | null>(
   Symbol("esphome-disk-usage")
 );
 
+/** The backend couldn't measure disk usage and has no earlier measurement. */
+export const diskUsageFailedContext = createContext<boolean>(
+  Symbol("esphome-disk-usage-failed")
+);
+
 /**
  * One in-flight (or recently terminal) remote-build job
  * running on a paired receiver.

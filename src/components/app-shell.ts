@@ -37,6 +37,7 @@ import {
   devicesContext,
   devicesLoadedContext,
   diskUsageContext,
+  diskUsageFailedContext,
   experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,
@@ -235,6 +236,7 @@ export class ESPHomeApp extends LitElement {
     OffloaderAlertSnapshotEntry
   > | null = null;
   @provide({ context: diskUsageContext }) @state() _diskUsage: DiskUsage | null = null;
+  @provide({ context: diskUsageFailedContext }) @state() _diskUsageFailed = false;
   @provide({ context: buildOffloadJobsContext }) @state() _buildOffloadJobs: Map<
     string,
     RemoteBuildJobState
