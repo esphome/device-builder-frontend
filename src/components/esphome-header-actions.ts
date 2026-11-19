@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiAlertOutline,
   mdiArchiveOutline,
   mdiCheck,
   mdiCog,
@@ -21,10 +22,12 @@ import type { AdoptableDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { JobStatus } from "../api/types/firmware-jobs.js";
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
+import type { DiskUsage } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   buildOffloadAlertsContext,
   desktopUpdateCapableContext,
+  diskUsageContext,
   firmwareJobsContext,
   importableDevicesContext,
   localizeContext,
@@ -32,17 +35,20 @@ import {
 } from "../context/index.js";
 import { dropdownMenuStyles } from "../styles/dropdown-menu.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { isDiskSpaceLow } from "../util/disk-usage.js";
 import { fireEvent } from "../util/fire-event.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-actions.js";
 import { headerActionsStyles } from "./esphome-header-actions.styles.js";
 import { OverflowMenuElement } from "./overflow-menu-element.js";
+import type { Section } from "./settings-dialog/types.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
 
 registerMdiIcons({
+  "alert-outline": mdiAlertOutline,
   "archive-outline": mdiArchiveOutline,
   check: mdiCheck,
   cog: mdiCog,
@@ -89,6 +95,11 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
   @consume({ context: buildOffloadAlertsContext, subscribe: true })
   @state()
   private _offloaderAlerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
+
+  /** Low free space badges the kebab and routes Settings to Storage. */
+  @consume({ context: diskUsageContext, subscribe: true })
+  @state()
+  private _diskUsage: DiskUsage | null = null;
 
   /** True on the dashboard route. Dashboard-only menu entries
    *  (Archived Devices) hide elsewhere; their dialog is hosted on the
@@ -168,6 +179,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
         ? this._localize("layout.more_options_with_count", { count: activeCount })
         : this._localize("dashboard.more_options");
     const hasAlerts = this._offloaderAlertsCount() > 0;
+    const diskLow = isDiskSpaceLow(this._diskUsage);
     const ignoredCount = this._importableDevices.filter((d) => d.ignored).length;
     // ⌘ is a locale-independent Apple glyph; the "Ctrl" label localizes (STRG in German).
     const searchShortcut = this._isApplePlatform
@@ -183,7 +195,7 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
       >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
         ${
-          activeCount > 0 || hasAlerts
+          activeCount > 0 || hasAlerts || diskLow
             ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
             : nothing
         }
@@ -310,6 +322,16 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                         >`
                       : nothing
                   }
+                  ${
+                    diskLow
+                      ? html`<wa-icon
+                          class="menu-item-warning"
+                          library="mdi"
+                          name="alert-outline"
+                          label=${this._localize("layout.low_disk_space")}
+                        ></wa-icon>`
+                      : nothing
+                  }
                 </div>
                 ${
                   this._desktopUpdateCapable
@@ -412,7 +434,15 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
 
   private _openSettings() {
     this._close();
-    fireEvent(this, "open-settings");
+    const section = this._attentionSection();
+    fireEvent(this, "open-settings", section ? { section } : undefined);
+  }
+
+  /** The section the Settings warning points at; Send builds alerts come first. */
+  private _attentionSection(): Section | undefined {
+    if (this._offloaderAlertsCount() > 0) return "build_offload";
+    if (isDiskSpaceLow(this._diskUsage)) return "storage";
+    return undefined;
   }
 
   private _openSearch() {

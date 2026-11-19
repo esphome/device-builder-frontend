@@ -214,3 +214,26 @@ export interface ArchivedDevice {
   friendly_name: string;
   comment: string | null;
 }
+
+/**
+ * Disk space on the volume holding the backend's ESPHome data dir, and what
+ * ESPHome uses of it. The ``*_bytes`` categories are disjoint: each file is
+ * counted once. Seeded by ``initial_state.disk_usage`` and refreshed by
+ * ``disk_usage_updated``.
+ */
+export interface DiskUsage {
+  total_bytes: number;
+  free_bytes: number;
+  /** Per-device build trees (``<data_dir>/build/``), deleted devices' included. */
+  builds_bytes: number;
+  /** Build-server work for paired dashboards (``<data_dir>/.remote_builds/``). */
+  remote_builds_bytes: number;
+  /** PlatformIO and ESPHome toolchains: what Reset build environment frees. */
+  toolchains_bytes: number;
+  /** The rest of the data dir (external components, project caches). */
+  cache_bytes: number;
+  /** YAML, secrets and version history outside the data dir. */
+  config_bytes: number;
+  /** Unix time (seconds) the category sizes were measured. */
+  measured_at: number;
+}

@@ -17,7 +17,7 @@ import type {
   RemoteBuildPeer,
   RemoteBuildSettings,
 } from "./remote-build.js";
-import type { UserPreferences } from "./system.js";
+import type { DiskUsage, UserPreferences } from "./system.js";
 
 // ─── Event Subscription ─────────────────────────────────────
 
@@ -45,6 +45,10 @@ export enum DeviceEventType {
   JOB_OUTPUT = "job_output",
   JOB_COMPLETED = "job_completed",
   JOB_FAILED = "job_failed",
+  // Backend remeasured disk usage (after a job, or free space moved).
+  DISK_USAGE_UPDATED = "disk_usage_updated",
+  // The first measurement failed; there is no DiskUsage to show yet.
+  DISK_USAGE_FAILED = "disk_usage_failed",
   // Remote-build events.
   REMOTE_BUILD_IDENTITY_ROTATED = "remote_build_identity_rotated",
   REMOTE_BUILD_LISTENER_CHANGED = "remote_build_listener_changed",
@@ -224,6 +228,11 @@ export interface InitialStateEventData {
    *  shot. Optional for the same reason as above; follow_jobs stays
    *  the live-update stream. */
   firmware_jobs?: FirmwareJob[];
+  /** Last disk measurement. Absent until the backend's first walk
+   *  finishes (~30 s after it starts). */
+  disk_usage?: DiskUsage;
+  /** Present instead of `disk_usage` when that first walk failed. */
+  disk_usage_failed?: true;
   /** Offloader-side master "Remote builds enabled" toggle (7b).
    *  When `false`, the backend's ``pick_build_path`` short-
    *  circuits every install to LOCAL; paired peer-link
@@ -305,6 +314,11 @@ export interface LabelEventData {
  *  cascade through the existing ``device_updated`` events. */
 export interface LabelDeletedEventData {
   label_id: string;
+}
+
+/** Payload of ``disk_usage_updated``. */
+export interface DiskUsageUpdatedEventData {
+  disk_usage: DiskUsage;
 }
 
 /** Callback for event subscription push events. */

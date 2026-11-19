@@ -1,6 +1,7 @@
 import type {
   DeviceEventData,
   DeviceStateChangedEventData,
+  DiskUsageUpdatedEventData,
   ImportableDeviceAddedEventData,
   ImportableDeviceRemovedEventData,
   InitialStateEventData,
@@ -68,6 +69,8 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         remote_jobs,
         remote_build_settings,
         firmware_jobs,
+        disk_usage,
+        disk_usage_failed,
         remote_builds_enabled,
         version_match_policy,
         include_local_in_pool,
@@ -118,6 +121,9 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         host._remoteBuildCleanupTtl = remote_build_settings.cleanup_ttl_seconds;
       }
       if (firmware_jobs !== undefined) seedJobs(host, firmware_jobs);
+      // Absent right after a backend start, until its first walk finishes.
+      host._diskUsage = disk_usage ?? null;
+      host._diskUsageFailed = disk_usage_failed === true;
       // Skip re-applying offloader settings while a toggle write is in flight,
       // so a reconnect's snapshot can't revert the optimistic value mid-write.
       if (host._offloaderWritesInFlight === 0) {
@@ -185,6 +191,15 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.IMPORTABLE_DEVICE_REMOVED: {
       const { name } = data as ImportableDeviceRemovedEventData;
       host._importableDevices = host._importableDevices.filter((d) => d.name !== name);
+      break;
+    }
+    case DeviceEventType.DISK_USAGE_UPDATED: {
+      host._diskUsage = (data as DiskUsageUpdatedEventData).disk_usage;
+      host._diskUsageFailed = false;
+      break;
+    }
+    case DeviceEventType.DISK_USAGE_FAILED: {
+      host._diskUsageFailed = true;
       break;
     }
     case DeviceEventType.LABEL_CREATED: {

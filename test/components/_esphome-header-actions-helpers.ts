@@ -10,6 +10,8 @@
 // webawesome components crash under happy-dom.
 import "../_mock-webawesome.js";
 
+import type { OffloaderAlertSnapshotEntry } from "../../src/api/types/remote-build-events.js";
+import type { DiskUsage } from "../../src/api/types/system.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { ESPHomeHeaderActions } from "../../src/components/esphome-header-actions.js";
 
@@ -24,6 +26,8 @@ export interface HeaderMenuOverrides {
   dashboardRoute?: boolean;
   _desktopUpdateCapable?: boolean;
   _localize?: LocalizeFunc;
+  _diskUsage?: DiskUsage | null;
+  _offloaderAlerts?: Map<string, OffloaderAlertSnapshotEntry> | null;
 }
 
 /**
