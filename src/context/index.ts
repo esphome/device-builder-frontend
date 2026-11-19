@@ -15,6 +15,7 @@ export {
   desktopVersionContext,
   devicesContext,
   devicesLoadedContext,
+  diskUsageContext,
   experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,

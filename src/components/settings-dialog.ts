@@ -3,6 +3,7 @@ import {
   mdiClose,
   mdiHandshake,
   mdiHandshakeOutline,
+  mdiHarddisk,
   mdiPalette,
   mdiPaletteOutline,
   mdiSend,
@@ -15,11 +16,17 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
+import type { DiskUsage } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { buildOffloadAlertsContext, localizeContext } from "../context/index.js";
+import {
+  buildOffloadAlertsContext,
+  diskUsageContext,
+  localizeContext,
+} from "../context/index.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { isDiskSpaceLow } from "../util/disk-usage.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { closeOpenDialogs } from "./base-dialog.js";
 import {
@@ -35,10 +42,12 @@ import "./settings-dialog/build-offload-section.js";
 import "./settings-dialog/build-server-section.js";
 import "./settings-dialog/language-section.js";
 import "./settings-dialog/pairing-requests-section.js";
+import "./settings-dialog/storage-section.js";
 
 registerMdiIcons({
   close: mdiClose,
   handshake: mdiHandshake,
+  harddisk: mdiHarddisk,
   "handshake-outline": mdiHandshakeOutline,
   palette: mdiPalette,
   "palette-outline": mdiPaletteOutline,
@@ -64,6 +73,11 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: buildOffloadAlertsContext, subscribe: true })
   @state()
   private _offloaderAlerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
+
+  /** Drives the attention dot on the Storage nav item when space runs low. */
+  @consume({ context: diskUsageContext, subscribe: true })
+  @state()
+  private _diskUsage: DiskUsage | null = null;
 
   @state()
   private _section: Section = "appearance";
@@ -123,16 +137,18 @@ export class ESPHomeSettingsDialog extends LitElement {
     // 'Send builds' (build_offload) entry. The dot's meaning is
     // 'something in this section needs your attention' -- driven
     // by the offloader-side alerts dict (pin_mismatch /
-    // peer_revoked). Other sections don't have alert surfaces
-    // today; the alertedSection switch lets future sections
-    // (e.g. pairing_requests with PENDING rows) attach the same
-    // dot without rewriting the render loop.
+    // peer_revoked) -- and on 'Storage' when free disk space is
+    // low. The sectionAlerted switch lets future sections (e.g.
+    // pairing_requests with PENDING rows) attach the same dot
+    // without rewriting the render loop.
     const offloadAlerted =
       this._offloaderAlerts !== null && this._offloaderAlerts.size > 0;
     const sectionAlerted = (id: Section): boolean => {
       switch (id) {
         case "build_offload":
           return offloadAlerted;
+        case "storage":
+          return isDiskSpaceLow(this._diskUsage);
         default:
           return false;
       }
@@ -181,6 +197,8 @@ export class ESPHomeSettingsDialog extends LitElement {
         return html`<esphome-settings-appearance></esphome-settings-appearance>`;
       case "language":
         return html`<esphome-settings-language></esphome-settings-language>`;
+      case "storage":
+        return html`<esphome-settings-storage></esphome-settings-storage>`;
       case "build_server":
         return html`<esphome-settings-build-server></esphome-settings-build-server>`;
       case "pairing_requests":

@@ -16,7 +16,7 @@ import type {
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
 import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
-import { type ExperienceLevel, Theme } from "../api/types/system.js";
+import { type DiskUsage, type ExperienceLevel, Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import {
@@ -36,6 +36,7 @@ import {
   desktopVersionContext,
   devicesContext,
   devicesLoadedContext,
+  diskUsageContext,
   experienceLevelContext,
   expertModeContext,
   firmwareJobsContext,
@@ -233,6 +234,7 @@ export class ESPHomeApp extends LitElement {
     string,
     OffloaderAlertSnapshotEntry
   > | null = null;
+  @provide({ context: diskUsageContext }) @state() _diskUsage: DiskUsage | null = null;
   @provide({ context: buildOffloadJobsContext }) @state() _buildOffloadJobs: Map<
     string,
     RemoteBuildJobState
@@ -559,6 +561,7 @@ export class ESPHomeApp extends LitElement {
       <esphome-update-all-dialog></esphome-update-all-dialog>
       <esphome-desktop-update-dialog></esphome-desktop-update-dialog>
       <esphome-settings-dialog
+        @open-reset-build-env=${() => this._firmwareJobsDialog?.openResetBuildEnv()}
         @open-reset-peer-build-env=${(e: CustomEvent<{ pin_sha256: string }>) =>
           this._firmwareJobsDialog?.openResetPeerBuildEnv(e.detail.pin_sha256)}
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
