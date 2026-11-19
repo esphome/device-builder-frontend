@@ -4,7 +4,7 @@ const GB = 1024 ** 3;
 
 /** One slice of the disk bar; `key` doubles as the CSS modifier and the label suffix. */
 export interface DiskSegment {
-  key: "builds" | "toolchains" | "remote_builds" | "config" | "other";
+  key: "builds" | "toolchains" | "remote_builds" | "config" | "other" | "used";
   bytes: number;
 }
 
@@ -24,7 +24,10 @@ export function toolchainAndCacheBytes(usage: DiskUsage): number {
 
 /**
  * Used-space slices for the disk bar, in display order. `other` is whatever
- * else uses the volume; zero-byte slices are dropped.
+ * else uses the volume; zero-byte slices are dropped. When ESPHome's folders
+ * add up to more than the volume's used space, some of them are on another
+ * volume (a separate build mount), so the bar shows a single `used` slice
+ * rather than slices that would push Free off the end.
  */
 export function diskSegments(usage: DiskUsage): DiskSegment[] {
   const esphome: DiskSegment[] = [
@@ -35,6 +38,7 @@ export function diskSegments(usage: DiskUsage): DiskSegment[] {
   ];
   const ours = esphome.reduce((sum, s) => sum + s.bytes, 0);
   const used = Math.max(0, usage.total_bytes - usage.free_bytes);
+  if (ours > used) return used > 0 ? [{ key: "used", bytes: used }] : [];
   const other: DiskSegment = { key: "other", bytes: Math.max(0, used - ours) };
   return [...esphome, other].filter((s) => s.bytes > 0);
 }

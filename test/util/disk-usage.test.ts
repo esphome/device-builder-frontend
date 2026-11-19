@@ -58,9 +58,18 @@ describe("diskSegments", () => {
     ]);
   });
 
-  it("drops empty slices and never reports negative other", () => {
-    const keys = diskSegments(usage({ free_bytes: 99 * GB })).map((s) => s.key);
+  it("drops empty slices", () => {
+    const free = 100 * GB - 7 * GB - 1024 ** 2;
+    const keys = diskSegments(usage({ free_bytes: free })).map((s) => s.key);
     expect(keys).toEqual(["builds", "toolchains", "config"]);
+  });
+
+  it("shows plain used space when ESPHome's folders span more than this volume", () => {
+    // 7 GB of ESPHome folders on a volume with only 1 GB used: builds sit elsewhere.
+    expect(diskSegments(usage({ free_bytes: 99 * GB }))).toEqual([
+      { key: "used", bytes: 1 * GB },
+    ]);
+    expect(diskSegments(usage({ free_bytes: 100 * GB }))).toEqual([]);
   });
 });
 

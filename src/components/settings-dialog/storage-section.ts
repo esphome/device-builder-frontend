@@ -39,6 +39,7 @@ const SEGMENT_LABEL_KEYS: Record<DiskSegment["key"], string> = {
   remote_builds: "settings.storage_remote_builds",
   config: "settings.storage_config",
   other: "settings.storage_other",
+  used: "settings.storage_used",
 };
 
 @customElement("esphome-settings-storage")
@@ -110,7 +111,8 @@ export class ESPHomeSettingsStorage extends LitElement {
       .seg--config {
         background: var(--wa-color-green-60);
       }
-      .seg--other {
+      .seg--other,
+      .seg--used {
         background: var(--wa-color-gray-60);
       }
       .seg--free {

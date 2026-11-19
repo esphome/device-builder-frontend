@@ -1669,6 +1669,7 @@
     "storage_config": "Configurations and version history",
     "storage_config_desc": "Your YAML files, secrets and their saved versions.",
     "storage_other": "Other files",
+    "storage_used": "Used",
     "storage_free_legend": "Free",
     "theme_desc": "Choose between light, dark, or follow your system preference.",
     "expert_mode": "Expert Mode",
