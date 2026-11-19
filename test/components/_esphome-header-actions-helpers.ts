@@ -10,6 +10,7 @@
 // webawesome components crash under happy-dom.
 import "../_mock-webawesome.js";
 
+import type { PairingSummary } from "../../src/api/types/remote-build.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { ESPHomeHeaderActions } from "../../src/components/esphome-header-actions.js";
 
@@ -23,6 +24,7 @@ import { ESPHomeHeaderActions } from "../../src/components/esphome-header-action
 export interface HeaderMenuOverrides {
   dashboardRoute?: boolean;
   _desktopUpdateCapable?: boolean;
+  _pairings?: Map<string, PairingSummary> | null;
   _localize?: LocalizeFunc;
 }
 

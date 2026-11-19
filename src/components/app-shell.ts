@@ -533,6 +533,8 @@ export class ESPHomeApp extends LitElement {
           this._settingsDialog?.open(e.detail?.section)}
         @open-firmware-jobs=${() => this._firmwareJobsDialog?.open()}
         @open-reset-build-env=${() => this._firmwareJobsDialog?.openResetBuildEnv()}
+        @open-reset-all-peer-build-env=${() =>
+          this._firmwareJobsDialog?.openResetAllPeerBuildEnv()}
         @open-reset-peer-build-env=${(e: CustomEvent<{ pin_sha256: string }>) =>
           this._firmwareJobsDialog?.openResetPeerBuildEnv(e.detail.pin_sha256)}
         @open-feedback=${() => this._feedbackDialog?.open()}
