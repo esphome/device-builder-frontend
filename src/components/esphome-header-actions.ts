@@ -42,6 +42,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./command-palette-actions.js";
 import { headerActionsStyles } from "./esphome-header-actions.styles.js";
 import { OverflowMenuElement } from "./overflow-menu-element.js";
+import type { Section } from "./settings-dialog/types.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/tooltip/tooltip.js";
@@ -433,10 +434,15 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
 
   private _openSettings() {
     this._close();
-    // Land on the warning when the disk is low and nothing else needs attention.
-    const toStorage =
-      isDiskSpaceLow(this._diskUsage) && this._offloaderAlertsCount() === 0;
-    fireEvent(this, "open-settings", toStorage ? { section: "storage" } : undefined);
+    const section = this._attentionSection();
+    fireEvent(this, "open-settings", section ? { section } : undefined);
+  }
+
+  /** The section the Settings warning points at; Send builds alerts come first. */
+  private _attentionSection(): Section | undefined {
+    if (this._offloaderAlertsCount() > 0) return "build_offload";
+    if (isDiskSpaceLow(this._diskUsage)) return "storage";
+    return undefined;
   }
 
   private _openSearch() {

@@ -68,6 +68,16 @@ describe("esphome-settings-storage", () => {
     expect(root.querySelector(".alert")).toBeNull();
   });
 
+  it("keeps the legend readable by screen readers, hiding only the swatches", async () => {
+    const root = await render({ _usage: usage() });
+    const legend = root.querySelector(".legend")!;
+    expect(legend.closest("[aria-hidden]")).toBeNull();
+    expect(legend.textContent).toContain("settings.storage_other");
+    for (const swatch of legend.querySelectorAll(".swatch")) {
+      expect(swatch.getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+
   it("hides the build-server row until this dashboard builds for others", async () => {
     expect(text(await render({ _usage: usage() }))).not.toContain(
       "settings.storage_remote_builds_desc"

@@ -264,18 +264,16 @@ export class ESPHomeSettingsStorage extends LitElement {
             ></span>`
         )}
       </div>
-      <ul class="legend" aria-hidden="true">
+      <ul class="legend">
         ${segments.map(
           (s) =>
             html`<li>
-              <span class="swatch seg--${s.key}"></span>${this._localize(
-                SEGMENT_LABEL_KEYS[s.key]
-              )}
-              ${formatFileSize(s.bytes)}
+              <span class="swatch seg--${s.key}" aria-hidden="true"></span
+              >${this._localize(SEGMENT_LABEL_KEYS[s.key])} ${formatFileSize(s.bytes)}
             </li>`
         )}
         <li>
-          <span class="swatch seg--free"></span
+          <span class="swatch seg--free" aria-hidden="true"></span
           >${this._localize("settings.storage_free_legend")}
           ${formatFileSize(usage.free_bytes)}
         </li>

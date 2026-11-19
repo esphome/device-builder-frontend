@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import type { OffloaderAlertSnapshotEntry } from "../../src/api/types/remote-build-events.js";
 import type { DiskUsage } from "../../src/api/types/system.js";
 import { renderOpenHeaderMenu } from "./_esphome-header-actions-helpers.js";
 
@@ -26,8 +27,15 @@ const settingsItem = (el: HTMLElement) =>
     i.textContent?.includes("layout.settings")
   )!;
 
-async function openMenu(free: number) {
-  const el = await renderOpenHeaderMenu({ _localize: (k) => k, _diskUsage: usage(free) });
+async function openMenu(
+  free: number,
+  alerts: Map<string, OffloaderAlertSnapshotEntry> | null = null
+) {
+  const el = await renderOpenHeaderMenu({
+    _localize: (k) => k,
+    _diskUsage: usage(free),
+    _offloaderAlerts: alerts,
+  });
   const seen = vi.fn();
   el.addEventListener("open-settings", (e) => seen((e as CustomEvent).detail));
   return { el, seen };
@@ -40,6 +48,13 @@ describe("header-actions low disk space", () => {
     expect(settingsItem(el).querySelector(".menu-item-warning")).not.toBeNull();
     settingsItem(el).click();
     expect(seen).toHaveBeenCalledWith({ section: "storage" });
+  });
+
+  it("opens Send builds first when it also has an alert", async () => {
+    const alerts = new Map([["peer", {} as OffloaderAlertSnapshotEntry]]);
+    const { el, seen } = await openMenu(3, alerts);
+    settingsItem(el).click();
+    expect(seen).toHaveBeenCalledWith({ section: "build_offload" });
   });
 
   it("stays quiet and opens Settings as usual with enough space", async () => {
