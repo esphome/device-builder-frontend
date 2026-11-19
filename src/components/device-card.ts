@@ -95,6 +95,9 @@ export class ESPHomeDeviceCard extends LitElement {
   // Truthy name_add_mac_suffix in the YAML — OFFLINE/UNKNOWN verdicts
   // are meaningless for such a device, so the badge shows "No status".
   @property({ type: Boolean, attribute: "name-add-mac-suffix" }) nameAddMacSuffix = false;
+  // Config has no wifi/ethernet/openthread, so it can never be seen on
+  // the network and the card shows no status at all.
+  @property({ type: Boolean, attribute: "no-network" }) noNetwork = false;
   // Raw device truth (``has_pending_changes``). Drives the 4-state encryption
   // lock indicator only — a local YAML edit not yet flashed, independent of
   // mDNS — so it stays in sync with the drawer's raw-flag badge.

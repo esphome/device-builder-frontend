@@ -12,6 +12,7 @@ import {
   deviceSortKey,
   sortDevices,
 } from "../../util/device-sort.js";
+import { hasNoNetwork } from "../../util/device-status.js";
 import { showPendingChanges, showUpdateAvailable } from "../../util/device-sync.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
@@ -147,6 +148,7 @@ export function renderCardGrid(
             .availableVersion=${device.current_version}
             ?api-enabled=${device.api_enabled === true}
             ?name-add-mac-suffix=${device.name_add_mac_suffix === true}
+            ?no-network=${hasNoNetwork(device.loaded_integrations)}
             ?api-encrypted=${device.api_encrypted === true}
             .apiEncryptionActive=${rt.api_encryption_active}
             .offlineSince=${rt.offline_since ?? null}

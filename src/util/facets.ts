@@ -118,6 +118,7 @@ export function computeStateFacet(
   if (selected.includes(UNTRACKED_STATE)) counts.set(UNTRACKED_STATE, 0);
   for (const d of devices) {
     const state = effectiveDeviceState(d);
+    if (state === null) continue;
     counts.set(state, (counts.get(state) ?? 0) + 1);
   }
   const labelKeyByState: Record<string, string> = {

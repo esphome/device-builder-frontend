@@ -85,6 +85,15 @@ describe("renderCardGrid", () => {
     expect(bare.offlineSince).toBeNull();
   });
 
+  it("passes noNetwork for a compiled config without a network component", () => {
+    const hidden = renderCard(makeConfiguredDevice({ loaded_integrations: ["api"] }));
+    expect(hidden.hasAttribute("no-network")).toBe(true);
+    const wifi = renderCard(makeConfiguredDevice({ loaded_integrations: ["wifi"] }));
+    expect(wifi.hasAttribute("no-network")).toBe(false);
+    const fresh = renderCard(makeConfiguredDevice());
+    expect(fresh.hasAttribute("no-network")).toBe(false);
+  });
+
   it("binds the raw migration flag onto the card, ungated", () => {
     const shown = renderCard(makeConfiguredDevice({ migration_available: true }));
     expect(shown.hasAttribute("migration-available")).toBe(true);
