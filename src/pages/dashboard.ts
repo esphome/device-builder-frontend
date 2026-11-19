@@ -152,13 +152,15 @@ import "../components/device-card.js";
 import "../components/device/board-reselect-dialog.js";
 import "../components/encryption-key-dialog.js";
 import type { ESPHomeEncryptionKeyDialog } from "../components/encryption-key-dialog.js";
+import "../components/packages/file-list-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
+import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/discovered-device-card.js";
 import "../components/firmware-install-dialog.js";
-import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
+import type { ESPHomeFileListDialog } from "../components/packages/file-list-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/labels/bulk-labels-dialog.js";
-import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/labels/label-dialog.js";
 import "../components/logs-dialog.js";
 import "../components/remote-build-panel.js";
@@ -325,6 +327,9 @@ export class ESPHomePageDashboard extends LitElement {
 
   @query("esphome-encryption-key-dialog")
   _encryptionKeyDialog!: ESPHomeEncryptionKeyDialog;
+
+  @query("esphome-file-list-dialog")
+  _fileListDialog?: ESPHomeFileListDialog;
   @query("esphome-archived-devices-dialog")
   _archivedDialog?: ESPHomeArchivedDevicesDialog;
   @query("esphome-confirm-dialog") _confirmDialog!: ESPHomeConfirmDialog;
@@ -990,6 +995,8 @@ export class ESPHomePageDashboard extends LitElement {
     if (key === null) return;
     this._encryptionKeyDialog.open(key);
   };
+  _showDependencies = (device: ConfiguredDevice) =>
+    void this._fileListDialog?.showDependencies(device.configuration);
   _downloadFirmware = (device: ConfiguredDevice) =>
     this._firmwareDialog.downloadArtifacts(device);
   _onRequestDownloadFirmware = (e: CustomEvent<ConfiguredDevice>) =>

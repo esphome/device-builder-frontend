@@ -158,6 +158,18 @@ export function createRouter(
       render: () => html`<esphome-page-secrets></esphome-page-secrets>`,
     },
     {
+      path: withBase("/packages"),
+      enter: () => lazyEnter(() => import("../../pages/packages.js"), hooks),
+      render: () => html`<esphome-page-packages></esphome-page-packages>`,
+    },
+    {
+      // Wildcard, not ``:id``: a package path keeps its literal slashes.
+      path: withBase("/file/*"),
+      enter: () => lazyEnter(() => import("../../pages/file.js"), hooks),
+      render: (params) =>
+        html`<esphome-page-file .path=${decodeIdParam(params[0])}></esphome-page-file>`,
+    },
+    {
       path: withBase("/device/:id"),
       enter: () =>
         lazyEnter(

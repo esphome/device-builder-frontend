@@ -11,6 +11,7 @@ import {
   mdiEyeOutline,
   mdiKeyVariant,
   mdiMagnify,
+  mdiPackageVariantClosed,
   mdiPlaylistCheck,
   mdiUpdate,
   mdiWifiCog,
@@ -32,6 +33,7 @@ import {
 } from "../context/index.js";
 import { dropdownMenuStyles } from "../styles/dropdown-menu.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { isApplePlatform } from "../util/apple-platform.js";
 import { fireEvent } from "../util/fire-event.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -53,23 +55,12 @@ registerMdiIcons({
   "eye-off-outline": mdiEyeOffOutline,
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
+  "package-variant-closed": mdiPackageVariantClosed,
   magnify: mdiMagnify,
   "playlist-check": mdiPlaylistCheck,
   update: mdiUpdate,
   "wifi-cog": mdiWifiCog,
 });
-
-/** True on Apple platforms, where the search shortcut uses the ⌘ glyph.
- *  ``userAgentData`` first; ``navigator.platform`` is deprecated but remains
- *  the only signal on Firefox and Safari. Read lazily and guarded so importing
- *  the module never touches an absent ``navigator``. */
-function isApplePlatform(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /mac|iphone|ipad/i.test(
-    (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ??
-      navigator.platform
-  );
-}
 
 @customElement("esphome-header-actions")
 export class ESPHomeHeaderActions extends OverflowMenuElement {
@@ -224,6 +215,18 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
                 >
                   <wa-icon library="mdi" name="key-variant"></wa-icon>
                   <span class="menu-item-label">${this._localize("layout.secrets")}</span>
+                </div>
+                <div
+                  class="menu-item"
+                  role="menuitem"
+                  tabindex="0"
+                  @click=${this._openPackages}
+                  @keydown=${this._onItemKeydown}
+                >
+                  <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+                  <span class="menu-item-label"
+                    >${this._localize("layout.packages")}</span
+                  >
                 </div>
                 <div
                   class="menu-item"
@@ -388,6 +391,11 @@ export class ESPHomeHeaderActions extends OverflowMenuElement {
   private _openSecrets() {
     this._close();
     void navigate("/secrets");
+  }
+
+  private _openPackages() {
+    this._close();
+    void navigate("/packages");
   }
 
   /** Opens the Wi-Fi credentials dialog on demand. The kebab item

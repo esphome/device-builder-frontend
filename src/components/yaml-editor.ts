@@ -13,6 +13,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../api/types/boards.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { isApplePlatform } from "../util/apple-platform.js";
 import {
   darkHighlight,
   EDITOR_BG_DARK,
@@ -29,8 +30,10 @@ import { initialDarkMode } from "../util/dark-mode.js";
 import { editorSearchPhrases } from "../util/editor-search-phrases.js";
 import { ESPHOME_YAML_INDENT } from "../util/esphome-yaml-indent.js";
 import { esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { openTargetUrl } from "../util/file-paths.js";
 import { fireEvent } from "../util/fire-event.js";
 import { idleCompletion } from "../util/idle-completion.js";
+import { navigate } from "../util/navigation.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import {
   cursorKeyPathAt,
@@ -44,6 +47,7 @@ import {
   type YamlAutoFix,
 } from "../util/yaml-error-analysis.js";
 import { createYamlHoverTooltip } from "../util/yaml-hover.js";
+import { includeLinks } from "../util/yaml-include-links.js";
 import { indentOf } from "../util/yaml-line-walker.js";
 import {
   createBackendYamlLinter,
@@ -143,6 +147,14 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
    * back to plain YAML editing with no diagnostics or suggestions.
    */
   @property() configuration = "";
+
+  /** Schema completion + hover docs without a ``configuration`` (e.g. a
+   *  package file); lint stays device-only. */
+  @property({ type: Boolean }) completion = false;
+
+  /** Config-relative path of a non-device file, the base its ``!include``
+   *  links resolve against (a device editor uses ``configuration``). */
+  @property() filePath = "";
 
   /**
    * The device's resolved board catalog entry. Supplies the target
@@ -558,6 +570,23 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
         }),
         lintErrorLineGutter
       );
+    }
+
+    if (this.configuration || this.filePath) {
+      extensions.push(
+        includeLinks(
+          () => this.filePath || this.configuration,
+          this._openInclude,
+          this._localize(
+            isApplePlatform()
+              ? "yaml_editor.include_link_title_mac"
+              : "yaml_editor.include_link_title"
+          )
+        )
+      );
+    }
+
+    if (this._api && (this.configuration || this.completion)) {
       // The device's platform/board, read per invocation so completion
       // and hover share the structured editor's hydrated-body cache bucket.
       const getDeviceTarget = () => ({
@@ -602,6 +631,11 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
 
     return extensions;
   }
+
+  /** Open an include target: device YAMLs in the device editor, others in the file editor. */
+  private _openInclude = (path: string) => {
+    void navigate(openTargetUrl(path));
+  };
 
   private _buildView() {
     this._mountView(this.value, this._buildExtensions());
@@ -784,6 +818,7 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
       (changed.has("_darkMode") ||
         changed.has("_api") ||
         changed.has("maskAllValues") ||
+        changed.has("completion") ||
         changed.has("_localize")) &&
       this._view
     ) {
