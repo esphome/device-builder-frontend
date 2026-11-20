@@ -50,7 +50,7 @@
     "codemirror": "^6.0.2",
     "esptool-js": "^0.7.1",
     "fflate": "^0.8.3",
-    "improv-wifi-serial-sdk": "^2.8.1",
+    "improv-wifi-serial-sdk": "^2.10.0",
     "intl-messageformat": "^12.1.5",
     "lit": "3.3.3",
     "lit-html": "3.3.3",
