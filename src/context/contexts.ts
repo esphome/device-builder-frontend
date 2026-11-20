@@ -170,6 +170,16 @@ export const versionHistoryEnabledContext = createContext<boolean>(
   Symbol("esphome-version-history-enabled")
 );
 
+/** Whether the firmware repository update endpoints are enabled. */
+export const firmwareRepositoryAccessEnabledContext = createContext<boolean>(
+  Symbol("esphome-firmware-repository-access-enabled")
+);
+
+/** Whether public firmware update endpoints allow anonymous access. */
+export const firmwareRepositoryAuthenticatePublicContext = createContext<boolean>(
+  Symbol("esphome-firmware-repository-authenticate-public")
+);
+
 /**
  * Context for whether preferences have arrived at least once this session.
  *

@@ -153,8 +153,10 @@ import "../components/device/board-reselect-dialog.js";
 import "../components/encryption-key-dialog.js";
 import type { ESPHomeEncryptionKeyDialog } from "../components/encryption-key-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import type { ESPHomeFirmwareRepositoryDialog } from "../components/firmware-repository/esphome-firmware-repository-dialog.js";
 import "../components/discovered-device-card.js";
 import "../components/firmware-install-dialog.js";
+import "../components/firmware-repository/esphome-firmware-repository-dialog.js";
 import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/labels/bulk-labels-dialog.js";
@@ -336,6 +338,8 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-command-dialog") _commandDialog!: ESPHomeCommandDialog;
   @query("esphome-firmware-install-dialog")
   _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+  @query("esphome-firmware-repository-dialog")
+  _firmwareRepositoryDialog!: ESPHomeFirmwareRepositoryDialog;
   @query("esphome-board-reselect-dialog")
   _boardReselectDialog!: ESPHomeBoardReselectDialog;
   @query("esphome-logs-dialog") _logsDialog!: ESPHomeLogsDialog;
@@ -992,6 +996,18 @@ export class ESPHomePageDashboard extends LitElement {
   };
   _downloadFirmware = (device: ConfiguredDevice) =>
     this._firmwareDialog.downloadArtifacts(device);
+  _openFirmwareRepository = (e: CustomEvent<ConfiguredDevice>) =>
+    this._firmwareRepositoryDialog.open(
+      e.detail.configuration,
+      e.detail.friendly_name || e.detail.name
+    );
+  _saveFirmwareRepository = (device: ConfiguredDevice) => {
+    if (this._activeJobs.has(device.configuration)) return;
+    this._firmwareRepositoryDialog.openSave(
+      device.configuration,
+      device.friendly_name || device.name
+    );
+  };
   _onRequestDownloadFirmware = (e: CustomEvent<ConfiguredDevice>) =>
     this._downloadFirmware(e.detail);
 

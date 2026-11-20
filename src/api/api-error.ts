@@ -20,6 +20,17 @@ export class APIError extends Error {
   }
 }
 
+/** A client-side validation failure with a stable code for localized UI handling. */
+export class ClientValidationError extends Error {
+  errorCode: string;
+
+  constructor(errorCode: string) {
+    super(errorCode);
+    this.name = "ClientValidationError";
+    this.errorCode = errorCode;
+  }
+}
+
 /** The user-facing detail carried by a thrown APIError, or "" if none.
  *  Reads the structured 'details' field directly so callers don't parse
  *  the formatted '<code>: <details>' message string back apart. */

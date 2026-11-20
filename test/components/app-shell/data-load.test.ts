@@ -102,6 +102,8 @@ describe("loadPreferences (post-wizard context refresh)", () => {
     remote_compute_only: true,
     hide_device_builder: false,
     version_history_enabled: true,
+    firmware_repository_access_enabled: false,
+    firmware_repository_authenticate_public: true,
     onboarding_completed_version: 2,
   };
 
@@ -110,6 +112,8 @@ describe("loadPreferences (post-wizard context refresh)", () => {
       _prefsWritesInFlight: 0,
       _experienceLevel: null as ExperienceLevel | null,
       _remoteComputeOnly: false,
+      _firmwareRepositoryAccessEnabled: false,
+      _firmwareRepositoryAuthenticatePublic: true,
       _prefsLoaded: false,
       applyTheme: vi.fn(),
       _api: { getPreferences: vi.fn(async () => prefs) },

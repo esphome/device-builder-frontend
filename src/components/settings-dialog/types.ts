@@ -1,5 +1,10 @@
 export type Section =
-  "appearance" | "language" | "build_server" | "pairing_requests" | "build_offload";
+  | "appearance"
+  | "firmware_repository"
+  | "language"
+  | "build_server"
+  | "pairing_requests"
+  | "build_offload";
 
 export interface SectionDef {
   id: Section;
@@ -21,6 +26,11 @@ export const SECTIONS: SectionDef[] = [
     icon: "palette-outline",
     iconActive: "palette",
     labelKey: "settings.appearance",
+  },
+  {
+    id: "firmware_repository",
+    icon: "archive-outline",
+    labelKey: "settings.firmware_repository",
   },
   { id: "language", icon: "translate", labelKey: "settings.language" },
   {

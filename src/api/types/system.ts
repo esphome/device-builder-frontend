@@ -121,6 +121,10 @@ export interface UserPreferences {
   /** Auto-commit config edits to a Git history. Default ``true``; the
    *  off switch is an expert-only Appearance toggle. */
   version_history_enabled: boolean;
+  /** Expose the firmware repository update endpoints. */
+  firmware_repository_access_enabled: boolean;
+  /** Keep public update endpoints open instead of requiring an allowlisted token. */
+  firmware_repository_authenticate_public: boolean;
   /** Highest onboarding-flow version the user has acknowledged.
    *  ``0`` ⇒ never gone through onboarding. The dashboard surfaces
    *  the wizard whenever this is below the server's

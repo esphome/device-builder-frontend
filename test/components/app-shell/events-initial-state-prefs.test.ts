@@ -27,6 +27,8 @@ function prefs(over: Partial<UserPreferences> = {}): UserPreferences {
     remote_compute_only: true,
     hide_device_builder: false,
     version_history_enabled: true,
+    firmware_repository_access_enabled: false,
+    firmware_repository_authenticate_public: true,
     onboarding_completed_version: 2,
     ...over,
   };
@@ -38,6 +40,8 @@ function makeHost() {
     _prefsWritesInFlight: 0,
     _experienceLevel: null as ExperienceLevel | null,
     _remoteComputeOnly: false,
+    _firmwareRepositoryAccessEnabled: false,
+    _firmwareRepositoryAuthenticatePublic: true,
     applyTheme: vi.fn(),
     // Other fields the INITIAL_STATE handler also writes.
     _devices: [],
@@ -74,10 +78,12 @@ function dispatch(host: ReturnType<typeof makeHost>, data: InitialStateEventData
 describe("handleEvent INITIAL_STATE preferences", () => {
   it("applies prefs from the snapshot and marks them loaded", () => {
     const host = makeHost();
-    dispatch(host, snapshot(prefs()));
+    dispatch(host, snapshot(prefs({ firmware_repository_access_enabled: true })));
     expect(host._prefsLoaded).toBe(true);
     expect(host._experienceLevel).toBe(ExperienceLevel.EXPERT);
     expect(host._remoteComputeOnly).toBe(true);
+    expect(host._firmwareRepositoryAccessEnabled).toBe(true);
+    expect(host._firmwareRepositoryAuthenticatePublic).toBe(true);
     expect(host.applyTheme).toHaveBeenCalledWith("dark");
   });
 
