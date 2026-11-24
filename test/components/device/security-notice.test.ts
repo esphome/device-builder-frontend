@@ -101,6 +101,21 @@ describe("security-notice — detection", () => {
       true,
     ],
     ["web_server: absent", "web_server", "web_server:\n  port: 80\n", 1, false],
+    [
+      "web_server: !remove",
+      "web_server",
+      "wifi:\n  ssid: x\nweb_server: !remove\n",
+      3,
+      true,
+    ],
+    ["api: !remove", "api", "api: !remove\n", 1, true],
+    [
+      "ota: item removed by id",
+      "ota.esphome",
+      "ota:\n  - platform: esphome\n    id: !remove my_ota\n",
+      2,
+      true,
+    ],
   ];
   for (const [name, sk, yaml, fromLine, present] of cases) {
     it(`_markerPresent: ${name}`, () => {
@@ -128,6 +143,13 @@ describe("security-notice — render", () => {
     ]);
     expect(el.shadowRoot!.querySelector(".notice")).not.toBeNull();
     expect(el.shadowRoot!.querySelector(".cta")).not.toBeNull();
+  });
+
+  it("renders nothing for a section removed with !remove", async () => {
+    const { el } = await mount("web_server", "web_server: !remove\n", 1, [
+      { name: "kitchen" },
+    ]);
+    expect(el.shadowRoot!.querySelector(".notice")).toBeNull();
   });
 
   it("renders nothing when the marker is present", async () => {

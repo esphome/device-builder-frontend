@@ -38,7 +38,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { recommendedSecretKeys } from "../../util/secret-eligibility.js";
 import { ensureSecretInYaml } from "../../util/secrets-write.js";
 import { splitYamlDocLines } from "../../util/yaml-doc-lines.js";
-import { findDirectChildLine } from "../../util/yaml-section-reader.js";
+import { findDirectChildLine, isSectionRemoved } from "../../util/yaml-section-reader.js";
 import { dispatchApplySectionValues } from "./notice-banner.js";
 import { noticeBannerStyles } from "./notice-banner.styles.js";
 
@@ -213,17 +213,17 @@ export class ESPHomeSecurityNotice extends LitElement {
   }
 
   /** Whether a marker is a *direct child* of the section. A line scan, since the
-   *  parser drops a keyless block (an HA-provisioned `encryption:`) that counts. */
+   *  parser drops a keyless block (an HA-provisioned `encryption:`) that counts.
+   *  A section dropped with `!remove` has nothing to secure, so it counts too. */
   private _markerPresent(): boolean {
     const setting = this._setting;
     if (!setting) return false;
     // `ota.esphome` → scan from the esphome list-item dash (its fromLine).
     const baseKey = this.sectionKey.split(".")[0];
+    const lines = splitYamlDocLines(this.yaml);
+    if (isSectionRemoved(lines, baseKey, this.fromLine)) return true;
     const marker = new RegExp(`^(?:${setting.markers.join("|")})\\s*:`);
-    return (
-      findDirectChildLine(splitYamlDocLines(this.yaml), baseKey, marker, this.fromLine) >=
-      0
-    );
+    return findDirectChildLine(lines, baseKey, marker, this.fromLine) >= 0;
   }
 
   private _suppressed(): boolean {

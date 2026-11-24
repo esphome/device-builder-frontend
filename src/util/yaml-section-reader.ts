@@ -92,6 +92,27 @@ export function findDirectChildLine(
   return found;
 }
 
+const REMOVE_VALUE_RE = /:\s*!remove\s*(?:#.*)?$/;
+const REMOVE_ID_RE = /^id\s*:\s*!remove(?:\s|$)/;
+
+/**
+ * Whether the section is dropped by ESPHome's `!remove` merge tag: a
+ * `key: !remove` section line, or (with `fromLine` at a list item) an
+ * `id: !remove <id>` child. A removed section has no firmware presence, so
+ * its form and security nudges don't apply. `fromLine` is 1-indexed.
+ */
+export function isSectionRemoved(
+  lines: string[],
+  sectionKey: string,
+  fromLine?: number
+): boolean {
+  const start = findSectionStart(lines, sectionKey, fromLine);
+  if (start < 0 || start >= lines.length) return false;
+  if (REMOVE_VALUE_RE.test(lines[start])) return true;
+  if (fromLine === undefined || !LIST_ITEM_START_RE.test(lines[start])) return false;
+  return findDirectChildLine(lines, sectionKey, REMOVE_ID_RE, fromLine) >= 0;
+}
+
 /**
  * Parse the values inside a YAML section into a plain object.
  * Walks from `fromLine` (or the first `${sectionKey}:` line) and
