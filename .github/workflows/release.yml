@@ -282,7 +282,7 @@ jobs:
           persist-credentials: false
 
       - name: Generate release notes (draft)
-        uses: release-drafter/release-drafter@v7.10.0
+        uses: release-drafter/release-drafter@v7.11.0
         with:
           config-name: release-drafter.yml
           version: ${{ inputs.version }}
