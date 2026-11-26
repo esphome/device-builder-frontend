@@ -72,7 +72,7 @@
     "husky": "^9.1.7",
     "prettier": "3.9.10",
     "typescript": "7.0.2",
-    "typescript-eslint": "^8.72.1",
+    "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0"
   },
   "browserslist": {
