@@ -23,6 +23,7 @@ import {
   type RevealState,
   sectionIndexForLine,
 } from "../../../src/components/device/navigator-reveal-controller.js";
+import { CORE_KEYS } from "../../../src/util/yaml-sections.js";
 import { clickSubgroup, sectionLine } from "./_navigator-fixtures.js";
 
 const YAML = [
@@ -77,41 +78,53 @@ async function mount(openSections: Set<number>): Promise<{
 
 describe("sectionIndexForLine", () => {
   it("maps a line to its bucket (core/components/automations)", () => {
-    const buckets = deriveNavigatorBuckets(YAML);
+    const buckets = deriveNavigatorBuckets(YAML, CORE_KEYS);
     expect(sectionIndexForLine(buckets, buckets.core[0].fromLine)).toBe(0);
     expect(sectionIndexForLine(buckets, buckets.components[0].fromLine)).toBe(1);
     expect(sectionIndexForLine(buckets, 9999)).toBe(-1);
   });
 });
 
+/** A bare controller over *state*; *rowVisible* makes the selected row scrollable. */
+function makeRevealHarness(state: RevealState, rowVisible = false) {
+  const reveals: number[] = [];
+  const scrollIntoView = vi.fn();
+  const row = { getClientRects: () => [{}], scrollIntoView };
+  const host = {
+    addController() {},
+    removeController() {},
+    requestUpdate() {},
+    updateComplete: Promise.resolve(true),
+    renderRoot: {
+      querySelector: () => (rowVisible ? row : null),
+    } as unknown as ParentNode,
+    dispatchEvent(e: Event) {
+      reveals.push((e as CustomEvent<{ index: number }>).detail.index);
+      return true;
+    },
+  } as unknown as RevealHost;
+  return {
+    ctrl: new NavigatorRevealController(host, () => state),
+    reveals,
+    scrollIntoView,
+  };
+}
+
 // Focused on the controller: an intervening selection that maps to no nav row
 // (index === -1, e.g. an unscoped automation) must not pin the reveal latch, so
 // returning to a still-collapsed section re-reveals it.
 describe("NavigatorRevealController one-shot latch", () => {
   it("re-reveals after an index===-1 line breaks the selection run", () => {
-    const buckets = deriveNavigatorBuckets(YAML);
     const sLine = sensorLine();
-    const reveals: number[] = [];
-    const host = {
-      addController() {},
-      removeController() {},
-      requestUpdate() {},
-      updateComplete: Promise.resolve(true),
-      renderRoot: { querySelector: () => null } as unknown as ParentNode,
-      dispatchEvent(e: Event) {
-        reveals.push((e as CustomEvent<{ index: number }>).detail.index);
-        return true;
-      },
-    } as unknown as RevealHost;
     // Section stays closed and the row never scrolls (querySelector → null), so
     // only the latch governs whether reveal fires.
     const state: RevealState = {
       selectedLine: null,
-      buckets,
+      buckets: deriveNavigatorBuckets(YAML, CORE_KEYS),
       openSections: new Set(),
       filtering: false,
     };
-    const ctrl = new NavigatorRevealController(host, () => state);
+    const { ctrl, reveals } = makeRevealHarness(state);
 
     state.selectedLine = sLine; // sensor row, section closed
     ctrl.hostUpdated();
@@ -124,6 +137,40 @@ describe("NavigatorRevealController one-shot latch", () => {
     state.selectedLine = sLine; // back to the still-closed sensor row
     ctrl.hostUpdated();
     expect(reveals).toEqual([1, 1]);
+  });
+});
+
+describe("NavigatorRevealController after the row moves section", () => {
+  const yaml = "esphome:\n  name: t\nhttp_request:\n";
+  const before = deriveNavigatorBuckets(yaml, CORE_KEYS);
+  const after = deriveNavigatorBuckets(yaml, new Set([...CORE_KEYS, "http_request"]));
+  const state = (openSections: Set<number>): RevealState => ({
+    selectedLine: sectionLine(yaml, "http_request"),
+    buckets: before,
+    openSections,
+    filtering: false,
+  });
+
+  it("re-reveals past the reveal latch", () => {
+    const s = state(new Set());
+    const { ctrl, reveals } = makeRevealHarness(s);
+    ctrl.hostUpdated();
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([1]);
+    s.buckets = after;
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([1, 0]);
+  });
+
+  it("re-reveals past the scroll latch", () => {
+    const s = state(new Set([1]));
+    const { ctrl, reveals, scrollIntoView } = makeRevealHarness(s, true);
+    ctrl.hostUpdated();
+    ctrl.hostUpdated();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    s.buckets = after;
+    ctrl.hostUpdated();
+    expect(reveals).toEqual([0]);
   });
 });
 

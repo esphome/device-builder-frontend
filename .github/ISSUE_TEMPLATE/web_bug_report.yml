@@ -1,6 +1,5 @@
 name: 🌐 web.esphome.io bug report
 description: Report a problem with the web.esphome.io site (flashing, Wi-Fi provisioning, logs).
-title: "[web.esphome.io] "
 type: "Bug"
 labels: ["web.esphome.io"]
 body:
@@ -23,8 +22,10 @@ body:
         run yourself) go on the
         [device-builder tracker](https://github.com/esphome/device-builder/issues/new?template=bug_report.yml).
 
-        - **Quick questions** land faster in the
-        [Discord channel](https://discord.gg/Rf2jWGVjaK).
+        - **This isn't a support queue.** Issues here are for bugs in
+        web.esphome.io itself; questions and help with a device or a config
+        land faster in the [Discord channel](https://discord.gg/Rf2jWGVjaK)
+        or the [community forum](https://community.home-assistant.io/c/esphome/).
 
   - type: textarea
     id: what-happened

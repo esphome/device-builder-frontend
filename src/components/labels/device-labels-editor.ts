@@ -12,7 +12,9 @@
  * (``devices/set_labels`` round trips, optimistically reflected in
  * the chip row immediately), and an inline "Create new label" form
  * (name + optional color swatch) that calls ``labels/create`` and
- * then assigns the freshly-minted label.
+ * then assigns the freshly-minted label. Each row's pencil switches
+ * that form to renaming the label; its trash fires
+ * ``request-delete-label`` for the dashboard's confirm flow.
  *
  * The component reads from context: ``apiContext`` for the WS
  * round trips and ``labelsContext`` for the live catalog (so a
@@ -38,6 +40,7 @@ import {
 import { espHomeStyles } from "../../styles/shared.js";
 import { textStyles } from "../../styles/text.js";
 import { DialogOpenController } from "../../util/dialog-open-controller.js";
+import { fireEvent } from "../../util/fire-event.js";
 import {
   labelChipStyles,
   renderLabelChip,
@@ -49,6 +52,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { setsEqual } from "../../util/set-equal.js";
 import "./label-form.js";
 import type { ESPHomeLabelForm } from "./label-form.js";
+import { labelRowActionStyles, renderLabelRowActions } from "./label-row-actions.js";
 import { labelsListStyles } from "./labels-list-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -98,6 +102,10 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @state()
   private _optimisticLabels: string[] | null = null;
 
+  /** Catalog label the dialog's form is renaming, or ``null`` for create. */
+  @state()
+  private _editingLabel: Label | null = null;
+
   /** Promise chain that serializes ``set_labels`` round trips so
    *  fast successive clicks reach the backend in click order
    *  rather than in network-arrival order — without serialization,
@@ -120,6 +128,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     textStyles,
     labelChipStyles,
     labelsListStyles,
+    labelRowActionStyles,
     // Neutral header + title + quiet close button (shared) — dialog-chrome.ts.
     dialogChromeStyles,
     quietCloseButtonStyles,
@@ -227,6 +236,17 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         max-height: 320px;
       }
 
+      .option-row {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .option-row .option {
+        flex: 1;
+        min-width: 0;
+      }
+
       .create-section {
         margin-top: var(--wa-space-l);
         padding-top: var(--wa-space-m);
@@ -236,6 +256,15 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   ];
 
   protected willUpdate(changed: Map<string, unknown>) {
+    // Another client may delete the label being renamed; drop back to create.
+    const editing = this._editingLabel;
+    if (
+      changed.has("_catalog") &&
+      editing &&
+      !this._catalog.some((l) => l.id === editing.id)
+    ) {
+      this._editingLabel = null;
+    }
     if (!changed.has("device")) return;
     const prev = changed.get("device") as ConfiguredDevice | undefined;
     // Only a real swap to a *different* device tears down the transient edit
@@ -246,7 +275,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     if (prev !== undefined && prev.configuration !== this.device.configuration) {
       this._optimisticLabels = null;
       this._dialog.open = false;
-      this._createForm?.collapse();
+      this._resetForm();
       this._saveChain = Promise.resolve();
       // Drop any in-flight create snapshot so a late ``label-created``
       // arriving after the swap is ignored rather than misapplied.
@@ -331,30 +360,42 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
                 </div>`
               : this._catalog.map((label) => {
                   const checked = assignedSet.has(label.id);
-                  return html`<button
-                    class="option"
-                    type="button"
-                    role="checkbox"
-                    aria-checked=${checked ? "true" : "false"}
-                    @click=${() => this._toggleAssignment(label.id, !checked)}
-                  >
-                    <span class="option-check ${checked ? "option-check--checked" : ""}">
-                      ${
-                        checked
-                          ? html`<wa-icon library="mdi" name="check"></wa-icon>`
-                          : nothing
-                      }
-                    </span>
-                    ${renderLabelChip(label)}
-                  </button>`;
+                  return html`<div class="option-row">
+                    <button
+                      class="option"
+                      type="button"
+                      role="checkbox"
+                      aria-checked=${checked ? "true" : "false"}
+                      @click=${() => this._toggleAssignment(label.id, !checked)}
+                    >
+                      <span
+                        class="option-check ${checked ? "option-check--checked" : ""}"
+                      >
+                        ${
+                          checked
+                            ? html`<wa-icon library="mdi" name="check"></wa-icon>`
+                            : nothing
+                        }
+                      </span>
+                      ${renderLabelChip(label)}
+                    </button>
+                    ${renderLabelRowActions(
+                      this._localize,
+                      () => void this._startRename(label),
+                      () => fireEvent(this, "request-delete-label", label)
+                    )}
+                  </div>`;
                 })
           }
         </div>
         <div class="create-section">
           <esphome-label-form
             .existingNames=${this._catalog.map((l) => l.name)}
+            .editing=${this._editingLabel}
             @submitting=${this._onCreateSubmitting}
             @label-created=${this._onCreateResolved}
+            @label-saved=${this._onLabelSaved}
+            @form-cancel=${this._stopRename}
           ></esphome-label-form>
         </div>
       </esphome-base-dialog>
@@ -368,6 +409,28 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     this._pendingCreateConfig = this.device.configuration;
   };
 
+  /** Switch the form to renaming *label* and bring it into view. */
+  private async _startRename(label: Label) {
+    this._editingLabel = label;
+    await this.updateComplete;
+    this._createForm?.scrollIntoView({ block: "nearest" });
+  }
+
+  private _stopRename = () => {
+    this._editingLabel = null;
+  };
+
+  /** Leave rename mode unless the user moved on to another label mid-save. */
+  private _onLabelSaved = (e: CustomEvent<Label>) => {
+    if (this._editingLabel?.id === e.detail.id) this._stopRename();
+  };
+
+  /** Leave rename mode and collapse the create form. */
+  private _resetForm() {
+    this._editingLabel = null;
+    this._createForm?.collapse();
+  }
+
   private _onCreateResolved = (e: CustomEvent<Label>) => {
     const targetConfig = this._pendingCreateConfig;
     this._pendingCreateConfig = null;
@@ -377,13 +440,13 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   };
 
   private _openDialog = () => {
-    this._createForm?.collapse();
+    this._resetForm();
     this._dialog.open = true;
   };
 
   private _onDialogClose = () => {
     this._dialog.open = false;
-    this._createForm?.collapse();
+    this._resetForm();
   };
 
   /** Re-emit a ``label_ids`` change as a serialized

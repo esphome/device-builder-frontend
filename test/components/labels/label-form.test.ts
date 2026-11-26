@@ -50,3 +50,28 @@ describe("esphome-label-form cancel", () => {
     expect(toggleButton(el)).not.toBeNull();
   });
 });
+
+describe("esphome-label-form pending create", () => {
+  it("keeps a rename draft opened while a create is pending", async () => {
+    const el = await mount(new ESPHomeLabelForm());
+    let resolve!: (l: Label) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._api = {
+      createLabel: () => new Promise<Label>((r) => (resolve = r)),
+    };
+    el.expand("garage");
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pending = (el as any)._submit() as Promise<void>;
+
+    el.editing = LABEL;
+    await el.updateComplete;
+    const input = el.shadowRoot!.querySelector("input")!;
+    expect(input.value).toBe("kitchen");
+
+    resolve({ id: "l2", name: "garage", color: null } as Label);
+    await pending;
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector("input")!.value).toBe("kitchen");
+  });
+});

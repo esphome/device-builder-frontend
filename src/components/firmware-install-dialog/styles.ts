@@ -146,6 +146,18 @@ export const firmwareInstallDialogStyles = css`
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
   }
+  .download-md5 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--wa-space-xs) var(--wa-space-s);
+    margin-top: var(--wa-space-m);
+  }
+  .download-md5-label {
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-quiet);
+  }
 
   .footer {
     display: flex;

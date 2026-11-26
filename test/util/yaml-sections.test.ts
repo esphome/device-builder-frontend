@@ -3,6 +3,7 @@ import { parseYamlSectionValues } from "../../src/util/yaml-section-reader.js";
 import {
   _clearYamlSectionsMemo,
   categorizeSections,
+  CORE_KEYS,
   instanceComponentId,
   parseYamlAutomations,
   parseYamlTopLevelSections,
@@ -537,40 +538,50 @@ describe("categorizeSections", () => {
   const mk = (key: string): YamlSection => ({ key, fromLine: 1, toLine: 1 });
 
   it("puts esphome/logger/wifi into core", () => {
-    const { core, components, automations } = categorizeSections([
-      mk("esphome"),
-      mk("logger"),
-      mk("wifi"),
-    ]);
+    const { core, components, automations } = categorizeSections(
+      [mk("esphome"), mk("logger"), mk("wifi")],
+      CORE_KEYS
+    );
     expect(core.map((s) => s.key)).toEqual(["esphome", "logger", "wifi"]);
     expect(components).toEqual([]);
     expect(automations).toEqual([]);
   });
 
+  it("uses a caller-supplied core key set", () => {
+    const { core, components } = categorizeSections(
+      [mk("esphome"), mk("sensor")],
+      new Set(["sensor"])
+    );
+    expect(core.map((s) => s.key)).toEqual(["sensor"]);
+    expect(components.map((s) => s.key)).toEqual(["esphome"]);
+  });
+
   it("puts script/interval into automations and globals into core", () => {
-    const { core, automations } = categorizeSections([
-      mk("script"),
-      mk("interval"),
-      mk("globals"),
-    ]);
+    const { core, automations } = categorizeSections(
+      [mk("script"), mk("interval"), mk("globals")],
+      CORE_KEYS
+    );
     expect(automations.map((s) => s.key)).toEqual(["script", "interval"]);
     expect(core.map((s) => s.key)).toEqual(["globals"]);
   });
 
   it("routes unknown keys to components", () => {
-    const { components } = categorizeSections([mk("sensor"), mk("switch")]);
+    const { components } = categorizeSections([mk("sensor"), mk("switch")], CORE_KEYS);
     expect(components.map((s) => s.key)).toEqual(["sensor", "switch"]);
   });
 
   it("puts the renamed rp2 platform block into core", () => {
     // esphome#17145 renames the rp2040 platform key to rp2; both
     // belong under Core, not Components.
-    const { core } = categorizeSections([mk("rp2"), mk("rp2040")]);
+    const { core } = categorizeSections([mk("rp2"), mk("rp2040")], CORE_KEYS);
     expect(core.map((s) => s.key)).toEqual(["rp2", "rp2040"]);
   });
 
   it("splits a mixed list across all three buckets", () => {
-    const result = categorizeSections([mk("esphome"), mk("sensor"), mk("script")]);
+    const result = categorizeSections(
+      [mk("esphome"), mk("sensor"), mk("script")],
+      CORE_KEYS
+    );
     expect(result.core.map((s) => s.key)).toEqual(["esphome"]);
     expect(result.components.map((s) => s.key)).toEqual(["sensor"]);
     expect(result.automations.map((s) => s.key)).toEqual(["script"]);

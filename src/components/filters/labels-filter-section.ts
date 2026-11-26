@@ -11,13 +11,7 @@
  * never coexist with the popover's document-click dismissal.
  */
 import { consume } from "@lit/context";
-import {
-  mdiCheck,
-  mdiChevronDown,
-  mdiPencilOutline,
-  mdiPlus,
-  mdiTrashCanOutline,
-} from "@mdi/js";
+import { mdiCheck, mdiChevronDown, mdiPlus } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Label } from "../../api/types/devices.js";
@@ -30,6 +24,10 @@ import { labelChipStyles } from "../../util/label-chip-template.js";
 import { labelChipStyleString } from "../../util/label-style.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { toggleSelection } from "../../util/toggle-selection.js";
+import {
+  labelRowActionStyles,
+  renderLabelRowActions,
+} from "../labels/label-row-actions.js";
 import { filterSectionStyles } from "./filter-section.styles.js";
 import { filterStyles } from "./filter-styles.js";
 import { labelsFilterSectionStyles } from "./labels-filter-section.styles.js";
@@ -39,9 +37,7 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 registerMdiIcons({
   check: mdiCheck,
   "chevron-down": mdiChevronDown,
-  "pencil-outline": mdiPencilOutline,
   plus: mdiPlus,
-  "trash-can-outline": mdiTrashCanOutline,
 });
 
 @customElement("esphome-labels-filter-section")
@@ -82,6 +78,7 @@ export class ESPHomeLabelsFilterSection extends LitElement {
     filterSectionStyles,
     labelChipStyles,
     labelsFilterSectionStyles,
+    labelRowActionStyles,
   ];
 
   protected render() {
@@ -170,24 +167,11 @@ export class ESPHomeLabelsFilterSection extends LitElement {
       ${
         this.managed
           ? html`<div class="row-actions">
-              <button
-                class="row-action"
-                type="button"
-                aria-label=${this._localize("dashboard.labels_rename")}
-                title=${this._localize("dashboard.labels_rename")}
-                @click=${(e: Event) => this._onEditClick(e, label)}
-              >
-                <wa-icon library="mdi" name="pencil-outline"></wa-icon>
-              </button>
-              <button
-                class="row-action row-action--danger"
-                type="button"
-                aria-label=${this._localize("dashboard.labels_delete")}
-                title=${this._localize("dashboard.labels_delete")}
-                @click=${(e: Event) => this._onDeleteClick(e, label)}
-              >
-                <wa-icon library="mdi" name="trash-can-outline"></wa-icon>
-              </button>
+              ${renderLabelRowActions(
+                this._localize,
+                (e) => this._onEditClick(e, label),
+                (e) => this._onDeleteClick(e, label)
+              )}
             </div>`
           : nothing
       }

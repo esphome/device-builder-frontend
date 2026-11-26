@@ -62,7 +62,7 @@ export const installMethodDialogStyles = css`
   }
 
   /* The text dims, not the whole info block: a disabled row may keep a
-     live control under its description (the copy-address button). */
+     live control under its description (the copy-value button). */
   .option--disabled > wa-icon,
   .option--disabled .title,
   .option--disabled .desc {

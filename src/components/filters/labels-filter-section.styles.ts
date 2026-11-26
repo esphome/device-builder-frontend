@@ -66,51 +66,6 @@ export const labelsFilterSectionStyles = css`
     }
   }
 
-  .row-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: var(--wa-border-radius-m);
-    border: var(--wa-border-width-s) solid transparent;
-    background: var(--wa-color-surface-default);
-    color: var(--wa-color-text-quiet);
-    cursor: pointer;
-    padding: 0;
-    transition:
-      background-color 0.12s,
-      border-color 0.12s,
-      color 0.12s;
-  }
-
-  .row-action:hover {
-    background: var(--wa-color-surface-raised);
-    border-color: var(--wa-color-surface-border);
-    color: var(--wa-color-text-normal);
-  }
-
-  .row-action:focus-visible {
-    outline: none;
-    color: var(--wa-color-text-normal);
-    box-shadow: var(--esphome-focus-ring-tight);
-  }
-
-  .row-action--danger:hover {
-    background: color-mix(in srgb, var(--wa-color-danger-fill-loud), transparent 88%);
-    border-color: color-mix(in srgb, var(--wa-color-danger-fill-loud), transparent 70%);
-    color: var(--wa-color-danger-fill-loud);
-  }
-
-  .row-action--danger:focus-visible {
-    box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--wa-color-danger-fill-loud), transparent 70%);
-  }
-
-  .row-action wa-icon {
-    font-size: 14px;
-  }
-
   /* Create-label CTA. Sits below the catalog list (or fills the
      section when the catalog is empty), visually separated from
      the rows by a divider. Primary-tinted rather than filled so it

@@ -1,8 +1,8 @@
 /**
  * Inline label form — handles both creating a new label and
  * editing an existing one (rename and / or recolor). Shared by the
- * device-drawer label editor (create only, dialog-mounted) and the
- * dashboard's labels filter (create + edit, popover-mounted).
+ * device-drawer label editor and the dashboard's label dialog, both
+ * create + edit.
  *
  * The two modes share the entire form layout (name input + colour-
  * swatch radiogroup + submit / cancel buttons); the differences
@@ -522,10 +522,13 @@ export class ESPHomeLabelForm extends LitElement {
             composed: true,
           })
         );
-        this._name = "";
-        this._color = null;
-        this._colorManual = false;
-        if (!this.defaultOpen) this._open = false;
+        // A rename opened while the create was pending owns the inputs now.
+        if (this.editing === null) {
+          this._name = "";
+          this._color = null;
+          this._colorManual = false;
+          if (!this.defaultOpen) this._open = false;
+        }
       }
     } catch (err) {
       console.warn(editing ? "label update failed" : "label create failed", err);

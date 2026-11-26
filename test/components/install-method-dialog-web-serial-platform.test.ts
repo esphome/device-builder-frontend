@@ -441,7 +441,7 @@ describe("install-method-dialog BLE NUS row gating", () => {
     expect(bleRow(d).textContent).toContain(
       defaultLocalize("dashboard.logs_method_ble_nus_desc")
     );
-    expect(bleRow(d).querySelector(".copy-address")).toBeNull();
+    expect(bleRow(d).querySelector(".copy-value")).toBeNull();
   });
 
   it("enables the row once the adapter answers available", async () => {
@@ -458,7 +458,7 @@ describe("install-method-dialog BLE NUS row gating", () => {
     expect(bleRow(d).textContent).toContain(
       defaultLocalize("dashboard.logs_method_ble_nus_off")
     );
-    expect(bleRow(d).querySelector(".copy-address")).toBeNull();
+    expect(bleRow(d).querySelector(".copy-value")).toBeNull();
   });
 
   it("takes only the newest open's answer, so a slow earlier probe cannot disable the row", async () => {
@@ -489,7 +489,7 @@ describe("install-method-dialog BLE NUS row gating", () => {
     expect(bleRow(d).textContent).toContain(
       defaultLocalize("dashboard.logs_method_ble_nus_brave")
     );
-    const copy = bleRow(d).querySelector<HTMLButtonElement>("button.copy-address")!;
+    const copy = bleRow(d).querySelector<HTMLButtonElement>("button.copy-value")!;
     expect(copy.textContent).toContain(BRAVE_WEB_BLUETOOTH_FLAG);
     copy.click();
     await flush();

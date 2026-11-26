@@ -2,9 +2,10 @@ import { mdiContentCopy } from "@mdi/js";
 import { html, nothing, type TemplateResult } from "lit";
 import type { IdentityView } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { copyAddressToClipboard } from "../../util/copy-address.js";
+import { ADDRESS_COPY_TOASTS, copyAddressToClipboard } from "../../util/copy-address.js";
 import { formatHostPort, pairingAddress } from "../../util/pairing-address.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderCopyValue } from "./copy-value.js";
 
 registerMdiIcons({ "content-copy": mdiContentCopy });
 
@@ -80,18 +81,9 @@ async function _copyAddress(
  * `pairingAddressStyles`.
  */
 export function renderCopyAddress(localize: LocalizeFunc, value: string): TemplateResult {
-  return html`
-    <button
-      type="button"
-      class="copy-address"
-      aria-label=${localize("settings.remote_build_address_copy_aria", {
-        address: value,
-      })}
-      title=${localize("settings.remote_build_address_copy")}
-      @click=${() => void copyAddressToClipboard(localize, value)}
-    >
-      <code>${value}</code>
-      <wa-icon library="mdi" name="content-copy"></wa-icon>
-    </button>
-  `;
+  return renderCopyValue(localize, value, {
+    ariaLabel: localize("settings.remote_build_address_copy_aria", { address: value }),
+    title: localize("settings.remote_build_address_copy"),
+    ...ADDRESS_COPY_TOASTS,
+  });
 }

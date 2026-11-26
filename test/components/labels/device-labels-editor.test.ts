@@ -275,3 +275,85 @@ describe("device-labels-editor optimistic override lifecycle", () => {
     expect(chipIds(el)).toEqual(["a"]);
   });
 });
+
+describe("device-labels-editor catalog management", () => {
+  const LABEL = { id: "a", name: "Kitchen", color: null };
+
+  async function mountWithCatalog(): Promise<ESPHomeDeviceLabelsEditor> {
+    const el = await mount();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._catalog = [LABEL];
+    el.shadowRoot!.querySelector<HTMLButtonElement>(".edit-btn")!.click();
+    await el.updateComplete;
+    return el;
+  }
+
+  const form = (el: ESPHomeDeviceLabelsEditor) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    el.shadowRoot!.querySelector("esphome-label-form") as any;
+
+  const actions = (el: ESPHomeDeviceLabelsEditor) =>
+    el.shadowRoot!.querySelectorAll<HTMLButtonElement>(".option-row .row-action");
+
+  it("rename puts the form in edit mode until save or cancel", async () => {
+    const el = await mountWithCatalog();
+    actions(el)[0].click();
+    await el.updateComplete;
+    expect(form(el).editing).toEqual(LABEL);
+
+    form(el).dispatchEvent(new CustomEvent("label-saved", { detail: LABEL }));
+    await el.updateComplete;
+    expect(form(el).editing).toBeNull();
+
+    actions(el)[0].click();
+    await el.updateComplete;
+    form(el).dispatchEvent(new CustomEvent("form-cancel"));
+    await el.updateComplete;
+    expect(form(el).editing).toBeNull();
+  });
+
+  it("a late save for one label keeps another label's rename open", async () => {
+    const el = await mountWithCatalog();
+    const other = { id: "b", name: "Garage", color: null };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._catalog = [LABEL, other];
+    await el.updateComplete;
+    actions(el)[2].click();
+    await el.updateComplete;
+    expect(form(el).editing).toEqual(other);
+
+    form(el).dispatchEvent(new CustomEvent("label-saved", { detail: LABEL }));
+    await el.updateComplete;
+    expect(form(el).editing).toEqual(other);
+  });
+
+  it("scrolls the rename form into view", async () => {
+    const el = await mountWithCatalog();
+    const scroll = vi.fn();
+    form(el).scrollIntoView = scroll;
+    actions(el)[0].click();
+    await el.updateComplete;
+    await el.updateComplete;
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+  });
+
+  it("drops edit mode when the label leaves the catalog", async () => {
+    const el = await mountWithCatalog();
+    actions(el)[0].click();
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._catalog = [];
+    await el.updateComplete;
+    expect(form(el).editing).toBeNull();
+  });
+
+  it("delete fires a composed request-delete-label with the label", async () => {
+    const el = await mountWithCatalog();
+    const seen = vi.fn();
+    document.body.addEventListener("request-delete-label", (e) =>
+      seen((e as CustomEvent).detail)
+    );
+    actions(el)[1].click();
+    expect(seen).toHaveBeenCalledWith(LABEL);
+  });
+});
