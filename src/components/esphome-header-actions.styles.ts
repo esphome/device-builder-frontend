@@ -83,6 +83,16 @@ export const headerActionsStyles = css`
     color: var(--esphome-primary);
   }
 
+  /* Beats ".menu-item wa-icon"; same amber as the kebab badge. */
+  .menu-item .menu-item-warning {
+    margin-left: auto;
+    color: var(--esphome-warning, #f59e0b);
+  }
+
+  .menu-item .menu-item-count + .menu-item-warning {
+    margin-left: var(--wa-space-2xs);
+  }
+
   .menu-item-count {
     margin-left: auto;
     font-size: var(--wa-font-size-2xs);

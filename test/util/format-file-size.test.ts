@@ -19,4 +19,10 @@ describe("formatFileSize", () => {
     expect(formatFileSize(5 * 1024 * 1024)).toBe("5.0 MB");
     expect(formatFileSize(2.5 * 1024 * 1024)).toBe("2.5 MB");
   });
+
+  it("formats gigabytes with one decimal", () => {
+    expect(formatFileSize(1024 * 1024 * 1024 - 1)).toBe("1024.0 MB");
+    expect(formatFileSize(1024 * 1024 * 1024)).toBe("1.0 GB");
+    expect(formatFileSize(4.5 * 1024 * 1024 * 1024)).toBe("4.5 GB");
+  });
 });

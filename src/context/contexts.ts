@@ -17,7 +17,7 @@ import type {
   PeerSummary,
   RemoteBuildPeer,
 } from "../api/types/remote-build.js";
-import type { ExperienceLevel } from "../api/types/system.js";
+import type { DiskUsage, ExperienceLevel } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /** Context for the ESPHome API client instance. */
@@ -464,6 +464,16 @@ export const buildOffloadAlertsContext = createContext<Map<
   string,
   OffloaderAlertSnapshotEntry
 > | null>(Symbol("esphome-build-offload-alerts"));
+
+/** Backend disk usage; ``null`` until the first measurement lands. */
+export const diskUsageContext = createContext<DiskUsage | null>(
+  Symbol("esphome-disk-usage")
+);
+
+/** The backend couldn't measure disk usage and has no earlier measurement. */
+export const diskUsageFailedContext = createContext<boolean>(
+  Symbol("esphome-disk-usage-failed")
+);
 
 /**
  * One in-flight (or recently terminal) remote-build job
