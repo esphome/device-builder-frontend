@@ -6,6 +6,8 @@ import { ExperienceLevel } from "../../../src/api/types/system.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import {
   onSetExpertMode,
+  onSetFirmwareRepositoryAccessEnabled,
+  onSetFirmwareRepositoryAuthenticatePublic,
   onSetHideDeviceBuilder,
   onSetOffloaderIncludeLocal,
   onSetOffloaderPairingEnabled,
@@ -29,6 +31,8 @@ type PrefsHost = Pick<
   | "_remoteComputeOnly"
   | "_hideDeviceBuilder"
   | "_versionHistoryEnabled"
+  | "_firmwareRepositoryAccessEnabled"
+  | "_firmwareRepositoryAuthenticatePublic"
   | "_localize"
   | "_prefsWritesInFlight"
 > & { _api: { updatePreferences: (p: Record<string, unknown>) => Promise<unknown> } };
@@ -41,6 +45,8 @@ function makePrefsHost(
     _remoteComputeOnly: false,
     _hideDeviceBuilder: false,
     _versionHistoryEnabled: true,
+    _firmwareRepositoryAccessEnabled: false,
+    _firmwareRepositoryAuthenticatePublic: true,
     _localize: identityLocalize as ESPHomeApp["_localize"],
     _prefsWritesInFlight: 0,
     _api: { updatePreferences },
@@ -460,6 +466,60 @@ describe("onSetVersionHistoryEnabled", () => {
     expect(host._versionHistoryEnabled).toBe(true);
     expect(toastError).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe("firmware repository preferences", () => {
+  beforeEach(() => toastError.mockClear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("optimistically enables public firmware endpoints and persists the preference", async () => {
+    const update = vi.fn(async () => ({}));
+    const host = makePrefsHost(update);
+    onSetFirmwareRepositoryAccessEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+
+    expect(host._firmwareRepositoryAccessEnabled).toBe(true);
+    await flush();
+    expect(update).toHaveBeenCalledWith({ firmware_repository_access_enabled: true });
+    expect(host._firmwareRepositoryAccessEnabled).toBe(true);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("reverts and toasts if the backend rejects the preference", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const host = makePrefsHost(
+      vi.fn(async () => {
+        throw new Error("backend said no");
+      })
+    );
+    onSetFirmwareRepositoryAccessEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+
+    expect(host._firmwareRepositoryAccessEnabled).toBe(true);
+    await flush();
+    expect(host._firmwareRepositoryAccessEnabled).toBe(false);
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("persists the public authentication preference optimistically", async () => {
+    const update = vi.fn(async () => ({}));
+    const host = makePrefsHost(update);
+    onSetFirmwareRepositoryAuthenticatePublic(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: false })
+    );
+
+    expect(host._firmwareRepositoryAuthenticatePublic).toBe(false);
+    await flush();
+    expect(update).toHaveBeenCalledWith({
+      firmware_repository_authenticate_public: false,
+    });
   });
 });
 

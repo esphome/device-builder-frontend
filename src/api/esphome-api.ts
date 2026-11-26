@@ -9,7 +9,7 @@
 import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-token.js";
 import { BASE_PATH } from "../util/base-path.js";
 import { hydrateBoard, hydratePagedBoardsResponse } from "../util/board-hydrate.js";
-import { APIError, CommandTimeoutError } from "./api-error.js";
+import { APIError, ClientValidationError, CommandTimeoutError } from "./api-error.js";
 import { LivenessMonitor } from "./liveness.js";
 import type {
   AutomationAction,
@@ -61,6 +61,14 @@ import type {
   FirmwareJobResult,
 } from "./types/firmware-jobs.js";
 import type {
+  FirmwareRepositoryAccessToken,
+  FirmwareRepositoryAccessTokenCreated,
+  FirmwareRepositoryArtifactType,
+  FirmwareRepositoryFile,
+  FirmwareRepositoryRecord,
+  FirmwareRepositorySaveMetadata,
+} from "./types/firmware-repository.js";
+import type {
   CommandMessage,
   ErrorMessage,
   EventMessage,
@@ -92,6 +100,25 @@ import type { DeviceTroubleshootResult } from "./types/troubleshoot.js";
 interface AuthLoginResult {
   token: string;
   expires_at: number;
+}
+
+function filenameFromContentDisposition(
+  contentDisposition: string | null,
+  fallback: string
+): string {
+  if (!contentDisposition) return fallback;
+
+  const encoded = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(contentDisposition)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded.trim().replace(/^"|"$/g, ""));
+    } catch {
+      return fallback;
+    }
+  }
+
+  const filename = /filename\s*=\s*(?:"([^"]+)"|([^;]+))/i.exec(contentDisposition);
+  return filename?.[1] ?? filename?.[2]?.trim() ?? fallback;
 }
 
 // The backend caps the decoder subprocess at 60s; the margin covers the
@@ -1549,6 +1576,99 @@ export class ESPHomeAPI {
       throw new Error(`Firmware download failed: ${response.status}`);
     }
     return response.arrayBuffer();
+  }
+
+  /** List firmware versions stored in the repository. */
+  async firmwareRepositoryList(): Promise<FirmwareRepositoryRecord[]> {
+    return this.sendCommand<FirmwareRepositoryRecord[]>("firmware_repository/list");
+  }
+
+  /** List allowlisted firmware repository tokens without their secrets. */
+  async firmwareRepositoryAccessTokens(): Promise<FirmwareRepositoryAccessToken[]> {
+    return this.sendCommand<FirmwareRepositoryAccessToken[]>(
+      "config/list_firmware_repository_tokens"
+    );
+  }
+
+  /** Create an allowlisted token; its secret is returned only by this command. */
+  async firmwareRepositoryAddAccessToken(
+    name: string
+  ): Promise<FirmwareRepositoryAccessTokenCreated> {
+    return this.sendCommand<FirmwareRepositoryAccessTokenCreated>(
+      "config/add_firmware_repository_token",
+      { name }
+    );
+  }
+
+  /** Revoke an allowlisted firmware repository token. */
+  async firmwareRepositoryDeleteAccessToken(tokenId: string): Promise<void> {
+    await this.sendCommand("config/delete_firmware_repository_token", {
+      token_id: tokenId,
+    });
+  }
+
+  /** Save the latest compiled firmware for a configuration to the repository. */
+  async firmwareRepositorySave(
+    configuration: string,
+    metadata: FirmwareRepositorySaveMetadata
+  ): Promise<FirmwareRepositoryRecord> {
+    const summary = metadata.summary?.trim();
+    if (!summary) {
+      throw new ClientValidationError("firmware_repository_summary_required");
+    }
+
+    const args: { configuration: string; summary: string; release_url?: string } = {
+      configuration,
+      summary,
+    };
+    const releaseUrl = metadata.release_url?.trim();
+    if (releaseUrl) args.release_url = releaseUrl;
+    return this.sendCommand<FirmwareRepositoryRecord>("firmware_repository/save", args);
+  }
+
+  /** Publish a saved or obsolete firmware version. */
+  async firmwareRepositoryPublish(
+    device: string,
+    version: string
+  ): Promise<FirmwareRepositoryRecord> {
+    return this.sendCommand<FirmwareRepositoryRecord>("firmware_repository/publish", {
+      device,
+      version,
+    });
+  }
+
+  /** Delete one firmware version from the repository. */
+  async firmwareRepositoryDelete(device: string, version: string): Promise<void> {
+    await this.sendCommand("firmware_repository/delete", { device, version });
+  }
+
+  /** Download a stored repository artifact through the authenticated HTTP route. */
+  async firmwareRepositoryDownload(
+    device: string,
+    version: string,
+    file: FirmwareRepositoryFile,
+    type?: FirmwareRepositoryArtifactType
+  ): Promise<{ blob: Blob; filename: string }> {
+    const params = new URLSearchParams({ device, version, file });
+    if (type) params.set("type", type);
+    const token = this._authToken ?? getStoredToken();
+    const response = await fetch(
+      `${BASE_PATH}api/firmware_repository/download?${params}`,
+      token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+    );
+    if (!response.ok) {
+      throw new Error(`Firmware repository download failed: ${response.status}`);
+    }
+
+    const typeSuffix = type ? `-${type}` : "";
+    const fallbackExtension = file === "md5" ? "bin.md5" : file;
+    return {
+      blob: await response.blob(),
+      filename: filenameFromContentDisposition(
+        response.headers.get("Content-Disposition"),
+        `${device}-${version}${typeSuffix}.${fallbackExtension}`
+      ),
+    };
   }
 
   // ─── Board Commands ───────────────────────────────────────

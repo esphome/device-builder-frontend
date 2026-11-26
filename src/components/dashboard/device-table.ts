@@ -454,6 +454,14 @@ export class ESPHomeDeviceTable extends LitElement {
           e.stopPropagation();
           this._forwardEvent("download", e.detail);
         }}
+        @save-firmware-repository=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("save-firmware-repository", e.detail);
+        }}
+        @open-firmware-repository=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("open-firmware-repository", e.detail);
+        }}
         @enter-select=${(e: CustomEvent<ConfiguredDevice>) => {
           e.stopPropagation();
           this._enterSelectMode(e.detail);

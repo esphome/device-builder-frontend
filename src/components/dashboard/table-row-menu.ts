@@ -6,6 +6,7 @@ import {
   mdiCheckDecagram,
   mdiClockRemoveOutline,
   mdiContentDuplicate,
+  mdiContentSave,
   mdiDelete,
   mdiDownload,
   mdiFileDownloadOutline,
@@ -41,6 +42,7 @@ registerMdiIcons({
   "clock-remove-outline": mdiClockRemoveOutline,
   "text-box-outline": mdiTextBoxOutline,
   "content-duplicate": mdiContentDuplicate,
+  "content-save": mdiContentSave,
   delete: mdiDelete,
   download: mdiDownload,
   "file-download-outline": mdiFileDownloadOutline,
@@ -253,6 +255,17 @@ export class ESPHomeTableRowMenu extends LitElement {
         <div class="menu-item" @click=${() => this._emit("download")}>
           <wa-icon library="mdi" name="file-download-outline"></wa-icon>
           ${this._localize("dashboard.action_download")}
+        </div>
+        <div
+          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("save-firmware-repository")}
+        >
+          <wa-icon library="mdi" name="content-save"></wa-icon>
+          ${this._localize("firmware_repository.save_action")}
+        </div>
+        <div class="menu-item" @click=${() => this._emit("open-firmware-repository")}>
+          <wa-icon library="mdi" name="archive-outline"></wa-icon>
+          ${this._localize("firmware_repository.manage_action")}
         </div>
         <div class="menu-divider"></div>
         <div class="menu-item" @click=${() => this._emit("enter-select")}>

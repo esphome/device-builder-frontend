@@ -48,11 +48,13 @@ function link(el: ESPHomeDeviceActionsMenu): HTMLAnchorElement | null {
 }
 
 // Paint order (menu opens upward; frequent actions sit nearest the trigger):
-// Clean build, divider, Validate, Logs. A webUiUrl mount inserts Visit web UI
-// after the divider; those tests select by class, not index.
+// Clean build, save, manage, divider, Validate, Logs. A webUiUrl mount inserts
+// Visit web UI after the divider; those tests select by class, not index.
 const CLEAN = 0;
-const VALIDATE = 1;
-const LOGS = 2;
+const SAVE_REPOSITORY = 1;
+const MANAGE_REPOSITORY = 2;
+const VALIDATE = 3;
+const LOGS = 4;
 
 async function openMenu(el: ESPHomeDeviceActionsMenu): Promise<HTMLElement[]> {
   el.shadowRoot!.querySelector<HTMLElement>(".menu-btn")!.click();
@@ -67,10 +69,43 @@ function pressEnter(row: HTMLElement): void {
 }
 
 describe("esphome-device-actions-menu", () => {
-  it("is closed until the kebab is clicked, then shows all three actions", async () => {
+  it("is closed until the kebab is clicked, then shows all five actions", async () => {
     const el = await mount();
     expect(items(el)).toHaveLength(0);
-    expect(await openMenu(el)).toHaveLength(3);
+    expect(await openMenu(el)).toHaveLength(5);
+  });
+
+  it("emits save and manage repository actions", async () => {
+    const el = await mount();
+    const onSave = vi.fn();
+    const onManage = vi.fn();
+    el.addEventListener("save-firmware-repository", onSave);
+    el.addEventListener("open-firmware-repository", onManage);
+    const rows = await openMenu(el);
+
+    rows[SAVE_REPOSITORY].click();
+    expect(onSave).toHaveBeenCalledTimes(1);
+    await openMenu(el);
+    items(el)[MANAGE_REPOSITORY].click();
+    expect(onManage).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables saving while busy or while YAML edits are unsaved", async () => {
+    const busy = await mount({ busy: true });
+    const onBusySave = vi.fn();
+    busy.addEventListener("save-firmware-repository", onBusySave);
+    const busySave = (await openMenu(busy))[SAVE_REPOSITORY];
+    expect(busySave.getAttribute("aria-disabled")).toBe("true");
+    busySave.click();
+    expect(onBusySave).not.toHaveBeenCalled();
+
+    const dirty = await mount({ validateDisabled: true });
+    const onDirtySave = vi.fn();
+    dirty.addEventListener("save-firmware-repository", onDirtySave);
+    const dirtySave = (await openMenu(dirty))[SAVE_REPOSITORY];
+    expect(dirtySave.getAttribute("aria-disabled")).toBe("true");
+    dirtySave.click();
+    expect(onDirtySave).not.toHaveBeenCalled();
   });
 
   it("emits open-logs when Logs is clicked", async () => {
@@ -153,17 +188,19 @@ describe("esphome-device-actions-menu", () => {
     expect(a.textContent).toContain("dashboard.action_visit_web_ui");
   });
 
-  it("paints Clean build, divider, Visit web UI, Validate, Logs", async () => {
+  it("paints repository actions before Visit web UI, Validate, and Logs", async () => {
     const el = await mount({ webUiUrl: "http://kitchen.local/" });
     const labels = (await openMenu(el)).map((row) => row.textContent!.trim());
     expect(labels).toEqual([
       "dashboard.action_clean_build",
+      "firmware_repository.save_action",
+      "firmware_repository.manage_action",
       "dashboard.action_visit_web_ui",
       "device.validate",
       "device.show_logs",
     ]);
     const divider = el.shadowRoot!.querySelector(".menu-divider")!;
-    expect(divider.previousElementSibling).toBe(items(el)[CLEAN]);
+    expect(divider.previousElementSibling).toBe(items(el)[MANAGE_REPOSITORY]);
   });
 
   it("activates Visit web UI on Space, leaving Enter to the anchor", async () => {
@@ -230,6 +267,8 @@ describe("esphome-device-actions-menu — Analyze memory (Expert Mode)", () => {
     expect(rows.map((row) => row.textContent!.trim())).toEqual([
       LABEL,
       "dashboard.action_clean_build",
+      "firmware_repository.save_action",
+      "firmware_repository.manage_action",
       "device.validate",
       "device.show_logs",
     ]);
