@@ -2,7 +2,11 @@ import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { activeLocale } from "../../common/localize.js";
-import { isStatusUntracked, offlineSeconds } from "../../util/device-status.js";
+import {
+  isStatusHidden,
+  isStatusUntracked,
+  offlineSeconds,
+} from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
@@ -129,7 +133,12 @@ export function renderEncryptionIcon(
 
 /** The pill's "Offline 2h" label, ``null`` when it shows no duration. */
 export function offlineDurationLabel(card: ESPHomeDeviceCard): string | null {
-  const seconds = offlineSeconds(card.state, card.nameAddMacSuffix, card.offlineSince);
+  const seconds = offlineSeconds(
+    card.state,
+    card.nameAddMacSuffix,
+    card.noNetwork,
+    card.offlineSince
+  );
   if (seconds === null || jobBadgeShown(card)) return null;
   return card._localize("dashboard.offline_for", {
     duration: formatDuration(seconds, { language: activeLocale(), units: 1 }),
@@ -147,7 +156,9 @@ export function jobBadgeShown(card: ESPHomeDeviceCard): boolean {
   return card.busy || finishedBadgeStatus(card) !== null;
 }
 
-export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
+export function renderStatusBadge(
+  card: ESPHomeDeviceCard
+): TemplateResult | typeof nothing {
   if (card.busy) {
     const labelKey =
       (card.activeJob && BUSY_STATUS_KEY[card.activeJob.job_type]) ??
@@ -170,6 +181,7 @@ export function renderStatusBadge(card: ESPHomeDeviceCard): TemplateResult {
       ${card._localize(RECENT_JOB_LABEL[finished])}
     </div>`;
   }
+  if (isStatusHidden(card.state, card.noNetwork)) return nothing;
   // "No status" is the least self-explanatory state; clicking it opens
   // the dialog in explainer-only mode (the probe stays suppressed
   // there — it keys on a name no unit broadcasts).

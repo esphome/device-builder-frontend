@@ -104,14 +104,21 @@ describe("device table empty-cell placeholder (#1038)", () => {
 });
 
 describe("device table status dot with name_add_mac_suffix", () => {
-  const statusCell = (state: DeviceState, nameAddMacSuffix: boolean) => {
+  const statusCell = (
+    state: DeviceState,
+    nameAddMacSuffix: boolean,
+    loadedIntegrations: string[] = []
+  ) => {
     const info = {
       getValue: () => state,
       row: {
         original: {
           busy: false,
           recentJob: null,
-          _device: { name_add_mac_suffix: nameAddMacSuffix },
+          _device: {
+            name_add_mac_suffix: nameAddMacSuffix,
+            loaded_integrations: loadedIntegrations,
+          },
         },
       },
     } as unknown as DeviceCellContext;
@@ -125,6 +132,22 @@ describe("device table status dot with name_add_mac_suffix", () => {
       expect(html).toContain("dashboard.status_untracked_tooltip");
       expect(html).not.toContain("table_status_offline");
     }
+  });
+
+  it("renders an empty status cell for a no-network device, even when flagged", () => {
+    for (const state of [DeviceState.OFFLINE, DeviceState.UNKNOWN]) {
+      const html = statusCell(state, true, ["api"]);
+      expect(html).toContain("cell-status");
+      expect(html).not.toContain("status-dot");
+      expect(html).not.toContain("role=");
+      expect(html).not.toContain("title=");
+    }
+  });
+
+  it("keeps a real ONLINE verdict for a no-network device", () => {
+    expect(statusCell(DeviceState.ONLINE, false, ["api"])).toContain(
+      "dashboard.table_status_online"
+    );
   });
 
   it("keeps a real ONLINE verdict and the plain dots without the flag", () => {

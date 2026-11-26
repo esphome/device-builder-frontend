@@ -81,7 +81,10 @@ export function applyFacetFilters(
   }
   if (selectedStates.length > 0) {
     const set = new Set(selectedStates);
-    out = out.filter((d) => set.has(effectiveDeviceState(d)));
+    out = out.filter((d) => {
+      const state = effectiveDeviceState(d);
+      return state !== null && set.has(state);
+    });
   }
   if (selectedUpdateStatus.length > 0) {
     // AND / narrowing: a device must satisfy every selected bucket

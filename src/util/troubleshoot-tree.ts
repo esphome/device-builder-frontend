@@ -7,8 +7,9 @@
 import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { ReachabilityStateEvent } from "../api/types/reachability.js";
 import type { DeviceTroubleshootResult } from "../api/types/troubleshoot.js";
+import { hasNoNetwork } from "./device-status.js";
 import { isIpLiteral } from "./ip-literal.js";
-import { NETWORK_SECTIONS, type NetworkPresence } from "./network-sections.js";
+import type { NetworkPresence } from "./network-sections.js";
 import { isNeverFlashed } from "./never-flashed.js";
 
 export const MAC_SUFFIX_DOCS_URL =
@@ -88,9 +89,7 @@ export function buildTroubleshootSections(
   // integrations decide; empty ones prove nothing.
   const noNetwork =
     input.networkInYaml === "absent" ||
-    (input.networkInYaml === "unknown" &&
-      device.loaded_integrations.length > 0 &&
-      !NETWORK_SECTIONS.some((s) => device.loaded_integrations.includes(s)));
+    (input.networkInYaml === "unknown" && hasNoNetwork(device.loaded_integrations));
   if (noNetwork) {
     // Offline by construction; network advice and the manual-address
     // drill would both mislead.
