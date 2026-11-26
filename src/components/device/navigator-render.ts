@@ -225,7 +225,7 @@ export function renderNavSection(v: NavSectionView): TemplateResult | typeof not
       v.open
         ? html`
             <div class="separator"></div>
-            ${v.filtering ? nothing : html`<p class="italic">${v.desc}</p>`}
+            ${v.filtering || !v.desc ? nothing : html`<p class="italic">${v.desc}</p>`}
             ${
               v.groups
                 ? v.groups.map((group) =>

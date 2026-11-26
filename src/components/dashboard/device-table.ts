@@ -438,6 +438,10 @@ export class ESPHomeDeviceTable extends LitElement {
           e.stopPropagation();
           this._forwardEvent("download-yaml", e.detail);
         }}
+        @show-dependencies=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("show-dependencies", e.detail);
+        }}
         @rename-device=${(e: CustomEvent) => {
           e.stopPropagation();
           this._forwardEvent("rename-device", e.detail);
