@@ -85,4 +85,8 @@ describe("formatAbsoluteTime", () => {
     const out = formatAbsoluteTime(iso, NOW, "en-US");
     expect(out).toMatch(/^[A-Z][a-z]{2}\s\d{1,2}\s\d{1,2}:\d{2}(\s?(AM|PM))?$/);
   });
+
+  it("returns a placeholder instead of throwing for an unparseable timestamp", () => {
+    expect(formatAbsoluteTime("not-a-date", NOW, "en-US")).toBe("Invalid Date");
+  });
 });
