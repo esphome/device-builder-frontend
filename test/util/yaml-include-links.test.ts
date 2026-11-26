@@ -199,6 +199,33 @@ describe("includeLinks decorations", () => {
     view.destroy();
   });
 
+  it("doesn't underline a refused secrets-like target, but keeps the top-level secrets link", () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "a: !include common/secrets.yaml\nb: !include secrets.ci.yaml\nc: !include secrets.yml\nd: !include ../secrets.yaml\n",
+        extensions: [
+          esphomeYaml(),
+          includeLinks(
+            () => "common/base.yaml",
+            () => {},
+            "open"
+          ),
+        ],
+      }),
+    });
+    forceParsing(view, view.state.doc.length);
+    const links = [...view.dom.querySelectorAll(".cm-include-link")];
+    expect(links.map((l) => l.textContent)).toEqual(["../secrets.yaml"]);
+    expect(
+      includePathAt(
+        view,
+        view.state.doc.toString().indexOf("secrets.ci") + 2,
+        "kitchen.yaml"
+      )
+    ).toBeNull();
+    view.destroy();
+  });
+
   it("decorates a line split by a fold once, in order", () => {
     // Only a large fold splits the line into two visible ranges.
     const filler = Array.from({ length: 400 }, (_, i) => `k${i}: v`).join(", ");

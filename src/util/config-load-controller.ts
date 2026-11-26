@@ -10,6 +10,8 @@ export interface ConfigLoadOptions {
   /** WS liveness; the false→true edge re-runs a load that gave up. */
   connected: () => boolean;
   configuration: () => string;
+  /** A target that must never be fetched: any load parks it as "missing". */
+  refused?: () => boolean;
   /** Transport attempts before the failure surfaces; spent only while
    *  the socket is up (``loadConfigWithRecovery`` parks otherwise). */
   attempts: number;
@@ -81,6 +83,10 @@ export class ConfigLoadController implements ReactiveController {
   private async _load(background: boolean): Promise<void> {
     const configuration = this._opts.configuration();
     const gen = ++this._gen;
+    if (this._opts.refused?.()) {
+      this._setState("missing");
+      return;
+    }
     if (!background || this.state !== "ready") this._setState("loading");
     let yaml: string | null;
     try {

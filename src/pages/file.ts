@@ -103,7 +103,7 @@ export class ESPHomePageFile extends LitElement {
   @state() private _savedYaml = "";
   @state() private _saving = false;
   /** The file a rename is moving: edits to it would be saved under the old name. */
-  @state() private _renamingPath: string | null = null;
+  @state() private _renaming: ReadonlyMap<number, string> = new Map();
   private _renameSeq = 0;
   /** Navigator selection and the YAML range it highlights. */
   @state() private _selectedSection: string | null = null;
@@ -118,6 +118,7 @@ export class ESPHomePageFile extends LitElement {
     api: () => this._api,
     connected: () => this._apiConnected,
     configuration: () => this.path,
+    refused: () => this._refused,
     attempts: 4,
     commit: (yaml) => {
       this._yaml = yaml;
@@ -181,13 +182,18 @@ export class ESPHomePageFile extends LitElement {
       this._selectedFromLine = undefined;
       this._highlight = null;
       this._scrollToHighlight = false;
-      if (!this._refused) void this._load.start();
+      void this._load.start();
     }
   }
 
   /** Secrets files belong to the Secrets page; the backend refuses files/* on them. */
   private get _refused(): boolean {
     return isSecretsLikeName(this.path);
+  }
+
+  /** Whether a rename of the open file is still in flight. */
+  private get _isRenamingPath(): boolean {
+    return [...this._renaming.values()].includes(this.path);
   }
 
   /** The navigator needs a loaded file; without it the editor takes the full width. */
@@ -385,7 +391,7 @@ export class ESPHomePageFile extends LitElement {
                   <wa-icon library="mdi" name="content-save"></wa-icon>
                   ${this._localize(this._saving ? "file.saving" : "file.save")}
                 </button>
-                <div class="editor-pane" ?inert=${this._renamingPath === this.path}>
+                <div class="editor-pane" ?inert=${this._isRenamingPath}>
                   <esphome-yaml-editor
                     completion
                     .filePath=${this.path}
@@ -538,8 +544,8 @@ export class ESPHomePageFile extends LitElement {
       notifyError(this._localize("packages.rename_save_first"));
       return;
     }
-    this._renamingPath = e.detail.path;
     const token = ++this._renameSeq;
+    this._renaming = new Map(this._renaming).set(token, e.detail.path);
     try {
       const newPath = await renameFile(this._api, this._localize, e.detail);
       // The user may have moved on while the rename ran.
@@ -547,8 +553,10 @@ export class ESPHomePageFile extends LitElement {
         await navigate(fileEditorUrl(newPath));
       }
     } finally {
-      // A later rename (started after navigating away) owns the lock now.
-      if (token === this._renameSeq) this._renamingPath = null;
+      // Release only this rename's lock; others still in flight keep theirs.
+      const next = new Map(this._renaming);
+      next.delete(token);
+      this._renaming = next;
     }
   };
 

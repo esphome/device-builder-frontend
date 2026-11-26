@@ -549,7 +549,9 @@ describe("esphome-page-file rename", () => {
 
   test("the editor can't take edits until the rename finishes", async () => {
     let finish!: (r: unknown) => void;
-    const page = makePage() as unknown as RenameView & { _renamingPath: string | null };
+    const page = makePage() as unknown as RenameView & {
+      _renaming: ReadonlyMap<number, string>;
+    };
     page._api = {
       renameFile: vi.fn(() => new Promise((resolve) => (finish = resolve))),
     } as unknown as ESPHomeAPI;
@@ -559,19 +561,21 @@ describe("esphome-page-file rename", () => {
         detail: { path: "common/base.yaml", newPath: "common/main.yaml" },
       })
     );
-    expect(page._renamingPath).toBe("common/base.yaml");
+    expect([...page._renaming.values()]).toEqual(["common/base.yaml"]);
     const [pane] = findTemplatesByAnchor(page.render(), 'class="editor-pane"');
     expect(pane.strings.join("")).toContain("?inert=");
     expect(pane.values).toContain(true);
 
     finish({ path: "common/main.yaml", rewritten: [], unresolved: [] });
     await renaming;
-    expect(page._renamingPath).toBeNull();
+    expect(page._renaming.size).toBe(0);
   });
 
   test("one rename finishing doesn't unlock another's file", async () => {
     const finish: Array<(r: unknown) => void> = [];
-    const page = makePage() as unknown as RenameView & { _renamingPath: string | null };
+    const page = makePage() as unknown as RenameView & {
+      _renaming: ReadonlyMap<number, string>;
+    };
     page._api = {
       renameFile: vi.fn(() => new Promise((resolve) => finish.push(resolve))),
     } as unknown as ESPHomeAPI;
@@ -584,10 +588,37 @@ describe("esphome-page-file rename", () => {
     const b = start("common/b.yaml");
     finish[0]({ path: "x/y.yaml", rewritten: [], unresolved: [] });
     await a;
-    expect(page._renamingPath).toBe("common/b.yaml");
+    expect([...page._renaming.values()]).toEqual(["common/b.yaml"]);
     finish[1]({ path: "x/y.yaml", rewritten: [], unresolved: [] });
     await b;
-    expect(page._renamingPath).toBeNull();
+    expect(page._renaming.size).toBe(0);
+  });
+
+  test("the first rename stays locked when a later one finishes first", async () => {
+    const finish: Array<(r: unknown) => void> = [];
+    const page = makePage({ path: "common/a.yaml" }) as unknown as RenameView & {
+      _renaming: ReadonlyMap<number, string>;
+    };
+    page._api = {
+      renameFile: vi.fn(() => new Promise((resolve) => finish.push(resolve))),
+    } as unknown as ESPHomeAPI;
+    const start = (path: string) =>
+      page._rename(
+        new CustomEvent("rename-file", { detail: { path, newPath: "x/y.yaml" } })
+      );
+    const paneInert = () =>
+      (page as unknown as { _isRenamingPath: boolean })._isRenamingPath;
+
+    const a = start("common/a.yaml");
+    const b = start("common/b.yaml");
+    finish[1]({ path: "x/y.yaml", rewritten: [], unresolved: [] });
+    await b;
+    expect([...page._renaming.values()]).toEqual(["common/a.yaml"]);
+    expect(paneInert()).toBe(true);
+    finish[0]({ path: "x/y.yaml", rewritten: [], unresolved: [] });
+    await a;
+    expect(page._renaming.size).toBe(0);
+    expect(paneInert()).toBe(false);
   });
 
   test("a failed rename stays put", async () => {
@@ -618,16 +649,29 @@ describe("esphome-page-file refused and hidden paths", () => {
   });
 
   test.each(["secrets.yaml", "common/secrets.ci.yml"])(
-    "%s is refused as not found and never loaded",
-    (path) => {
-      const page = makePage({ path, _load: { state: "loading" } });
-      const load = vi.fn();
-      (page as unknown as { _load: { start: () => void } })._load.start = load;
+    "%s is refused as not found and never fetched",
+    async (path) => {
+      const getConfig = vi.fn();
+      const page = makePage({
+        path,
+        _api: { ready: Promise.resolve(), getConfig } as unknown as ESPHomeAPI,
+      });
+      const load = (
+        page as unknown as {
+          _load: { start(): Promise<void>; retry(): void; state: string };
+        }
+      )._load;
       (page as unknown as { willUpdate(c: Map<string, unknown>): void }).willUpdate(
         new Map([["path", ""]])
       );
-      expect(load).not.toHaveBeenCalled();
+      await flushMicrotasks(8);
+      expect(load.state).toBe("missing");
+      load.retry();
+      await flushMicrotasks(8);
+      expect(getConfig).not.toHaveBeenCalled();
+      expect(load.state).toBe("missing");
       expect(text(page.render())).toContain("file.not_found");
+      expect(text(page.render())).not.toContain("command.retry");
     }
   );
 });

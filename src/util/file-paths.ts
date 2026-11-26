@@ -70,6 +70,12 @@ export function isDevicePath(path: string): boolean {
   );
 }
 
+/** Whether *segment* is the ``devices`` folder in any case: the backend refuses
+ *  package operations there, though only the exact name holds devices. */
+function isDevicesFolder(segment: string): boolean {
+  return segment.toLowerCase() === DEVICES_DIR;
+}
+
 /** Whether config-relative *path* is a package: a visible subfolder YAML
  *  outside ``devices/`` and ``archive/`` that is not a secrets file. */
 export function isPackagePath(path: string): boolean {
@@ -78,7 +84,7 @@ export function isPackagePath(path: string): boolean {
     parts.length > 1 &&
     isVisibleYaml(parts) &&
     !isSecretsLikeName(path) &&
-    parts[0] !== DEVICES_DIR &&
+    !isDevicesFolder(parts[0]) &&
     !isArchivedPath(path)
   );
 }
@@ -89,12 +95,14 @@ export function isHiddenPath(path: string): boolean {
   return path.split("/").some((p) => p.startsWith("."));
 }
 
-/** Where to open config-relative *path*: the Secrets page for the top-level
- *  secrets file, the device editor for a device, the file editor otherwise.
+/** Where to open config-relative *path*: the Secrets page (which edits
+ *  ``secrets.yaml``) for the top-level ``secrets.yaml``, the device editor for a device, the file editor otherwise.
  *  Null for any other secrets-like file, which the file editor refuses. */
 export function openTargetUrl(path: string): string | null {
   if (isSecretsLikeName(path))
-    return !path.includes("/") && isSecretsFile(path) ? "/secrets" : null;
+    return !path.includes("/") && foldedFileName(path) === "secrets.yaml"
+      ? "/secrets"
+      : null;
   return isDevicePath(path) ? deviceEditorUrl(path) : fileEditorUrl(path);
 }
 
@@ -160,6 +168,6 @@ export function newPackagePathProblem(raw: string): string | null {
   if (isSecretsLikeName(path) || parts[0].toLowerCase() === "archive") {
     return "packages.path_reserved";
   }
-  if (parts[0] === DEVICES_DIR) return "packages.path_in_devices";
+  if (isDevicesFolder(parts[0])) return "packages.path_in_devices";
   return null;
 }

@@ -44,10 +44,18 @@ describe("file-paths", () => {
 
   it("sends the top-level secrets file to the Secrets page, other secrets files nowhere", () => {
     expect(openTargetUrl("secrets.yaml")).toBe("/secrets");
-    expect(openTargetUrl("Secrets.YML")).toBe("/secrets");
+    expect(openTargetUrl("Secrets.YAML")).toBe("/secrets");
+    // the Secrets page edits secrets.yaml only, so a .yml include has no target
+    expect(openTargetUrl("secrets.yml")).toBeNull();
+    expect(openTargetUrl("Secrets.YML")).toBeNull();
     expect(openTargetUrl("secrets.ci.yaml")).toBeNull();
     expect(openTargetUrl("common/secrets.yaml")).toBeNull();
     expect(openTargetUrl("devices/secrets.local.yml")).toBeNull();
+  });
+
+  it("treats Devices/ as neither a device nor a package folder", () => {
+    expect(isDevicePath("Devices/desk.yaml")).toBe(false);
+    expect(isPackagePath("Devices/desk.yaml")).toBe(false);
   });
 
   it("flags hidden paths at any depth", () => {
@@ -93,6 +101,8 @@ describe("file-paths", () => {
     ["common/secrets.ci.yaml", false],
     ["archive/old.yaml", false],
     ["Archive/old.yaml", false],
+    ["Devices/shared.yaml", false],
+    ["DEVICES/a/b.yaml", false],
     ["common/.x.yaml", false],
     [".git/x.yaml", false],
     ["common/x.txt", false],
@@ -186,7 +196,7 @@ describe("file-paths", () => {
     ["devices/secrets.yaml", "packages.path_reserved"],
     ["devices/shared.yaml", "packages.path_in_devices"],
     ["devices/lights/shared.yaml", "packages.path_in_devices"],
-    ["Devices/shared.yaml", null],
+    ["Devices/shared.yaml", "packages.path_in_devices"],
     ["common/devices/x.yaml", null],
   ])("newPackagePathProblem(%j) → %j", (input, expected) => {
     expect(newPackagePathProblem(input)).toBe(expected);
