@@ -20,6 +20,7 @@ import {
   NO_INSTANCE_ERRORS,
 } from "../../util/backend-field-errors.js";
 import { effectiveDeviceLayout } from "../../util/editor-layout.js";
+import { fileNameOf } from "../../util/file-paths.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { notifyError, notifyWarning } from "../../util/notify.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -316,8 +317,10 @@ export class ESPHomeDeviceEditor extends LitElement {
               <h2 class="editor-header-title truncate">${title}</h2>
               ${
                 this.configuration && !compactHeader
-                  ? html`<span class="editor-header-file truncate"
-                      >${this.configuration}</span
+                  ? html`<span
+                      class="editor-header-file truncate"
+                      title=${this.configuration}
+                      >${fileNameOf(this.configuration)}</span
                     >`
                   : nothing
               }

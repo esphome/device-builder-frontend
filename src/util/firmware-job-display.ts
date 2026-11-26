@@ -2,6 +2,11 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import { JobType } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { fileStemOf, renamedConfiguration } from "./file-paths.js";
+
+// Where a received remote build's YAML is extracted, relative to the
+// receiver's config dir (the backend's ``REMOTE_BUILDS_SUBDIR``).
+const REMOTE_BUILDS_PREFIX = ".esphome/.remote_builds/";
 
 /**
  * Resolve the human-readable label for a job's *type* (as opposed to
@@ -65,27 +70,27 @@ export function firmwareJobDisplayName(
     if (job.device_name) {
       return job.device_name;
     }
-    /* Configuration is ``.esphome/.remote_builds/<id>/<device>/<device>.yaml``.
-       The second-to-last segment is the device folder name — the
-       cleanest fallback when both display fields are empty (older
-       offloader didn't set the NotRequired wire fields). Strip
-       the YAML extension off the last segment if the path has
-       only the filename (defensive). */
-    const segments = job.configuration.split("/");
-    if (segments.length >= 2) {
+    /* A received build's configuration is
+       ``.esphome/.remote_builds/<id>/<device>/<device>.yaml``; the
+       second-to-last segment is the device folder name, the cleanest
+       fallback when both display fields are empty (older offloader
+       didn't set the NotRequired wire fields). Anything else is a
+       local configuration, possibly nested (``devices/x/y.yaml``),
+       whose file name stem is the device name. */
+    if (job.configuration.startsWith(REMOTE_BUILDS_PREFIX)) {
+      const segments = job.configuration.split("/");
       return segments[segments.length - 2];
     }
-    return job.configuration.replace(/\.ya?ml$/, "") || job.configuration;
+    return fileStemOf(job.configuration) || job.configuration;
   }
   if (job.job_type === JobType.RENAME && job.new_name) {
-    /* job.configuration is the *old* YAML filename (``foo.yaml`` or
-       ``foo.yml``); strip the extension to recover the old device
-       name for the transition label, and reuse the same extension
-       for the new YAML so devices using ``.yml`` keep matching. */
-    const oldExtMatch = job.configuration.match(/\.ya?ml$/);
-    const ext = oldExtMatch ? oldExtMatch[0] : ".yaml";
-    const oldName = job.configuration.slice(0, job.configuration.length - ext.length);
-    const newConfiguration = `${job.new_name}${ext}`;
+    /* job.configuration is the *old* YAML (``foo.yaml``, ``foo.yml``
+       or a nested ``devices/x/foo.yaml``); its file name stem is the
+       old device name for the transition label, and the new YAML
+       keeps its folder and extension so devices using ``.yml`` keep
+       matching. */
+    const oldName = fileStemOf(job.configuration);
+    const newConfiguration = renamedConfiguration(job.configuration, job.new_name);
     /* Look the configured device up under either side of the rename.
        Mid-flight both YAMLs can briefly exist (the new one written
        before the old one's deleted); after the job lands only the

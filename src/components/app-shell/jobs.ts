@@ -1,4 +1,5 @@
 import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
+import { renamedConfiguration } from "../../util/file-paths.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import type { ESPHomeApp } from "../app-shell.js";
 
@@ -26,9 +27,7 @@ const RECENT_JOB_TTL_MS_ATTENTION = 30_000;
 export function renameKeys(job: FirmwareJob): string[] {
   if (job.job_type !== JobType.RENAME) return [];
   if (!job.new_name) return [];
-  const extMatch = job.configuration.match(/\.ya?ml$/);
-  const ext = extMatch ? extMatch[0] : ".yaml";
-  const renamed = `${job.new_name}${ext}`;
+  const renamed = renamedConfiguration(job.configuration, job.new_name);
   return renamed === job.configuration ? [] : [renamed];
 }
 

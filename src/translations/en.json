@@ -1935,7 +1935,7 @@
   },
   "packages": {
     "title": "Packages",
-    "desc": "Shared YAML that devices pull in with packages: or !include. Any YAML in a subfolder of your config folder is a package, not a device.",
+    "desc": "Shared YAML that devices pull in with packages: or !include. Any YAML in a subfolder of your config folder is a package, except those in the devices folder, which are devices.",
     "new_label": "New package path",
     "new_placeholder": "common/wifi.yaml",
     "new": "New package",
@@ -1979,12 +1979,13 @@
     "dependencies_none": "This device doesn't include any other files.",
     "dependencies_incomplete": "The config hasn't loaded yet, so this list may be incomplete.",
     "dependencies_failed": "Couldn't list the included files",
-    "path_needs_folder": "Put the package in a folder, e.g. common/wifi.yaml. Files at the top level are devices.",
+    "path_needs_folder": "Put the package in a folder, e.g. common/wifi.yaml. Files at the top level and in the devices folder are devices.",
     "path_invalid": "Use a relative path without .. or hidden (dot) names.",
     "path_needs_yaml": "The file name must end in .yaml or .yml.",
     "path_characters": "Don't use spaces or any of # \" ' { } [ ] , $ in the name.",
     "path_start": "Start each folder and file name with a letter, digit or _.",
-    "path_reserved": "secrets.yaml and the archive folder are reserved."
+    "path_reserved": "secrets.yaml, names like secrets.ci.yaml and the archive folder are reserved.",
+    "path_in_devices": "Files in the devices folder are devices. Put the package in another folder, e.g. common/wifi.yaml."
   },
   "file": {
     "loading": "Loading file…",

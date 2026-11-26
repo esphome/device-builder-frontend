@@ -28,6 +28,7 @@ import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { renderConfigLabel } from "../util/config-label-template.js";
 import { fireEvent } from "../util/fire-event.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { OfflineClockController } from "../util/offline-clock.js";
@@ -253,7 +254,7 @@ export class ESPHomeDeviceCard extends LitElement {
               ${renderEncryptionIcon(this)}
             </div>
             <p class="device-config truncate" title=${this.configuration}>
-              ${this.configuration}
+              ${renderConfigLabel(this.configuration)}
             </p>
             ${
               this.comment

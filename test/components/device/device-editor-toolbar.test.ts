@@ -142,4 +142,11 @@ describe("device-editor save button", () => {
     expect(btn.querySelector("wa-spinner")).not.toBeNull();
     expect(btn.querySelector("wa-icon")).toBeNull();
   });
+
+  it("shows a nested configuration's file name, with the full path as its title", async () => {
+    const el = await mount({ layout: "both", configuration: "devices/lights/desk.yaml" });
+    const file = q(el, ".editor-header-file")!;
+    expect(file.textContent).toBe("desk.yaml");
+    expect(file.title).toBe("devices/lights/desk.yaml");
+  });
 });

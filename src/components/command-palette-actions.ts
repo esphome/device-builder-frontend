@@ -1,6 +1,7 @@
 import type { ConfiguredDevice, YamlSearchHit } from "../api/types/devices.js";
 import type { LanguageChoice, LocalizeFunc } from "../common/localize.js";
 import { languageLabel, LANGUAGES } from "../common/localize.js";
+import { deviceEditorUrl } from "../util/file-paths.js";
 import { navigate } from "../util/navigation.js";
 import {
   forEachYamlMatch,
@@ -84,7 +85,7 @@ export function buildCommands(ctx: CommandActionContext): CommandAction[] {
     label: d.friendly_name || d.name || d.configuration,
     icon: "chip",
     keywords: [d.configuration, d.name],
-    run: () => navigate(`/device/${d.configuration}`),
+    run: () => navigate(deviceEditorUrl(d.configuration)),
   }));
 
   const themeGroup = t("layout.theme");

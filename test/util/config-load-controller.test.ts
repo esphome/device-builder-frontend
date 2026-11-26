@@ -81,6 +81,29 @@ describe("ConfigLoadController", () => {
     expect(order).toEqual(["commit", "ready-hook"]);
   });
 
+  it("parks a refused target as missing without fetching, even from error", async () => {
+    const getConfig = vi.fn().mockRejectedValue(new Error("boom"));
+    let refused = false;
+    const host = new FakeHost();
+    const controller = new ConfigLoadController(host, {
+      api: () => makeApi(getConfig),
+      connected: () => true,
+      configuration: () => "secrets.yaml",
+      refused: () => refused,
+      attempts: 1,
+      commit: vi.fn(),
+    });
+    host.connect();
+    await controller.start();
+    expect(controller.state).toBe("error");
+    getConfig.mockClear();
+    refused = true;
+    controller.retry();
+    await flushMicrotasks(8);
+    expect(controller.state).toBe("missing");
+    expect(getConfig).not.toHaveBeenCalled();
+  });
+
   it("a failed start lands in the error state", async () => {
     const { controller } = makeLoad({
       getConfig: vi.fn().mockRejectedValue(new Error("WebSocket closed")),

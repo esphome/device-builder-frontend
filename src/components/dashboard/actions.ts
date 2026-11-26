@@ -7,6 +7,7 @@ import { type BoardDetection, detectBoard } from "../../platforms/detect-board.j
 import { EngineLoadError, UnsupportedChipError } from "../../platforms/esp/index.js";
 import { downloadBlob } from "../../util/download-text.js";
 import { getErrorMessage } from "../../util/error-message.js";
+import { deviceEditorUrl, fileNameOf } from "../../util/file-paths.js";
 import { navigate } from "../../util/navigation.js";
 import {
   LONG_TOAST_DURATION_MS,
@@ -34,9 +35,7 @@ export function editDevice(
   if (opts.section) params.set("section", opts.section);
   if (opts.reveal) params.set("reveal", "1");
   const query = params.toString();
-  void navigate(
-    `/device/${encodeURIComponent(device.configuration)}${query ? `?${query}` : ""}`
-  );
+  void navigate(`${deviceEditorUrl(device.configuration)}${query ? `?${query}` : ""}`);
 }
 
 /** Open the editor deep-linked to a component section (e.g. ``api`` for the
@@ -282,9 +281,9 @@ export async function downloadYaml(
   const name = device.friendly_name || device.name;
   try {
     const yaml = await api.getConfig(device.configuration);
-    const filename = device.configuration.endsWith(".yaml")
-      ? device.configuration
-      : `${device.configuration}.yaml`;
+    // A nested device saves under its file name, not ``devices/x/...``.
+    const file = fileNameOf(device.configuration);
+    const filename = file.endsWith(".yaml") ? file : `${file}.yaml`;
     downloadBlob(yaml, filename, "text/yaml");
   } catch {
     notifyError(localize("dashboard.action_download_yaml_failed", { name }));

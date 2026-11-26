@@ -343,3 +343,42 @@ describe("name-cell encryption deep-link", () => {
     expect(container.querySelector("wa-icon.cell-encryption")).not.toBeNull();
   });
 });
+
+describe("device table config column", () => {
+  it("shows a nested configuration's file name with the full path as its title", () => {
+    const cell = renderInto(renderCell("config", "devices/lights/desk.yaml"));
+    const span = cell.querySelector<HTMLElement>(".cell-config")!;
+    expect(span.textContent).toMatch(/^desk\.yaml\s+devices\/lights$/);
+    expect(span.querySelector(".config-folder")?.textContent).toBe("devices/lights");
+    expect(span.title).toBe("devices/lights/desk.yaml");
+  });
+
+  it("shows a top-level configuration's file name alone", () => {
+    const cell = renderInto(renderCell("config", "kitchen.yaml"));
+    const span = cell.querySelector<HTMLElement>(".cell-config")!;
+    expect(span.textContent).toBe("kitchen.yaml");
+    expect(span.querySelector(".config-folder")).toBeNull();
+  });
+
+  it("sorts by the file name, the folder only breaking ties", () => {
+    const col = columns.find((c) => "accessorKey" in c && c.accessorKey === "config")!;
+    const sortFn = (col as unknown as { sortFn: (a: unknown, b: unknown) => number })
+      .sortFn;
+    const row = (config: string) => ({ original: { config } });
+    const sorted = [
+      "devices/lights/zeta.yaml",
+      "devices/b/desk.yaml",
+      "alpha.yaml",
+      "devices/a/desk.yaml",
+    ]
+      .map(row)
+      .sort(sortFn)
+      .map((r) => r.original.config);
+    expect(sorted).toEqual([
+      "alpha.yaml",
+      "devices/a/desk.yaml",
+      "devices/b/desk.yaml",
+      "devices/lights/zeta.yaml",
+    ]);
+  });
+});

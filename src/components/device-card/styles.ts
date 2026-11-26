@@ -230,6 +230,9 @@ export const deviceCardStyles = [
       font-size: var(--wa-font-size-xs);
       color: var(--wa-color-text-quiet);
     }
+    .config-folder {
+      opacity: 0.7;
+    }
 
     /* Free-form user text under the filename, set as a standard metadata
        row: a leading glyph on an upright quiet line. The icon is what tells

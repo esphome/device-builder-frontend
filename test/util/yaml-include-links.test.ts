@@ -2,7 +2,7 @@
 import { codeFolding, foldEffect, forceParsing } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import {
   findIncludeTargets,
@@ -199,6 +199,33 @@ describe("includeLinks decorations", () => {
     view.destroy();
   });
 
+  it("doesn't underline a refused secrets-like target, but keeps the top-level secrets link", () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "a: !include common/secrets.yaml\nb: !include secrets.ci.yaml\nc: !include secrets.yml\nd: !include ../secrets.yaml\n",
+        extensions: [
+          esphomeYaml(),
+          includeLinks(
+            () => "common/base.yaml",
+            () => {},
+            "open"
+          ),
+        ],
+      }),
+    });
+    forceParsing(view, view.state.doc.length);
+    const links = [...view.dom.querySelectorAll(".cm-include-link")];
+    expect(links.map((l) => l.textContent)).toEqual(["../secrets.yaml"]);
+    expect(
+      includePathAt(
+        view,
+        view.state.doc.toString().indexOf("secrets.ci") + 2,
+        "kitchen.yaml"
+      )
+    ).toBeNull();
+    view.destroy();
+  });
+
   it("decorates a line split by a fold once, in order", () => {
     // Only a large fold splits the line into two visible ranges.
     const filler = Array.from({ length: 400 }, (_, i) => `k${i}: v`).join(", ");
@@ -230,5 +257,37 @@ describe("includeLinks decorations", () => {
     expect(view.visibleRanges.length).toBe(2);
     expect(links()).toBe(2);
     view.destroy();
+  });
+});
+
+describe("includeLinks click target", () => {
+  const click = (target: "link" | "empty") => {
+    const open = vi.fn();
+    const doc = "a: !include common/a.yaml\n";
+    const view = new EditorView({
+      parent: document.body,
+      state: EditorState.create({
+        doc,
+        extensions: [esphomeYaml(), includeLinks(() => "kitchen.yaml", open, "open")],
+      }),
+    });
+    forceParsing(view, doc.length);
+    // happy-dom has no layout, so pin the position CodeMirror would report.
+    view.posAtCoords = () => doc.indexOf(".yaml") + 2;
+    const el =
+      target === "link" ? view.dom.querySelector(".cm-include-link")! : view.contentDOM;
+    el.dispatchEvent(
+      new MouseEvent("mousedown", { ctrlKey: true, bubbles: true, cancelable: true })
+    );
+    view.destroy();
+    return open;
+  };
+
+  it("opens the path when the link itself is clicked", () => {
+    expect(click("link")).toHaveBeenCalledWith("common/a.yaml");
+  });
+
+  it("ignores a click on the empty space that maps to the path end", () => {
+    expect(click("empty")).not.toHaveBeenCalled();
   });
 });

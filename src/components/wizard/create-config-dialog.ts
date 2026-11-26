@@ -32,6 +32,7 @@ import {
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../base-dialog.js";
+import { deviceEditorUrl } from "../../util/file-paths.js";
 import type { WizardBoardPreset } from "./wizard-step-board-platforms.js";
 import "./wizard-step-board.js";
 import "./wizard-step-empty-config.js";
@@ -483,10 +484,10 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
    *   highlight + scroll for the next time the user lands back on
    *   ``/`` (e.g. after closing the editor with the back button).
    * - Then close the dialog and navigate to the device editor.
-   *   ``encodeURIComponent`` keeps spaces / Unicode safe in the URL
-   *   — ``app-shell``'s router render decodes the param on the
-   *   receiving side so ``this.id`` stays the raw filename for
-   *   ``configuration`` comparison.
+   *   ``deviceEditorUrl`` encodes each path segment so spaces /
+   *   Unicode stay safe in the URL; ``app-shell``'s router render
+   *   decodes it on the receiving side so ``this.id`` stays the raw
+   *   configuration for comparison.
    *
    * Public so the import controller can reuse it; centralised so the
    * creation paths can't drift on which one-shot signals they arm.
@@ -494,7 +495,7 @@ export class ESPHomeCreateConfigDialog extends LitElement implements ImportFlowH
   async navigateToCreated(configuration: string): Promise<void> {
     markJustCreated(configuration);
     markPendingHighlight(configuration);
-    if (await navigate(`/device/${encodeURIComponent(configuration)}`)) this.close();
+    if (await navigate(deviceEditorUrl(configuration))) this.close();
   }
 
   private async _onCreateEmptyConfig(

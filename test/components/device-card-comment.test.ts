@@ -44,3 +44,20 @@ describe("device-card comment", () => {
     expect(el.shadowRoot!.querySelector(".device-comment")).toBeNull();
   });
 });
+
+describe("device-card configuration line", () => {
+  it("shows a nested configuration's file name with the full path as its title", async () => {
+    const el = await mount({ configuration: "devices/lights/desk.yaml" });
+    const node = el.shadowRoot!.querySelector<HTMLElement>(".device-config")!;
+    expect(node.textContent!.trim()).toMatch(/^desk\.yaml\s+devices\/lights$/);
+    expect(node.querySelector(".config-folder")?.textContent).toBe("devices/lights");
+    expect(node.title).toBe("devices/lights/desk.yaml");
+  });
+
+  it("shows a top-level configuration's file name with no folder", async () => {
+    const el = await mount({ configuration: "kitchen.yaml" });
+    const node = el.shadowRoot!.querySelector<HTMLElement>(".device-config")!;
+    expect(node.textContent!.trim()).toBe("kitchen.yaml");
+    expect(node.querySelector(".config-folder")).toBeNull();
+  });
+});

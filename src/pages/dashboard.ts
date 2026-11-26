@@ -173,6 +173,7 @@ import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-conf
 import "../components/select-bar.js";
 import "../components/wizard/create-config-dialog.js";
 import { findBoardDisagreement, openBoardReselect } from "../util/board-change.js";
+import { deviceEditorUrl } from "../util/file-paths.js";
 
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,
@@ -1072,7 +1073,7 @@ export class ESPHomePageDashboard extends LitElement {
     () => this._localize
   );
   _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
-    void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+    void navigate(deviceEditorUrl(e.detail.configuration));
   };
 
   /** Chip-mismatch recovery hand-off from the install dialog. */

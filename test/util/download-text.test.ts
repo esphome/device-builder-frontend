@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  configurationStem,
   downloadAnsiText,
   downloadBlob,
   triggerDownload,
@@ -164,5 +165,18 @@ describe("triggerDownload", () => {
     // so there is no object URL to mint or revoke either.
     expect(FakeBlob.instances).toHaveLength(0);
     expect(url.createObjectURL).not.toHaveBeenCalled();
+  });
+});
+
+describe("configurationStem", () => {
+  it("drops the extension and, for a nested device, the folder", () => {
+    expect(configurationStem("kitchen.yaml", "device")).toBe("kitchen");
+    expect(configurationStem("devices/lights/desk.yml", "device")).toBe("desk");
+  });
+
+  it("falls back for a missing, empty or extension-only configuration", () => {
+    expect(configurationStem(undefined, "device")).toBe("device");
+    expect(configurationStem("", "device")).toBe("device");
+    expect(configurationStem("devices/.yaml", "device")).toBe("device");
   });
 });

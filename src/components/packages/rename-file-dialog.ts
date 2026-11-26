@@ -23,6 +23,7 @@ import {
   fileNameOf,
   folderOf,
   isArchivedPath,
+  isDevicePath,
   newPackagePathProblem,
 } from "../../util/file-paths.js";
 import {
@@ -238,9 +239,7 @@ export class ESPHomeRenameFileDialog extends LitElement {
     if (isArchivedPath(path)) {
       return { label: path, detail: this._localize("packages.rename_archived") };
     }
-    return folderOf(path) === ""
-      ? deviceItems([path], this._devices)[0]
-      : { label: path };
+    return isDevicePath(path) ? deviceItems([path], this._devices)[0] : { label: path };
   }
 
   private _toggle(path: string, checked: boolean) {

@@ -42,6 +42,13 @@ describe("renderYamlMode hit header", () => {
     expect(anchor?.getAttribute("href")).toBe("/device/living_room.yaml");
   });
 
+  it("keeps a nested configuration's folder slashes literal in the link", () => {
+    const hit = { ...makeHit(), configuration: "devices/rooms/living room.yaml" };
+    const container = renderInto(renderYamlMode(makeHost([hit])));
+    const anchor = container.querySelector<HTMLAnchorElement>(".yaml-hit-group-name");
+    expect(anchor?.getAttribute("href")).toBe("/device/devices/rooms/living%20room.yaml");
+  });
+
   it("displays the friendly label as the title text", () => {
     const container = renderInto(renderYamlMode(makeHost([makeHit()])));
     const anchor = container.querySelector<HTMLAnchorElement>(".yaml-hit-group-name");

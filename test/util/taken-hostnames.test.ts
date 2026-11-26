@@ -18,6 +18,14 @@ describe("takenHostnameSet", () => {
     expect(set.has("other")).toBe(false);
   });
 
+  it("uses a nested device's file name stem, not its path", () => {
+    const set = takenHostnameSet([
+      { name: "desk", configuration: "devices/lights/desk-lamp.yaml" },
+    ]);
+    expect(set.has("desk-lamp")).toBe(true);
+    expect(set.has("devices/lights/desk-lamp")).toBe(false);
+  });
+
   it("includes discovered-but-unadopted device names", () => {
     const set = takenHostnameSet(
       [{ name: "kitchen-plug", configuration: "kitchen-plug.yaml" }],

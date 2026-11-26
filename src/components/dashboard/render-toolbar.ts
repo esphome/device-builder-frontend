@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DashboardView } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { folderOf } from "../../util/file-paths.js";
 import { tourAnchor } from "../guided-tour/tour-anchor.js";
 import { renderFacets } from "./render-facets.js";
 import { renderYamlPreviewPivot } from "./render-yaml.js";
@@ -262,6 +263,15 @@ export function renderAddDeviceCard(
   `;
 }
 
+/** Whether *configurations* holds a device nested under ``devices/``, which
+ *  the backend does not archive yet. */
+function hasNestedDevice(configurations: Iterable<string>): boolean {
+  for (const configuration of configurations) {
+    if (folderOf(configuration) !== "") return true;
+  }
+  return false;
+}
+
 export function renderSelectBarOrFab(
   host: ESPHomePageDashboard
 ): TemplateResult | string {
@@ -270,6 +280,7 @@ export function renderSelectBarOrFab(
       <esphome-select-bar
         selected-count=${host._selectedDevices.size}
         ?all-visible-selected=${host._allVisibleSelected}
+        ?archive-disabled=${hasNestedDevice(host._selectedDevices)}
         @select-all=${() => host._addToSelection(host._currentlyVisibleConfigurations())}
         @deselect-all=${() =>
           host._removeFromSelection(host._currentlyVisibleConfigurations())}

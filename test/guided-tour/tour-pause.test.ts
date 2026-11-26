@@ -286,6 +286,26 @@ describe("guided-tour pause state", () => {
     expect(getTourConfiguration()).toBe("my tour.yaml");
   });
 
+  it("remembers a nested configuration with literal slashes", () => {
+    window.history.replaceState(null, "", "/device/devices/lights/my%20tour.yaml");
+
+    captureTourConfiguration(true);
+
+    expect(getTourConfiguration()).toBe("devices/lights/my tour.yaml");
+  });
+
+  it("resumes a nested device with its slashes kept literal", async () => {
+    const yamlIndex = TOUR_STEPS.findIndex((step) => step.anchors.includes("yaml"));
+    setTourPending(yamlIndex);
+    setTourConfiguration("devices/lights/my device.yaml");
+    const state = internals(new ESPHomeGuidedTour());
+
+    state.firstUpdated();
+    await Promise.resolve();
+
+    expect(navigate).toHaveBeenCalledWith("/device/devices/lights/my%20device.yaml");
+  });
+
   it("does not steal Enter from a focused tour button", () => {
     const state = internals(new ESPHomeGuidedTour());
     state._active = true;

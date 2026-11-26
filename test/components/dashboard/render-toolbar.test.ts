@@ -150,6 +150,16 @@ describe("renderSelectBarOrFab bulk action wiring", () => {
     expect(compileSelected).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    [["a.yaml", "b.yaml"], false],
+    [["a.yaml", "devices/lights/desk.yaml"], true],
+  ])("disables bulk Archive when %j holds a nested device: %j", (selected, disabled) => {
+    const bar = renderInto(
+      renderSelectBarOrFab(makeSelectHost({ _selectedDevices: new Set(selected) }))
+    ).querySelector("esphome-select-bar")!;
+    expect(bar.hasAttribute("archive-disabled")).toBe(disabled);
+  });
+
   it("keeps update-selected wired to _updateSelected", () => {
     const updateSelected = vi.fn();
     dispatchFromBar(

@@ -127,3 +127,26 @@ describe("esphome-select-bar update split button", () => {
     expect(caretOf(el).getAttribute("aria-expanded")).toBe("false");
   });
 });
+
+describe("esphome-select-bar archive button", () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  function archiveButton(el: ESPHomeSelectBar): HTMLButtonElement {
+    return el
+      .shadowRoot!.querySelector('wa-icon[name="archive-outline"]')!
+      .closest("button")!;
+  }
+
+  it("is enabled for a selection the backend can archive", async () => {
+    expect(archiveButton(await mount()).disabled).toBe(false);
+  });
+
+  it("is disabled while the selection holds a nested device", async () => {
+    const el = await mount();
+    el.archiveDisabled = true;
+    await el.updateComplete;
+    expect(archiveButton(el).disabled).toBe(true);
+  });
+});

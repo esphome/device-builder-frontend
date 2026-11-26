@@ -17,6 +17,7 @@ import {
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { isApplePlatform } from "./apple-platform.js";
+import { openTargetUrl } from "./file-paths.js";
 import { readKeyText } from "./yaml-ast.js";
 
 /** A path ending in ``.yaml`` / ``.yml`` (any case): same rules as the backend's
@@ -98,6 +99,13 @@ export function resolveIncludePath(basePath: string, ref: string): string | null
   return parts.join("/");
 }
 
+/** *ref* resolved like {@link resolveIncludePath}, or null when nothing opens it
+ *  either (a refused secrets-like file). */
+function linkablePath(basePath: string, ref: string): string | null {
+  const path = resolveIncludePath(basePath, ref);
+  return path !== null && openTargetUrl(path) !== null ? path : null;
+}
+
 const linkMark = (title: string) =>
   Decoration.mark({ class: "cm-include-link", attributes: { title } });
 
@@ -112,8 +120,8 @@ function buildDecorations(
   let last = -1;
   for (const { from, to } of view.visibleRanges) {
     for (const t of findIncludeTargets(view.state, from, to)) {
-      // A click on a target outside the config dir does nothing, so it isn't a link.
-      if (t.from <= last || resolveIncludePath(basePath, t.ref) === null) continue;
+      // A click on a target outside the config dir or one nothing opens does nothing, so it isn't a link.
+      if (t.from <= last || linkablePath(basePath, t.ref) === null) continue;
       builder.add(t.from, t.to, mark);
       last = t.from;
     }
@@ -181,6 +189,13 @@ export function includeLinks(
   const click = EditorView.domEventHandlers({
     mousedown(event, view) {
       if (!linkModifier(event) || event.button !== 0) return false;
+      // The empty space after an include maps to the path's end offset; only a click on the link itself opens it.
+      if (
+        !(event.target instanceof Element) ||
+        !event.target.closest(".cm-include-link")
+      ) {
+        return false;
+      }
       const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
       if (pos === null) return false;
       const path = includePathAt(view, pos, getBasePath());
@@ -213,5 +228,5 @@ export function includePathAt(
   const hit = findIncludeTargets(view.state, pos, pos).find(
     (t) => pos >= t.from && pos <= t.to
   );
-  return hit ? resolveIncludePath(basePath, hit.ref) : null;
+  return hit ? linkablePath(basePath, hit.ref) : null;
 }

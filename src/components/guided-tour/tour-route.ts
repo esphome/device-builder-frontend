@@ -1,4 +1,5 @@
 import { stripBase } from "../../util/base-path.js";
+import { deviceEditorUrl } from "../../util/file-paths.js";
 import { navigate } from "../../util/navigation.js";
 import { getTourConfiguration, setTourConfiguration } from "./tour-session.js";
 import type { TourStep } from "./tour-steps.js";
@@ -23,7 +24,7 @@ export function navigateToTourStep(
     target = "/";
   } else if (resuming && step.route === "device" && !onTourDeviceRoute()) {
     const configuration = getTourConfiguration();
-    if (configuration) target = `/device/${encodeURIComponent(configuration)}`;
+    if (configuration) target = deviceEditorUrl(configuration);
   }
   if (target === null) return false;
 

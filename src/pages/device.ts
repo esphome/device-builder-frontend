@@ -64,6 +64,7 @@ import {
 import { ConfigLoadController } from "../util/config-load-controller.js";
 import { showPendingChanges, showUpdateAvailable } from "../util/device-sync.js";
 import { deviceLayoutToPref, prefToDeviceLayout } from "../util/editor-layout.js";
+import { deviceEditorUrl } from "../util/file-paths.js";
 import { followActiveJob } from "../util/firmware-job-display.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { goBackOrHome, navigate, PopLeaveGuardController } from "../util/navigation.js";
@@ -535,7 +536,7 @@ export class ESPHomePageDevice extends LitElement {
       this._kickSectionFlush();
       return this._isDirty || (this._activeSection?.lastFlushFailed ?? false);
     },
-    url: () => `/device/${this.id}`,
+    url: () => deviceEditorUrl(this.id),
   });
 
   private get _isYamlDirty(): boolean {
@@ -1291,7 +1292,7 @@ export class ESPHomePageDevice extends LitElement {
   private _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     e.stopPropagation();
     if (e.detail.configuration === this._device?.configuration) return;
-    void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+    void navigate(deviceEditorUrl(e.detail.configuration));
   };
 
   private _onRequestDownloadFirmware = (e: CustomEvent<ConfiguredDevice>) =>

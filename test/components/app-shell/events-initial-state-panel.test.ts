@@ -118,6 +118,20 @@ describe("handleEvent INITIAL_STATE panel seeds", () => {
     expect(host._activeJobs.get("brand-new.yaml")?.job_id).toBe("j-ren");
   });
 
+  it("mirrors a nested RENAME job under the new name in the same folder", () => {
+    const host = makeHost();
+    const rename = makeFirmwareJob({
+      job_id: "j-ren",
+      configuration: "devices/lights/old.yml",
+      job_type: JobType.RENAME,
+      status: JobStatus.RUNNING,
+      new_name: "brand-new",
+    });
+    dispatch(host, { firmware_jobs: [rename] });
+    expect(host._activeJobs.get("devices/lights/old.yml")?.job_id).toBe("j-ren");
+    expect(host._activeJobs.get("devices/lights/brand-new.yml")?.job_id).toBe("j-ren");
+  });
+
   it("seeds the jobs snapshot in one shot, terminal jobs history-only", () => {
     const host = makeHost();
     const running = makeFirmwareJob({
