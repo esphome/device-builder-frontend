@@ -1,16 +1,25 @@
+# Approves Dependabot PRs so they only need a maintainer merge.
+#
+# Runs on `pull_request`, not `pull_request_target`. It uses the job's
+# GITHUB_TOKEN because Dependabot-triggered `pull_request` runs get no
+# Actions secrets, but they do respect the `permissions:` block below.
 name: Auto-approve Dependabot PRs
 
-on: pull_request_target
+on: pull_request
 
 permissions:
-  pull-requests: write
+  pull-requests: write  # raises the read-only Dependabot token so it can approve
 
 jobs:
   auto-approve:
-    if: github.actor == 'dependabot[bot]'
+    if: >-
+      github.actor == 'dependabot[bot]'
+      && github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - run: gh pr review --approve "$PR_URL"
+      - name: Approve the pull request
+        run: gh pr review --approve "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ github.token }}
