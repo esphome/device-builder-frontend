@@ -446,6 +446,14 @@ describe("esphome-secrets-structured-editor", () => {
     expect(link!.getAttribute("href")).toBe("/device/bw15.yaml");
   });
 
+  test("a group header keeps a nested device's folder slashes literal", async () => {
+    const el = await mount("bw15__api: a\n", false, [
+      { name: "bw15", configuration: "devices/lights/bw15.yaml", friendly_name: "BW15" },
+    ]);
+    const link = el.shadowRoot!.querySelector<HTMLAnchorElement>(".group-link");
+    expect(link!.getAttribute("href")).toBe("/device/devices/lights/bw15.yaml");
+  });
+
   test("a group header is plain text when no matching device exists", async () => {
     const el = await mount("bw15__api: a\n");
     expect(el.shadowRoot!.querySelector(".group-link")).toBeNull();

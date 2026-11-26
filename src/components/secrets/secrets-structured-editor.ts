@@ -15,6 +15,7 @@ import { inputStyles } from "../../styles/inputs.js";
 import { modalDialogStyles } from "../../styles/modal-dialog.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
+import { deviceEditorUrl } from "../../util/file-paths.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { navigateOrReload } from "../../util/navigation.js";
 import { notifyError } from "../../util/notify.js";
@@ -153,7 +154,7 @@ export class ESPHomeSecretsStructuredEditor extends LitElement {
     // The anchor href carries the deployment base path (HA ingress / reverse
     // proxy) so modifier-click / copy-link resolve correctly; ``navigate``
     // gets the un-based path and applies the base itself.
-    const path = `/device/${encodeURIComponent(match.configuration)}`;
+    const path = deviceEditorUrl(match.configuration);
     const href = withBase(path);
     return html`<h2 class="group-header">
       <a

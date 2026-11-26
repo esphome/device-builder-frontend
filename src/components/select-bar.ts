@@ -47,6 +47,11 @@ export class ESPHomeSelectBar extends LitElement {
   @property({ type: Boolean, attribute: "all-visible-selected" })
   allVisibleSelected = false;
 
+  /** True when the selection holds a device the backend cannot archive yet
+   *  (one nested under ``devices/``). */
+  @property({ type: Boolean, attribute: "archive-disabled" })
+  archiveDisabled = false;
+
   @state()
   private _menuOpen = false;
 
@@ -398,7 +403,7 @@ export class ESPHomeSelectBar extends LitElement {
           <button
             class="btn btn--secondary"
             aria-label=${archiveAriaLabel}
-            ?disabled=${count === 0}
+            ?disabled=${count === 0 || this.archiveDisabled}
             @click=${() => fireEvent(this, "archive-selected")}
           >
             <wa-icon library="mdi" name="archive-outline"></wa-icon>

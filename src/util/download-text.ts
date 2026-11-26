@@ -1,4 +1,5 @@
 import { stripAnsiSgr } from "./ansi-escapes.js";
+import { fileStemOf } from "./file-paths.js";
 
 /**
  * Trigger a browser save of *bytes* as *filename* via an
@@ -62,7 +63,7 @@ export function configurationStem(
   configuration: string | undefined,
   fallback: string
 ): string {
-  return configuration?.replace(/\.ya?ml$/, "") || fallback;
+  return (configuration && fileStemOf(configuration)) || fallback;
 }
 
 /**

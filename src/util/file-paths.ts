@@ -1,29 +1,108 @@
 /**
- * Helpers for config-relative file paths (package / include YAMLs).
+ * Helpers for config-relative file paths (devices and package / include YAMLs).
  *
- * A YAML at the top of the config dir is a device; one in a subfolder
- * is a package. The backend is authoritative; these only shape URLs and
- * catch obvious input mistakes before the round-trip.
+ * A YAML at the top of the config dir, or anywhere under the top-level
+ * ``devices/`` folder, is a device; any other YAML in a subfolder is a
+ * package. Secrets files (``secrets.yaml`` and ``secrets.<name>.yaml``) are
+ * neither. The backend is authoritative; these only shape URLs and catch
+ * obvious input mistakes before the round-trip.
  */
 
 const YAML_RE = /\.ya?ml$/i;
+// The trailing dots and spaces Win32 drops from a file name, as the backend does.
+const TRAILING_DOTS_RE = /[. ]+$/;
+
+/** Top-level folder whose YAMLs, at any depth, are devices (exact, lowercase). */
+export const DEVICES_DIR = "devices";
+
+function encodeSegments(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
 
 /** App-relative URL of the file editor for *path* (slashes kept literal). */
 export function fileEditorUrl(path: string): string {
-  return `/file/${path.split("/").map(encodeURIComponent).join("/")}`;
+  return `/file/${encodeSegments(path)}`;
 }
 
-/** Where to open config-relative *path*: the device editor for a top-level
- *  YAML (the scanner's device rule), the file editor for anything deeper. */
-export function openTargetUrl(path: string): string {
-  return folderOf(path) === ""
-    ? `/device/${encodeURIComponent(path)}`
-    : fileEditorUrl(path);
+/** App-relative URL of the device editor for *configuration*; a nested
+ *  device keeps its literal slashes like {@link fileEditorUrl}. */
+export function deviceEditorUrl(configuration: string): string {
+  return `/device/${encodeSegments(configuration)}`;
 }
 
-/** Whether *path* is an archived device (``archive/<name>``); it has no editor. */
+/** *path*'s file name the way Win32 resolves it: trailing dots and spaces
+ *  gone, case folded. */
+function foldedFileName(path: string): string {
+  return fileNameOf(path).replace(TRAILING_DOTS_RE, "").toLowerCase();
+}
+
+/** Whether *path* names a secrets file (``secrets.yaml``, ``secrets.ci.yaml``, ...). */
+export function isSecretsLikeName(path: string): boolean {
+  const name = foldedFileName(path);
+  return name.startsWith("secrets.") && YAML_RE.test(name);
+}
+
+/** Whether *path* is THE secrets file ``!secret`` reads (``secrets.yaml`` or
+ *  ``.yml``, at any depth); ``secrets.ci.yaml`` is not. */
+export function isSecretsFile(path: string): boolean {
+  const name = foldedFileName(path);
+  return name === "secrets.yaml" || name === "secrets.yml";
+}
+
+/** Whether every segment of *path* is non-empty and not hidden, and it ends
+ *  in a YAML name: the only files the backend walks. */
+function isVisibleYaml(parts: readonly string[]): boolean {
+  return (
+    parts.every((p) => p !== "" && !p.startsWith(".")) &&
+    YAML_RE.test(parts[parts.length - 1])
+  );
+}
+
+/** Whether config-relative *path* is a device: a visible YAML at the top
+ *  level or under ``devices/``, and not a secrets file. Mirrors the
+ *  backend's classifier. */
+export function isDevicePath(path: string): boolean {
+  const parts = path.split("/");
+  return (
+    isVisibleYaml(parts) &&
+    !isSecretsLikeName(path) &&
+    (parts.length === 1 || parts[0] === DEVICES_DIR)
+  );
+}
+
+/** Whether config-relative *path* is a package: a visible subfolder YAML
+ *  outside ``devices/`` and ``archive/`` that is not a secrets file. */
+export function isPackagePath(path: string): boolean {
+  const parts = path.split("/");
+  return (
+    parts.length > 1 &&
+    isVisibleYaml(parts) &&
+    !isSecretsLikeName(path) &&
+    parts[0] !== DEVICES_DIR &&
+    !isArchivedPath(path)
+  );
+}
+
+/** Whether any segment of *path* is hidden (starts with a dot): the backend
+ *  neither walks such files nor answers usage lookups for them. */
+export function isHiddenPath(path: string): boolean {
+  return path.split("/").some((p) => p.startsWith("."));
+}
+
+/** Where to open config-relative *path*: the Secrets page for the top-level
+ *  secrets file, the device editor for a device, the file editor otherwise.
+ *  Null for any other secrets-like file, which the file editor refuses. */
+export function openTargetUrl(path: string): string | null {
+  if (isSecretsLikeName(path))
+    return !path.includes("/") && isSecretsFile(path) ? "/secrets" : null;
+  return isDevicePath(path) ? deviceEditorUrl(path) : fileEditorUrl(path);
+}
+
+/** Whether *path* lies in the top-level ``archive/`` folder (any case, as
+ *  the backend folds it); an archived device has no editor. */
 export function isArchivedPath(path: string): boolean {
-  return path.startsWith("archive/");
+  const slash = path.indexOf("/");
+  return slash > 0 && path.slice(0, slash).toLowerCase() === "archive";
 }
 
 /** Folder part of *path* ("" for a top-level file). */
@@ -35,6 +114,20 @@ export function folderOf(path: string): string {
 /** File name part of *path*. */
 export function fileNameOf(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
+}
+
+/** File name of *path* without its YAML extension: the device name a
+ *  configuration stands for, whatever folder it sits in. */
+export function fileStemOf(path: string): string {
+  return fileNameOf(path).replace(YAML_RE, "");
+}
+
+/** *configuration* renamed to *newName*, keeping its folder and its
+ *  ``.yaml`` / ``.yml`` extension (``.yaml`` when it has neither). */
+export function renamedConfiguration(configuration: string, newName: string): string {
+  const ext = configuration.match(/\.ya?ml$/)?.[0] ?? ".yaml";
+  const folder = folderOf(configuration);
+  return `${folder ? `${folder}/` : ""}${newName}${ext}`;
 }
 
 /** *paths* grouped by folder; folders and files keep the input order. */
@@ -64,11 +157,9 @@ export function newPackagePathProblem(raw: string): string | null {
   // Unicode, like the backend's Python ``\w``.
   if (parts.some((p) => !/^[\p{L}\p{N}_]/u.test(p))) return "packages.path_start";
   if (!YAML_RE.test(path)) return "packages.path_needs_yaml";
-  if (
-    /^secrets\.ya?ml$/i.test(fileNameOf(path)) ||
-    parts[0].toLowerCase() === "archive"
-  ) {
+  if (isSecretsLikeName(path) || parts[0].toLowerCase() === "archive") {
     return "packages.path_reserved";
   }
+  if (parts[0] === DEVICES_DIR) return "packages.path_in_devices";
   return null;
 }

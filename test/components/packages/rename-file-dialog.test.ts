@@ -30,6 +30,10 @@ async function openDialog(
     _api: { getFileUsage: vi.fn().mockResolvedValue(reply) },
     _devices: [
       makeConfiguredDevice({ configuration: "kitchen.yaml", friendly_name: "Kitchen" }),
+      makeConfiguredDevice({
+        configuration: "devices/lights/desk.yaml",
+        friendly_name: "Desk Lamp",
+      }),
     ],
   });
   document.body.appendChild(el);
@@ -97,6 +101,23 @@ describe("rename-file-dialog", () => {
       "kitchen.yaml",
     ]);
     expect(checkboxes(el).every((box) => box.checked)).toBe(true);
+  });
+
+  it("names a nested device by its friendly name, not as a plain file", async () => {
+    const el = await openDialog({
+      used_by: ["devices/lights/desk.yaml"],
+      rewritable: ["devices/lights/desk.yaml", "templates/light.yaml"],
+      unreadable: [],
+    });
+    const rows = [...el.shadowRoot!.querySelectorAll(".check-row")];
+    expect(rows.map((r) => r.querySelector(".link-label")?.textContent)).toEqual([
+      "Desk Lamp",
+      "templates/light.yaml",
+    ]);
+    expect(rows.map((r) => r.querySelector(".link-detail")?.textContent)).toEqual([
+      "devices/lights/desk.yaml",
+      undefined,
+    ]);
   });
 
   it("lists the files it can't update apart, without a checkbox", async () => {

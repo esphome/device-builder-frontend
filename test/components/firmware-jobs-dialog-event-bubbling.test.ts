@@ -13,9 +13,14 @@ vi.mock("../../src/util/notify.js", () => ({
   notifySuccess: vi.fn(),
   notifyError: vi.fn(),
 }));
+vi.mock("../../src/util/navigation.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/navigation.js")>()),
+  navigate: vi.fn().mockResolvedValue(true),
+}));
 
 import { dialogOpen, mount } from "../_dom.js";
 import { ESPHomeFirmwareJobsDialog } from "../../src/components/firmware-jobs-dialog.js";
+import { navigate } from "../../src/util/navigation.js";
 
 describe("firmware-jobs-dialog event bubbling", () => {
   it("lets open-reset-build-env escape to an ancestor", async () => {
@@ -53,5 +58,22 @@ describe("firmware-jobs-dialog event bubbling", () => {
     } finally {
       document.removeEventListener("open-settings", onOpenSettings);
     }
+  });
+
+  it("opens a nested device's editor from request-open-editor and closes", async () => {
+    const dialog = await mount(new ESPHomeFirmwareJobsDialog());
+    dialog.open();
+    await dialog.updateComplete;
+
+    dialog.shadowRoot!.querySelector("esphome-command-dialog")!.dispatchEvent(
+      new CustomEvent("request-open-editor", {
+        detail: { configuration: "devices/lights/desk lamp.yaml" },
+        bubbles: true,
+        composed: true,
+      })
+    );
+
+    expect(navigate).toHaveBeenCalledWith("/device/devices/lights/desk%20lamp.yaml");
+    expect(dialogOpen(dialog)).toBe(false);
   });
 });

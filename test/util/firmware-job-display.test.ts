@@ -117,3 +117,80 @@ describe("firmwareJobDisplayName (locally-submitted jobs)", () => {
     expect(firmwareJobDisplayName(j, NO_DEVICES, localize)).toBe("unknown.yaml");
   });
 });
+
+describe("firmwareJobDisplayName (nested device configurations)", () => {
+  it("names a remote_peer job on a nested local configuration by its file stem", () => {
+    /* Only the ``.esphome/.remote_builds/`` prefix marks a received
+       build; a nested device's folder (``lights``) is not its name. */
+    const j = job({
+      remote_peer: "alpha-dashboard",
+      configuration: "devices/lights/desk-led.yaml",
+      device_name: "",
+      device_friendly_name: "",
+    });
+
+    expect(firmwareJobDisplayName(j, NO_DEVICES, localize)).toBe("desk-led");
+  });
+
+  it("keeps the configuration when its stem is empty", () => {
+    const j = job({
+      remote_peer: "alpha-dashboard",
+      configuration: ".yaml",
+      device_name: "",
+      device_friendly_name: "",
+    });
+
+    expect(firmwareJobDisplayName(j, NO_DEVICES, localize)).toBe(".yaml");
+  });
+});
+
+describe("firmwareJobDisplayName (rename jobs)", () => {
+  const rename = (configuration: string, new_name = "lamp") =>
+    job({ job_type: JobType.RENAME, configuration, new_name });
+
+  it("labels the transition with the old and new names", () => {
+    expect(firmwareJobDisplayName(rename("desk.yaml"), NO_DEVICES, localize)).toBe(
+      "desk → lamp"
+    );
+  });
+
+  it("uses the file stem of a nested configuration, not its folder", () => {
+    expect(
+      firmwareJobDisplayName(rename("devices/lights/desk.yaml"), NO_DEVICES, localize)
+    ).toBe("desk → lamp");
+  });
+
+  it("prefixes the friendly name found under the old configuration", () => {
+    const devices = [
+      {
+        name: "desk",
+        friendly_name: "Desk Lamp",
+        configuration: "devices/lights/desk.yaml",
+      },
+    ] as ConfiguredDevice[];
+
+    expect(
+      firmwareJobDisplayName(rename("devices/lights/desk.yaml"), devices, localize)
+    ).toBe("Desk Lamp (desk → lamp)");
+  });
+
+  it("finds the device under the new nested configuration once renamed", () => {
+    const devices = [
+      { name: "lamp", friendly_name: "", configuration: "devices/lights/lamp.yml" },
+    ] as ConfiguredDevice[];
+
+    expect(
+      firmwareJobDisplayName(rename("devices/lights/desk.yml"), devices, localize)
+    ).toBe("lamp (desk → lamp)");
+  });
+
+  it("drops the friendly prefix when it equals the old name", () => {
+    const devices = [
+      { name: "desk", friendly_name: "", configuration: "desk.yaml" },
+    ] as ConfiguredDevice[];
+
+    expect(firmwareJobDisplayName(rename("desk.yaml"), devices, localize)).toBe(
+      "desk → lamp"
+    );
+  });
+});

@@ -78,6 +78,14 @@ describe("esphome-page-file rendering", () => {
     const top = makePage({ path: "_shared.yaml" }).render();
     expect(findTemplatesByAnchor(top, 'name="delete"')).toHaveLength(0);
   });
+
+  test.each(["devices/lights/desk.yaml", "common/secrets.yaml"])(
+    "offers no Delete for %s, which is not a package",
+    (path) => {
+      const tree = makePage({ path }).render();
+      expect(findTemplatesByAnchor(tree, 'name="delete"')).toHaveLength(0);
+    }
+  );
 });
 
 describe("esphome-page-file save", () => {
@@ -100,6 +108,22 @@ describe("esphome-page-file save", () => {
     );
     expect(page._savedYaml).toBe("logger:\n  level: INFO\n");
   });
+
+  test.each(["secrets.yaml", "devices/garage/secrets.yml"])(
+    "saves %s without expected, which the backend refuses for a secrets file",
+    async (path) => {
+      const updateConfig = vi.fn().mockResolvedValue(undefined);
+      const page = makePage({ path, _yaml: "wifi_ssid: x\n" });
+      page._api = {
+        updateConfig,
+        getFileUsage: vi.fn().mockResolvedValue({ used_by: [], unknown: [] }),
+      } as unknown as ESPHomeAPI;
+
+      expect(await page._save()).toBe(true);
+
+      expect(updateConfig).toHaveBeenCalledWith(path, "wifi_ssid: x\n", {});
+    }
+  );
 
   test("an outside edit keeps the buffer dirty and offers Reload", async () => {
     const page = makePage({ _yaml: "new: 1\n" });
@@ -545,6 +569,27 @@ describe("esphome-page-file rename", () => {
     expect(page._renamingPath).toBeNull();
   });
 
+  test("one rename finishing doesn't unlock another's file", async () => {
+    const finish: Array<(r: unknown) => void> = [];
+    const page = makePage() as unknown as RenameView & { _renamingPath: string | null };
+    page._api = {
+      renameFile: vi.fn(() => new Promise((resolve) => finish.push(resolve))),
+    } as unknown as ESPHomeAPI;
+    const start = (path: string) =>
+      page._rename(
+        new CustomEvent("rename-file", { detail: { path, newPath: "x/y.yaml" } })
+      );
+
+    const a = start("common/a.yaml");
+    const b = start("common/b.yaml");
+    finish[0]({ path: "x/y.yaml", rewritten: [], unresolved: [] });
+    await a;
+    expect(page._renamingPath).toBe("common/b.yaml");
+    finish[1]({ path: "x/y.yaml", rewritten: [], unresolved: [] });
+    await b;
+    expect(page._renamingPath).toBeNull();
+  });
+
   test("a failed rename stays put", async () => {
     const page = makePage() as unknown as RenameView;
     page._api = {
@@ -559,4 +604,30 @@ describe("esphome-page-file rename", () => {
 
     expect(navigate).not.toHaveBeenCalled();
   });
+});
+
+describe("esphome-page-file refused and hidden paths", () => {
+  const usageButtons = (tree: unknown) =>
+    findTemplatesByAnchor(tree, 'name="devices"').length;
+  const text = (tree: unknown) => JSON.stringify(tree);
+
+  test("shows the usage action for a visible file only", () => {
+    expect(usageButtons(makePage().render())).toBe(1);
+    expect(usageButtons(makePage({ path: "common/.hidden.yaml" }).render())).toBe(0);
+    expect(usageButtons(makePage({ path: "common/secrets.yaml" }).render())).toBe(0);
+  });
+
+  test.each(["secrets.yaml", "common/secrets.ci.yml"])(
+    "%s is refused as not found and never loaded",
+    (path) => {
+      const page = makePage({ path, _load: { state: "loading" } });
+      const load = vi.fn();
+      (page as unknown as { _load: { start: () => void } })._load.start = load;
+      (page as unknown as { willUpdate(c: Map<string, unknown>): void }).willUpdate(
+        new Map([["path", ""]])
+      );
+      expect(load).not.toHaveBeenCalled();
+      expect(text(page.render())).toContain("file.not_found");
+    }
+  );
 });

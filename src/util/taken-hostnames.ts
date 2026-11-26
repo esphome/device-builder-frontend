@@ -1,3 +1,5 @@
+import { fileStemOf } from "./file-paths.js";
+
 interface CacheEntry {
   importables: readonly { name: string }[] | undefined;
   set: ReadonlySet<string>;
@@ -23,9 +25,7 @@ export function takenHostnameSet(
   if (!devices) return EMPTY;
   const hit = cache.get(devices);
   if (hit && hit.importables === importables) return hit.set;
-  const set = new Set(
-    devices.flatMap((d) => [d.name, d.configuration.replace(/\.ya?ml$/i, "")])
-  );
+  const set = new Set(devices.flatMap((d) => [d.name, fileStemOf(d.configuration)]));
   for (const d of importables ?? []) set.add(d.name);
   cache.set(devices, { importables, set });
   return set;

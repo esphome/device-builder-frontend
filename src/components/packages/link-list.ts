@@ -2,7 +2,7 @@
  *  usage / dependencies dialog and the delete confirm. */
 import { css, html, nothing, type TemplateResult } from "lit";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
-import { isArchivedPath, openTargetUrl } from "../../util/file-paths.js";
+import { deviceEditorUrl, isArchivedPath, openTargetUrl } from "../../util/file-paths.js";
 
 export interface LinkItem {
   label: string;
@@ -24,7 +24,7 @@ export function deviceItems(
     return {
       label,
       detail: label === configuration ? undefined : configuration,
-      url: `/device/${encodeURIComponent(configuration)}`,
+      url: deviceEditorUrl(configuration),
     };
   });
 }

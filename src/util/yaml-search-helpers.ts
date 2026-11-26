@@ -18,6 +18,7 @@
 
 import type { YamlSearchHit, YamlSearchMatch } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { deviceEditorUrl } from "./file-paths.js";
 import { maskSensitiveLine, maskSensitiveLines } from "./yaml-sensitive-redact.js";
 
 /**
@@ -46,7 +47,7 @@ export function yamlHitLabel(hit: YamlSearchHit, match: YamlSearchMatch): string
  * highlight.
  */
 export function yamlHitHref(hit: YamlSearchHit, match: YamlSearchMatch): string {
-  return `/device/${encodeURIComponent(hit.configuration)}?line=${match.line_number}`;
+  return `${deviceEditorUrl(hit.configuration)}?line=${match.line_number}`;
 }
 
 /**
@@ -248,5 +249,5 @@ export function yamlSnippetBlockHref(
   // ``buildYamlSnippetBlocks`` always populates it.
   const firstMatch =
     block.matchedLines.size > 0 ? Math.min(...block.matchedLines) : block.startLine;
-  return `/device/${encodeURIComponent(hit.configuration)}?line=${firstMatch}`;
+  return `${deviceEditorUrl(hit.configuration)}?line=${firstMatch}`;
 }

@@ -40,7 +40,14 @@ import { loadMessageStyles } from "../styles/load-message.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { runBulkUpdate } from "../util/bulk-update.js";
 import { ConfigLoadController } from "../util/config-load-controller.js";
-import { fileEditorUrl, fileNameOf, folderOf } from "../util/file-paths.js";
+import {
+  fileEditorUrl,
+  fileNameOf,
+  isHiddenPath,
+  isPackagePath,
+  isSecretsFile,
+  isSecretsLikeName,
+} from "../util/file-paths.js";
 import { navigate, PopLeaveGuardController } from "../util/navigation.js";
 import { LONG_TOAST_DURATION_MS, notifyError, notifySuccess } from "../util/notify.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -97,6 +104,7 @@ export class ESPHomePageFile extends LitElement {
   @state() private _saving = false;
   /** The file a rename is moving: edits to it would be saved under the old name. */
   @state() private _renamingPath: string | null = null;
+  private _renameSeq = 0;
   /** Navigator selection and the YAML range it highlights. */
   @state() private _selectedSection: string | null = null;
   @state() private _selectedFromLine?: number;
@@ -173,8 +181,13 @@ export class ESPHomePageFile extends LitElement {
       this._selectedFromLine = undefined;
       this._highlight = null;
       this._scrollToHighlight = false;
-      void this._load.start();
+      if (!this._refused) void this._load.start();
     }
+  }
+
+  /** Secrets files belong to the Secrets page; the backend refuses files/* on them. */
+  private get _refused(): boolean {
+    return isSecretsLikeName(this.path);
   }
 
   /** The navigator needs a loaded file; without it the editor takes the full width. */
@@ -186,9 +199,10 @@ export class ESPHomePageFile extends LitElement {
     return this._yaml !== this._savedYaml;
   }
 
-  /** Only packages (subfolder YAMLs) are deletable here; a top-level file is a device. */
+  /** Only packages are deletable here; a device (top level or under
+   *  ``devices/``) or a secrets file is not. */
   private get _isPackage(): boolean {
-    return folderOf(this.path) !== "";
+    return isPackagePath(this.path);
   }
 
   private _onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -284,10 +298,18 @@ export class ESPHomePageFile extends LitElement {
                 </button>`
               : null
           }
-          <button type="button" class="header-button" @click=${this._showUsage}>
-            <wa-icon library="mdi" name="devices"></wa-icon>
-            ${this._localize("packages.show_usage")}
-          </button>
+          ${
+            this._refused || isHiddenPath(this.path)
+              ? null
+              : html`<button
+                  type="button"
+                  class="header-button"
+                  @click=${this._showUsage}
+                >
+                  <wa-icon library="mdi" name="devices"></wa-icon>
+                  ${this._localize("packages.show_usage")}
+                </button>`
+          }
           ${
             this._isPackage
               ? html`<button
@@ -336,13 +358,13 @@ export class ESPHomePageFile extends LitElement {
           }
           <div class="editor-card">
             ${renderAsyncState({
-              loading: this._load.state === "loading",
+              loading: !this._refused && this._load.state === "loading",
               loadingMessage: this._localize("file.loading"),
               loadingLead: html`<wa-spinner></wa-spinner>`,
               error:
                 this._load.state === "error"
                   ? this._localize("file.load_failed")
-                  : this._load.state === "missing"
+                  : this._refused || this._load.state === "missing"
                     ? this._localize("file.not_found", { path: this.path })
                     : null,
               errorActions: () =>
@@ -445,7 +467,9 @@ export class ESPHomePageFile extends LitElement {
     const content = this._yaml;
     this._saving = true;
     try {
-      await this._api.updateConfig(path, content, { expected: this._savedYaml });
+      // The backend refuses ``expected`` for a secrets file, at any depth.
+      const opts = isSecretsFile(path) ? {} : { expected: this._savedYaml };
+      await this._api.updateConfig(path, content, opts);
     } catch (err) {
       if (err instanceof APIError && err.errorCode === ErrorCode.PRECONDITION_FAILED) {
         notifyError(this._localize("file.changed_on_disk"), {
@@ -515,6 +539,7 @@ export class ESPHomePageFile extends LitElement {
       return;
     }
     this._renamingPath = e.detail.path;
+    const token = ++this._renameSeq;
     try {
       const newPath = await renameFile(this._api, this._localize, e.detail);
       // The user may have moved on while the rename ran.
@@ -522,7 +547,8 @@ export class ESPHomePageFile extends LitElement {
         await navigate(fileEditorUrl(newPath));
       }
     } finally {
-      this._renamingPath = null;
+      // A later rename (started after navigating away) owns the lock now.
+      if (token === this._renameSeq) this._renamingPath = null;
     }
   };
 

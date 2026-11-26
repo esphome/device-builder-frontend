@@ -634,7 +634,8 @@ export class ESPHomeYamlEditor extends CodeMirrorEditorElement {
 
   /** Open an include target: device YAMLs in the device editor, others in the file editor. */
   private _openInclude = (path: string) => {
-    void navigate(openTargetUrl(path));
+    const url = openTargetUrl(path);
+    if (url !== null) void navigate(url);
   };
 
   private _buildView() {

@@ -181,6 +181,13 @@ export function includeLinks(
   const click = EditorView.domEventHandlers({
     mousedown(event, view) {
       if (!linkModifier(event) || event.button !== 0) return false;
+      // The empty space after an include maps to the path's end offset; only a click on the link itself opens it.
+      if (
+        !(event.target instanceof Element) ||
+        !event.target.closest(".cm-include-link")
+      ) {
+        return false;
+      }
       const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
       if (pos === null) return false;
       const path = includePathAt(view, pos, getBasePath());

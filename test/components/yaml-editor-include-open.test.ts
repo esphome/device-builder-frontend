@@ -24,6 +24,17 @@ describe("yaml-editor include link target", () => {
     expect(navigate).toHaveBeenLastCalledWith("/file/common/base.yaml");
   });
 
+  it("opens the top-level secrets file on the Secrets page", () => {
+    editorWithDevices().open("secrets.yaml");
+    expect(navigate).toHaveBeenLastCalledWith("/secrets");
+  });
+
+  it("doesn't open a nested secrets file", () => {
+    vi.mocked(navigate).mockClear();
+    editorWithDevices().open("common/secrets.yaml");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it("opens a device YAML in the device editor", () => {
     editorWithDevices().open("_shared.yaml");
     expect(navigate).toHaveBeenLastCalledWith("/device/_shared.yaml");

@@ -190,6 +190,12 @@ describe("yamlHitHref", () => {
       "/device/guest%20room%20(1).yaml?line=7"
     );
   });
+
+  it("keeps a nested configuration's folder slashes literal", () => {
+    expect(
+      yamlHitHref(mkHit({ configuration: "devices/lights/desk led.yaml" }), MATCH)
+    ).toBe("/device/devices/lights/desk%20led.yaml?line=7");
+  });
 });
 
 describe("yamlHitDeviceLabel", () => {
@@ -579,5 +585,14 @@ describe("yamlSnippetBlockHref", () => {
     expect(
       yamlSnippetBlockHref(mkHit({ configuration: "guest room (1).yaml" }), block)
     ).toBe("/device/guest%20room%20(1).yaml?line=5");
+  });
+
+  it("keeps a nested configuration's folder slashes literal", () => {
+    const m = mkMatch({ line_number: 5, line_text: "wifi:" });
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(
+      yamlSnippetBlockHref(mkHit({ configuration: "devices/lights/desk.yaml" }), block)
+    ).toBe("/device/devices/lights/desk.yaml?line=5");
   });
 });

@@ -132,6 +132,28 @@ describe("esphome-page-packages create", () => {
     ).toBe(true);
   });
 
+  test("flags a path under devices/ and does not create it", async () => {
+    const createFile = vi.fn();
+    const page = await mountWith({
+      listPackages: vi.fn().mockResolvedValue([]),
+      createFile,
+    });
+
+    await typePath(page, "devices/lights/shared.yaml");
+    root(page)
+      .querySelector("form")!
+      .dispatchEvent(new Event("submit", { cancelable: true }));
+    await flushMicrotasks(4);
+
+    expect(root(page).querySelector(".problem")?.textContent).toBe(
+      "packages.path_in_devices"
+    );
+    expect(
+      root(page).querySelector<HTMLButtonElement>(".create .primary")!.disabled
+    ).toBe(true);
+    expect(createFile).not.toHaveBeenCalled();
+  });
+
   test("creates the file from the template and opens it", async () => {
     const createFile = vi.fn().mockResolvedValue({ path: "common/wifi.yaml" });
     const page = await mountWith({

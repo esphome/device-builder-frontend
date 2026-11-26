@@ -37,6 +37,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { textStyles } from "../styles/text.js";
 import { DialogOpenController } from "../util/dialog-open-controller.js";
 import { getErrorMessage } from "../util/error-message.js";
+import { deviceEditorUrl } from "../util/file-paths.js";
 import { fireEvent } from "../util/fire-event.js";
 import { cancelFirmwareJob } from "../util/firmware-job-actions.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
@@ -166,7 +167,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   private _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     e.stopPropagation();
     this.close();
-    void navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+    void navigate(deviceEditorUrl(e.detail.configuration));
   };
 
   private _onCleanBuild = (e: CustomEvent<ConfiguredDevice>) =>

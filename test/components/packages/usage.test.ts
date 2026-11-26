@@ -39,6 +39,16 @@ describe("link-list items", () => {
     ]);
   });
 
+  it("links a nested device with literal slashes", () => {
+    expect(deviceItems(["devices/lights/desk lamp.yaml"], devices)).toEqual([
+      {
+        label: "devices/lights/desk lamp.yaml",
+        detail: undefined,
+        url: "/device/devices/lights/desk%20lamp.yaml",
+      },
+    ]);
+  });
+
   it("links top-level files to the device editor, the rest to the file editor, absolute paths nowhere", () => {
     expect(
       fileItems([
@@ -47,6 +57,10 @@ describe("link-list items", () => {
         "/abs/x.yaml",
         "C:/abs/y.yaml",
         "archive/old.yaml",
+        "devices/lights/desk.yaml",
+        "secrets.yaml",
+        "common/secrets.yaml",
+        ".common.yaml",
       ])
     ).toEqual([
       { label: "common/a.yaml", url: "/file/common/a.yaml" },
@@ -54,6 +68,10 @@ describe("link-list items", () => {
       { label: "/abs/x.yaml", url: null },
       { label: "C:/abs/y.yaml", url: null },
       { label: "archive/old.yaml", url: null },
+      { label: "devices/lights/desk.yaml", url: "/device/devices/lights/desk.yaml" },
+      { label: "secrets.yaml", url: "/secrets" },
+      { label: "common/secrets.yaml", url: null },
+      { label: ".common.yaml", url: "/file/.common.yaml" },
     ]);
   });
 });

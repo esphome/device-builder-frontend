@@ -2,6 +2,7 @@ import { html, type TemplateResult } from "lit";
 import type { ConfiguredDevice, YamlSearchHit } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { deviceEditorUrl } from "../../util/file-paths.js";
 import { navigate } from "../../util/navigation.js";
 import {
   buildYamlSnippetBlocks,
@@ -80,7 +81,7 @@ function renderYamlDeviceTitle(
   trailing: TemplateResult | string,
   body: TemplateResult | string
 ): TemplateResult {
-  const deviceHref = `/device/${encodeURIComponent(configuration)}`;
+  const deviceHref = deviceEditorUrl(configuration);
   return html`
     <section class="yaml-hit-group">
       <header class="yaml-hit-group-header">

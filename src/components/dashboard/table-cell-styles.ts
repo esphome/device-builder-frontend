@@ -244,6 +244,9 @@ export const tableCellStyles = css`
   .cell-config {
     color: var(--wa-color-text-quiet);
   }
+  .cell-config .config-folder {
+    opacity: 0.7;
+  }
 
   .cell-actions {
     display: inline-flex;

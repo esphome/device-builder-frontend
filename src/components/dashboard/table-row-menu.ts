@@ -26,6 +26,7 @@ import { localizeContext } from "../../context/index.js";
 import { dropdownMenuStyles } from "../../styles/dropdown-menu.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EscapeController } from "../../util/escape-controller.js";
+import { folderOf } from "../../util/file-paths.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { busyActionLabel } from "../../util/update-tooltip.js";
@@ -180,6 +181,9 @@ export class ESPHomeTableRowMenu extends LitElement {
 
   protected render() {
     if (!this.device || !this.position) return nothing;
+    // Rename and archive only handle top-level YAMLs for now; the backend
+    // refuses them for a device nested under ``devices/``.
+    const nested = folderOf(this.device.configuration) !== "";
 
     return html`
       <div
@@ -235,13 +239,17 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="file-tree-outline"></wa-icon>
           ${this._localize("dashboard.action_show_dependencies")}
         </div>
-        <div
-          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
-          @click=${this.busy ? undefined : () => this._emit("rename-device")}
-        >
-          <wa-icon library="mdi" name="rename-outline"></wa-icon>
-          ${this._localize("dashboard.action_rename")}
-        </div>
+        ${
+          nested
+            ? nothing
+            : html`<div
+                class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+                @click=${this.busy ? undefined : () => this._emit("rename-device")}
+              >
+                <wa-icon library="mdi" name="rename-outline"></wa-icon>
+                ${this._localize("dashboard.action_rename")}
+              </div>`
+        }
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
           @click=${this.busy ? undefined : () => this._emit("clone-device")}
@@ -266,13 +274,17 @@ export class ESPHomeTableRowMenu extends LitElement {
           ${this._localize("dashboard.context_select")}
         </div>
         <div class="menu-divider"></div>
-        <div
-          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
-          @click=${this.busy ? undefined : () => this._emit("archive-device")}
-        >
-          <wa-icon library="mdi" name="archive-outline"></wa-icon>
-          ${this._localize("dashboard.action_archive")}
-        </div>
+        ${
+          nested
+            ? nothing
+            : html`<div
+                class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+                @click=${this.busy ? undefined : () => this._emit("archive-device")}
+              >
+                <wa-icon library="mdi" name="archive-outline"></wa-icon>
+                ${this._localize("dashboard.action_archive")}
+              </div>`
+        }
         <div
           class="menu-item menu-item--danger ${this.busy ? "menu-item--disabled" : ""}"
           @click=${this.busy ? undefined : () => this._emit("delete-device")}

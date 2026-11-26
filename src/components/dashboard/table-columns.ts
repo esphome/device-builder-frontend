@@ -3,9 +3,11 @@ import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import { DeviceState } from "../../api/types/devices.js";
 import { JobStatus } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { renderConfigLabel } from "../../util/config-label-template.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { isStatusUntracked } from "../../util/device-status.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
+import { fileNameOf } from "../../util/file-paths.js";
 import { fireEvent } from "../../util/fire-event.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
@@ -343,7 +345,18 @@ export function createDeviceColumns(
     {
       accessorKey: "config",
       header: localize("dashboard.table_col_config"),
-      cell: (info) => html`<span class="cell-mono cell-config">${info.getValue()}</span>`,
+      cell: (info) => {
+        const configuration = info.getValue() as string;
+        return html`<span class="cell-mono cell-config" title=${configuration}
+          >${renderConfigLabel(configuration)}</span
+        >`;
+      },
+      // By the file name shown first, the folder only breaking ties.
+      sortFn: (rowA, rowB) =>
+        DEVICE_SORT_COLLATOR.compare(
+          fileNameOf(rowA.original.config),
+          fileNameOf(rowB.original.config)
+        ) || DEVICE_SORT_COLLATOR.compare(rowA.original.config, rowB.original.config),
       size: 180,
       enableHiding: true,
     },

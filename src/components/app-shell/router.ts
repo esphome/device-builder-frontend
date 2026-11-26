@@ -11,7 +11,7 @@ import {
 import { notifyError } from "../../util/notify.js";
 import { sleep } from "../../util/sleep.js";
 
-// Decode the :id path param, falling back to the raw value on URIError so a
+// Decode a wildcard path param, falling back to the raw value on URIError so a
 // malformed % sequence doesn't crash the whole router — the device page's
 // "not found" empty state is the right UX for a broken URL.
 function decodeIdParam(id: string | undefined): string {
@@ -170,14 +170,15 @@ export function createRouter(
         html`<esphome-page-file .path=${decodeIdParam(params[0])}></esphome-page-file>`,
     },
     {
-      path: withBase("/device/:id"),
+      // Wildcard too: a nested device (``devices/lights/x.yaml``) keeps its slashes.
+      path: withBase("/device/*"),
       enter: () =>
         lazyEnter(
           () => import(/* webpackPrefetch: true */ "../../pages/device.js"),
           hooks
         ),
-      render: ({ id }) =>
-        html`<esphome-page-device .id=${decodeIdParam(id)}></esphome-page-device>`,
+      render: (params) =>
+        html`<esphome-page-device .id=${decodeIdParam(params[0])}></esphome-page-device>`,
     },
   ]);
 }

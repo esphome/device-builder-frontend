@@ -36,6 +36,8 @@ import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { ESPHomeCreateConfigDialog } from "../../../src/components/wizard/create-config-dialog.js";
 import enMessages from "../../../src/translations/en.json";
 import { _clearBoardBodyCache } from "../../../src/util/board-body-cache.js";
+import { clearJustCreated } from "../../../src/util/just-created.js";
+import { consumePendingHighlight } from "../../../src/util/pending-highlight.js";
 
 function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
   let resolve!: (v: T) => void;
@@ -294,6 +296,14 @@ describe("create-config-dialog create de-dupe + retry", () => {
     // The dialog closes only once the navigation went through.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._dialog.open).toBe(false);
+  });
+
+  it("opens a created device's editor with its folder slashes literal", async () => {
+    const el = await mount({});
+    await el.navigateToCreated("devices/lights/desk led.yaml");
+    expect(navigate).toHaveBeenCalledWith("/device/devices/lights/desk%20led.yaml");
+    expect(consumePendingHighlight()).toBe("devices/lights/desk led.yaml");
+    clearJustCreated();
   });
 
   it("keeps the dialog and its error when the Secrets navigation is vetoed", async () => {
