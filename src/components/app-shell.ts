@@ -18,7 +18,7 @@ import type {
 import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
 import { type ExperienceLevel, Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
-import type { RemoteBuildJobState } from "../context/index.js";
+import type { DashboardPrefs, RemoteBuildJobState } from "../context/index.js";
 import {
   activeJobsContext,
   apiConnectedContext,
@@ -32,6 +32,7 @@ import {
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
   darkModeContext,
+  dashboardPrefsContext,
   desktopUpdateCapableContext,
   desktopVersionContext,
   devicesContext,
@@ -97,6 +98,7 @@ import { consumePreAuthExhaustion, createRouter } from "./app-shell/router.js";
 import { dispatchOrStashSerialSetup } from "./app-shell/serial-setup.js";
 import {
   onPairRequestSent,
+  onSetDashboardPrefs,
   onSetExpertMode,
   onSetHideDeviceBuilder,
   onSetLanguage,
@@ -176,12 +178,8 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: experienceLevelContext })
   @state()
   _experienceLevel: ExperienceLevel | null = null;
-  @provide({ context: remoteComputeOnlyContext })
-  @state()
-  _remoteComputeOnly = false;
-  @provide({ context: hideDeviceBuilderContext })
-  @state()
-  _hideDeviceBuilder = false;
+  @provide({ context: remoteComputeOnlyContext }) @state() _remoteComputeOnly = false;
+  @provide({ context: hideDeviceBuilderContext }) @state() _hideDeviceBuilder = false;
   // Default true until the subscribe snapshot delivers preferences, matching
   // the backend default so the expert toggle paints as on before first load.
   @provide({ context: versionHistoryEnabledContext })
@@ -190,9 +188,10 @@ export class ESPHomeApp extends LitElement {
   // False until the subscribe snapshot delivers preferences; the dashboard
   // waits on it before honouring remote_compute_only so the accordion's
   // default section can't flip after first paint.
-  @provide({ context: prefsLoadedContext })
+  @provide({ context: prefsLoadedContext }) @state() _prefsLoaded = false;
+  @provide({ context: dashboardPrefsContext })
   @state()
-  _prefsLoaded = false;
+  _dashboardPrefs: DashboardPrefs | null = null;
   // Derived from _experienceLevel in willUpdate (EXPERT ⇒ true); there is no
   // separate expert_mode preference.
   @provide({ context: expertModeContext }) @state() _expertMode = false;
@@ -526,6 +525,7 @@ export class ESPHomeApp extends LitElement {
       ${this._connectionLost ? renderReconnectPill(this._localize) : nothing}
       <esphome-layout
         @set-theme=${(e: CustomEvent<string>) => onSetTheme(this, e)}
+        @set-dashboard-prefs=${(e: CustomEvent) => onSetDashboardPrefs(this, e)}
         @set-expert-mode=${(e: CustomEvent<boolean>) => onSetExpertMode(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}

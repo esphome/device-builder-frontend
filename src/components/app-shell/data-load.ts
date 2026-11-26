@@ -1,4 +1,5 @@
 import type { UserPreferences } from "../../api/types/system.js";
+import type { DashboardPrefs } from "../../context/index.js";
 import {
   isExperienceChosen,
   shouldAutoShowOnboarding,
@@ -13,6 +14,18 @@ export function applyPreferences(host: ESPHomeApp, prefs: UserPreferences): void
   host._remoteComputeOnly = prefs.remote_compute_only;
   host._hideDeviceBuilder = prefs.hide_device_builder;
   host._versionHistoryEnabled = prefs.version_history_enabled;
+  host._dashboardPrefs = pickDashboardPrefs(prefs);
+}
+
+/** The dashboard's view and table slice of *prefs*. */
+export function pickDashboardPrefs(prefs: UserPreferences): DashboardPrefs {
+  return {
+    dashboard_view: prefs.dashboard_view,
+    table_page_size: prefs.table_page_size,
+    table_column_visibility: prefs.table_column_visibility,
+    table_sort_column: prefs.table_sort_column,
+    table_sort_direction: prefs.table_sort_direction,
+  };
 }
 
 export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
