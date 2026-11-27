@@ -6,7 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { findDirectChildLine } from "../../src/util/yaml-section-reader.js";
+import {
+  findDirectChildLine,
+  isSectionRemoved,
+} from "../../src/util/yaml-section-reader.js";
 
 const lines = (yaml: string) => yaml.split("\n");
 const PASSWORD_RE = /^password\s*:/;
@@ -48,5 +51,36 @@ describe("findDirectChildLine", () => {
 
   it("returns -1 when the section is absent", () => {
     expect(findDirectChildLine(lines("wifi:\n  ssid: x\n"), "ota", PASSWORD_RE)).toBe(-1);
+  });
+});
+
+describe("isSectionRemoved", () => {
+  it("detects a top-level `key: !remove`", () => {
+    const doc = lines("wifi:\n  ssid: x\nweb_server: !remove\napi:\n");
+    expect(isSectionRemoved(doc, "web_server")).toBe(true);
+    expect(isSectionRemoved(doc, "web_server", 3)).toBe(true);
+    expect(isSectionRemoved(doc, "wifi", 1)).toBe(false);
+  });
+
+  it("allows a trailing comment after the tag", () => {
+    expect(isSectionRemoved(lines("api: !remove  # not needed\n"), "api", 1)).toBe(true);
+  });
+
+  it("ignores a nested `!remove` child", () => {
+    const doc = lines("wifi:\n  ssid: x\n  ap: !remove\n");
+    expect(isSectionRemoved(doc, "wifi", 1)).toBe(false);
+  });
+
+  it("detects a list item removed by `id: !remove`", () => {
+    const doc = lines("ota:\n  - platform: esphome\n    id: !remove my_ota\n  - id: x\n");
+    expect(isSectionRemoved(doc, "ota", 2)).toBe(true);
+    expect(isSectionRemoved(doc, "ota", 4)).toBe(false);
+    expect(isSectionRemoved(lines("ota:\n  - id: !remove my_ota\n"), "ota", 2)).toBe(
+      true
+    );
+  });
+
+  it("returns false for a missing section", () => {
+    expect(isSectionRemoved(lines("api:\n"), "web_server")).toBe(false);
   });
 });

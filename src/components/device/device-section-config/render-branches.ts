@@ -4,6 +4,8 @@
  */
 import { html, nothing, type TemplateResult } from "lit";
 import { resolveSectionEntries } from "../../../util/section-entry-overrides.js";
+import { splitYamlDocLines } from "../../../util/yaml-doc-lines.js";
+import { isSectionRemoved } from "../../../util/yaml-section-reader.js";
 // The value import (isSecuritySection) already executes the module,
 // registering the notice element — no separate side-effect import needed.
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
@@ -43,20 +45,20 @@ export function renderYamlOnlyBranch(
 ) {
   return html`${renderNotice(html`
     <p>${host._localize("device.yaml_only_section")}</p>
-    ${
-      host.yamlPaneVisible
-        ? nothing
-        : html`<button
-            type="button"
-            class="yaml-only-notice-cta"
-            @click=${host._onShowYamlEditor}
-          >
-            ${host._localize("device.show_yaml_editor")}
-          </button>`
-    }
+    ${renderShowYamlCta(host)}
   `)}
   ${renderApiActionsTable(host)} ${renderTriggersTable(host)}
   ${renderActionFieldsTable(host)} ${renderActionsRow(host, canDelete)}`;
+}
+
+/** A section dropped with `!remove`: nothing to edit until the tag is gone,
+ *  so no form or automation lists (their writes would nest under the tag). */
+function renderRemovedBranch(host: ESPHomeDeviceSectionConfig, canDelete: boolean) {
+  return html`${renderNotice(html`
+    <p>${host._localize("device.removed_section")}</p>
+    ${renderShowYamlCta(host)}
+  `)}
+  ${renderActionsRow(host, canDelete)}`;
 }
 
 export function renderStructuredFormBranch(
@@ -64,6 +66,12 @@ export function renderStructuredFormBranch(
   config: SectionConfigResponse,
   canDelete: boolean
 ) {
+  // A `!remove`d section isn't in the firmware: no form to edit (a write
+  // would nest keys under the tag) and no security nudge to show.
+  const baseKey = host._renderedKey.split(".")[0];
+  if (isSectionRemoved(splitYamlDocLines(host.yaml), baseKey, host._resolvedFromLine)) {
+    return renderRemovedBranch(host, canDelete);
+  }
   // Repeats render()'s call. Cheap: the resolver returns a constant or the
   // catalog's own array for map/default sections; only list sections
   // allocate fresh, as every render already did.
@@ -116,6 +124,18 @@ function renderNotice(body: TemplateResult) {
     <wa-icon library="mdi" name="information-outline"></wa-icon>
     <div class="yaml-only-notice-body">${body}</div>
   </div>`;
+}
+
+/** "Show YAML editor" CTA, only while the YAML pane is hidden. */
+function renderShowYamlCta(host: ESPHomeDeviceSectionConfig) {
+  if (host.yamlPaneVisible) return nothing;
+  return html`<button
+    type="button"
+    class="yaml-only-notice-cta"
+    @click=${host._onShowYamlEditor}
+  >
+    ${host._localize("device.show_yaml_editor")}
+  </button>`;
 }
 
 function renderActionsRow(host: ESPHomeDeviceSectionConfig, canDelete: boolean) {

@@ -1194,6 +1194,7 @@
     "platform_domain_section": "Each entry under \"{key}\" is a platform component (like \"- platform: gpio\"). Add one to configure it.",
     "load_config_error": "Failed to load section config",
     "yaml_only_section": "This section doesn't have a structured editor — edit it directly in the YAML pane on the right.",
+    "removed_section": "This section is removed with \"!remove\", so it isn't part of the firmware. To restore it, edit the YAML directly in the YAML pane on the right.",
     "security_generate": "Generate",
     "security_applied": "Install the device to apply the new credentials.",
     "api_encryption_notice": "API is enabled without encryption. Anyone on your network can read or control this device.",
